@@ -434,13 +434,14 @@ rm(counts)
 select.peaks.with.readThreshold = TRUE
 select.background.for.peaks = TRUE
 
+
 if(select.peaks.with.readThreshold){
   #ss = rowMax(counts(dds)[, grep('Embryo_', dds$conds)])
   ss = rowMax(counts(dds))
   
   hist(log10(ss), breaks = 200, main = 'log2(sum of read within peaks) ')
   cutoff.peak = 50
-  cutoff.bg = 20
+  cutoff.bg = 10
   cat(length(which(ss >= cutoff.peak)), 'peaks selected with minimum read of the highest peak -- ', cutoff.peak,  '\n')
   cat(length(which(ss < cutoff.bg)), 'peaks selected with minimum read of the highest peak -- ', cutoff.bg,  '\n')
   abline(v= log10(cutoff.peak), col = 'red', lwd = 2.0)
@@ -464,7 +465,6 @@ plot(sizeFactors(dds), colSums(counts(dds))/median(colSums(counts(dds))), log = 
 
 plot(sizeFactors(dds), design$unique.rmdup, log = 'xy')
 text(sizeFactors(dds), design$unique.rmdup, labels = design$samples, cex = 0.7)
-
 
 save.scalingFactors.for.deeptools = FALSE
 if(save.scalingFactors.for.deeptools){
@@ -524,28 +524,45 @@ if(Test.atac.normalization.batch.correction){
   fpm.bc = ComBat(dat=fpm, batch=bc, mod=mod, par.prior=TRUE, ref.batch = '2021')    
   fpm = fpm.bc
   
-  library(preprocessCore)
-  fpm.qn = normalize.quantiles(fpm)
-  colnames(fpm.qn) = colnames(fpm)
-  rownames(fpm.qn) = rownames(fpm)
-  fpm = fpm.qn
-  #rm(fpm.qn)
-  
   make.pca.plots(fpm.bc, ntop = 5000, conds.plot = 'all')
   make.pca.plots(fpm.bc, ntop = 5000, conds.plot = 'Dev.Mature')
   
-  make.pca.plots(fpm.qn, ntop = 5000, conds.plot = 'all')
+  # normalize the peak width to have fpkm
+  library(preprocessCore)
+  
+  peakNames = rownames(fpm)
+  peakNames = gsub('bg_', '', peakNames)
+  peakNames = gsub('_', '-', peakNames)
+  
+  pp = data.frame(t(sapply(peakNames, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  
+  pp$strand = '*'
+  pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
+  ll = width(pp)
+  
+  fpkm = fpm.bc
+  for(n in 1:ncol(fpkm))
+  {
+    fpkm[,n] = fpkm[,n]/ll*10^3
+  }
+  
+  fpkm.qn = normalize.quantiles(fpkm)
+  colnames(fpkm.qn) = colnames(fpkm)
+  rownames(fpkm.qn) = rownames(fpkm)
+  fpkm = fpkm.qn
+  #rm(fpm.qn)
+  make.pca.plots(fpkm.qn, ntop = 5000, conds.plot = 'all')
   
   rm(fpm.bc)
-  rm(fpm.qn)
+  rm(fpkm.qn)
   
-  saveRDS(fpm, file = paste0(RdataDir, '/fpm_TMM_combat_qunatile.rds'))
+  save(fpm, fpkm, file = paste0(RdataDir, '/fpm_TMM_combat_fpkm_quantileNorm.rds'))
   
 }
 
 #dds <- estimateDispersions(dds)
 #plotDispEsts(dds, ymin = 10^-4)
-
 
 ##########################################
 # grouping atac-seq peak profiles
@@ -556,15 +573,16 @@ if(Test.atac.normalization.batch.correction){
 Grouping.atac.peaks = FALSE
 if(Grouping.atac.peaks){
   
-  fpm = readRDS(file = paste0(RdataDir, '/fpm_TMM_combat_qunatile.rds'))
+  #fpm = readRDS(file = paste0(RdataDir, '/fpm_TMM_combat_qunatile.rds'))
+  load(file = paste0(RdataDir, '/fpm_TMM_combat_fpkm_quantileNorm.rds'))
   
   # make Granges for peaks 
-  jj = grep('bg_', rownames(fpm), invert = TRUE)
-  fpm.bg = fpm[grep('bg_', rownames(fpm), invert = FALSE), ]
-  fpm = fpm[jj, ]
-  rownames(fpm) = gsub('_', '-', rownames(fpm))
+  jj = grep('bg_', rownames(fpkm), invert = TRUE)
+  fpkm.bg = fpkm[grep('bg_', rownames(fpkm), invert = FALSE), ]
+  fpkm = fpkm[jj, ]
+  rownames(fpkm) = gsub('_', '-', rownames(fpkm))
     
-  pp = data.frame(t(sapply(rownames(fpm), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  pp = data.frame(t(sapply(rownames(fpkm), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
   
   pp$strand = '*'
   pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
@@ -576,7 +594,6 @@ if(Grouping.atac.peaks){
   ii.Hox = which(overlapsAny(pp, Hoxs))
   ii.test = unique(c(ii.test, ii.Hox))
   
-  source('Functions.R')
   
   #conds = as.character(unique(design$conds))
   conds = c("Embryo_Stage44_proximal", "Embryo_Stage44_distal",
@@ -590,7 +607,9 @@ if(Grouping.atac.peaks){
     cc = c(cc, rep(conds[n], length(kk)))
   }
   
-  res = apply(fpm[ii.test, sample.sels], 1, spatial.peaks.test, c = cc)
+  source('Functions.R')
+  
+  res = apply(fpkm[ii.test, sample.sels], 1, spatial.peaks.test, c = cc)
   
   names = names(res)
   #names = gsub('_', '-', names)
@@ -602,7 +621,7 @@ if(Grouping.atac.peaks){
   pdf(pdfname, width = 10, height = 6)
   par(cex = 1.0, las = 1, mgp = c(3,1,0), mar = c(6,3,2,0.2), tcl = -0.3)
   
-  plot.peak.profiles(peak.name = names, fpm = fpm, mains = mains)
+  plot.peak.profiles(peak.name = names, fpkm = fpkm, mains = mains)
   
   dev.off()
   

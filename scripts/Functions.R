@@ -1631,7 +1631,7 @@ plot.peak.profiles = function(peak.name, fpm = NULL, mains = NULL)
 
 spatial.peaks.test = function(x, c = c("Mature_UA", "Mature_UA", "Mature_LA", "Mature_LA"), cutoff.bg = 2.0, testPlot = FALSE)
 {
-  # x = fpm[ii.test[1], sample.sels]; c = cc; cutoff.bg = 2.0
+  # x = fpkm[ii.test[1], sample.sels]; c = cc; cutoff.bg = 
   
   if(length(x) != length(c)){
     stop('nb of data is the same as nb of conditions')
