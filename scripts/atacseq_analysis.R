@@ -546,6 +546,7 @@ if(Test.atac.normalization.batch.correction){
 #dds <- estimateDispersions(dds)
 #plotDispEsts(dds, ymin = 10^-4)
 
+
 ##########################################
 # grouping atac-seq peak profiles
 # 1) first identify static peaks (probably most of them) with model selection 
