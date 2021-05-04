@@ -624,8 +624,8 @@ if(Grouping.atac.peaks){
   #ii.test = unique(c(ii.test, ii.Hox))
   
   #conds = as.character(unique(design$conds))
-  conds = c("Embryo_Stage44_proximal", "Embryo_Stage44_distal",
-            "Mature_UA", "Mature_LA", "Mature_Hand",
+  conds = c("Mature_UA", "Mature_LA", "Mature_Hand", 
+            "Embryo_Stage44_proximal", "Embryo_Stage44_distal",
             "BL_UA_13days_proximal", "BL_UA_13days_distal")
   sample.sels = c()
   cc = c()
@@ -652,23 +652,45 @@ if(Grouping.atac.peaks){
   
   #write.table(xx, file = paste0(resDir, '/HoxClusters_spatialDynamic_peaks.txt'), 
   #            col.names = TRUE, row.names = TRUE, sep = '\t', quote = FALSE)
-  #names = names(res)
-  #names = gsub('_', '-', names)
   
+  # visualize the position-dependent peaks
   source('Functions.R')
-  mains = signif(res, d = 2)
+  
+  keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
+  keep = as.matrix(keep)
+  
+  # for(c in c('Mature', 'Embryo', 'BL_UA'))
+  # {
+  #   jj = grep(c, cc)
+  #   keep[,jj] = t(apply(keep[, jj], 1, scale, scale = FALSE))
+  # }
+  
+  df <- data.frame(cc)
+  rownames(df) = colnames(keep)
+  
+  ii.gaps = c(7, 11)
+  
+  pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
+           cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps)
+  
+  
+  
   
   pdfname = paste0(resDir, "/peak_profiles_test.static.peaks.pdf")
   pdf(pdfname, width = 10, height = 6)
   par(cex = 1.0, las = 1, mgp = c(3,1,0), mar = c(6,3,2,0.2), tcl = -0.3)
   
-  plot.peak.profiles(peak.name = names, fpm = fpm, mains = mains)
+  #mains = signif(res, d = 2)
+  #plot.peak.profiles(peak.name = names, fpm = fpm, mains = mains)
   
   dev.off()
   
   conds = c("Embryo_Stage40", "Embryo_Stage44_proximal", "Embryo_Stage44_distal",
             "Mature_UA", "Mature_LA", "Mature_Hand",
             "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal", "BL_UA_13days_distal")
+  
+  
+  
   
 }
 

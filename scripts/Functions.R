@@ -1630,7 +1630,7 @@ plot.peak.profiles = function(peak.name, fpm = NULL, mains = NULL)
 }
 
 spatial.peaks.test = function(x, c = c("Mature_UA", "Mature_UA", "Mature_LA", "Mature_LA"), 
-                              test.Dev.Reg = FALSE, testPlot = FALSE)
+                              test.Dev.Reg = TRUE, testPlot = FALSE)
 {
   # x = fpkm[ii.test[1], sample.sels]; c = cc; bg.dist = fpkm.bg;
   library(qvalue)
@@ -1669,7 +1669,7 @@ spatial.peaks.test = function(x, c = c("Mature_UA", "Mature_UA", "Mature_LA", "M
       fit1 = lm (y1 ~ s1)
       pval1 = summary(fit1)$coefficients[2, 4]
       
-      nb1.bg = sum(c(mean(x[ii1]), mean(x[ii2])) < cutoff.bg) 
+      #nb1.bg = sum(c(mean(x[ii1]), mean(x[ii2])) < cutoff.bg) 
       
       ii1 = which(cc == 'BL_UA_13days_proximal')
       ii2 = which(cc == 'BL_UA_13days_distal')
@@ -1678,6 +1678,9 @@ spatial.peaks.test = function(x, c = c("Mature_UA", "Mature_UA", "Mature_LA", "M
       fit2 = lm (y2 ~ s2)
       pval2 = summary(fit2)$coefficients[2, 4]
       #nb2.bg = sum(c(mean(x[ii1]), mean(x[ii2])) < cutoff.bg)
+      
+      res2 = c(min())
+      
     }
     
     if(testPlot){
