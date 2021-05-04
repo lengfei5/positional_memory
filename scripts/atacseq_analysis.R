@@ -35,14 +35,13 @@ require("pheatmap")
 ##########################################
 # some annotations for all analysis 
 ##########################################
+Import.HoxCluster.annotation = TRUE
 promoters = readRDS(file = paste0(RdataDir, 
                                   '/axolotl_promoters_Granges_AmexT_v47_putative.full.length_N.terminal_upstream2kb.downstream2kb.rds'))
 #promoters =  reduce(promoters, drop.empty.ranges = TRUE, ignore.strand = TRUE)
 #promoters.dev = readRDS(file= paste0(RdataDir, 
 #        '/axolotl_promoters_Granges_AmexT_v47_putative.full.length_N.terminal_upstream2kb.downstream2kb_rmHouseKeepingGenes.rds'))
 
-
-Import.HoxCluster.annotation = FALSE
 if(Import.HoxCluster.annotation){
   HoxA = data.frame(chr = 'chr2p', start = 873085043, end = 884416919, strand = '*', stringsAsFactors = FALSE)
   HoxA = makeGRangesFromDataFrame(HoxA, seqnames.field = 'chr', start.field = 'start', end.field = 'end', strand.field = 'strand')
@@ -429,18 +428,27 @@ sels = grep('Mature|Embryo|BL_UA', design$conds)
 
 dds <- DESeqDataSetFromMatrix(as.matrix(counts[, sels]), DataFrame(design[sels, ]), design = ~ conds)
 
-rm(counts)
+#rm(counts)
+
+# check the peak length
+peakNames = rownames(dds)
+pp = data.frame(t(sapply(peakNames, function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
+
+pp$strand = '*'
+pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                              start.field="X2", end.field="X3", strand.field="strand")
+ll = width(pp)
+
 
 select.peaks.with.readThreshold = TRUE
 select.background.for.peaks = TRUE
 
-
 if(select.peaks.with.readThreshold){
   #ss = rowMax(counts(dds)[, grep('Embryo_', dds$conds)])
-  ss = rowMax(counts(dds))
+  ss = rowMax(counts(dds))/ll*500
   
   hist(log10(ss), breaks = 200, main = 'log2(sum of read within peaks) ')
-  cutoff.peak = 50
+  cutoff.peak = 40
   cutoff.bg = 10
   cat(length(which(ss >= cutoff.peak)), 'peaks selected with minimum read of the highest peak -- ', cutoff.peak,  '\n')
   cat(length(which(ss < cutoff.bg)), 'peaks selected with minimum read of the highest peak -- ', cutoff.bg,  '\n')
@@ -453,9 +461,11 @@ if(select.peaks.with.readThreshold){
     ii.bg = sample(ii.bg, size = 1000, replace = FALSE)
     rownames(dds)[ii.bg] = paste0('bg_', rownames(dds)[ii.bg])
     dds = dds[c(ii, ii.bg), ]
+    ll.sels = ll[c(ii, ii.bg)]
     
   }else{
     dds <- dds[ss >= cutoff.peak, ]
+    ll.sels = ll[ss >= cutoff.peak]
   }
   
 }
@@ -524,8 +534,8 @@ if(Test.atac.normalization.batch.correction){
   fpm.bc = ComBat(dat=fpm, batch=bc, mod=mod, par.prior=TRUE, ref.batch = '2021')    
   fpm = fpm.bc
   
-  make.pca.plots(fpm.bc, ntop = 5000, conds.plot = 'all')
-  make.pca.plots(fpm.bc, ntop = 5000, conds.plot = 'Dev.Mature')
+  make.pca.plots(fpm.bc, ntop = 3000, conds.plot = 'all')
+  make.pca.plots(fpm.bc, ntop = 3000, conds.plot = 'Dev.Mature')
   
   # normalize the peak width to have fpkm
   library(preprocessCore)
@@ -588,6 +598,7 @@ if(Grouping.atac.peaks){
   pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
                                 start.field="X2", end.field="X3", strand.field="strand")
   
+  
   # examples to test 
   test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
   ii.test = which(overlapsAny(pp, promoters[which(!is.na(match(promoters$geneSymbol, test.examples)))]))
@@ -608,10 +619,13 @@ if(Grouping.atac.peaks){
   }
   
   source('Functions.R')
+  res = t(apply(fpkm[ii.test, sample.sels], 1, spatial.peaks.test, c = cc))
+  res = data.frame(res, stringsAsFactors = FALSE)
   
-  res = apply(fpkm[ii.test, sample.sels], 1, spatial.peaks.test, c = cc)
+  res = res[which(res$prob.M0 < 0.3), ]
+  res = res[order(-res$log2FC), ]
   
-  names = names(res)
+  #names = names(res)
   #names = gsub('_', '-', names)
   
   source('Functions.R')
@@ -881,33 +895,6 @@ if(Test.position.related.peaks.in.mature){
            color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(100),
            cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps)
   
-  Remove.Batch = FALSE
-  if(Remove.Batch){
-    #require("sva")
-    #batch = df$batch
-    #mod = model.matrix(~ as.factor(conds), data = df);
-    #logcpm.bc = ComBat(dat=keep, batch=batch, mod=mod, par.prior=TRUE, ref.batch = NULL)
-    
-    require('limma')
-    dff = df
-    dff$batch[grep('749', rownames(dff))] = '2019'
-    batch = dff$batch
-    dff$conds = as.factor(dff$conds)
-    
-    design.tokeep<-model.matrix(~ 0 + conds,  data = dff)
-    cpm.bc = removeBatchEffect(keep, batch = dff$batch, design = design.tokeep)
-    
-    #keep = log2(cpm.bc + 2^-4)
-    keep.bc = cpm.bc
-    
-    pheatmap(keep.bc, cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
-             color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(100),
-             cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps)
-    
-    write.table(keep.bc, file = paste0(resDir, '/position_related_peaks_matureSamples.txt'),
-                sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
-    
-  }
   
 }
 

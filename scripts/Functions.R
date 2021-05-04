@@ -1629,48 +1629,68 @@ plot.peak.profiles = function(peak.name, fpm = NULL, mains = NULL)
   
 }
 
-spatial.peaks.test = function(x, c = c("Mature_UA", "Mature_UA", "Mature_LA", "Mature_LA"), cutoff.bg = 2.0, testPlot = FALSE)
+spatial.peaks.test = function(x, c = c("Mature_UA", "Mature_UA", "Mature_LA", "Mature_LA"), 
+                              test.Dev.Reg = FALSE, testPlot = FALSE)
 {
-  # x = fpkm[ii.test[1], sample.sels]; c = cc; cutoff.bg = 
-  
+  # x = fpkm[ii.test[1], sample.sels]; c = cc; bg.dist = fpkm.bg;
+  library(qvalue)
   if(length(x) != length(c)){
     stop('nb of data is the same as nb of conditions')
   }else{
-    # test distal vs promixal in embryo.stage 44
-    ii1 = which(cc == 'Embryo_Stage44_proximal')
-    ii2 = which(cc == 'Embryo_Stage44_distal')
-    y1 = as.numeric(x[c(ii1, ii2)])
-    s1 = c(rep(1, length(ii1)), rep(2, length(ii2)))  
-    fit1 = lm (y1 ~ s1)
-    pval1 = summary(fit1)$coefficients[2, 4]
-    nb1.bg = sum(c(mean(x[ii1]), mean(x[ii2])) < cutoff.bg) 
-    
-    ii1 = which(cc == 'BL_UA_13days_proximal')
-    ii2 = which(cc == 'BL_UA_13days_distal')
-    y2 = as.numeric(x[c(ii1, ii2)])
-    s2 = c(rep(1, length(ii1)), rep(2, length(ii2)))  
-    fit2 = lm (y2 ~ s2)
-    pval2 = summary(fit2)$coefficients[2, 4]
-    nb2.bg = sum(c(mean(x[ii1]), mean(x[ii2])) < cutoff.bg)
-    
+    # the main test of mature samples 
     ii1 = which(cc == 'Mature_UA')
     ii2 = which(cc == 'Mature_LA')
     ii3 = which(cc == 'Mature_Hand')
-    y3 = as.numeric(x[c(ii1, ii2, ii3)])
-    s3 = c(rep(1, length(ii1)), rep(2, length(ii2)), rep(3, length(ii3)))  
-    fit3 = lm (y3 ~ poly(s3, degree = 2, raw = TRUE))
-    #pval3 = summary(fit3)$coefficients[2, 4]
+    y0 = as.numeric(x[c(ii1, ii2, ii3)])
+    s0 = c(rep(1, length(ii1)), rep(2, length(ii2)), rep(3, length(ii3)))  
+    fit0 = lm (y0 ~ poly(s0, degree = 2, raw = TRUE))
+    fit01 = lm(y0 ~ s0)
+    fit02 = lm(y0 ~ 1)
     
-    fit4 = lm(y3 ~ s3)
-    fit5 = lm(y3 ~ 1)
-    
-    bics = BIC(fit3, fit4, fit5)
+    bics = BIC(fit0, fit01, fit02)
     scores = bics$BIC
     scores.relavtive = scores-min(scores)
     prob.model = exp(-0.5*scores.relavtive)
     prob.model = prob.model/sum(prob.model)
     
+    # test UA, LA and Hand fitting values are above backgrounds
+    pred = predict(fit0)[match(unique(s0), s0)]
+    #pvals = empPvals(pred, bg.dist, pool = TRUE)
     
+    res = c(prob.model[3],  max(pred), min(pred), (max(pred) - min(pred)))
+    names(res) = c('prob.M0', 'max', 'min', 'log2FC')
+    
+    if(test.Dev.Reg){
+      # test distal vs promixal in embryo.stage 44
+      ii1 = which(cc == 'Embryo_Stage44_proximal')
+      ii2 = which(cc == 'Embryo_Stage44_distal')
+      y1 = as.numeric(x[c(ii1, ii2)])
+      s1 = c(rep(1, length(ii1)), rep(3, length(ii2)))  
+      fit1 = lm (y1 ~ s1)
+      pval1 = summary(fit1)$coefficients[2, 4]
+      
+      nb1.bg = sum(c(mean(x[ii1]), mean(x[ii2])) < cutoff.bg) 
+      
+      ii1 = which(cc == 'BL_UA_13days_proximal')
+      ii2 = which(cc == 'BL_UA_13days_distal')
+      y2 = as.numeric(x[c(ii1, ii2)])
+      s2 = c(rep(1, length(ii1)), rep(3, length(ii2)))  
+      fit2 = lm (y2 ~ s2)
+      pval2 = summary(fit2)$coefficients[2, 4]
+      #nb2.bg = sum(c(mean(x[ii1]), mean(x[ii2])) < cutoff.bg)
+    }
+    
+    if(testPlot){
+      plot(s0, y0, cex = 1, ylim = range(x))
+      points(s0, predict(fit0), type = 'l', col = 'blue')
+      points(s0, predict(fit01), type = 'l', col = 'orange', lty = 1)
+      abline(h = mean(y0), lty = 1, col = 'red', lwd = 2.0)
+      points(s1, y1, cex = 1, pch = 2)
+      points(s2, y2, cex = 1, pch =3)
+      
+    }
+    
+    return(res)
     
   }
   
