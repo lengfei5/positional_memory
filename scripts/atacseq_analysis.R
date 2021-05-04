@@ -534,40 +534,46 @@ if(Test.atac.normalization.batch.correction){
   fpm.bc = ComBat(dat=fpm, batch=bc, mod=mod, par.prior=TRUE, ref.batch = '2021')    
   fpm = fpm.bc
   
-  make.pca.plots(fpm.bc, ntop = 3000, conds.plot = 'all')
+  make.pca.plots(fpm.bc, ntop = 5000, conds.plot = 'all')
   make.pca.plots(fpm.bc, ntop = 3000, conds.plot = 'Dev.Mature')
   
-  # normalize the peak width to have fpkm
-  library(preprocessCore)
-  
-  peakNames = rownames(fpm)
-  peakNames = gsub('bg_', '', peakNames)
-  peakNames = gsub('_', '-', peakNames)
-  
-  pp = data.frame(t(sapply(peakNames, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
-  
-  pp$strand = '*'
-  pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
-                                start.field="X2", end.field="X3", strand.field="strand")
-  ll = width(pp)
-  
-  fpkm = fpm.bc
-  for(n in 1:ncol(fpkm))
-  {
-    fpkm[,n] = fpkm[,n]/ll*10^3
-  }
-  
-  fpkm.qn = normalize.quantiles(fpkm)
-  colnames(fpkm.qn) = colnames(fpkm)
-  rownames(fpkm.qn) = rownames(fpkm)
-  fpkm = fpkm.qn
-  #rm(fpm.qn)
-  make.pca.plots(fpkm.qn, ntop = 5000, conds.plot = 'all')
-  
   rm(fpm.bc)
-  rm(fpkm.qn)
+  saveRDS(fpm, file = paste0(RdataDir, '/fpm_TMM_combat.rds'))
   
-  save(fpm, fpkm, file = paste0(RdataDir, '/fpm_TMM_combat_fpkm_quantileNorm.rds'))
+  # normalize the peak width to have fpkm
+  FPKM.normalization = FALSE
+  if(FPKM.normalization){
+    library(preprocessCore)
+    
+    peakNames = rownames(fpm)
+    peakNames = gsub('bg_', '', peakNames)
+    peakNames = gsub('_', '-', peakNames)
+    
+    pp = data.frame(t(sapply(peakNames, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+    
+    pp$strand = '*'
+    pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                  start.field="X2", end.field="X3", strand.field="strand")
+    ll = width(pp)
+    
+    fpkm = fpm.bc
+    for(n in 1:ncol(fpkm))
+    {
+      fpkm[,n] = fpkm[,n]/ll*10^3
+    }
+    
+    fpkm.qn = normalize.quantiles(fpkm)
+    colnames(fpkm.qn) = colnames(fpkm)
+    rownames(fpkm.qn) = rownames(fpkm)
+    fpkm = fpkm.qn
+    #rm(fpm.qn)
+    make.pca.plots(fpkm.qn, ntop = 5000, conds.plot = 'all')
+    
+    rm(fpkm.qn)
+    
+    save(fpm, fpkm, file = paste0(RdataDir, '/fpm_TMM_combat_fpkm_quantileNorm.Rdata'))
+  }
+ 
   
 }
 
@@ -583,8 +589,8 @@ if(Test.atac.normalization.batch.correction){
 Grouping.atac.peaks = FALSE
 if(Grouping.atac.peaks){
   
-  #fpm = readRDS(file = paste0(RdataDir, '/fpm_TMM_combat_qunatile.rds'))
-  load(file = paste0(RdataDir, '/fpm_TMM_combat_fpkm_quantileNorm.rds'))
+  #load(file = paste0(RdataDir, '/fpm_TMM_combat_fpkm_quantileNorm.rds'))
+  fpm = readRDS(file = paste0(RdataDir, '/fpm_TMM_combat.rds'))
   
   # make Granges and annotate peaks
   creat.Granges.and.peakAnnotation = FALSE
@@ -600,36 +606,22 @@ if(Grouping.atac.peaks){
     pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
                                   start.field="X2", end.field="X3", strand.field="strand")
     
-  
-    pp = data.frame(t(sapply(rownames(dds), function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
-    
-    rownames(pp) = gsub('_', '-', rownames(pp))
-    
-    pp$strand = '*'
-    pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
-                                  start.field="X2", end.field="X3", strand.field="strand")
-    #saveRDS(pp, file = paste0(RdataDir, 'all_mergedPeaks_coordinates_Granges.rds'))
-    
     require(ChIPpeakAnno)
     require(ChIPseeker)
     
     amex = GenomicFeatures::makeTxDbFromGFF(file = paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf'))
     #amex = makeTxDbFromGFF(file = paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf'))
     #amex = readRDS(file = paste0(annotDir, 'TxDb_ax6_UCSC_2021_01_26_genes.putative.full.length.rds')) # reimport object does not work
-    
     pp.annots = as.data.frame(annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript'))
     
   }
   
-  
-  
-  
   # examples to test 
-  #test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
-  test.examples = c('Hoxa13')
+  test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
+  #test.examples = c('Hoxa13')
   ii.test = which(overlapsAny(pp, promoters[which(!is.na(match(promoters$geneSymbol, test.examples)))]))
-  ii.Hox = which(overlapsAny(pp, Hoxs))
-  ii.test = unique(c(ii.test, ii.Hox))
+  #ii.Hox = which(overlapsAny(pp, Hoxs))
+  #ii.test = unique(c(ii.test, ii.Hox))
   
   #conds = as.character(unique(design$conds))
   conds = c("Embryo_Stage44_proximal", "Embryo_Stage44_distal",
@@ -643,15 +635,23 @@ if(Grouping.atac.peaks){
     cc = c(cc, rep(conds[n], length(kk)))
   }
   
+ 
+  library(tictoc)
+  ii.test = c(1:nrow(fpm)) # takes about 2 mins for 40k peaks
   source('Functions.R')
+  tic() 
   res = t(apply(fpm[ii.test, sample.sels], 1, spatial.peaks.test, c = cc))
-  res = data.frame(res, stringsAsFactors = FALSE)
+  res = data.frame(res, pp.annots[ii.test, ], stringsAsFactors = FALSE)
+  toc()
   
   jj = which(res$prob.M0 < 0.3 & res$log2FC >1) # select the spatially dynamic peaks
   xx = res[jj, ]
   xx = xx[order(-xx$log2FC), ]
+  
   xx = xx[which(xx$min < 3 & xx$max >3), ]
   
+  #write.table(xx, file = paste0(resDir, '/HoxClusters_spatialDynamic_peaks.txt'), 
+  #            col.names = TRUE, row.names = TRUE, sep = '\t', quote = FALSE)
   #names = names(res)
   #names = gsub('_', '-', names)
   
