@@ -586,26 +586,50 @@ if(Grouping.atac.peaks){
   #fpm = readRDS(file = paste0(RdataDir, '/fpm_TMM_combat_qunatile.rds'))
   load(file = paste0(RdataDir, '/fpm_TMM_combat_fpkm_quantileNorm.rds'))
   
-  # make Granges for peaks 
-  jj = grep('bg_', rownames(fpkm), invert = TRUE)
-  fpkm.bg = fpkm[grep('bg_', rownames(fpkm), invert = FALSE), ]
-  fpkm = fpkm[jj, ]
-  rownames(fpkm) = gsub('_', '-', rownames(fpkm))
+  # make Granges and annotate peaks
+  creat.Granges.and.peakAnnotation = FALSE
+  if(creat.Granges.peaks){
+    jj = grep('bg_', rownames(fpm), invert = TRUE)
+    fpm.bg = fpm[grep('bg_', rownames(fpm), invert = FALSE), ]
+    fpm = fpm[jj, ]
+    rownames(fpm) = gsub('_', '-', rownames(fpm))
     
-  pp = data.frame(t(sapply(rownames(fpkm), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+    pp = data.frame(t(sapply(rownames(fpm), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+    
+    pp$strand = '*'
+    pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                  start.field="X2", end.field="X3", strand.field="strand")
+    
   
-  pp$strand = '*'
-  pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
-                                start.field="X2", end.field="X3", strand.field="strand")
+    pp = data.frame(t(sapply(rownames(dds), function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
+    
+    rownames(pp) = gsub('_', '-', rownames(pp))
+    
+    pp$strand = '*'
+    pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                  start.field="X2", end.field="X3", strand.field="strand")
+    #saveRDS(pp, file = paste0(RdataDir, 'all_mergedPeaks_coordinates_Granges.rds'))
+    
+    require(ChIPpeakAnno)
+    require(ChIPseeker)
+    
+    amex = GenomicFeatures::makeTxDbFromGFF(file = paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf'))
+    #amex = makeTxDbFromGFF(file = paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf'))
+    #amex = readRDS(file = paste0(annotDir, 'TxDb_ax6_UCSC_2021_01_26_genes.putative.full.length.rds')) # reimport object does not work
+    
+    pp.annots = as.data.frame(annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript'))
+    
+  }
+  
   
   
   
   # examples to test 
-  test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
+  #test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
+  test.examples = c('Hoxa13')
   ii.test = which(overlapsAny(pp, promoters[which(!is.na(match(promoters$geneSymbol, test.examples)))]))
   ii.Hox = which(overlapsAny(pp, Hoxs))
   ii.test = unique(c(ii.test, ii.Hox))
-  
   
   #conds = as.character(unique(design$conds))
   conds = c("Embryo_Stage44_proximal", "Embryo_Stage44_distal",
@@ -614,17 +638,19 @@ if(Grouping.atac.peaks){
   sample.sels = c()
   cc = c()
   for(n in 1:length(conds)) {
-    kk = which(design$conds == conds[n])
+    kk = which(design$conds == conds[n] & design$SampleID != '136159')
     sample.sels = c(sample.sels, kk)
     cc = c(cc, rep(conds[n], length(kk)))
   }
   
   source('Functions.R')
-  res = t(apply(fpkm[ii.test, sample.sels], 1, spatial.peaks.test, c = cc))
+  res = t(apply(fpm[ii.test, sample.sels], 1, spatial.peaks.test, c = cc))
   res = data.frame(res, stringsAsFactors = FALSE)
   
-  res = res[which(res$prob.M0 < 0.3), ]
-  res = res[order(-res$log2FC), ]
+  jj = which(res$prob.M0 < 0.3 & res$log2FC >1) # select the spatially dynamic peaks
+  xx = res[jj, ]
+  xx = xx[order(-xx$log2FC), ]
+  xx = xx[which(xx$min < 3 & xx$max >3), ]
   
   #names = names(res)
   #names = gsub('_', '-', names)
@@ -636,38 +662,13 @@ if(Grouping.atac.peaks){
   pdf(pdfname, width = 10, height = 6)
   par(cex = 1.0, las = 1, mgp = c(3,1,0), mar = c(6,3,2,0.2), tcl = -0.3)
   
-  plot.peak.profiles(peak.name = names, fpkm = fpkm, mains = mains)
+  plot.peak.profiles(peak.name = names, fpm = fpm, mains = mains)
   
   dev.off()
   
   conds = c("Embryo_Stage40", "Embryo_Stage44_proximal", "Embryo_Stage44_distal",
             "Mature_UA", "Mature_LA", "Mature_Hand",
             "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal", "BL_UA_13days_distal")
-  
-}
-
-##########################################
-# make Granges for peaks and annotate peaks
-##########################################
-creat.Granges.and.peakAnnotation = FALSE
-if(creat.Granges.peaks){
-  pp = data.frame(t(sapply(rownames(dds), function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
-  
-  rownames(pp) = gsub('_', '-', rownames(pp))
-  
-  pp$strand = '*'
-  pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
-                                start.field="X2", end.field="X3", strand.field="strand")
-  #saveRDS(pp, file = paste0(RdataDir, 'all_mergedPeaks_coordinates_Granges.rds'))
-  
-  require(ChIPpeakAnno)
-  require(ChIPseeker)
-  
-  amex = GenomicFeatures::makeTxDbFromGFF(file = paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf'))
-  #amex = makeTxDbFromGFF(file = paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf'))
-  #amex = readRDS(file = paste0(annotDir, 'TxDb_ax6_UCSC_2021_01_26_genes.putative.full.length.rds')) # reimport object does not work
-  
-  pp.annots = as.data.frame(annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript'))
   
 }
 
