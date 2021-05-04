@@ -599,6 +599,7 @@ if(Grouping.atac.peaks){
                                 start.field="X2", end.field="X3", strand.field="strand")
   
   
+  
   # examples to test 
   test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
   ii.test = which(overlapsAny(pp, promoters[which(!is.na(match(promoters$geneSymbol, test.examples)))]))
