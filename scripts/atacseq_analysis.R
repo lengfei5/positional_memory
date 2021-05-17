@@ -579,13 +579,15 @@ if(Test.atac.normalization.batch.correction){
 
 #dds <- estimateDispersions(dds)
 #plotDispEsts(dds, ymin = 10^-4)
-
-##########################################
-# grouping atac-seq peak profiles
+########################################################
+########################################################
+# Section : grouping atac-seq peak profiles
 # 1) first identify static peaks (probably most of them) with model selection 
 # (linear regression with only intercept and nonlinear fitting with spline or GAM)
 # 2) grouping dynamic peaks using DP-GP
-##########################################
+# 
+########################################################
+########################################################
 Grouping.atac.peaks = FALSE
 if(Grouping.atac.peaks){
   
@@ -616,6 +618,9 @@ if(Grouping.atac.peaks){
     
   }
   
+  ##########################################
+  # position-dependent test
+  ##########################################
   # examples to test 
   test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
   #test.examples = c('Hoxa13')
@@ -644,11 +649,21 @@ if(Grouping.atac.peaks){
   res = data.frame(res, pp.annots[ii.test, ], stringsAsFactors = FALSE)
   toc()
   
-  jj = which(res$prob.M0 < 0.3 & res$log2FC >1) # select the spatially dynamic peaks
-  xx = res[jj, ]
-  xx = xx[order(-xx$log2FC), ]
+  saveRDS(res, file = paste0(RdataDir, '/res_position_dependant_test.rds'))
   
-  xx = xx[which(xx$min < 3 & xx$max >3), ]
+  jj = which(res$prob.M0.mature < 0.3 & res$log2FC.mature >1) # select the spatially dynamic peaks
+  jj1 = which(res$pval.embryo < 0.01 & res$log2FC.embryo >1)
+  jj2 = which(res$pval.BL < 0.01 & res$log2FC.BL >1)
+  
+  xx = res[c(jj), ]
+  xx = xx[order(-xx$log2FC.mature), ]
+  
+  length(which(xx$min.mature <3.0))
+  length(which(xx$min.mature <2.5))
+  length(which(xx$min.mature <2.))
+  
+  
+  #xx = xx[which(xx$min.m < 3 & xx$max >3), ]
   
   #write.table(xx, file = paste0(resDir, '/HoxClusters_spatialDynamic_peaks.txt'), 
   #            col.names = TRUE, row.names = TRUE, sep = '\t', quote = FALSE)
@@ -673,22 +688,21 @@ if(Grouping.atac.peaks){
   pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
            cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps)
   
-  
-  
-  
   pdfname = paste0(resDir, "/peak_profiles_test.static.peaks.pdf")
   pdf(pdfname, width = 10, height = 6)
   par(cex = 1.0, las = 1, mgp = c(3,1,0), mar = c(6,3,2,0.2), tcl = -0.3)
   
-  #mains = signif(res, d = 2)
-  #plot.peak.profiles(peak.name = names, fpm = fpm, mains = mains)
+  mains = signif(res, d = 2)
+  plot.peak.profiles(peak.name = names, fpm = fpm, mains = mains)
   
   dev.off()
   
+  ##########################################
+  # temporal-peaks test
+  ##########################################
   conds = c("Embryo_Stage40", "Embryo_Stage44_proximal", "Embryo_Stage44_distal",
             "Mature_UA", "Mature_LA", "Mature_Hand",
             "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal", "BL_UA_13days_distal")
-  
   
   
   

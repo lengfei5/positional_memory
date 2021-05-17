@@ -1632,7 +1632,7 @@ plot.peak.profiles = function(peak.name, fpm = NULL, mains = NULL)
 spatial.peaks.test = function(x, c = c("Mature_UA", "Mature_UA", "Mature_LA", "Mature_LA"), 
                               test.Dev.Reg = TRUE, testPlot = FALSE)
 {
-  # x = fpkm[ii.test[1], sample.sels]; c = cc; bg.dist = fpkm.bg;
+  # x = fpm[ii.test[1], sample.sels]; c = cc; 
   library(qvalue)
   if(length(x) != length(c)){
     stop('nb of data is the same as nb of conditions')
@@ -1658,7 +1658,7 @@ spatial.peaks.test = function(x, c = c("Mature_UA", "Mature_UA", "Mature_LA", "M
     #pvals = empPvals(pred, bg.dist, pool = TRUE)
     
     res = c(prob.model[3],  max(pred), min(pred), (max(pred) - min(pred)))
-    names(res) = c('prob.M0', 'max', 'min', 'log2FC')
+    names(res) = paste0(c('prob.M0', 'max', 'min', 'log2FC'), '.mature')
     
     if(test.Dev.Reg){
       # test distal vs promixal in embryo.stage 44
@@ -1668,7 +1668,10 @@ spatial.peaks.test = function(x, c = c("Mature_UA", "Mature_UA", "Mature_LA", "M
       s1 = c(rep(1, length(ii1)), rep(3, length(ii2)))  
       fit1 = lm (y1 ~ s1)
       pval1 = summary(fit1)$coefficients[2, 4]
+      pred1 = fit1$fitted.values[match(unique(s1), s1)]
       
+      res1 = c(min(pred1), (max(pred1) - min(pred1)), pval1)
+      names(res1) = paste0(c('min', 'log2FC', 'pval'), '.embryo')
       #nb1.bg = sum(c(mean(x[ii1]), mean(x[ii2])) < cutoff.bg) 
       
       ii1 = which(cc == 'BL_UA_13days_proximal')
@@ -1677,10 +1680,13 @@ spatial.peaks.test = function(x, c = c("Mature_UA", "Mature_UA", "Mature_LA", "M
       s2 = c(rep(1, length(ii1)), rep(3, length(ii2)))  
       fit2 = lm (y2 ~ s2)
       pval2 = summary(fit2)$coefficients[2, 4]
-      #nb2.bg = sum(c(mean(x[ii1]), mean(x[ii2])) < cutoff.bg)
       
-      res2 = c(min())
+      pred2 = fit2$fitted.values[match(unique(s2), s2)]
       
+      res2 = c(min(pred2), (max(pred2) - min(pred2)), pval2)
+      names(res2) = paste0(c('min', 'log2FC', 'pval'), '.BL')
+      
+      res = c(res, res1, res2)
     }
     
     if(testPlot){
