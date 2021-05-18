@@ -1770,32 +1770,32 @@ temporal.peaks.test = function(x, c = c("Mature_UA", "Mature_UA", "BL_UA_5days",
 
 
 
-static.peaks.test = function(x, c = rep(c(1:10), each = 2), testPlot = FALSE)
+all.peaks.test = function(x, c = c("Embryo_Stage40", "Embryo_Stage40", "Mature_UA", "Mature_UA", "BL_UA_5days", "BL_UA_5days", 
+                                   'BL_UA_9days', 'BL_UA_9days'), testPlot = FALSE)
 {
-  # x = fpm[ii.test[1], sample.sels]; c = match(design$conds, conds);
-  
+  # x = fpm[ii.test[1], sample.sels]; c = cc; 
   if(length(x) != length(c)){
     stop('nb of data is the same as nb of conditions')
   }else{
-    #library("mgcv")
+    library(qvalue)
+    # reorder the values with the time points
+    ii.index = c()
+    tt = c()
+    cc.order = c('Embryo_Stage40', 'Embryo_Stage44_proximal', 'Embryo_Stage44_distal',
+                 'Mature_UA', 'Mature_LA', 'Mature_Hand', 'BL_UA_5days', 'BL_UA_9days', 'BL_UA_13days_proximal', 'BL_UA_13days_distal')
+    
+    for(i in 1:length(cc.order))
+    {
+      ii.index = c(ii.index, which(c == cc.order[i]))
+      tt = c(tt, rep(i, length(which(c == cc.order[i]))))
+    }
+    
+    y0 = as.numeric(x[ii.index])
+   
     library('gam')
-    o1 = order(c)
-    c = c[o1]
-    x = x[o1]
-    #names = names(x)
-    x = as.numeric(x)
     
-    # model null static 
-    fit0 = lm(x ~ 1)
-    #rss0 = sum((x - mean(x))^2)
-    # definition of BIC https://en.wikipedia.org/wiki/Bayesian_information_criterion
-    # be careful !!! nb of parameters k including intercept, slope and constant variance
-    #bic0 = length(x)*log(rss0/length(x)) + 2*log(length(x)) 
-      
-    # alternative model
-    
-    #dat = data.frame(x =x, c = c, stringsAsFactors = FALSE)
-    fit <- gam(x ~ s(c, df=3), family = gaussian)
+    fit <- gam(y0 ~ s(tt, df=4), family = gaussian)
+    fit0 = lm(y0 ~ 1)
     # summary(fit)
     #plot(fit)
     #rss1 = sum(fit$residuals^2)
@@ -1805,19 +1805,120 @@ static.peaks.test = function(x, c = rep(c(1:10), each = 2), testPlot = FALSE)
     scores = bics$BIC
     scores.relavtive = scores-min(scores)
     prob.model = exp(-0.5*scores.relavtive)
-    prob.model = prob.model[1]/sum(prob.model)
+    prob.model = prob.model/sum(prob.model)
     
     #prob.model = prob.model[1]
     #names(prob.model) = 'prob.m0'
     
+    # test UA, LA and Hand fitting values are above backgrounds
+    pred = predict(fit)[match(unique(tt), tt)]
+    #pvals = empPvals(pred, bg.dist, pool = TRUE)
+    
+    res = c(prob.model[1],  max(pred), min(pred), (max(pred) - min(pred)))
+    names(res) = c('prob.M0', 'max', 'min', 'log2FC')
+    
     if(testPlot){
-      plot(c, x, cex = 1)
-      points(c, fit$fitted.values, lwd = 1.0, type = 'l')
-      abline(h = mean(x))
+      plot(tt, y0, cex = 1, ylim = range(x), xlab = 'time points', 
+           main = paste0('prob.M1 (', signif(prob.model[1], d = 2), ') -- prob.M1 (', 
+                         signif(prob.model[2], d = 2), ')'))
+      points(tt, predict(fit0), type = 'l', col = 'blue')
+      newtt = seq(0, max(tt), by = 0.2) 
+      points(newtt, predict(fit, newdata = data.frame(tt = newtt)), type = 'l', col = 'orange', lty = 1, lwd = 2.0)
+      abline(h = mean(y0), lty = 1, col = 'red', lwd = 2.0)
+    
     }
     
-    return(prob.model)
+    return(res)
     
   }
+}
+
+
+
+
+# all.peaks.test = function(x, c = rep(c(1:10), each = 2), testPlot = FALSE)
+# {
+#   # x = fpm[ii.test[1], sample.sels]; c = match(design$conds, conds);
+#   
+#   if(length(x) != length(c)){
+#     stop('nb of data is the same as nb of conditions')
+#   }else{
+#     #library("mgcv")
+#     library('gam')
+#     o1 = order(c)
+#     c = c[o1]
+#     x = x[o1]
+#     #names = names(x)
+#     x = as.numeric(x)
+#     
+#     # model null static 
+#     fit0 = lm(x ~ 1)
+#     #rss0 = sum((x - mean(x))^2)
+#     # definition of BIC https://en.wikipedia.org/wiki/Bayesian_information_criterion
+#     # be careful !!! nb of parameters k including intercept, slope and constant variance
+#     #bic0 = length(x)*log(rss0/length(x)) + 2*log(length(x)) 
+#       
+#     # alternative model
+#     
+#     #dat = data.frame(x =x, c = c, stringsAsFactors = FALSE)
+#     fit <- gam(x ~ s(c, df=3), family = gaussian)
+#     # summary(fit)
+#     #plot(fit)
+#     #rss1 = sum(fit$residuals^2)
+#     #bic1 = length(x)*log(rss1/length(x)) +  (pen.edf(fit)+2)*log(length(x))
+#     
+#     bics = BIC(fit0, fit)
+#     scores = bics$BIC
+#     scores.relavtive = scores-min(scores)
+#     prob.model = exp(-0.5*scores.relavtive)
+#     prob.model = prob.model[1]/sum(prob.model)
+#     
+#     #prob.model = prob.model[1]
+#     #names(prob.model) = 'prob.m0'
+#     
+#     if(testPlot){
+#       plot(c, x, cex = 1)
+#       points(c, fit$fitted.values, lwd = 1.0, type = 'l')
+#       abline(h = mean(x))
+#     }
+#     
+#     return(prob.model)
+#     
+#   }
+#   
+# }
+
+
+########################################################
+########################################################
+# Section : motif activity analysis 
+# 
+########################################################
+########################################################
+save.peak.bed.file.for.fimo = function()
+{
+  load(file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.withinPeaks.pval6.Rdata'))
+  fpm = readRDS(file = paste0(RdataDir, '/fpm_TMM_combat.rds'))
+  
+  # prepare the background distribution
+  jj = grep('bg_', rownames(fpm), invert = TRUE)
+  fpm.bg = fpm[grep('bg_', rownames(fpm), invert = FALSE), ]
+  fpm = fpm[jj, ]
+  rownames(fpm) = gsub('_', '-', rownames(fpm))
+  
+  pp = data.frame(t(sapply(rownames(fpm), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  
+  pp$name = rownames(fpm)
+  pp$strand = '*'
+  
+  write.table(pp, file = '../results/motif_analysis/peaks/peaks_for_fimo.bed', row.names = FALSE, col.names = FALSE,
+              quote = FALSE, sep = '\t')
+  
+  
+  
   
 }
+
+
+
+
