@@ -594,14 +594,15 @@ if(Grouping.atac.peaks){
   #load(file = paste0(RdataDir, '/fpm_TMM_combat_fpkm_quantileNorm.rds'))
   fpm = readRDS(file = paste0(RdataDir, '/fpm_TMM_combat.rds'))
   
+  # prepare the background distribution
+  jj = grep('bg_', rownames(fpm), invert = TRUE)
+  fpm.bg = fpm[grep('bg_', rownames(fpm), invert = FALSE), ]
+  fpm = fpm[jj, ]
+  rownames(fpm) = gsub('_', '-', rownames(fpm))
+  
+  creat.Granges.and.peakAnnotation = TRUE
   # make Granges and annotate peaks
-  creat.Granges.and.peakAnnotation = FALSE
-  if(creat.Granges.peaks){
-    jj = grep('bg_', rownames(fpm), invert = TRUE)
-    fpm.bg = fpm[grep('bg_', rownames(fpm), invert = FALSE), ]
-    fpm = fpm[jj, ]
-    rownames(fpm) = gsub('_', '-', rownames(fpm))
-    
+  if(creat.Granges.and.peakAnnotation){
     pp = data.frame(t(sapply(rownames(fpm), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
     
     pp$strand = '*'
@@ -619,7 +620,39 @@ if(Grouping.atac.peaks){
   }
   
   ##########################################
-  # all-peaks
+  # all-peaks test M0 (static peaks), M1 (dynamic peaks above background), M2 (dyanmic peaks with some condtions below background)
+  ##########################################
+  conds = c("Embryo_Stage40", "Embryo_Stage44_proximal",
+            "Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal")
+  
+  # examples to test
+  test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
+  #test.examples = c('Hoxa13')
+  ii.test = which(overlapsAny(pp, promoters[which(!is.na(match(promoters$geneSymbol, test.examples)))]))
+  #ii.Hox = which(overlapsAny(pp, Hoxs))
+  #ii.test = unique(c(ii.test, ii.Hox))
+  
+  sample.sels = c()
+  cc = c()
+  for(n in 1:length(conds)) {
+    kk = which(design$conds == conds[n] & design$SampleID != '136159')
+    sample.sels = c(sample.sels, kk)
+    cc = c(cc, rep(conds[n], length(kk)))
+  }
+  
+  library(tictoc)
+  ii.test = c(1:nrow(fpm)) # takes about 2 mins for 40k peaks
+  
+  source('Functions.R')
+  tic() 
+  res = t(apply(fpm[ii.test, sample.sels], 1, temporal.peaks.test, c = cc))
+  res = data.frame(res, pp.annots[ii.test, ], stringsAsFactors = FALSE)
+  toc()
+  
+  saveRDS(res, file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test.rds'))
+  
+  ##########################################
+  # temporal-peaks test
   ##########################################
   conds = c("Embryo_Stage40", "Embryo_Stage44_proximal",
             "Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal")
@@ -755,37 +788,7 @@ if(Grouping.atac.peaks){
   
   
   
-  ##########################################
-  # temporal-peaks test
-  ##########################################
-  conds = c("Embryo_Stage40", "Embryo_Stage44_proximal",
-            "Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal")
-  
-  # examples to test
-  test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
-  #test.examples = c('Hoxa13')
-  ii.test = which(overlapsAny(pp, promoters[which(!is.na(match(promoters$geneSymbol, test.examples)))]))
-  #ii.Hox = which(overlapsAny(pp, Hoxs))
-  #ii.test = unique(c(ii.test, ii.Hox))
-  
-  sample.sels = c()
-  cc = c()
-  for(n in 1:length(conds)) {
-    kk = which(design$conds == conds[n] & design$SampleID != '136159')
-    sample.sels = c(sample.sels, kk)
-    cc = c(cc, rep(conds[n], length(kk)))
-  }
-  
-  library(tictoc)
-  ii.test = c(1:nrow(fpm)) # takes about 2 mins for 40k peaks
-  
-  source('Functions.R')
-  tic() 
-  res = t(apply(fpm[ii.test, sample.sels], 1, temporal.peaks.test, c = cc))
-  res = data.frame(res, pp.annots[ii.test, ], stringsAsFactors = FALSE)
-  toc()
-  
-  saveRDS(res, file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test.rds'))
+ 
   
 }
 
