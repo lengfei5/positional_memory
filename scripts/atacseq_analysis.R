@@ -740,11 +740,13 @@ if(Grouping.atac.peaks){
     
     saveRDS(res, file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test.rds'))
     
+    res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test.rds'))
     # select the temporal dynamic peaks
     length(which(res$prob.M0<0.05))
     length(which(res$prob.M0<0.05 & res$log2FC > 1))
     jj = which(res$prob.M0 < 0.05 & res$log2FC >1 )
     
+    jj = which(res$prob.M0 < 0.01 & res$log2FC >2 )
     xx = res[c(jj), ]
     xx = xx[order(-xx$log2FC), ]
     
@@ -759,6 +761,14 @@ if(Grouping.atac.peaks){
     
     pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
              cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps)
+    
+    
+    ##########################################
+    # first motif activity analysis for temporally dynamic peaks 
+    ##########################################
+    source('Functions.R')
+    xx = run.MARA.atac.temporal(keep, cc)
+    
       
   }
   
@@ -868,8 +878,9 @@ if(Grouping.atac.peaks){
     dev.off()
     
   }
-    
+  
 }
+
 
 ########################################################
 ########################################################

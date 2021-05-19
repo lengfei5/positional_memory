@@ -1889,36 +1889,5 @@ all.peaks.test = function(x, c = c("Embryo_Stage40", "Embryo_Stage40", "Mature_U
 # }
 
 
-########################################################
-########################################################
-# Section : motif activity analysis 
-# 
-########################################################
-########################################################
-save.peak.bed.file.for.fimo = function()
-{
-  load(file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.withinPeaks.pval6.Rdata'))
-  fpm = readRDS(file = paste0(RdataDir, '/fpm_TMM_combat.rds'))
-  
-  # prepare the background distribution
-  jj = grep('bg_', rownames(fpm), invert = TRUE)
-  fpm.bg = fpm[grep('bg_', rownames(fpm), invert = FALSE), ]
-  fpm = fpm[jj, ]
-  rownames(fpm) = gsub('_', '-', rownames(fpm))
-  
-  pp = data.frame(t(sapply(rownames(fpm), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
-  
-  pp$name = rownames(fpm)
-  pp$strand = '*'
-  
-  write.table(pp, file = '../results/motif_analysis/peaks/peaks_for_fimo.bed', row.names = FALSE, col.names = FALSE,
-              quote = FALSE, sep = '\t')
-  
-  
-  
-  
-}
-
-
 
 
