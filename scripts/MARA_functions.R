@@ -17,16 +17,190 @@ extract.TFs.annotation.from.TFClass = function()
   
   tfs = '/Users/jiwang/workspace/imp/positional_memory/results/motif_analysis/tfclass.ttl'
   
-  x <- rdf()
-  rdf <- rdf_parse(tfs)
+  # x <- rdf()
+  # rdf <- rdf_parse(tfs)
+  # 
+  # options(rdf_print_format = "turtle")
+  # rdf
+  # 
+  # car_triples <- 
+  #   rdf %>% 
+  #   rownames_to_column("label") %>% 
+  #   gather(attribute,measurement, -Model)
+  # 
   
-  options(rdf_print_format = "turtle")
-  rdf
+  ##########################################
+  # try another code from 
+  # https://bioconductor.org/packages/release/data/experiment/vignettes/ELMER.data/inst/doc/vignettes.html 
+  ##########################################
+  library(xml2)
+  library(httr)
+  library(dplyr)
+  library(rvest)
   
-  car_triples <- 
-    rdf %>% 
-    rownames_to_column("label") %>% 
-    gather(attribute,measurement, -Model)
+  createMotifRelevantTfs <- function(classification = "family"){
+    
+    message("Accessing hocomoco to get last version of TFs ", classification)
+    file <- paste0(classification,".motif.relevant.TFs.rda")
+    
+    # Download from http://hocomoco.autosome.ru/human/mono
+    tf.family <- "http://hocomoco11.autosome.ru/human/mono?full=true" %>% read_html()  %>%  html_table()
+    tf.family <- tf.family[[1]]
+    # Split TF for each family, this will help us map for each motif which are the some ones in the family
+    # basicaly: for a TF get its family then get all TF in that family
+    col <- ifelse(classification == "family", "TF family","TF subfamily")
+    family <- split(tf.family,f = tf.family[[col]])
+    
+    motif.relevant.TFs <- plyr::alply(tf.family,1, function(x){  
+      f <- x[[col]]
+      if(f == "") return(x$`Transcription factor`) # Case without family, we will get only the same object
+      return(unique(family[as.character(f)][[1]]$`Transcription factor`))
+    },.progress = "text")
+    #names(motif.relevant.TFs) <- tf.family$`Transcription factor`
+    names(motif.relevant.TFs) <- tf.family$Model
+    # Cleaning object
+    attr(motif.relevant.TFs,which="split_type") <- NULL
+    attr(motif.relevant.TFs,which="split_labels") <- NULL
+    
+    return(motif.relevant.TFs)
+  }
+  
+  updateTFClassList <- function(tf.list, classification = "family"){
+    col <- ifelse(classification == "family","family.name","subfamily.name")
+    TFclass <- getTFClass()
+    # Hocomoco
+    tf.family <- "http://hocomoco11.autosome.ru/human/mono?full=true" %>% read_html()  %>%  html_table()
+    tf.family <- tf.family[[1]]
+    
+    tf.members <- plyr::alply(unique(TFclass %>% pull(col)),1, function(x){  
+      TFclass$Gene[which(x == TFclass[,col])]
+    },.progress = "text")
+    names(tf.members) <- unique(TFclass %>% pull(col))
+    attr(tf.members,which="split_type") <- NULL
+    attr(tf.members,which="split_labels") <- NULL
+    
+    for(i in names(tf.list)){
+      x <- tf.family[tf.family$Model == i,"Transcription factor"]
+      idx <- which(sapply(lapply(tf.members, function(ch) grep(paste0("^",x,"$"), ch)), function(x) length(x) > 0))
+      if(length(idx) == 0) next
+      members <- tf.members[[idx]]
+      tf.list[[i]] <- sort(unique(c(tf.list[[i]],members)))
+    }
+    return(tf.list)
+  }
+  
+  getTFClass <- function(){
+    # get TF classification
+    file <- "TFClass.rda"
+    if(file.exists(file)) {
+      return(get(load(file)))
+    }
+    file <- "http://tfclass.bioinf.med.uni-goettingen.de/suppl/tfclass.ttl.gz"
+    downloader::download(file,basename(file))
+    char_vector <- readLines(basename(file))
+    # Find TF idx
+    idx <- grep("genus",char_vector,ignore.case = T)
+    
+    # get TF names
+    TF <- char_vector[sort(c( idx +1, idx + 2, idx + 4))]
+    TF <- TF[-grep("LOGO_|rdf:type",TF)]
+    TF <- gsub("  rdfs:label | ;| rdfs:subClassOf <http://sybig.de/tfclass#|>","",TF)
+    TF <- stringr::str_trim(gsub('"', '', TF))
+    TF <- tibble::as.tibble(t(matrix(TF,nrow = 2)))
+    colnames(TF) <- c("Gene", "class")
+    
+    # Get family and subfamily classification
+    family.pattern <-  "^<http://sybig.de/tfclass#[0-9]+\\.[0-9]+\\.[0-9]+>"
+    
+    idx <- grep(family.pattern,char_vector)
+    family.names <- char_vector[ sort(c(idx,idx+ 2))]
+    family.names <- gsub("  rdfs:label | ;| rdfs:subClassOf <http://sybig.de/tfclass#|>|<http://sybig.de/tfclass#| rdf:type owl:Class","",family.names)
+    family.names <- stringr::str_trim(gsub('"', '', family.names))
+    family.names <- tibble::as.tibble(t(matrix(family.names,nrow = 2)))
+    colnames(family.names) <- c("family", "family.name")
+    
+    
+    subfamily.pattern <-  "^<http://sybig.de/tfclass#[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+>"
+    
+    idx <- grep(subfamily.pattern,char_vector)
+    subfamily.names <- char_vector[ sort(c(idx,idx+ 2))]
+    subfamily.names <- gsub("  rdfs:label | ;| rdfs:subClassOf <http://sybig.de/tfclass#|>|<http://sybig.de/tfclass#| rdf:type owl:Class","",subfamily.names)
+    subfamily.names <- stringr::str_trim(gsub('"', '', subfamily.names))
+    subfamily.names <- tibble::as.tibble(t(matrix(subfamily.names,nrow = 2)))
+    colnames(subfamily.names) <- c("subfamily", "subfamily.name")
+    subfamily.names$family <- stringr::str_sub(subfamily.names$subfamily,1,5)
+    
+    classification <- left_join(family.names,subfamily.names)
+    classification$class <- ifelse(is.na(classification$subfamily),classification$family,classification$subfamily)
+    
+    # Add classification to TF list
+    TFclass <- left_join(TF,classification)
+    
+    # Break ( into multiple cases)
+    m <- grep("\\(|/",TFclass$Gene)
+    df <- NULL
+    for(i in m){
+      gene <- sort(stringr::str_trim(unlist(stringr::str_split(TFclass$Gene[i],"\\(|,|\\)|/"))))
+      gene <- gene[stringr::str_length(gene) > 0]
+      aux <- TFclass[rep(i,length(gene)),]
+      aux$Gene <- gene
+      df <- rbind(df,aux)
+    }
+    TFclass <- rbind(TFclass,df)
+    TFclass <- TFclass[!duplicated(TFclass),]
+    
+    # Break ( into multiple cases)
+    m <- grep("-",TFclass$Gene)
+    df <- NULL
+    for(i in m){
+      gene <- gsub("-","",sort(stringr::str_trim(unlist(stringr::str_split(TFclass$Gene[i],"\\(|,|\\)|/")))))
+      gene <- gene[stringr::str_length(gene) > 0]
+      aux <- TFclass[rep(i,length(gene)),]
+      aux$Gene <- gene
+      df <- rbind(df,aux)
+    }
+    TFclass <- rbind(TFclass,df)
+    
+    library(limma)
+    require(org.Hs.eg.db)
+    df <- NULL
+    for(i in 1:length(TFclass$Gene)){
+      m <- TFclass$Gene[i]
+      gene <- unique(c(toupper(alias2Symbol(toupper(m))),toupper(m),toupper(alias2Symbol(m))))
+      if(all(gene %in% TFclass$Gene)) next
+      aux <- TFclass[rep(i,length(gene)),]
+      aux$Gene <- gene
+      df <- rbind(df,aux)
+    }
+    TFclass <- rbind(TFclass,df)
+    TFclass <- TFclass[!duplicated(TFclass),]
+    TFclass <- TFclass[TFclass$Gene %in% human.TF$external_gene_name,]
+    save(TFclass,file = "TFClass.rda")
+    return(TFclass)
+  }
+  TF.family <- createMotifRelevantTfs("family")
+  TF.family <- updateTFClassList(TF.family,"family")
+  TF.subfamily <- createMotifRelevantTfs("subfamily")
+  TF.subfamily <- updateTFClassList(TF.subfamily,classification = "subfamily")
+  save(TF.family,file = "~/ELMER.data/data/TF.family.rda", compress = "xz")
+  save(TF.subfamily,file = "~/ELMER.data/data/TF.subfamily.rda", compress = "xz")
+  
+  ##########################################
+  # human TF downalod and used from 
+  # https://bioconductor.org/packages/release/data/experiment/vignettes/ELMER.data/inst/doc/vignettes.html
+  # reference : A curated list of TF was retrieved from Lambert, Samuel A., et al. 
+  # “The human transcription factors.” Cell 172.4 (2018): 650-665 (Lambert, Samuel A and Jolma, Arttu and 
+  #Campitelli, Laura F and Das, Pratyush K and Yin, Yimeng and Albu, Mihai and Chen, #
+  # Xiaoting and Taipale, Jussi and Hughes, Timothy R and Weirauch, Matthew T 2018) with the following code.
+  ##########################################
+  human.TF <- readr::read_csv("http://humantfs.ccbr.utoronto.ca/download/v_1.01/DatabaseExtract_v_1.01.csv")
+  human.TF <- human.TF[human.TF$`Is TF?` == "Yes",]
+  colnames(human.TF)[1:2] <- c("ensembl_gene_id","external_gene_name")
+  human.TF = as.data.frame(human.TF)
+  
+  saveRDS(human.TF, 
+          file = paste0('/Users/jiwang/workspace/imp/positional_memory/results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
+  
   
 }
 
@@ -433,7 +607,7 @@ run.RF.otherMethods = function()
 {
   library(randomForest)
   tic()
-  rf <- randomForest::randomForest(x = x, y = y[, 2], ntree = 100, keep.forest = FALSE, 
+  rf <- randomForest::randomForest(x = x, y = y[, 2], ntree = 200, keep.forest = FALSE, 
                                          importance = TRUE)
   toc()
   
