@@ -318,17 +318,19 @@ run.MARA.atac.temporal = function(keep, cc)
   X = as.matrix(motif.oc)
   Y = as.matrix(Y)
   
-  alpha = 0.5
+  alpha = 0.2
   standardize = TRUE;
-  use.lambda.min = TRUE;
+  use.lambda.min = FALSE;
   binarize.x = TRUE
   standardize.response=FALSE
   intercept=FALSE
   family = 'mgaussian'
-  lambdas = 10^(seq(-4, 1, length.out = 100))
+  lambdas = 10^(seq(-4, 2, length.out = 100))
+  
   x = X;
   y = scale(Y, center = TRUE, scale = FALSE); # center response and standardize X (cf. elastic-net paper)
   if(binarize.x) x = x > 0
+  #y = y[, c(2, 3)]
   
   library(doMC) 
   registerDoMC(cores=6)
@@ -341,6 +343,11 @@ run.MARA.atac.temporal = function(keep, cc)
   
   plot(cv.fit)
   toc()
+  
+  
+  
+  #library(ridge)
+  #fit2 = linearRidge(y[,1] ~ x)
   
   tic()
   fit=glmnet(x,y, alpha=alpha, lambda=cv.fit$lambda, family=family,
@@ -355,26 +362,23 @@ run.MARA.atac.temporal = function(keep, cc)
     s.optimal = cv.fit$lambda.1se
   }
   
-  xx = coef(fit, s = fit$lambda[100])
-  aa = c()
-  for(j in 1:length(xx))
-  {
-    aa = cbind(aa, as.numeric(xx[j]))
-    
-  }
+  #s.optimal = fit$lambda[16]
+  
+  xx = coef(fit, s = s.optimal)
+  aa = c();  for(j in 1:length(xx)) { aa = cbind(aa, as.numeric(xx[[j]])); }
   
   rownames(aa) = rownames(xx[[1]])
-  #colnames(aa) = c('E40', 'E44.P', 'mUA', 'BL.UA.D5', 'BL.UA.D9', 'BL.UA.D13.P')
   colnames(aa) = colnames(y)
   aa = as.data.frame(aa[-1, ]) # ignore the intercept
-  aa = apply(aa, 2, scale)
-  #aa = scale(aa)
-  rownames(aa) = rownames(xx[[1]])[-1]
+  aa = scale(aa) # calculate z score here is probably not a good idea to do feature selection
+  #rownames(aa) = rownames(xx[[1]])[-1]
   
-  cutoff.activity = 0
+  cutoff.activity = 2.5
   ss = apply(aa, 1, function(x) length(which(abs(x) > cutoff.activity)))
+  cat(length(which(ss>0)), ' nzero features \n')
+  
   print(aa[which(ss>0), ])
- 
+  
   
   pheatmap(aa[which(ss>0), ], cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE, breaks = NA,
            scale = 'none', cluster_cols=FALSE, main = paste0("motif activity by MARA"), 
@@ -424,6 +428,18 @@ run.MARA.atac.temporal = function(keep, cc)
   
 }
 
+
+run.RF.otherMethods = function()
+{
+  library(randomForest)
+  tic()
+  rf <- randomForest::randomForest(x = x, y = y[, 2], ntree = 100, keep.forest = FALSE, 
+                                         importance = TRUE)
+  toc()
+  
+  varImpPlot(rf, n.var = 50)
+  
+}
 
 run.MARA.atac.spatial = function(keep, cc)
 {
