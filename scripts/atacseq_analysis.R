@@ -774,8 +774,9 @@ if(Grouping.atac.peaks){
     source('MARA_functions.R')
     xx = run.MARA.atac.temporal(keep, cc)
     
-      
   }
+  
+  
   
   ##########################################
   # position-dependent test

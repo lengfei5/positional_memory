@@ -613,6 +613,88 @@ run.RF.otherMethods = function()
   
   varImpPlot(rf, n.var = 50)
   
+  RF.parameter.tuing = FALSE
+  if(RF.parameter.tuing)
+  {
+    library(randomForest)
+    library(ranger)
+    library(stats)
+    library(mlbench)
+    library(caret)
+    library(tictoc)
+    
+    ## tune mtry parameter with tuneRF from randomForest package
+    m2 <- tuneRF(
+      x          = train,
+      y          = y,
+      ntreeTry   = ntree,
+      mtryStart  = floor(sqrt(ncol(x))),
+      stepFactor = 1.5,
+      improve    = 0.01,
+      trace      = FALSE      # to not show real-time progress 
+    )
+    print(m2)
+    
+    # hyperparameter grid search
+    hyper_grid <- expand.grid(
+      mtry       = seq(20, 60, by = 5),
+      node_size  = seq(1, 10, by = 2),
+      #sample_size = c(.55, .632, .70, .80),
+      sample_size = c(.632),
+      prediction_err   = 0
+    )
+    
+    # total number of combinations
+    nrow(hyper_grid)
+    ## [1] 96
+    
+    for(i in 1:nrow(hyper_grid)) {
+      # train model
+      model <- ranger(
+        x = train, 
+        y = y,
+        num.trees       = ntree,
+        mtry            = hyper_grid$mtry[i],
+        min.node.size   = hyper_grid$node_size[i],
+        sample.fraction = hyper_grid$sample_size[i],
+        seed            = 123
+      )
+      
+      # add OOB error to grid
+      hyper_grid$prediction_err[i] <- model$prediction.error
+    }
+    
+    hyper_grid %>% 
+      dplyr::arrange(prediction_err) %>%
+      head(10)
+    
+    index.optimal = which.min(hyper_grid$prediction_err)
+    tic()
+    train.optimal = ranger::ranger(x = train, y = y, 
+                                   num.trees = ntree, 
+                                   mtry = hyper_grid$mtry[index.optimal], 
+                                   min.node.size = hyper_grid$node_size[index.optimal],
+                                   sample.fraction = hyper_grid$sample_size[index.optimal], 
+                                   write.forest = TRUE, 
+                                   probability = TRUE,
+                                   classification = TRUE, 
+                                   local.importance = TRUE)
+    toc()
+    
+    saveRDS(train.optimal, file = paste0(RdataDir, 'MurrayData_classifier_test_RF_optimalParam.rds'))
+    rf.fit = readRDS(file = paste0(RdataDir, 'MurrayData_classifier_test_RF_optimalParam.rds'))
+    #pred_test <-stats::predict(rf.fit, test)
+    
+    err.test = mean(pred_test==factor(y.test, levels = levels(pred_test)))
+  }
+
+#Prediction <- stats::predict(train_rf, test, type = "prob")
+#Prediction <- stats::predict(m1, test, type = "prob")
+#Prediction <- predict(train_rf, test, type = "response")$predictions
+#rf.res = data.frame(label = apply(Prediction, 1, function(x) colnames(Prediction)[which.max(x)]),
+#                    prob = apply(Prediction, 1, function(x) x[which.max(x)]), stringsAsFactors = FALSE)
+
+  
 }
 
 run.MARA.atac.spatial = function(keep, cc)
