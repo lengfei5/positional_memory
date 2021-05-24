@@ -751,7 +751,7 @@ if(Grouping.atac.peaks){
     length(which(res$prob.M0<0.05 & res$log2FC > 1))
     jj = which(res$prob.M0 < 0.05 & res$log2FC >1 )
     
-    jj = which(res$prob.M0 < 0.01 & res$log2FC >2 )
+    jj = which(res$prob.M0 < 0.01 & res$log2FC > 1.5 )
     xx = res[c(jj), ]
     xx = xx[order(-xx$log2FC), ]
     

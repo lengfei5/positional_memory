@@ -318,21 +318,16 @@ run.MARA.atac.temporal = function(keep, cc)
   X = as.matrix(motif.oc)
   Y = as.matrix(Y)
   
-  #sels = c(1:5000)
-  #x = x[sels, ]
-  #y = y[sels, ]
-  
-  x = X;
-  y = scale(Y, center = TRUE, scale = FALSE);
-  
-  alpha = 0
+  alpha = 0.5
   standardize = TRUE;
-  use.lambda.min = FALSE;
+  use.lambda.min = TRUE;
   binarize.x = TRUE
   standardize.response=FALSE
   intercept=FALSE
   family = 'mgaussian'
-  
+  lambdas = 10^(seq(-4, 1, length.out = 100))
+  x = X;
+  y = scale(Y, center = TRUE, scale = FALSE); # center response and standardize X (cf. elastic-net paper)
   if(binarize.x) x = x > 0
   
   library(doMC) 
@@ -340,51 +335,46 @@ run.MARA.atac.temporal = function(keep, cc)
   
   library(tictoc)
   tic()
-  cv.fit=cv.glmnet(x, y, family= family, grouped=FALSE, 
-                   alpha=alpha, nlambda=100, standardize=standardize, 
+  cv.fit=cv.glmnet(x, y, family= family,
+                   alpha=alpha, lambda = lambdas, standardize=standardize, 
                    standardize.response=standardize.response, parallel = TRUE)
   
   plot(cv.fit)
   toc()
   
-  
+  tic()
+  fit=glmnet(x,y, alpha=alpha, lambda=cv.fit$lambda, family=family,
+             standardize=standardize, standardize.response=standardize.response, intercept=intercept, 
+             relax = FALSE)
+  plot(fit, xvar = "lambda", label = TRUE, type.coef = "2norm")
+  toc()
+    
   if(use.lambda.min){
     s.optimal = cv.fit$lambda.min
   }else{
     s.optimal = cv.fit$lambda.1se
   }
   
-  fit=glmnet(x,y,alpha=alpha, lambda=s.optimal, family=family, 
-             standardize=standardize, standardize.response=standardize.response, intercept=intercept, 
-             relax = FALSE)
-  
-  #fit=glmnet(x, y, family='mgaussian', standardize=standardize, standardize.response=standardize.response, intercept=TRUE)
-  #plot(fit, xvar = "lambda", label = TRUE, type.coef = "2norm")
-  
-  xx = coef(fit, s = s.optimal)
+  xx = coef(fit, s = fit$lambda[100])
   aa = c()
   for(j in 1:length(xx))
   {
-    aa = cbind(aa, as.numeric(xx[[j]]))
+    aa = cbind(aa, as.numeric(xx[j]))
+    
   }
+  
   rownames(aa) = rownames(xx[[1]])
   #colnames(aa) = c('E40', 'E44.P', 'mUA', 'BL.UA.D5', 'BL.UA.D9', 'BL.UA.D13.P')
   colnames(aa) = colnames(y)
   aa = as.data.frame(aa[-1, ]) # ignore the intercept
   aa = apply(aa, 2, scale)
   #aa = scale(aa)
-  rownames(aa) = rownames(xx[[1]])[-1] 
+  rownames(aa) = rownames(xx[[1]])[-1]
   
-  #kk = apply(aa, 1, function(x) all(abs(x)>10^-6))
-  #aa = aa[kk, ]
-  
-  #ss = apply(aa, 1, function(x) !all(x==0))
-  #aa = aa[ss, ]
-  #head(rownames(aa)[order(-abs(aa$MSxp))], 10)
-  #head(rownames(aa)[order(-abs(aa$MSxa))], 10)
-  Test.zscore.cutoff = 2.5
-  ss = apply(aa, 1, function(x) length(which(abs(x) > Test.zscore.cutoff)))
+  cutoff.activity = 0
+  ss = apply(aa, 1, function(x) length(which(abs(x) > cutoff.activity)))
   print(aa[which(ss>0), ])
+ 
   
   pheatmap(aa[which(ss>0), ], cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE, breaks = NA,
            scale = 'none', cluster_cols=FALSE, main = paste0("motif activity by MARA"), 
