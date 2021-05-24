@@ -732,13 +732,18 @@ if(Grouping.atac.peaks){
     library(tictoc)
     ii.test = c(1:nrow(fpm)) # takes about 2 mins for 40k peaks
     
-    source('Functions.R')
-    tic() 
-    res = t(apply(fpm[ii.test, sample.sels], 1, temporal.peaks.test, c = cc))
-    res = data.frame(res, pp.annots[ii.test, ], stringsAsFactors = FALSE)
-    toc()
-    
-    saveRDS(res, file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test.rds'))
+    Run.temporal.peak.test = FALSE
+    if(Run.temporal.peak.test)
+    {
+      source('Functions.R')
+      tic() 
+      res = t(apply(fpm[ii.test, sample.sels], 1, temporal.peaks.test, c = cc))
+      res = data.frame(res, pp.annots[ii.test, ], stringsAsFactors = FALSE)
+      toc()
+      
+      saveRDS(res, file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test.rds'))
+      
+    }
     
     res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test.rds'))
     # select the temporal dynamic peaks
@@ -766,7 +771,7 @@ if(Grouping.atac.peaks){
     ##########################################
     # first motif activity analysis for temporally dynamic peaks 
     ##########################################
-    source('Functions.R')
+    source('MARA_functions.R')
     xx = run.MARA.atac.temporal(keep, cc)
     
       
@@ -810,7 +815,7 @@ if(Grouping.atac.peaks){
     res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test.rds'))
     
     # select the spatially dynamic peaks
-    jj = which(res$prob.M0.mature < 0.3 & res$log2FC.mature >1)
+    jj = which(res$prob.M0.mature < 0.01 & res$log2FC.mature >1)
     #jj1 = which(res$pval.embryo < 0.01 & res$log2FC.embryo >1)
     #jj2 = which(res$pval.BL < 0.01 & res$log2FC.BL >1)
     
@@ -820,6 +825,22 @@ if(Grouping.atac.peaks){
     length(which(xx$min.mature <3.0))
     length(which(xx$min.mature <2.5))
     length(which(xx$min.mature <2.))
+    
+    
+    keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
+    keep = as.matrix(keep)
+    
+    ##########################################
+    # first motif activity analysis for temporally dynamic peaks 
+    ##########################################
+    source('MARA_functions.R')
+    jj = grep('Mature', cc)
+    keep = keep[, jj]
+    cc = cc[jj]
+    
+    xx = run.MARA.atac.temporal(keep, cc)
+    
+    
     
     library(ggplot2)
     bgs = data.frame(bg = as.numeric(fpm.bg))
@@ -849,10 +870,7 @@ if(Grouping.atac.peaks){
     
     # visualize the position-dependent peaks
     source('Functions.R')
-    
-    keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
-    keep = as.matrix(keep)
-    
+   
     # for(c in c('Mature', 'Embryo', 'BL_UA'))
     # {
     #   jj = grep(c, cc)

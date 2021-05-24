@@ -7,18 +7,65 @@
 # Date of creation: Wed May 19 10:47:23 2021
 ##########################################################################
 ##########################################################################
+extract.TFs.annotation.from.TFClass = function()
+{
+  library(rdflib)
+  library(dplyr)
+  library(tidyr)
+  library(tibble)
+  library(jsonld)
+  
+  tfs = '/Users/jiwang/workspace/imp/positional_memory/results/motif_analysis/tfclass.ttl'
+  
+  x <- rdf()
+  rdf <- rdf_parse(tfs)
+  
+  options(rdf_print_format = "turtle")
+  rdf
+  
+  car_triples <- 
+    rdf %>% 
+    rownames_to_column("label") %>% 
+    gather(attribute,measurement, -Model)
+  
+}
+
+
 # manually add extra motifs for hnd-1, pha-4, unc-120 and nhr-67 from dm, mus and homo
 convert.cisbp.format.to.meme = function()
 {
   library(universalmotif)
   #pwmDIr = '/Volumes/groups/cochella/jiwang/Databases/motifs_TFs/PWMs_C_elegans/extra_pwm'
-  pwm.cisbp = '../data/test/PWM.txt'
-  xx = read_cisbp(file = pwm.cisbp, skip = 0)
+  pwm.old = '../results/motif_analysis/SwissRegulon_PWMs/hg19_weight_matrices_v2.txt'
+  xx = read_matrix(file = pwm.old, skip = 0)
   yy = convert_type(xx, "PWM")
   
-  write_meme(yy, file = '../data/test/PWM_converted.meme', overwrite = TRUE)
+  xx <- query(MotifDb, andStrings=c("hsapiens"), orStrings=c("swissregulon"))
+  yy = convert_type(xx, "PWM")
+  
+  write_meme(yy, file = '../results/motif_analysis/SwissRegulon_PWMs/hg19_weight_matrices_v2.meme', overwrite = TRUE)
   
 }
+
+extract.SwissRegulon.meme.from.MotifDb = function()
+{
+  library(universalmotif)
+  #pwmDIr = '/Volumes/groups/cochella/jiwang/Databases/motifs_TFs/PWMs_C_elegans/extra_pwm'
+  #pwm.old = '../results/motif_analysis/SwissRegulon_PWMs/hg19_weight_matrices_v2.txt'
+  #xx = read_matrix(file = pwm.old, skip = 0)
+  #yy = convert_type(xx, "PWM")
+  
+  library(MotifDb)
+  xx <- query(MotifDb, andStrings=c("hsapiens"), orStrings=c("swissregulon"))
+  yy = convert_type(xx, "PWM")
+  
+  write_meme(yy, file = '../results/motif_analysis/SwissRegulon_PWMs/hg19_weight_matrices_v2.meme', overwrite = TRUE)
+  
+  
+  
+  
+}
+
 
 generate.logos.for.motifs.pwm = function()
 {
@@ -230,7 +277,7 @@ make.motif.oc.matrix.from.fimo.output = function()
 }
 
 ##########################################
-# 
+# run glmnet
 ##########################################
 run.MARA.atac.temporal = function(keep, cc)
 {
@@ -276,29 +323,30 @@ run.MARA.atac.temporal = function(keep, cc)
   #y = y[sels, ]
   
   x = X;
-  y = scale(Y, center = TRUE, scale = FALSE)
+  y = scale(Y, center = TRUE, scale = FALSE);
   
-  #y = y[, 3]
-  
-  alpha = 0;
+  alpha = 0
   standardize = TRUE;
   use.lambda.min = FALSE;
   binarize.x = TRUE
   standardize.response=FALSE
-  intercept=TRUE
+  intercept=FALSE
   family = 'mgaussian'
   
   if(binarize.x) x = x > 0
   
-  library(tictoc)
+  library(doMC) 
+  registerDoMC(cores=6)
   
+  library(tictoc)
   tic()
   cv.fit=cv.glmnet(x, y, family= family, grouped=FALSE, 
                    alpha=alpha, nlambda=100, standardize=standardize, 
-                   standardize.response=standardize.response)
+                   standardize.response=standardize.response, parallel = TRUE)
   
   plot(cv.fit)
   toc()
+  
   
   if(use.lambda.min){
     s.optimal = cv.fit$lambda.min
@@ -320,6 +368,7 @@ run.MARA.atac.temporal = function(keep, cc)
     aa = cbind(aa, as.numeric(xx[[j]]))
   }
   rownames(aa) = rownames(xx[[1]])
+  #colnames(aa) = c('E40', 'E44.P', 'mUA', 'BL.UA.D5', 'BL.UA.D9', 'BL.UA.D13.P')
   colnames(aa) = colnames(y)
   aa = as.data.frame(aa[-1, ]) # ignore the intercept
   aa = apply(aa, 2, scale)
@@ -333,57 +382,216 @@ run.MARA.atac.temporal = function(keep, cc)
   #aa = aa[ss, ]
   #head(rownames(aa)[order(-abs(aa$MSxp))], 10)
   #head(rownames(aa)[order(-abs(aa$MSxa))], 10)
-  Test.zscore.cutoff = 2.0
+  Test.zscore.cutoff = 2.5
   ss = apply(aa, 1, function(x) length(which(abs(x) > Test.zscore.cutoff)))
-  aa = aa[which(ss>0), ]
-  print(aa)
+  print(aa[which(ss>0), ])
+  
+  pheatmap(aa[which(ss>0), ], cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE, breaks = NA,
+           scale = 'none', cluster_cols=FALSE, main = paste0("motif activity by MARA"), 
+           na_col = "white", fontsize_col = 12) 
   
   
-  
-  aa = as.data.frame(coef.glmnet(fit, s = s.optimal))
-  aa = aa[-1, ] # remove intecept
-  colnames(aa) = names(fit$beta)
-  if(alpha > 0.0){
-    rownames(aa) = rownames(fit$beta[[2]])
-    res = aa;
-    ## collect result from the elastic-net
-    #kk = apply(aa, 1, function(x) !all(x==0))
-    #aa = aa[kk, ]
-    #colnames(x)[which(fit$beta[[1]][,optimal]!=0)]
-    #colnames(x)[which(fit$beta[[2]][,optimal]!=0)]
-    
-    # rerun lm with selected features
-    relax.fitting.lm = FALSE
-    if(relax.fitting.lm){
-      fit.lm = lm(y ~ x[, match(rownames(aa), colnames(x))])
-      res = data.frame(fit.lm$coefficients)
-      res = res[-1, ] # remove intercept
-      rownames(res) = rownames(aa)
-      
-      pheatmap(res, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE, breaks = NA,
-               scale = 'column', cluster_cols=FALSE, main = paste0("motif activity"), 
-               na_col = "white", fontsize_col = 10)
-    }
-    
-  }else{
-    if(zscore.output) aa = apply(aa, 2, scale)
-    rownames(aa) = rownames(fit$beta[[2]])
-    #ss = apply(aa, 1, function(x) !all(x==0))
-    #aa = aa[ss, ]
-    #head(rownames(aa)[order(-abs(aa$MSxp))], 10)
-    #head(rownames(aa)[order(-abs(aa$MSxa))], 10)
-    res = aa
-    
-    if(Test){
-      ss = apply(aa, 1, function(x) length(which(abs(x) > Test.zscore.cutoff)))
-      aa = aa[which(ss>0), ]
-      print(aa)
-    }
-  }
-  
-  
+  # aa = as.data.frame(coef.glmnet(fit, s = s.optimal))
+  # aa = aa[-1, ] # remove intecept
+  # colnames(aa) = names(fit$beta)
+  # if(alpha > 0.0){
+  #   rownames(aa) = rownames(fit$beta[[2]])
+  #   res = aa;
+  #   ## collect result from the elastic-net
+  #   #kk = apply(aa, 1, function(x) !all(x==0))
+  #   #aa = aa[kk, ]
+  #   #colnames(x)[which(fit$beta[[1]][,optimal]!=0)]
+  #   #colnames(x)[which(fit$beta[[2]][,optimal]!=0)]
+  #   
+  #   # rerun lm with selected features
+  #   relax.fitting.lm = FALSE
+  #   if(relax.fitting.lm){
+  #     fit.lm = lm(y ~ x[, match(rownames(aa), colnames(x))])
+  #     res = data.frame(fit.lm$coefficients)
+  #     res = res[-1, ] # remove intercept
+  #     rownames(res) = rownames(aa)
+  #     
+  #     pheatmap(res, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE, breaks = NA,
+  #              scale = 'column', cluster_cols=FALSE, main = paste0("motif activity"), 
+  #              na_col = "white", fontsize_col = 10)
+  #   }
+  #   
+  # }else{
+  #   if(zscore.output) aa = apply(aa, 2, scale)
+  #   rownames(aa) = rownames(fit$beta[[2]])
+  #   #ss = apply(aa, 1, function(x) !all(x==0))
+  #   #aa = aa[ss, ]
+  #   #head(rownames(aa)[order(-abs(aa$MSxp))], 10)
+  #   #head(rownames(aa)[order(-abs(aa$MSxa))], 10)
+  #   res = aa
+  #   
+  #   if(Test){
+  #     ss = apply(aa, 1, function(x) length(which(abs(x) > Test.zscore.cutoff)))
+  #     aa = aa[which(ss>0), ]
+  #     print(aa)
+  #   }
+  # }
   
 }
+
+
+run.MARA.atac.spatial = function(keep, cc)
+{
+  library(pheatmap)
+  library(RColorBrewer)
+  require(glmnet)
+  
+  # prepare Y matrix 
+  cc.uniq = unique(cc)
+  Y = matrix(NA, ncol = length(cc.uniq), nrow = nrow(keep))
+  
+  for(n in 1:ncol(Y))
+  {
+    jj = which(cc == cc.uniq[n])
+    if(length(jj) == 1) {
+      Y[,n] = keep[,jj]
+    }else{
+      Y[,n] = apply(keep[ ,jj], 1, mean)
+    }
+  }
+  colnames(Y) = cc.uniq
+  rownames(Y) = rownames(keep)
+  
+  # X matrix
+  motif.oc = readRDS(file = '../results/motif_analysis/motif_oc_fimo.rds')
+  mm = match(rownames(motif.oc), rownames(Y))
+  motif.oc = motif.oc[!is.na(mm), ]
+  
+  ss.m = apply(motif.oc, 2, sum)
+  motif.oc = motif.oc[ , which(ss.m>0)]
+  
+  ss.p = apply(motif.oc, 1, sum)
+  motif.oc = motif.oc[which(ss.p>0), ]
+  
+  kk = match(rownames(motif.oc), rownames(Y))
+  Y = Y[kk, ]
+  
+  X = as.matrix(motif.oc)
+  Y = as.matrix(Y)
+  
+  ### specify glment parameters
+  alpha = 0
+  standardize = TRUE;
+  use.lambda.min = FALSE;
+  binarize.x = TRUE
+  standardize.response=FALSE
+  intercept=FALSE
+  family = 'mgaussian'
+  
+  if(binarize.x) x = x > 0
+  library(doMC) 
+  registerDoMC(cores=6)
+  
+  x = X;
+  y = scale(Y, center = TRUE, scale = FALSE)
+  
+  #sels = c(1:5000)
+  #x = x[sels, ]
+  #y = y[sels, ]
+  
+  library(tictoc)
+  tic()
+  cv.fit=cv.glmnet(x, y, family= family, grouped=FALSE, 
+                   alpha=alpha, nlambda=100, standardize=standardize, 
+                   standardize.response=standardize.response, parallel = TRUE)
+  
+  plot(cv.fit)
+  toc()
+  
+  
+  if(use.lambda.min){
+    s.optimal = cv.fit$lambda.min
+  }else{
+    s.optimal = cv.fit$lambda.1se
+  }
+  
+  fit=glmnet(x,y,alpha=alpha, lambda=s.optimal, family=family, 
+             standardize=standardize, standardize.response=standardize.response, intercept=intercept, 
+             relax = FALSE)
+  
+  #fit=glmnet(x, y, family='mgaussian', standardize=standardize, standardize.response=standardize.response, intercept=TRUE)
+  #plot(fit, xvar = "lambda", label = TRUE, type.coef = "2norm")
+  
+  xx = coef(fit, s = s.optimal)
+  aa = c()
+  for(j in 1:length(xx))
+  {
+    aa = cbind(aa, as.numeric(xx[[j]]))
+  }
+  rownames(aa) = rownames(xx[[1]])
+  #colnames(aa) = c('E40', 'E44.P', 'mUA', 'BL.UA.D5', 'BL.UA.D9', 'BL.UA.D13.P')
+  colnames(aa) = colnames(y)
+  aa = as.data.frame(aa[-1, ]) # ignore the intercept
+  aa = apply(aa, 2, scale)
+  #aa = scale(aa)
+  rownames(aa) = rownames(xx[[1]])[-1] 
+  
+  #kk = apply(aa, 1, function(x) all(abs(x)>10^-6))
+  #aa = aa[kk, ]
+  
+  #ss = apply(aa, 1, function(x) !all(x==0))
+  #aa = aa[ss, ]
+  #head(rownames(aa)[order(-abs(aa$MSxp))], 10)
+  #head(rownames(aa)[order(-abs(aa$MSxa))], 10)
+  Test.zscore.cutoff = 2.5
+  ss = apply(aa, 1, function(x) length(which(abs(x) > Test.zscore.cutoff)))
+  print(aa[which(ss>0), ])
+  
+  bb = aa[which(ss>0), ]
+  bb[which(abs(bb)<Test.zscore.cutoff)] = 0
+  pheatmap(bb, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE, 
+           scale = 'none', cluster_cols=FALSE, main = paste0("motif activity by MARA"), 
+           na_col = "white", fontsize_col = 12) 
+  
+  
+  # aa = as.data.frame(coef.glmnet(fit, s = s.optimal))
+  # aa = aa[-1, ] # remove intecept
+  # colnames(aa) = names(fit$beta)
+  # if(alpha > 0.0){
+  #   rownames(aa) = rownames(fit$beta[[2]])
+  #   res = aa;
+  #   ## collect result from the elastic-net
+  #   #kk = apply(aa, 1, function(x) !all(x==0))
+  #   #aa = aa[kk, ]
+  #   #colnames(x)[which(fit$beta[[1]][,optimal]!=0)]
+  #   #colnames(x)[which(fit$beta[[2]][,optimal]!=0)]
+  #   
+  #   # rerun lm with selected features
+  #   relax.fitting.lm = FALSE
+  #   if(relax.fitting.lm){
+  #     fit.lm = lm(y ~ x[, match(rownames(aa), colnames(x))])
+  #     res = data.frame(fit.lm$coefficients)
+  #     res = res[-1, ] # remove intercept
+  #     rownames(res) = rownames(aa)
+  #     
+  #     pheatmap(res, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE, breaks = NA,
+  #              scale = 'column', cluster_cols=FALSE, main = paste0("motif activity"), 
+  #              na_col = "white", fontsize_col = 10)
+  #   }
+  #   
+  # }else{
+  #   if(zscore.output) aa = apply(aa, 2, scale)
+  #   rownames(aa) = rownames(fit$beta[[2]])
+  #   #ss = apply(aa, 1, function(x) !all(x==0))
+  #   #aa = aa[ss, ]
+  #   #head(rownames(aa)[order(-abs(aa$MSxp))], 10)
+  #   #head(rownames(aa)[order(-abs(aa$MSxa))], 10)
+  #   res = aa
+  #   
+  #   if(Test){
+  #     ss = apply(aa, 1, function(x) length(which(abs(x) > Test.zscore.cutoff)))
+  #     aa = aa[which(ss>0), ]
+  #     print(aa)
+  #   }
+  # }
+  
+}
+
 
 
 
