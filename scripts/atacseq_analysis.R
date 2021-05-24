@@ -768,7 +768,6 @@ if(Grouping.atac.peaks){
              cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps)
     
     
-    
     ##########################################
     # first motif activity analysis for temporally dynamic peaks 
     ##########################################
