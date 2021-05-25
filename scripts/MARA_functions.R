@@ -206,8 +206,12 @@ extract.TFs.annotation.from.TFClass = function()
 
 collect.TFs.gene.expression = function()
 {
-  
   tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
+  load(file = paste0(tfDir, '/RNAseq_fpm_fitered.cutoff.', cutoff.gene, '.Rdata'))
+  annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                         'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr.rds'))
+  
+  kk = match(annot$gene.symbol.hs, tfs$)
   
   
 }

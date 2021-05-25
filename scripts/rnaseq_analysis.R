@@ -14,7 +14,6 @@
 # 
 ########################################################
 ########################################################
-
 rm(list = ls())
 
 # setup for data import and sequencing QCs
@@ -223,11 +222,12 @@ save(design, all, file=paste0(RdataDir, 'Design_stats_readCounts_', version.anal
 
 ########################################################
 ########################################################
-# Section : 
+# Section II : analyze the RNA-seq data 
 # 
 ########################################################
 ########################################################
 rm(list = ls())
+
 RNA.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functions/RNAseq_functions.R'
 RNA.QC.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functions/RNAseq_QCs.R'
 source(RNA.functions)
@@ -242,27 +242,28 @@ design.file = "../exp_design/RNAseq_sampleInfos.xlsx"
 
 resDir = paste0("../results/", version.Data)
 tabDir =  paste0(resDir, "/tables/")
+tfDir = '~/workspace/imp/positional_memory/results/motif_analysis'
 RdataDir = paste0(resDir, "/Rdata/")
 
 if(!dir.exists(resDir)){dir.create(resDir)}
 if(!dir.exists(tabDir)){dir.create(tabDir)}
 if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 
+##########################################
+# gene annotation 
+##########################################
 load(file=paste0(RdataDir, 'Design_stats_readCounts_', version.analysis, '.Rdata'))
 
-gene.mapping = read.delim('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/AmexT_v47.release_rm.contigs_geneID_geneSymbol.mapping.txt', 
-                          sep = '\t', header = TRUE)
-
+annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                       'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr.rds'))
 
 design$batch = as.factor(design$batch)
 
-Select.genes.having.symbols = TRUE
+Select.genes.having.symbols = FALSE
 if(Select.genes.having.symbols){
   gene.mapping = gene.mapping[which(!is.na(gene.mapping$gene.symbol.nr) | !is.na(gene.mapping$gene.symbol.hs)), ]
+  all = all[!is.na(match(all$gene, gene.mapping$gene.id)), ]
 }
-
-all = all[!is.na(match(all$gene, gene.mapping$gene.id)), ]
-
 
 QC.for.cpm = FALSE
 if(QC.for.cpm){
@@ -315,14 +316,17 @@ ss = rowSums(counts(dds))
 
 hist(log2(ss), breaks = 200, main = 'log2(sum of reads for each gene)')
 
-cutoff.peak = 2^5
-cat(length(which(ss > cutoff.peak)), 'peaks selected \n')
+cutoff.gene = 30
+cat(length(which(ss > cutoff.gene)), 'genes selected \n')
 
-dds <- dds[ss > cutoff.peak, ]
+dds <- dds[ss > cutoff.gene, ]
 
 # normalization and dimensionality reduction
 dds <- estimateSizeFactors(dds)
 fpm = fpm(dds, robust = TRUE)
+
+save(fpm, design, file = paste0(tfDir, '/RNAseq_fpm_fitered.cutoff.', cutoff.gene, '.Rdata'))
+
 vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
 
 pca=plotPCA(vsd, intgroup = c('conditions', 'batch'), returnData = FALSE)
