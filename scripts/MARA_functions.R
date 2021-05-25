@@ -204,6 +204,13 @@ extract.TFs.annotation.from.TFClass = function()
   
 }
 
+collect.TFs.gene.expression = function()
+{
+  
+  tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
+  
+  
+}
 
 # manually add extra motifs for hnd-1, pha-4, unc-120 and nhr-67 from dm, mus and homo
 convert.cisbp.format.to.meme = function()
@@ -234,9 +241,6 @@ extract.SwissRegulon.meme.from.MotifDb = function()
   yy = convert_type(xx, "PWM")
   
   write_meme(yy, file = '../results/motif_analysis/SwissRegulon_PWMs/hg19_weight_matrices_v2.meme', overwrite = TRUE)
-  
-  
-  
   
 }
 
@@ -687,13 +691,12 @@ run.RF.otherMethods = function()
     
     err.test = mean(pred_test==factor(y.test, levels = levels(pred_test)))
   }
-
-#Prediction <- stats::predict(train_rf, test, type = "prob")
-#Prediction <- stats::predict(m1, test, type = "prob")
-#Prediction <- predict(train_rf, test, type = "response")$predictions
-#rf.res = data.frame(label = apply(Prediction, 1, function(x) colnames(Prediction)[which.max(x)]),
-#                    prob = apply(Prediction, 1, function(x) x[which.max(x)]), stringsAsFactors = FALSE)
-
+  
+  #Prediction <- stats::predict(train_rf, test, type = "prob")
+  #Prediction <- stats::predict(m1, test, type = "prob")
+  #Prediction <- predict(train_rf, test, type = "response")$predictions
+  #rf.res = data.frame(label = apply(Prediction, 1, function(x) colnames(Prediction)[which.max(x)]),
+  #                    prob = apply(Prediction, 1, function(x) x[which.max(x)]), stringsAsFactors = FALSE)
   
 }
 
