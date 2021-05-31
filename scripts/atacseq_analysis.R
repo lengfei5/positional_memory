@@ -287,20 +287,18 @@ if(Grouping.atac.peaks){
   ##########################################
   ## make Granges and annotate peaks
   ##########################################
-  creat.Granges.and.peakAnnotation = TRUE
-  if(creat.Granges.and.peakAnnotation){
-    pp = data.frame(t(sapply(rownames(fpm), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  Make.Granges.and.peakAnnotation = TRUE
+  if(Make.Granges.and.peakAnnotation){
+    require(ChIPpeakAnno)
+    require(ChIPseeker)
     
+    pp = data.frame(t(sapply(rownames(fpm), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
     pp$strand = '*'
     pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
                                   start.field="X2", end.field="X3", strand.field="strand")
     
-    require(ChIPpeakAnno)
-    require(ChIPseeker)
-    
-    amex = GenomicFeatures::makeTxDbFromGFF(file = paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf'))
-    #amex = makeTxDbFromGFF(file = paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf'))
-    #amex = readRDS(file = paste0(annotDir, 'TxDb_ax6_UCSC_2021_01_26_genes.putative.full.length.rds')) # reimport object does not work
+    # annotation from ucsc browser ambMex60DD_genes_putative
+    amex = GenomicFeatures::makeTxDbFromGFF(file = paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf')) 
     pp.annots = as.data.frame(annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript'))
     
   }

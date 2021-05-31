@@ -304,6 +304,7 @@ annotatePeak.curateAxolotl = function(peaks)
   ##########################################
   require(GenomicFeatures)
   require(ChIPpeakAnno)
+  
   amex = makeTxDbFromGFF(file = paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf'))
   
   saveRDS(amex, file = paste0(annotDir, 'TxDb_ax6_UCSC_2021_01_26_genes.putative.full.length.rds'))
