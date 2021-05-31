@@ -53,16 +53,13 @@ if(Import.HoxCluster.annotation){
   HoxD2 = makeGRangesFromDataFrame(HoxD2, seqnames.field = 'chr', start.field = 'start', end.field = 'end', strand.field = 'strand')
   
   Hoxs = c(HoxA, HoxD1, HoxD2)
+  
 }
 
-
-########################################################
-########################################################
-# Section II: quantitative analysis (normalization, clustering, heatmpap) 
-# Embryo 40, Embryo 44 (proximal, distal)
-# Mature arms: UA, LA and Hand together   
-########################################################
-########################################################
+##########################################
+# Here import design matrix and read counts of pooled peaks across conditions (pval < 10^-6)
+# in the future the IDR will be used to select the peaks across replicates and and then pool peaks
+##########################################
 load(file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.withinPeaks.pval6.Rdata'))
 
 ##########################################
@@ -92,12 +89,14 @@ ggplot(data = xx, aes(x = samples, y = unique.rmdup, color= conds)) +
   geom_bar(aes(fill = batch), position = "dodge", stat="identity") +
   theme(axis.text.x = element_text(angle = 90, size = 8)) + 
   geom_hline(yintercept = c(20, 50, 100)) + ylab("unique.rmdup (M)")
-  
 
 
-##########################################
-# start the DESeq2 and quantile normalization and other normalization will be tested
-##########################################
+########################################################
+########################################################
+# Section I : normalization and batch correction
+########################################################
+########################################################
+
 sels = grep('Mature|Embryo|BL_UA', design$conds)
 
 dds <- DESeqDataSetFromMatrix(as.matrix(counts[, sels]), DataFrame(design[sels, ]), design = ~ conds)

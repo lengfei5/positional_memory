@@ -1888,15 +1888,15 @@ all.peaks.test = function(x, c = c("Embryo_Stage40", "Embryo_Stage40", "Mature_U
 #   
 # }
 
+########################################################
+########################################################
+# big Section  : quatitative analysis of peaks: bineary 0 (no peak) and 1 (peak)  
+# compare the peak numbers between development, mature and regeneration 
+# QCs and first analysis based on binary data (peak, no peak)
+########################################################
+########################################################
 ATACseq.peaks.binary.analysis = function()
 {
-  ########################################################
-  ########################################################
-  # Section I : quatitative analysis of peaks: bineary 0 (no peak) and 1 (peak)  
-  # compare the peak numbers between development, mature and regeneration 
-  # 
-  ########################################################
-  ########################################################
   Compare.peaks.nb.overlapping = FALSE
   if(Compare.peaks.nb.overlapping){
     source('functions_chipSeq.R')
@@ -2226,7 +2226,3 @@ ATACseq.peaks.binary.analysis = function()
   }
   
 }
-
-
-
-
