@@ -2226,3 +2226,240 @@ ATACseq.peaks.binary.analysis = function()
   }
   
 }
+
+########################################################
+########################################################
+# Section : first analysis for subgrouped peaks, promoter, enhancers
+# 
+########################################################
+########################################################
+Grouping.peaks.for.promoters.enhancers = function()
+{
+  ##########################################
+  # overview all peaks with heatmap for subgrouped peaks
+  ##########################################
+  source('Functions.R')
+  
+  make.heatmap.atacseq()
+  
+  sel.promoter = which(overlapsAny(pp, promoters, ignore.strand = TRUE) == TRUE)
+  sel.promoter.dev = which(overlapsAny(pp, promoters.dev, ignore.strand = TRUE) == TRUE)
+  
+  ii.promoter = grep('Promoter', peakAnnots$annotation)
+  sel.intron = grep('Intron ', peakAnnots$annotation)
+  sel.intergen = grep('Intergenic', peakAnnots$annotation)
+  
+  cat(length(sel.promoter), ' peaks in promoters\n')
+  cat(length(sel.promoter.dev), ' peaks in promoters.dev \n')
+  
+  cat(length(sel.intron), ' peaks in introns\n')
+  cat(length(sel.intergen), ' peaks in intergenic regions\n')
+  
+  ii.HoxA = which(overlapsAny(pp, HoxA, ignore.strand = TRUE) == TRUE & grepl('Intron|Intergenic', peakAnnots$annotation))
+  ii.HoxD1 = which(overlapsAny(pp, HoxD1, ignore.strand = TRUE) == TRUE & grepl('Intron|Intergenic', peakAnnots$annotation))
+  ii.HoxD2 = which(overlapsAny(pp, HoxD2, ignore.strand = TRUE) == TRUE & grepl('Intron|Intergenic', peakAnnots$annotation))
+  
+  ##########################################
+  #  select conditions of interest
+  ##########################################
+  #conds.sel = c('Embryo_Stage40_93',  'Embryo_Stage40_13', 'Embryo_Stage44_proximal', 'Embryo_Stage44_distal',  'Mature_UA_', 'Mature_LA', 
+  #              'Mature_Hand', 'BL_UA_5days_13', 'BL_UA_5days_89',  'BL_UA_9days_13', 'BL_UA_13days_proximal', 'BL_UA_13days_distal')
+  
+  conds.sel = c('Embryo_Stage40_93',  'Embryo_Stage40_13', 'Embryo_Stage44_proximal', 'Embryo_Stage44_distal',
+                'Mature_UA_13',  'Mature_LA', 'Mature_Hand', 'BL_UA_5days_13', 'BL_UA_5days_89',  'BL_UA_9days_13', 'BL_UA_13days_proximal',
+                'BL_UA_13days_distal')
+  #conds.sel = c('Mature_UA_13', 'Mature_UA_74938|Mature_UA_102655', 'Mature_LA', 'Mature_Hand')
+  
+  conds.sel = c('Mature_UA_13', 'BL_UA_5days_13', 'BL_UA_9days_13', 'BL_UA_13days_proximal',  'BL_UA_13days_distal')
+  
+  sample.sel = c()
+  ii.gaps = c()
+  for(n in 1:length(conds.sel)) {
+    c = conds.sel[n]
+    sample.sel = c(sample.sel, grep(c, colnames(fpm)))
+    if(n == 1) {
+      ii.gaps = c(ii.gaps, length(grep(c, colnames(fpm))))
+    }else{
+      if(n != length(conds.sel)) ii.gaps = c(ii.gaps, (ii.gaps[n-1] + length(grep(c, colnames(fpm)))))
+    }
+  }
+  
+  df <- data.frame(colData(dds)[,c("conds", 'batch')])[sample.sel, ]
+  
+  test.normalization.quantile = FALSE
+  if(test.normalization.quantile){
+    xx = fpm[, sample.sel]
+    plot(xx[, c(1, 3)], cex = 0.1); abline(0, 1, lwd = 2.0, col ='red')
+    plot(xx[, c(2, 3)], cex = 0.2); abline(0, 1, lwd = 2.0, col ='red')
+    
+    library(factoextra)
+    res.pca <- prcomp(t(xx), scale = TRUE)
+    #res.var <- get_pca_var(res.pca)
+    
+    fviz_pca_ind(res.pca,
+                 col.ind = "cos2", # Color by the quality of representation
+                 gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+                 repel = TRUE     # Avoid text overlapping
+    )
+    
+  }
+  
+  Split.peaks.into.promoters.intron.integeic = FALSE
+  i(Split.peaks.into.promoters.intron.integeic){
+    
+    ##########################################
+    # promoter peaks
+    ##########################################
+    keep =fpm[sel.promoter.dev, sample.sel]
+    
+    filtering.with.signal = TRUE
+    if(filtering.with.signal){
+      
+      ss = apply((keep), 1, max)
+      
+      max.cutoff = 3
+      
+      hist(ss, breaks = 100)
+      abline(v = max.cutoff, col='red', lwd =2.0)
+      cat(length(which(ss>max.cutoff)), 'peak selected\n')
+      
+      keep = keep[which(ss > max.cutoff), ]
+      
+    }
+    
+    keep = as.matrix(keep)
+    pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'none', show_colnames = FALSE,
+             cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps)
+    
+    
+    pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
+             cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps)
+    
+    
+    ##########################################
+    # promoter introns
+    ##########################################
+    keep =fpm[sel.intron, sample.sel]
+    
+    filtering.with.signal = TRUE
+    if(filtering.with.signal){
+      
+      ss = apply((keep), 1, max)
+      
+      max.cutoff = 3
+      hist(ss, breaks = 100)
+      abline(v = max.cutoff, col='red', lwd =2.0)
+      cat(length(which(ss>max.cutoff)), '\n')
+      
+      keep = keep[which(ss>max.cutoff), ]
+      
+    }
+    
+    #subsample = sample(c(1:nrow(keep)), 15000)
+    #keep = keep[subsample, ]
+    pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'none', show_colnames = FALSE,
+             cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps)
+    
+    ##########################################
+    # enhancer peaks too many and subseting is necessary
+    ##########################################
+    keep =fpm[sel.intergen, sample.sel]
+    
+    filtering.with.signal = TRUE
+    if(filtering.with.signal){
+      ss = apply((keep), 1, max)
+      
+      max.cutoff = 3.5
+      hist(ss, breaks = 100)
+      abline(v = max.cutoff, col='red', lwd =2.0)
+      cat(length(which(ss>max.cutoff)), '\n')
+      
+      keep = keep[which(ss>max.cutoff), ]
+      
+    }
+    
+    #subsample = sample(c(1:nrow(keep)), 10000)
+    #keep = keep[subsample, ]
+    
+    pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'none', show_colnames = FALSE,
+             cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps)
+    
+    pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
+             cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps)
+    
+    
+    ##########################################
+    # peaks in introns and intergenic regions in HoxA and HoxD clusters 
+    ##########################################
+    keep =fpm[ii.HoxA, sample.sel]
+    pheatmap(as.matrix(log2(keep + 1)), cluster_rows=TRUE, show_rownames=FALSE, scale = 'none', show_colnames = FALSE,
+             cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps)
+    
+    keep =fpm[ii.HoxD1, sample.sel]
+    pheatmap(as.matrix(log2(keep + 1)), cluster_rows=TRUE, show_rownames=FALSE, scale = 'none', show_colnames = FALSE,
+             cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps)
+    
+    
+  }
+  
+  ##########################################
+  # position-related mature peaks 
+  ##########################################
+  Test.position.related.peaks.in.mature = FALSE
+  if(Test.position.related.peaks.in.mature){
+    keep = fpm[, sample.sel]
+    
+    filtering.with.signal = TRUE
+    if(filtering.with.signal){
+      ss = apply((keep[, c(1:4)]), 1, mean)
+      vars = apply(keep[, c(1:4)], 1, var)
+      
+      plot(ss, vars, cex = 0.15)
+      #abline(h=c(1,2), col = 'red', lwd =2.0)
+      abline(v = 1, col = 'red', lwd =2.0)
+      jj = which(vars < 1.)
+      
+      keep = keep[jj, ]
+      
+      ss = apply(keep[, c(5:6)], 1, mean)
+      vars = apply(keep[, c(5:6)], 1, var)
+      plot(ss, vars, cex = 0.15)
+      abline(h=1, col = 'red', lwd =2.0)
+      
+      jj = which(vars < 1)
+      
+      keep = keep[jj, ]
+      
+      ss = apply(keep[, c(7:8)], 1, mean)
+      vars = apply(keep[, c(7:8)], 1, var)
+      plot(ss, vars, cex = 0.15)
+      
+      jj = which(vars < 1)
+      
+      keep = keep[jj, ]
+      
+      ss = apply(keep, 1, mean)
+      vars = apply(keep, 1, var)
+      plot(ss, vars, cex = 0.15)
+      
+      jj = which(ss>0 & vars >1)
+      
+      keep = keep[jj, ]
+      
+      
+      max.cutoff = 3.5
+      hist(ss, breaks = 100)
+      abline(v = max.cutoff, col='red', lwd =2.0)
+      cat(length(which(ss>max.cutoff)), '\n')
+      
+      
+    }
+    
+    pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
+             color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(100),
+             cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps)
+    
+    
+  }
+  
+}
