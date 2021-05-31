@@ -91,6 +91,19 @@ ggplot(data = xx, aes(x = samples, y = unique.rmdup, color= conds)) +
   geom_hline(yintercept = c(20, 50, 100)) + ylab("unique.rmdup (M)")
 
 
+
+########################################################
+########################################################
+# Section 0 : quatitative analysis of peaks: bineary 0 (no peak) and 1 (peak)
+# QCs and first analysis based on binary data (peak, no peak)
+########################################################
+########################################################
+Binary.peaks.QCs.analysis = FALSE
+if(Binary.peaks.QCs.analysis){
+  source('Functions.R')
+  ATACseq.peaks.binary.analysis()
+}
+
 ########################################################
 ########################################################
 # Section I : normalization and batch correction
@@ -248,6 +261,7 @@ if(Normalization.BatchCorrect){
   #plotDispEsts(dds, ymin = 10^-4)
   
 }
+
 
 ########################################################
 ########################################################
