@@ -96,165 +96,162 @@ ggplot(data = xx, aes(x = samples, y = unique.rmdup, color= conds)) +
 # Section I : normalization and batch correction
 ########################################################
 ########################################################
-
-sels = grep('Mature|Embryo|BL_UA', design$conds)
-
-dds <- DESeqDataSetFromMatrix(as.matrix(counts[, sels]), DataFrame(design[sels, ]), design = ~ conds)
-
-#rm(counts)
-
-# check the peak length
-peakNames = rownames(dds)
-pp = data.frame(t(sapply(peakNames, function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
-
-pp$strand = '*'
-pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
-                              start.field="X2", end.field="X3", strand.field="strand")
-ll = width(pp)
-
-
-select.peaks.with.readThreshold = TRUE
-select.background.for.peaks = TRUE
-
-if(select.peaks.with.readThreshold){
-  #ss = rowMax(counts(dds)[, grep('Embryo_', dds$conds)])
-  ss = rowMax(counts(dds))/ll*500
+Normalization.BatchCorrect = FALSE
+if(Normalization.BatchCorrect){
+  sels = grep('Mature|Embryo|BL_UA', design$conds)
   
-  hist(log10(ss), breaks = 200, main = 'log2(sum of read within peaks) ')
-  cutoff.peak = 40
-  cutoff.bg = 10
-  cat(length(which(ss >= cutoff.peak)), 'peaks selected with minimum read of the highest peak -- ', cutoff.peak,  '\n')
-  cat(length(which(ss < cutoff.bg)), 'peaks selected with minimum read of the highest peak -- ', cutoff.bg,  '\n')
-  abline(v= log10(cutoff.peak), col = 'red', lwd = 2.0)
-  abline(v= log10(cutoff.bg), col = 'blue', lwd = 2.0)
+  dds <- DESeqDataSetFromMatrix(as.matrix(counts[, sels]), DataFrame(design[sels, ]), design = ~ conds)
   
-  if(select.background.for.peaks){
-    ii = which(ss >= cutoff.peak)
-    ii.bg = which(ss < cutoff.bg)
-    ii.bg = sample(ii.bg, size = 1000, replace = FALSE)
-    rownames(dds)[ii.bg] = paste0('bg_', rownames(dds)[ii.bg])
-    dds = dds[c(ii, ii.bg), ]
-    ll.sels = ll[c(ii, ii.bg)]
+  #rm(counts)
+  
+  # check the peak length
+  peakNames = rownames(dds)
+  pp = data.frame(t(sapply(peakNames, function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
+  
+  pp$strand = '*'
+  pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
+  ll = width(pp)
+  
+  
+  select.peaks.with.readThreshold = TRUE
+  select.background.for.peaks = TRUE
+  
+  if(select.peaks.with.readThreshold){
+    #ss = rowMax(counts(dds)[, grep('Embryo_', dds$conds)])
+    ss = rowMax(counts(dds))/ll*500
     
-  }else{
-    dds <- dds[ss >= cutoff.peak, ]
-    ll.sels = ll[ss >= cutoff.peak]
-  }
-  
-}
-
-dds <- estimateSizeFactors(dds)
-plot(sizeFactors(dds), colSums(counts(dds))/median(colSums(counts(dds))), log = 'xy')
-
-plot(sizeFactors(dds), design$unique.rmdup, log = 'xy')
-text(sizeFactors(dds), design$unique.rmdup, labels = design$samples, cex = 0.7)
-
-save.scalingFactors.for.deeptools = FALSE
-if(save.scalingFactors.for.deeptools){
-  xx = data.frame(sampleID = design$SampleID,  
-                  scalingFactor = design$unique.rmdup/(sizeFactors(dds)*median(design$unique.rmdup)),
-                  stringsAsFactors = FALSE)
-  
-  write.table(xx, file = paste0(resDir, '/DESeq2_scalingFactor_forDeeptools.txt'), sep = '\t',
-              col.names = FALSE, row.names = FALSE, quote = FALSE)
-  
-}
-
-##########################################
-# QCs again for embryo and mature samples
-# Control the peak quality by checking the house-keeping genes and other-tissue specific genes, 
-# GO-enrichment analysis
-##########################################
-QC.PLOT = FALSE
-if(QC.PLOT){
-  pdfname = paste0(resDir, "/atacseq_Embryo_Mature_QCs_pval6.pdf")
-  pdf(pdfname, width = 12, height = 10)
-  
-  Check.RNAseq.Quality(read.count=counts(dds)[c(1:12000),], design.matrix = data.frame(design$SampleID, 
-                                                                                       design$conds, design$batch))
-  dev.off()
-  
-}
-
-Check.promoter.peak.enrichment = FALSE
-if(Check.promoter.peak.enrichment){
-  source('Functions.R')
-  DoubleCheck.promoter.peaks.enrichment(fpm)
-
-}
-
-##########################################
-# test normalization and batch correction of ATAC-seq data
-# TMM and combat were selected for normalization and batch correction
-##########################################
-Test.atac.normalization.batch.correction = FALSE
-if(Test.atac.normalization.batch.correction){
-  source('Functions.R')
-  
-  #norms = normalize.batch.correct(dds, design, norm.batch.method ='TMM.combat')
-  library(edgeR)
-  
-  d <- DGEList(counts=counts(dds), group=design$conds)
-  tmm <- calcNormFactors(d, method='TMM')
-  fpm = cpm(tmm, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 1)
-  rm(tmm)
-  rm(d)
-  #fpm = log2(tmm + 1)
-  
-  require("sva")
-  bc = as.factor(design$batch)
-  mod = model.matrix(~ as.factor(conds), data = design)
-  fpm.bc = ComBat(dat=fpm, batch=bc, mod=mod, par.prior=TRUE, ref.batch = '2021')    
-  fpm = fpm.bc
-  
-  make.pca.plots(fpm.bc, ntop = 5000, conds.plot = 'all')
-  make.pca.plots(fpm.bc, ntop = 3000, conds.plot = 'Dev.Mature')
-  
-  rm(fpm.bc)
-  saveRDS(fpm, file = paste0(RdataDir, '/fpm_TMM_combat.rds'))
-  
-  # normalize the peak width to have fpkm
-  FPKM.normalization = FALSE
-  if(FPKM.normalization){
-    library(preprocessCore)
+    hist(log10(ss), breaks = 200, main = 'log2(sum of read within peaks) ')
+    cutoff.peak = 40
+    cutoff.bg = 10
+    cat(length(which(ss >= cutoff.peak)), 'peaks selected with minimum read of the highest peak -- ', cutoff.peak,  '\n')
+    cat(length(which(ss < cutoff.bg)), 'peaks selected with minimum read of the highest peak -- ', cutoff.bg,  '\n')
+    abline(v= log10(cutoff.peak), col = 'red', lwd = 2.0)
+    abline(v= log10(cutoff.bg), col = 'blue', lwd = 2.0)
     
-    peakNames = rownames(fpm)
-    peakNames = gsub('bg_', '', peakNames)
-    peakNames = gsub('_', '-', peakNames)
-    
-    pp = data.frame(t(sapply(peakNames, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
-    
-    pp$strand = '*'
-    pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
-                                  start.field="X2", end.field="X3", strand.field="strand")
-    ll = width(pp)
-    
-    fpkm = fpm.bc
-    for(n in 1:ncol(fpkm))
-    {
-      fpkm[,n] = fpkm[,n]/ll*10^3
+    if(select.background.for.peaks){
+      ii = which(ss >= cutoff.peak)
+      ii.bg = which(ss < cutoff.bg)
+      ii.bg = sample(ii.bg, size = 1000, replace = FALSE)
+      rownames(dds)[ii.bg] = paste0('bg_', rownames(dds)[ii.bg])
+      dds = dds[c(ii, ii.bg), ]
+      ll.sels = ll[c(ii, ii.bg)]
+      
+    }else{
+      dds <- dds[ss >= cutoff.peak, ]
+      ll.sels = ll[ss >= cutoff.peak]
     }
     
-    fpkm.qn = normalize.quantiles(fpkm)
-    colnames(fpkm.qn) = colnames(fpkm)
-    rownames(fpkm.qn) = rownames(fpkm)
-    fpkm = fpkm.qn
-    #rm(fpm.qn)
-    make.pca.plots(fpkm.qn, ntop = 5000, conds.plot = 'all')
-    
-    rm(fpkm.qn)
-    
-    save(fpm, fpkm, file = paste0(RdataDir, '/fpm_TMM_combat_fpkm_quantileNorm.Rdata'))
   }
- 
+  
+  dds <- estimateSizeFactors(dds)
+  plot(sizeFactors(dds), colSums(counts(dds))/median(colSums(counts(dds))), log = 'xy')
+  
+  plot(sizeFactors(dds), design$unique.rmdup, log = 'xy')
+  text(sizeFactors(dds), design$unique.rmdup, labels = design$samples, cex = 0.7)
+  
+  save.scalingFactors.for.deeptools = FALSE
+  if(save.scalingFactors.for.deeptools){
+    xx = data.frame(sampleID = design$SampleID,  
+                    scalingFactor = design$unique.rmdup/(sizeFactors(dds)*median(design$unique.rmdup)),
+                    stringsAsFactors = FALSE)
+    
+    write.table(xx, file = paste0(resDir, '/DESeq2_scalingFactor_forDeeptools.txt'), sep = '\t',
+                col.names = FALSE, row.names = FALSE, quote = FALSE)
+    
+  }
+  
+  ##########################################
+  # QCs again for embryo and mature samples
+  # Control the peak quality by checking the house-keeping genes and other-tissue specific genes, 
+  # GO-enrichment analysis
+  ##########################################
+  QC.PLOT = FALSE
+  if(QC.PLOT){
+    pdfname = paste0(resDir, "/atacseq_Embryo_Mature_QCs_pval6.pdf")
+    pdf(pdfname, width = 12, height = 10)
+    
+    Check.RNAseq.Quality(read.count=counts(dds)[c(1:12000),], design.matrix = data.frame(design$SampleID, 
+                                                                                         design$conds, design$batch))
+    dev.off()
+    
+  }
+  
+  ##########################################
+  # test normalization and batch correction of ATAC-seq data
+  # TMM and combat were selected for normalization and batch correction
+  ##########################################
+  Test.atac.normalization.batch.correction = FALSE
+  if(Test.atac.normalization.batch.correction){
+    source('Functions.R')
+    
+    #norms = normalize.batch.correct(dds, design, norm.batch.method ='TMM.combat')
+    library(edgeR)
+    
+    d <- DGEList(counts=counts(dds), group=design$conds)
+    tmm <- calcNormFactors(d, method='TMM')
+    fpm = cpm(tmm, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 1)
+    rm(tmm)
+    rm(d)
+    #fpm = log2(tmm + 1)
+    
+    require("sva")
+    bc = as.factor(design$batch)
+    mod = model.matrix(~ as.factor(conds), data = design)
+    fpm.bc = ComBat(dat=fpm, batch=bc, mod=mod, par.prior=TRUE, ref.batch = '2021')    
+    fpm = fpm.bc
+    
+    make.pca.plots(fpm.bc, ntop = 5000, conds.plot = 'all')
+    make.pca.plots(fpm.bc, ntop = 3000, conds.plot = 'Dev.Mature')
+    
+    rm(fpm.bc)
+    saveRDS(fpm, file = paste0(RdataDir, '/fpm_TMM_combat.rds'))
+    
+    # normalize the peak width to have fpkm
+    FPKM.normalization = FALSE
+    if(FPKM.normalization){
+      library(preprocessCore)
+      
+      peakNames = rownames(fpm)
+      peakNames = gsub('bg_', '', peakNames)
+      peakNames = gsub('_', '-', peakNames)
+      
+      pp = data.frame(t(sapply(peakNames, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+      
+      pp$strand = '*'
+      pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                    start.field="X2", end.field="X3", strand.field="strand")
+      ll = width(pp)
+      
+      fpkm = fpm.bc
+      for(n in 1:ncol(fpkm))
+      {
+        fpkm[,n] = fpkm[,n]/ll*10^3
+      }
+      
+      fpkm.qn = normalize.quantiles(fpkm)
+      colnames(fpkm.qn) = colnames(fpkm)
+      rownames(fpkm.qn) = rownames(fpkm)
+      fpkm = fpkm.qn
+      #rm(fpm.qn)
+      make.pca.plots(fpkm.qn, ntop = 5000, conds.plot = 'all')
+      
+      rm(fpkm.qn)
+      
+      save(fpm, fpkm, file = paste0(RdataDir, '/fpm_TMM_combat_fpkm_quantileNorm.Rdata'))
+    }
+    
+    
+  }
+  
+  #dds <- estimateDispersions(dds)
+  #plotDispEsts(dds, ymin = 10^-4)
   
 }
 
-#dds <- estimateDispersions(dds)
-#plotDispEsts(dds, ymin = 10^-4)
 ########################################################
 ########################################################
-# Section : grouping atac-seq peak profiles
+# Section II : grouping atac-seq peak profiles
 # 1) first identify static peaks (probably most of them) with model selection 
 # (linear regression with only intercept and nonlinear fitting with spline or GAM)
 # 2) grouping dynamic peaks using DP-GP
@@ -376,6 +373,14 @@ if(Grouping.atac.peaks){
     ggplot(data=aa, aes(x=peakAnnot, y=nb.peaks, fill=groups)) +
       geom_bar(stat="identity", color="black", position=position_dodge()) +
       theme_minimal()  + scale_fill_manual(values=c('#999999','#E69F00'))
+    
+    
+    Check.promoter.peak.enrichment = FALSE
+    if(Check.promoter.peak.enrichment){
+      source('Functions.R')
+      DoubleCheck.promoter.peaks.enrichment(fpm)
+      
+    }
     
   }
   
