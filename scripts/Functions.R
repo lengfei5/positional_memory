@@ -236,7 +236,6 @@ select.promoters.regions = function(upstream = 2000, downstream = 2000, ORF.type
   #index.geneSymbols = which(!is.na(gene.mapping$gene.symbol.hs)|!is.na(gene.mapping$gene.symbol.nr))
   
   # select putative full length transcripts and C-terminal transcripts
-  
   if(ORF.type.gtf == 'Putative'){
     cat('select putative full length transcripts \n')
     index.sel = which(annot$ORF.type_gtf.transcript == 'Putative')
@@ -244,6 +243,7 @@ select.promoters.regions = function(upstream = 2000, downstream = 2000, ORF.type
     cat('select putative full length transcripts and C-terminal transcripts \n')
     index.sel = which(annot$ORF.type_gtf.transcript == 'Putative' | annot$ORF.type_gtf.transcript == 'N-terminal')
   }
+  
   index.sel = index.sel[grep('^chr', annot$chr_transcript[index.sel])] # rm genes in cotigs
   
   tss = data.frame(annot[index.sel, c(25, 26, 27, 1, 28, 7)], stringsAsFactors = FALSE)
@@ -307,7 +307,7 @@ annotatePeak.curateAxolotl = function(peaks)
   amex = makeTxDbFromGFF(file = paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf'))
   
   saveRDS(amex, file = paste0(annotDir, 'TxDb_ax6_UCSC_2021_01_26_genes.putative.full.length.rds'))
-
+  
   peakAnnots = annotatePeak(p1, TxDb=amex, tssRegion = c(-2000, 2000))
   xx = data.frame(peakAnnots)
   

@@ -91,7 +91,6 @@ ggplot(data = xx, aes(x = samples, y = unique.rmdup, color= conds)) +
   geom_hline(yintercept = c(20, 50, 100)) + ylab("unique.rmdup (M)")
 
 
-
 ########################################################
 ########################################################
 # Section 0 : quatitative analysis of peaks: bineary 0 (no peak) and 1 (peak)
@@ -135,6 +134,7 @@ if(Normalization.BatchCorrect){
     ss = rowMax(counts(dds))/ll*500
     
     hist(log10(ss), breaks = 200, main = 'log2(sum of read within peaks) ')
+    
     cutoff.peak = 40
     cutoff.bg = 10
     cat(length(which(ss >= cutoff.peak)), 'peaks selected with minimum read of the highest peak -- ', cutoff.peak,  '\n')
@@ -155,9 +155,10 @@ if(Normalization.BatchCorrect){
       ll.sels = ll[ss >= cutoff.peak]
     }
     
+    dds <- estimateSizeFactors(dds)
+      
   }
   
-  dds <- estimateSizeFactors(dds)
   plot(sizeFactors(dds), colSums(counts(dds))/median(colSums(counts(dds))), log = 'xy')
   
   plot(sizeFactors(dds), design$unique.rmdup, log = 'xy')
@@ -279,13 +280,14 @@ if(Grouping.atac.peaks){
   fpm = readRDS(file = paste0(RdataDir, '/fpm_TMM_combat.rds'))
   
   # prepare the background distribution
-  jj = grep('bg_', rownames(fpm), invert = TRUE)
   fpm.bg = fpm[grep('bg_', rownames(fpm), invert = FALSE), ]
-  fpm = fpm[jj, ]
+  fpm = fpm[grep('bg_', rownames(fpm), invert = TRUE), ]
   rownames(fpm) = gsub('_', '-', rownames(fpm))
   
+  ##########################################
+  ## make Granges and annotate peaks
+  ##########################################
   creat.Granges.and.peakAnnotation = TRUE
-  # make Granges and annotate peaks
   if(creat.Granges.and.peakAnnotation){
     pp = data.frame(t(sapply(rownames(fpm), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
     
