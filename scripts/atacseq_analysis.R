@@ -308,46 +308,56 @@ if(Grouping.atac.peaks){
   ##########################################
   make.test.All.Peaks = FALSE
   if(make.test.All.Peaks){
-    conds = c("Embryo_Stage40", "Embryo_Stage44_proximal", "Embryo_Stage44_distal",
-              "Mature_UA",  "Mature_LA", "Mature_Hand", 
-              "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal", "BL_UA_13days_distal")
     
-    # examples to test
-    test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
-    #test.examples = c('Hoxa13')
-    ii.test = which(overlapsAny(pp, promoters[which(!is.na(match(promoters$geneSymbol, test.examples)))]))
-    #ii.Hox = which(overlapsAny(pp, Hoxs))
-    #ii.test = unique(c(ii.test, ii.Hox))
-    
-    sample.sels = c()
-    cc = c()
-    for(n in 1:length(conds)) {
-      kk = which(design$conds == conds[n] & design$SampleID != '136159')
-      sample.sels = c(sample.sels, kk)
-      cc = c(cc, rep(conds[n], length(kk)))
+    Run.all.peaks.test = FALSE
+    if(Run.all.peaks.test){
+      
+      # all conditions included
+      conds = c("Embryo_Stage40", "Embryo_Stage44_proximal", "Embryo_Stage44_distal",
+                "Mature_UA",  "Mature_LA", "Mature_Hand", 
+                "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal", "BL_UA_13days_distal")
+      
+      # test examples
+      test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
+      #test.examples = c('Hoxa13')
+      ii.test = which(overlapsAny(pp, promoters[which(!is.na(match(promoters$geneSymbol, test.examples)))]))
+      #ii.Hox = which(overlapsAny(pp, Hoxs))
+      #ii.test = unique(c(ii.test, ii.Hox))
+      
+      sample.sels = c()
+      cc = c()
+      for(n in 1:length(conds)) {
+        kk = which(design$conds == conds[n] & design$SampleID != '136159')
+        sample.sels = c(sample.sels, kk)
+        cc = c(cc, rep(conds[n], length(kk)))
+      }
+      
+      library(tictoc)
+      ii.test = c(1:nrow(fpm)) # takes about 2 mins for 40k peaks
+      
+      source('Functions.R')
+      tic() 
+      res = t(apply(fpm[ii.test, sample.sels], 1, all.peaks.test, c = cc))
+      res = data.frame(res, pp.annots[ii.test, ], stringsAsFactors = FALSE)
+      toc()
+      
+      saveRDS(res, file = paste0(RdataDir, '/res_allPeaks_test.rds'))
+      
+    }else{
+      res = readRDS(file = paste0(RdataDir, '/res_allPeaks_test.rds'))
+      
     }
-    
-    library(tictoc)
-    ii.test = c(1:nrow(fpm)) # takes about 2 mins for 40k peaks
-    
-    source('Functions.R')
-    tic() 
-    res = t(apply(fpm[ii.test, sample.sels], 1, all.peaks.test, c = cc))
-    res = data.frame(res, pp.annots[ii.test, ], stringsAsFactors = FALSE)
-    toc()
-    
-    saveRDS(res, file = paste0(RdataDir, '/res_allPeaks_test.rds'))
     
     jj = which(res$prob.M0 < 0.5 & res$log2FC >1)
     xx = res[c(jj), ]
-    xx = xx[order(-xx$log2FC.mature), ]
+    xx = xx[order(-xx$log2FC), ]
     
-    length(which(xx$min.mature <3.0))
-    length(which(xx$min.mature <2.5))
-    length(which(xx$min.mature <2.))
-    
+    length(which(xx$min <3.0))
+    length(which(xx$min <2.5))
+    length(which(xx$min <2.))
     
     bgs = data.frame(bg = as.numeric(fpm.bg))
+    
     ggplot(bgs, aes(x=bg)) + geom_histogram(binwidth = 0.25, color="darkblue", fill="lightblue")
     
     #xx = xx[which(xx$min.m < 3 & xx$max >3), ]

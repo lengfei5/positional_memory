@@ -307,7 +307,7 @@ annotatePeak.curateAxolotl = function(peaks)
   
   amex = makeTxDbFromGFF(file = paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf'))
   
-  saveRDS(amex, file = paste0(annotDir, 'TxDb_ax6_UCSC_2021_01_26_genes.putative.full.length.rds'))
+  #saveRDS(amex, file = paste0(annotDir, 'TxDb_ax6_UCSC_2021_01_26_genes.putative.full.length.rds'))
   
   peakAnnots = annotatePeak(p1, TxDb=amex, tssRegion = c(-2000, 2000))
   xx = data.frame(peakAnnots)
@@ -322,6 +322,7 @@ annotatePeak.curateAxolotl = function(peaks)
   return(peaks)
   
 }
+
 
 ########################################################
 ########################################################
