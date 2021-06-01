@@ -53,8 +53,6 @@ if(Import.HoxCluster.annotation){
   
 }
 
-
-
 ##########################################
 # Here import design matrix and read counts of pooled peaks across conditions (pval < 10^-6)
 # in the future the IDR will be used to select the peaks across replicates and and then pool peaks
@@ -297,14 +295,16 @@ if(Grouping.atac.peaks){
                                   start.field="X2", end.field="X3", strand.field="strand")
     
     # annotation from ucsc browser ambMex60DD_genes_putative
-    amex = GenomicFeatures::makeTxDbFromGFF(file = paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf')) 
+    amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
     pp.annots = as.data.frame(annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript'))
     
   }
   
+  promoters = select.promoters.regions(upstream = 2000, downstream = 2000, ORF.type.gtf = 'Putative', promoter.select = 'all')
   
   ##########################################
   # all-peaks test M0 (static peaks), M1 (dynamic peaks above background), M2 (dyanmic peaks with some condtions below background)
+  # we will also loci that are always open across all conditions
   ##########################################
   make.test.All.Peaks = FALSE
   if(make.test.All.Peaks){
@@ -348,7 +348,7 @@ if(Grouping.atac.peaks){
       
     }
     
-    jj = which(res$prob.M0 < 0.5 & res$log2FC >1)
+    jj = which(res$prob.M0 < 0.05 & res$log2FC >1)
     xx = res[c(jj), ]
     xx = xx[order(-xx$log2FC), ]
     
@@ -358,14 +358,94 @@ if(Grouping.atac.peaks){
     
     bgs = data.frame(bg = as.numeric(fpm.bg))
     
+    ggplot(bgs, aes(x=bg)) + geom_histogram(binwidth = 0.25, color="darkblue", fill="lightblue") +
+      theme(axis.text.x = element_text(angle = 0, size = 16)) + 
+      xlab(" background signals (log2)") 
+    
+    Test.promoter.openness = FALSE
+    if(Test.promoter.openness){
+      
+      source('Functions.R')
+      Test.promoter.openness.enrichment(res, bg) # two different methods to test nonHS promoters have tendancy to be open across conditions
+      
+      #DoubleCheck.promoter.peaks.enrichment(fpm) # double check those open promoters are not due to sample contamination
+      
+      
+    }
+    
+  }
+  
+  ##########################################
+  # position-dependent test
+  ##########################################
+  grouping.position.dependent.peaks = FALSE
+  if(grouping.position.dependent.peaks){
+    
+    # examples to test 
+    test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
+    #test.examples = c('Hoxa13')
+    ii.test = which(overlapsAny(pp, promoters[which(!is.na(match(promoters$geneSymbol, test.examples)))]))
+    #ii.Hox = which(overlapsAny(pp, Hoxs))
+    #ii.test = unique(c(ii.test, ii.Hox))
+    
+    #conds = as.character(unique(design$conds))
+    conds = c("Mature_UA", "Mature_LA", "Mature_Hand", 
+              "Embryo_Stage44_proximal", "Embryo_Stage44_distal",
+              "BL_UA_13days_proximal", "BL_UA_13days_distal")
+    
+    sample.sels = c()
+    cc = c()
+    for(n in 1:length(conds)) {
+      kk = which(design$conds == conds[n] & design$SampleID != '136159')
+      sample.sels = c(sample.sels, kk)
+      cc = c(cc, rep(conds[n], length(kk)))
+    }
+    
+    
+    library(tictoc)
+    ii.test = c(1:nrow(fpm)) # takes about 2 mins for 40k peaks
+    source('Functions.R')
+    tic() 
+    res = t(apply(fpm[ii.test, sample.sels], 1, spatial.peaks.test, c = cc))
+    res = data.frame(res, pp.annots[ii.test, ], stringsAsFactors = FALSE)
+    toc()
+    
+    saveRDS(res, file = paste0(RdataDir, '/res_position_dependant_test.rds'))
+    
+    res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test.rds'))
+    
+    # select the spatially dynamic peaks
+    jj = which(res$prob.M0.mature < 0.01 & res$log2FC.mature >1)
+    #jj1 = which(res$pval.embryo < 0.01 & res$log2FC.embryo >1)
+    #jj2 = which(res$pval.BL < 0.01 & res$log2FC.BL >1)
+    
+    xx = res[c(jj), ]
+    xx = xx[order(-xx$log2FC.mature), ]
+    
+    length(which(xx$min.mature <3.0))
+    length(which(xx$min.mature <2.5))
+    length(which(xx$min.mature <2.))
+    
+    
+    keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
+    keep = as.matrix(keep)
+    
+    ##########################################
+    # first motif activity analysis for temporally dynamic peaks 
+    ##########################################
+    source('MARA_functions.R')
+    jj = grep('Mature', cc)
+    keep = keep[, jj]
+    cc = cc[jj]
+    
+    xx = run.MARA.atac.temporal(keep, cc)
+    
+    
+    library(ggplot2)
+    bgs = data.frame(bg = as.numeric(fpm.bg))
     ggplot(bgs, aes(x=bg)) + geom_histogram(binwidth = 0.25, color="darkblue", fill="lightblue")
     
-    #xx = xx[which(xx$min.m < 3 & xx$max >3), ]
-    
-    #write.table(xx, file = paste0(resDir, '/HoxClusters_spatialDynamic_peaks.txt'), 
-    #            col.names = TRUE, row.names = TRUE, sep = '\t', quote = FALSE)
-    
-    mins = res$min
+    mins = apply(cbind(res$max.mature, res$min.BL, res$min.embryo), 1, min)
     
     nb.openloci = c()
     thresholds = seq(2, 4, by = 0.1)
@@ -379,34 +459,38 @@ if(Grouping.atac.peaks){
     ggplot(opens, aes(x = thresholds, y = nb.open)) +
       geom_point(color = 'blue') + geom_line() +
       geom_vline(xintercept = 3.0, color = 'red') +
-      ggtitle('% of peaks above the bg thresholds')
+      ggtitle('% of all peaks above the bg thresholds')
     
     
-    xx = res
-    xx$annotation[grep('Promoter', xx$annotation)] = 'Promoter'
-    xx$annotation[grep('Intron', xx$annotation)] = 'Intron'
-    xx$annotation[grep('Exon', xx$annotation)] = 'Exon'
-    xx$annotation[grep('Downstream', xx$annotation)] = 'Downstream'
+    # visualize the position-dependent peaks
+    source('Functions.R')
     
-    aa = c(table(xx$annotation), table(xx$annotation[which(xx$min>3)]))
-    aa = data.frame(names(aa), aa, rep(c('Peak.all', 'Peak.above.bg'), each = 7))
-    colnames(aa) = c('peakAnnot', 'nb.peaks', 'groups')
-    #aa$peakAnnot = as.factor(as.character(aa$peakAnnot))
-    #aa = aa[, -3]
+    # for(c in c('Mature', 'Embryo', 'BL_UA'))
+    # {
+    #   jj = grep(c, cc)
+    #   keep[,jj] = t(apply(keep[, jj], 1, scale, scale = FALSE))
+    # }
     
-    ggplot(data=aa, aes(x=peakAnnot, y=nb.peaks, fill=groups)) +
-      geom_bar(stat="identity", color="black", position=position_dodge()) +
-      theme_minimal()  + scale_fill_manual(values=c('#999999','#E69F00'))
+    df <- data.frame(cc)
+    rownames(df) = colnames(keep)
+    
+    ii.gaps = c(7, 11)
+    
+    pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
+             cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps)
     
     
-    Check.promoter.peak.enrichment = FALSE
-    if(Check.promoter.peak.enrichment){
-      source('Functions.R')
-      DoubleCheck.promoter.peaks.enrichment(fpm)
-      
-    }
+    pdfname = paste0(resDir, "/peak_profiles_test.static.peaks.pdf")
+    pdf(pdfname, width = 10, height = 6)
+    par(cex = 1.0, las = 1, mgp = c(3,1,0), mar = c(6,3,2,0.2), tcl = -0.3)
+    
+    mains = signif(res, d = 2)
+    plot.peak.profiles(peak.name = names, fpm = fpm, mains = mains)
+    
+    dev.off()
     
   }
+  
   
   ##########################################
   # temporal-peaks test
@@ -475,128 +559,6 @@ if(Grouping.atac.peaks){
     ##########################################
     source('MARA_functions.R')
     xx = run.MARA.atac.temporal(keep, cc)
-    
-  }
-  
-  
-  
-  ##########################################
-  # position-dependent test
-  ##########################################
-  grouping.position.dependent.peaks = FALSE
-  if(grouping.position.dependent.peaks){
-    # examples to test 
-    test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
-    #test.examples = c('Hoxa13')
-    ii.test = which(overlapsAny(pp, promoters[which(!is.na(match(promoters$geneSymbol, test.examples)))]))
-    #ii.Hox = which(overlapsAny(pp, Hoxs))
-    #ii.test = unique(c(ii.test, ii.Hox))
-    
-    #conds = as.character(unique(design$conds))
-    conds = c("Mature_UA", "Mature_LA", "Mature_Hand", 
-              "Embryo_Stage44_proximal", "Embryo_Stage44_distal",
-              "BL_UA_13days_proximal", "BL_UA_13days_distal")
-    sample.sels = c()
-    cc = c()
-    for(n in 1:length(conds)) {
-      kk = which(design$conds == conds[n] & design$SampleID != '136159')
-      sample.sels = c(sample.sels, kk)
-      cc = c(cc, rep(conds[n], length(kk)))
-    }
-    
-    
-    library(tictoc)
-    ii.test = c(1:nrow(fpm)) # takes about 2 mins for 40k peaks
-    source('Functions.R')
-    tic() 
-    res = t(apply(fpm[ii.test, sample.sels], 1, spatial.peaks.test, c = cc))
-    res = data.frame(res, pp.annots[ii.test, ], stringsAsFactors = FALSE)
-    toc()
-    
-    saveRDS(res, file = paste0(RdataDir, '/res_position_dependant_test.rds'))
-    
-    res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test.rds'))
-    
-    # select the spatially dynamic peaks
-    jj = which(res$prob.M0.mature < 0.01 & res$log2FC.mature >1)
-    #jj1 = which(res$pval.embryo < 0.01 & res$log2FC.embryo >1)
-    #jj2 = which(res$pval.BL < 0.01 & res$log2FC.BL >1)
-    
-    xx = res[c(jj), ]
-    xx = xx[order(-xx$log2FC.mature), ]
-    
-    length(which(xx$min.mature <3.0))
-    length(which(xx$min.mature <2.5))
-    length(which(xx$min.mature <2.))
-    
-    
-    keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
-    keep = as.matrix(keep)
-    
-    ##########################################
-    # first motif activity analysis for temporally dynamic peaks 
-    ##########################################
-    source('MARA_functions.R')
-    jj = grep('Mature', cc)
-    keep = keep[, jj]
-    cc = cc[jj]
-    
-    xx = run.MARA.atac.temporal(keep, cc)
-    
-    
-    
-    library(ggplot2)
-    bgs = data.frame(bg = as.numeric(fpm.bg))
-    ggplot(bgs, aes(x=bg)) + geom_histogram(binwidth = 0.25, color="darkblue", fill="lightblue")
-    
-    #xx = xx[which(xx$min.m < 3 & xx$max >3), ]
-    
-    #write.table(xx, file = paste0(resDir, '/HoxClusters_spatialDynamic_peaks.txt'), 
-    #            col.names = TRUE, row.names = TRUE, sep = '\t', quote = FALSE)
-    
-    mins = apply(cbind(res$max.mature, res$min.BL, res$min.embryo), 1, min)
-    
-    nb.openloci = c()
-    thresholds = seq(2, 4, by = 0.1)
-    for(cutoff in thresholds)
-    {
-      nb.openloci = c(nb.openloci, length(which(mins>cutoff)))
-    }
-    
-    opens = data.frame(thresholds = thresholds, nb.open = nb.openloci/nrow(fpm))
-    
-    ggplot(opens, aes(x = thresholds, y = nb.open)) +
-      geom_point(color = 'blue') + geom_line() +
-      geom_vline(xintercept = 3.0, color = 'red') +
-      ggtitle('% of all peaks above the bg thresholds')
-    
-    
-    # visualize the position-dependent peaks
-    source('Functions.R')
-   
-    # for(c in c('Mature', 'Embryo', 'BL_UA'))
-    # {
-    #   jj = grep(c, cc)
-    #   keep[,jj] = t(apply(keep[, jj], 1, scale, scale = FALSE))
-    # }
-    
-    df <- data.frame(cc)
-    rownames(df) = colnames(keep)
-    
-    ii.gaps = c(7, 11)
-    
-    pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
-             cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps)
-    
-    
-    pdfname = paste0(resDir, "/peak_profiles_test.static.peaks.pdf")
-    pdf(pdfname, width = 10, height = 6)
-    par(cex = 1.0, las = 1, mgp = c(3,1,0), mar = c(6,3,2,0.2), tcl = -0.3)
-    
-    mains = signif(res, d = 2)
-    plot.peak.profiles(peak.name = names, fpm = fpm, mains = mains)
-    
-    dev.off()
     
   }
   

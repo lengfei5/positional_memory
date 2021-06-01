@@ -215,12 +215,15 @@ processing.development.genes.from.Sergej.paper = function()
 # 
 ########################################################
 ########################################################
-prepare.annotatioin.gtf.for.peak.annotation = function(annotDir)
-{
-   
-}
+# prepare.annotatioin.gtf.for.peak.annotation = function(annotDir)
+# {
+#    
+# }
 
-select.promoters.regions = function(upstream = 2000, downstream = 2000, ORF.type.gtf = 'Putative', toSave = FALSE)
+select.promoters.regions = function(upstream = 2000, downstream = 2000, 
+                                    ORF.type.gtf = 'Putative', promoter.select = 'all',
+                                    
+                                    toSave = FALSE)
 {
   require(GenomicRanges)
   cat('load gtf annotation \n')
@@ -258,7 +261,7 @@ select.promoters.regions = function(upstream = 2000, downstream = 2000, ORF.type
   tss$end = as.integer(as.character(tss$end))
   
   jj = which(tss$strand == '+')
-  tss$end[jj] = tss$start[jj] +1
+  tss$end[jj] = tss$start[jj] + 1
   tss$start[-jj] = tss$end[-jj] - 1
   
   tss$geneSymbol = tss$geneID
@@ -267,6 +270,29 @@ select.promoters.regions = function(upstream = 2000, downstream = 2000, ORF.type
   tss$geneSymbol[which(is.na(tss$geneSymbol))] = tss$geneID[which(is.na(tss$geneSymbol))]
   
   colnames(tss) = c('seqnames', 'start', 'end', 'transcriptID', 'strand', 'geneID', 'geneSymbol')
+  
+  if(promoter.select == 'all'){
+    cat('all promoters selected \n')
+  }else{
+    load(file =  paste0(annotDir, 'axolotl_housekeepingGenes_controls.other.tissues.liver.islet.testis_expressedIn21tissues.Rdata'))
+    hkgs = controls.tissue[which(controls.tissue$tissues == 'housekeeping'), ]
+    
+    if(promoter.select == 'nonhousekeeping'){
+      
+      tss = tss[is.na(match(tss$geneID, hkgs$geneIDs)), ]
+      cat('non-housekeeping promoters selected :', nrow(tss),  '\n')
+      
+    }else{
+      if(promoter.select == 'housekeeping'){
+        
+        tss = tss[!is.na(match(tss$geneID, hkgs$geneIDs)), ]
+        cat('housekeeping promoters selected', nrow(tss), '\n') 
+        
+      }else{
+        cat('unknown promoter selection \n')
+      }
+    }
+  }
   
   tss = makeGRangesFromDataFrame(tss, seqnames.field=c("seqnames"),
                                  start.field="start", end.field=c("end"), strand.field="strand", keep.extra.columns = TRUE)
@@ -328,7 +354,6 @@ annotatePeak.curateAxolotl = function(peaks)
   
 }
 
-
 ########################################################
 ########################################################
 # Section : promoter peak analysis
@@ -336,6 +361,94 @@ annotatePeak.curateAxolotl = function(peaks)
 # 2) gene enrichment analysis to check if those promoters were limb-development and limb related 
 ########################################################
 ########################################################
+Test.promoter.openness.enrichment = function(res, pp, bg)
+{
+  ##########################################
+  # first, annotate peaks as promoter, hs.promoter, enhancers
+  ##########################################
+  xx = res
+  xx$annotation[grep('Promoter', xx$annotation)] = 'Promoter'
+  xx$annotation[which(xx$annotation != 'Promoter')] = 'Enhancer'
+  #xx$annotation[grep('Intron', xx$annotation)] = 'Intron'
+  #xx$annotation[grep('Exon', xx$annotation)] = 'Exon'
+  #xx$annotation[grep('Downstream', xx$annotation)] = 'Downstream'
+  
+  xx$gene = xx$geneId
+  xx$gene = sapply(xx$gene, function(x) {x = unlist(strsplit(as.character(x), '[|]')); x[length(x)]})
+  
+  annot = readRDS(paste0(annotDir, 
+                         'AmexT_v47_transcriptID_transcriptCotig_geneSymbol.nr_geneSymbol.hs_geneID_gtf.geneInfo_gtf.transcriptInfo.rds'))
+  
+  mm = match(xx$gene, annot$transcriptid_gtf.transcript)
+  xx$gene = annot$geneID_gtf.gene[mm]
+  
+  
+  # double check the promoter peak annotation 
+  xx$annot.new = 'enhancer'
+  promoters = select.promoters.regions(upstream = 2000, downstream = 2000, ORF.type.gtf = 'Putative', promoter.select = 'all')
+  
+ 
+  xx$annot.new[overlapsAny(pp, promoters, ignore.strand = TRUE)] = 'promoter.nohkg'  
+  kk = which(xx$annot.new == 'Promoter' & xx$annotation != 'Promoter' )
+  
+  promoters.hkg = select.promoters.regions(upstream = 2000, downstream = 2000, ORF.type.gtf = 'Putative', 
+                                           promoter.select = 'housekeeping')
+  
+  xx$annot.new[overlapsAny(pp, promoters.hkg, ignore.strand = TRUE)] = 'promoter.hkg'  
+  
+  
+  #saveRDS(xx, file = paste0(RdataDir, '/peak_annotation_enhancers_promoters_nohkg_hkg.rds'))
+  xx = readRDS(file = paste0(RdataDir, '/peak_annotation_enhancers_promoters_nohkg_hkg.rds'))
+  
+  thresholds = seq(2, 4, by = 0.1)
+  opens = matrix(NA, ncol = 5, nrow = length(thresholds))
+  colnames(opens) = c('threshold.bg', 'all', 'enhancer', 'promoter.hs', 'promoter.nonhs')
+  opens[,1] = thresholds
+  
+  for(n in 1:length(thresholds))
+  {
+    cutoff = thresholds[n]
+    opens[n, 2] = length(which(xx$min > cutoff))
+    opens[n, 3] = length(which(xx$min[which(xx$annot.new == 'enhancer')] > cutoff))
+    opens[n, 4] = length(which(xx$min[which(xx$annot.new == 'promoter.hkg')] > cutoff))
+    opens[n, 5] = length(which(xx$min[which(xx$annot.new == 'promoter.nohkg')] > cutoff))
+  }
+  
+  opens = data.frame(opens)
+  
+  library("tidyverse")
+  df <- opens %>%
+    select(threshold.bg, all, enhancer, promoter.hs, promoter.nonhs) %>%
+    gather(key = "annotation", value = "nb.peaks", -threshold.bg)
+  
+  head(df)
+  
+  ggplot(df, aes(x = threshold.bg, y = nb.peaks)) + 
+    geom_line(aes(color = annotation)) 
+  
+  # ggplot(opens, aes(x = thresholds, y = nb.open)) +
+  #   geom_point(color = 'blue') + geom_line() +
+  #   geom_vline(xintercept = 3.0, color = 'red') +
+  #   ggtitle('nb of peaks above the background in function of thresholds') +
+  
+  aa = c(table(xx$annot.new), table(xx$annot.new[which(xx$min>3)]))
+  aa = c(aa, sum(table(xx$annot.new)), sum(table(xx$annot.new[which(xx$min>3)])))
+  names(aa)[7:8] = 'all'
+  aa = data.frame(names(aa), aa, c(rep(c('total.nb.peaks', 'nb.peak.above.background.all.conditions'), each = 3),
+                                   'total.nb.peaks', 'nb.peak.above.background.all.conditions'))
+  colnames(aa) = c('peakAnnot', 'nb.peaks', 'groups')
+  #df = df[which(df$threshold.bg == 3), ]
+  #df$nb.peaks.total = c(nrow(xx), length(which(xx$annot.new == 'enhancer')), 
+  #                      length(which(xx$annot.new == 'promoter.hkg')),
+  #                      length(which(xx$annot.new == 'promoter.nohkg')))
+  
+  ggplot(data=aa, aes(x=peakAnnot, y=nb.peaks, fill=groups)) +
+    geom_bar(stat="identity", color="black", position=position_dodge()) +
+    theme_minimal() 
+  
+  
+}
+
 DoubleCheck.promoter.peaks.enrichment = function(fpm)
 {
   require(ChIPpeakAnno)
@@ -662,7 +775,6 @@ DoubleCheck.promoter.peaks.enrichment = function(fpm)
                width = 8, height = 4)
       
     }
-    
     
     Visulize.with.heatmap = FALSE
     if(Visulize.with.heatmap){
