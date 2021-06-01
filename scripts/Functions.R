@@ -2312,7 +2312,7 @@ Grouping.peaks.for.promoters.enhancers = function()
   }
   
   Split.peaks.into.promoters.intron.integeic = FALSE
-  i(Split.peaks.into.promoters.intron.integeic){
+  if(Split.peaks.into.promoters.intron.integeic){
     
     ##########################################
     # promoter peaks

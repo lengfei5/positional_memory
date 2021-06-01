@@ -37,12 +37,7 @@ require("pheatmap")
 ##########################################
 Import.HoxCluster.annotation = TRUE
 
-
-promoters = readRDS(file = paste0(RdataDir, 
-                                  '/axolotl_promoters_Granges_AmexT_v47_putative.full.length_N.terminal_upstream2kb.downstream2kb.rds'))
-#promoters =  reduce(promoters, drop.empty.ranges = TRUE, ignore.strand = TRUE)
-#promoters.dev = readRDS(file= paste0(RdataDir, 
-#        '/axolotl_promoters_Granges_AmexT_v47_putative.full.length_N.terminal_upstream2kb.downstream2kb_rmHouseKeepingGenes.rds'))
+gtf.file =  paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf')
 
 if(Import.HoxCluster.annotation){
   HoxA = data.frame(chr = 'chr2p', start = 873085043, end = 884416919, strand = '*', stringsAsFactors = FALSE)
