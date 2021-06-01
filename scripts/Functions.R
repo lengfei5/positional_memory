@@ -215,6 +215,11 @@ processing.development.genes.from.Sergej.paper = function()
 # 
 ########################################################
 ########################################################
+prepare.annotatioin.gtf.for.peak.annotation = function(annotDir)
+{
+   
+}
+
 select.promoters.regions = function(upstream = 2000, downstream = 2000, ORF.type.gtf = 'Putative', toSave = FALSE)
 {
   require(GenomicRanges)
