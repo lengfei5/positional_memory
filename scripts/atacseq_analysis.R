@@ -36,6 +36,8 @@ require("pheatmap")
 # some annotations for all analysis 
 ##########################################
 Import.HoxCluster.annotation = TRUE
+
+
 promoters = readRDS(file = paste0(RdataDir, 
                                   '/axolotl_promoters_Granges_AmexT_v47_putative.full.length_N.terminal_upstream2kb.downstream2kb.rds'))
 #promoters =  reduce(promoters, drop.empty.ranges = TRUE, ignore.strand = TRUE)
@@ -55,6 +57,8 @@ if(Import.HoxCluster.annotation){
   Hoxs = c(HoxA, HoxD1, HoxD2)
   
 }
+
+
 
 ##########################################
 # Here import design matrix and read counts of pooled peaks across conditions (pval < 10^-6)
@@ -302,6 +306,7 @@ if(Grouping.atac.peaks){
     pp.annots = as.data.frame(annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript'))
     
   }
+  
   
   ##########################################
   # all-peaks test M0 (static peaks), M1 (dynamic peaks above background), M2 (dyanmic peaks with some condtions below background)
