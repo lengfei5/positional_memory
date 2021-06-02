@@ -1749,9 +1749,9 @@ plot.peak.profiles = function(peak.name, fpm = NULL, mains = NULL)
 }
 
 spatial.peaks.test = function(x, c = c("Mature_UA", "Mature_UA", "Mature_LA", "Mature_LA"), 
-                              test.Dev.Reg = TRUE, testPlot = FALSE)
+                              test.Dev.Reg = FALSE, testPlot = FALSE)
 {
-  # x = fpm[ii.test[1], sample.sels]; c = cc; 
+  # x = fpm[ii.test[3], sample.sels]; c = cc; 
   library(qvalue)
   if(length(x) != length(c)){
     stop('nb of data is the same as nb of conditions')
@@ -1761,12 +1761,12 @@ spatial.peaks.test = function(x, c = c("Mature_UA", "Mature_UA", "Mature_LA", "M
     ii2 = which(cc == 'Mature_LA')
     ii3 = which(cc == 'Mature_Hand')
     y0 = as.numeric(x[c(ii1, ii2, ii3)])
-    s0 = c(rep(1, length(ii1)), rep(2, length(ii2)), rep(3, length(ii3)))  
-    fit0 = lm (y0 ~ poly(s0, degree = 2, raw = TRUE))
-    fit01 = lm(y0 ~ s0)
+    tt = c(rep(1, length(ii1)), rep(2, length(ii2)), rep(3, length(ii3)))  
+    fit0 = lm (y0 ~ poly(tt, degree = 2, raw = TRUE))
+    #fit01 = lm(y0 ~ tt)
     fit02 = lm(y0 ~ 1)
     
-    bics = BIC(fit0, fit01, fit02)
+    bics = BIC(fit0, fit02)
     scores = bics$BIC
     scores.relavtive = scores-min(scores)
     prob.model = exp(-0.5*scores.relavtive)
@@ -1776,7 +1776,7 @@ spatial.peaks.test = function(x, c = c("Mature_UA", "Mature_UA", "Mature_LA", "M
     pred = predict(fit0)[match(unique(s0), s0)]
     #pvals = empPvals(pred, bg.dist, pool = TRUE)
     
-    res = c(prob.model[3],  max(pred), min(pred), (max(pred) - min(pred)))
+    res = c(prob.model[2],  max(pred), min(pred), (max(pred) - min(pred)))
     names(res) = paste0(c('prob.M0', 'max', 'min', 'log2FC'), '.mature')
     
     if(test.Dev.Reg){
@@ -1806,16 +1806,17 @@ spatial.peaks.test = function(x, c = c("Mature_UA", "Mature_UA", "Mature_LA", "M
       names(res2) = paste0(c('min', 'log2FC', 'pval'), '.BL')
       
       res = c(res, res1, res2)
+      
     }
     
     if(testPlot){
-      plot(s0, y0, cex = 1, ylim = range(x))
-      points(s0, predict(fit0), type = 'l', col = 'blue')
-      points(s0, predict(fit01), type = 'l', col = 'orange', lty = 1)
+      plot(tt, y0, cex = 1, ylim = range(x), xlab = 'time points', 
+           main = paste0('prob.M1 (', signif(prob.model[1], d = 2), ') -- prob.M1 (', 
+                         signif(prob.model[2], d = 2), ')'))
+      #points(tt, predict(fit0), type = 'l', col = 'blue')
+      newtt = seq(0, 7, by = 0.2) 
+      points(newtt, predict(fit0, newdata = data.frame(tt = newtt)), type = 'l', col = 'orange', lty = 1, lwd = 2.0)
       abline(h = mean(y0), lty = 1, col = 'red', lwd = 2.0)
-      points(s1, y1, cex = 1, pch = 2)
-      points(s2, y2, cex = 1, pch =3)
-      
     }
     
     return(res)

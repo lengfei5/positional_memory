@@ -211,7 +211,7 @@ collect.TFs.gene.expression = function()
   annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
                          'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr.rds'))
   
-  kk = match(annot$gene.symbol.hs, tfs$)
+  #kk = match(annot$gene.symbol.hs, tfs)
   
   
 }
