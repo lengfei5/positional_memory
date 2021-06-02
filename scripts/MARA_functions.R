@@ -704,11 +704,14 @@ run.RF.otherMethods = function()
   
 }
 
+##########################################
+# test MARA for position-dependent peaks 
+##########################################
 run.MARA.atac.spatial = function(keep, cc)
 {
+  require(glmnet)
   library(pheatmap)
   library(RColorBrewer)
-  require(glmnet)
   
   # prepare Y matrix 
   cc.uniq = unique(cc)
@@ -723,6 +726,7 @@ run.MARA.atac.spatial = function(keep, cc)
       Y[,n] = apply(keep[ ,jj], 1, mean)
     }
   }
+  
   colnames(Y) = cc.uniq
   rownames(Y) = rownames(keep)
   
@@ -746,7 +750,7 @@ run.MARA.atac.spatial = function(keep, cc)
   ### specify glment parameters
   alpha = 0
   standardize = TRUE;
-  use.lambda.min = FALSE;
+  use.lambda.min = TRUE;
   binarize.x = TRUE
   standardize.response=FALSE
   intercept=FALSE
@@ -756,7 +760,8 @@ run.MARA.atac.spatial = function(keep, cc)
   library(doMC) 
   registerDoMC(cores=6)
   
-  x = X;
+  #x = t(scale(t(X), center = TRUE, scale = TRUE));
+  x = X
   y = scale(Y, center = TRUE, scale = FALSE)
   
   #sels = c(1:5000)
@@ -771,7 +776,6 @@ run.MARA.atac.spatial = function(keep, cc)
   
   plot(cv.fit)
   toc()
-  
   
   if(use.lambda.min){
     s.optimal = cv.fit$lambda.min
@@ -796,8 +800,8 @@ run.MARA.atac.spatial = function(keep, cc)
   #colnames(aa) = c('E40', 'E44.P', 'mUA', 'BL.UA.D5', 'BL.UA.D9', 'BL.UA.D13.P')
   colnames(aa) = colnames(y)
   aa = as.data.frame(aa[-1, ]) # ignore the intercept
-  aa = apply(aa, 2, scale)
-  #aa = scale(aa)
+  #aa = apply(aa, 2, scale)
+  aa = scale(aa)
   rownames(aa) = rownames(xx[[1]])[-1] 
   
   #kk = apply(aa, 1, function(x) all(abs(x)>10^-6))
@@ -810,6 +814,7 @@ run.MARA.atac.spatial = function(keep, cc)
   Test.zscore.cutoff = 2.5
   ss = apply(aa, 1, function(x) length(which(abs(x) > Test.zscore.cutoff)))
   print(aa[which(ss>0), ])
+  print(aa[grep('MEIS|RXR|^HOX', rownames(aa)), ])
   
   bb = aa[which(ss>0), ]
   bb[which(abs(bb)<Test.zscore.cutoff)] = 0
@@ -818,46 +823,10 @@ run.MARA.atac.spatial = function(keep, cc)
            na_col = "white", fontsize_col = 12) 
   
   
-  # aa = as.data.frame(coef.glmnet(fit, s = s.optimal))
-  # aa = aa[-1, ] # remove intecept
-  # colnames(aa) = names(fit$beta)
-  # if(alpha > 0.0){
-  #   rownames(aa) = rownames(fit$beta[[2]])
-  #   res = aa;
-  #   ## collect result from the elastic-net
-  #   #kk = apply(aa, 1, function(x) !all(x==0))
-  #   #aa = aa[kk, ]
-  #   #colnames(x)[which(fit$beta[[1]][,optimal]!=0)]
-  #   #colnames(x)[which(fit$beta[[2]][,optimal]!=0)]
-  #   
-  #   # rerun lm with selected features
-  #   relax.fitting.lm = FALSE
-  #   if(relax.fitting.lm){
-  #     fit.lm = lm(y ~ x[, match(rownames(aa), colnames(x))])
-  #     res = data.frame(fit.lm$coefficients)
-  #     res = res[-1, ] # remove intercept
-  #     rownames(res) = rownames(aa)
-  #     
-  #     pheatmap(res, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE, breaks = NA,
-  #              scale = 'column', cluster_cols=FALSE, main = paste0("motif activity"), 
-  #              na_col = "white", fontsize_col = 10)
-  #   }
-  #   
-  # }else{
-  #   if(zscore.output) aa = apply(aa, 2, scale)
-  #   rownames(aa) = rownames(fit$beta[[2]])
-  #   #ss = apply(aa, 1, function(x) !all(x==0))
-  #   #aa = aa[ss, ]
-  #   #head(rownames(aa)[order(-abs(aa$MSxp))], 10)
-  #   #head(rownames(aa)[order(-abs(aa$MSxa))], 10)
-  #   res = aa
-  #   
-  #   if(Test){
-  #     ss = apply(aa, 1, function(x) length(which(abs(x) > Test.zscore.cutoff)))
-  #     aa = aa[which(ss>0), ]
-  #     print(aa)
-  #   }
-  # }
+  Test.ridge.package = FALSE
+  if(Test.ridge.package){
+      
+  }
   
 }
 

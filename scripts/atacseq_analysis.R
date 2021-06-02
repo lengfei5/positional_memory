@@ -460,31 +460,6 @@ if(Grouping.atac.peaks){
     pheatmap(keep, cluster_rows=TRUE, show_rownames=TRUE, scale = 'row', show_colnames = FALSE,
              cluster_cols=FALSE, annotation_col = df, fontsize_row = 9)
     
-    #bgs = data.frame(bg = as.numeric(fpm.bg))
-    #ggplot(bgs, aes(x=bg)) + geom_histogram(binwidth = 0.25, color="darkblue", fill="lightblue")
-    
-    #mins = apply(cbind(res$max.mature, res$min.BL, res$min.embryo), 1, min)
-    # nb.openloci = c()
-    # thresholds = seq(2, 4, by = 0.1)
-    # for(cutoff in thresholds)
-    # {
-    #   nb.openloci = c(nb.openloci, length(which(mins>cutoff)))
-    # }
-    # opens = data.frame(thresholds = thresholds, nb.open = nb.openloci/nrow(fpm))
-    # ggplot(opens, aes(x = thresholds, y = nb.open)) +
-    #   geom_point(color = 'blue') + geom_line() +
-    #   geom_vline(xintercept = 3.0, color = 'red') +
-    #   ggtitle('% of all peaks above the bg thresholds')
-    
-    # visualize the position-dependent peaks
-    #source('Functions.R')
-    
-    # pdfname = paste0(resDir, "/peak_profiles_test.static.peaks.pdf")
-    # pdf(pdfname, width = 10, height = 6)
-    # par(cex = 1.0, las = 1, mgp = c(3,1,0), mar = c(6,3,2,0.2), tcl = -0.3)
-    # mains = signif(res, d = 2)
-    # plot.peak.profiles(peak.name = names, fpm = fpm, mains = mains)
-    # dev.off()
     
     ##########################################
     # first motif activity analysis for temporally dynamic peaks 
@@ -493,22 +468,28 @@ if(Grouping.atac.peaks){
     res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v2.rds'))
     
     # select the spatially dynamic peaks
-    jj = which(res$prob.M0.mature < 0.01 & res$log2FC.mature > 1 )
+    jj = which(res$prob.M0.mature < 0.01 & res$log2FC.mature > 1  & res$min.mature < 1)
+    cat(length(jj), ' peaks selected \n')
     
     xx = res[c(jj), ]
     xx = xx[order(-xx$log2FC.mature), ]
     
-    length(which(xx$min.mature <1.))
-    length(which(xx$min.mature <2.))
-    length(which(xx$min.mature <2.5))
-    length(which(xx$min.mature < 3.0))
-    
-    keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
+    keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), ]
     keep = as.matrix(keep)
     
-    xx = run.MARA.atac.temporal(keep, cc)
+    conds = c("Mature_UA", "Mature_LA", "Mature_Hand")
     
+    sample.sels = c()
+    cc = c()
+    for(n in 1:length(conds)) {
+      kk = which(design$conds == conds[n] & design$SampleID != '136159')
+      sample.sels = c(sample.sels, kk)
+      cc = c(cc, rep(conds[n], length(kk)))
+    }
     
+    keep = keep[ , sample.sels]
+    
+    xx = run.MARA.atac.spatial(keep, cc)
    
     
   }
