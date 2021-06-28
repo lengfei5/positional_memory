@@ -825,7 +825,41 @@ run.MARA.atac.spatial = function(keep, cc)
   
   Test.ridge.package = FALSE
   if(Test.ridge.package){
-      
+    library(ridge)
+    fit1 = linearRidge(y[, 1] ~ x)
+    aa1 = pvals(fit1)
+    aa1 = data.frame(aa1$pval)
+    
+    fit2 = linearRidge(y[, 2] ~ x)
+    aa2 = pvals(fit2)
+    aa2 = data.frame(aa2$pval)
+    
+    fit3 = linearRidge(y[, 3] ~ x)
+    aa3 = pvals(fit3)
+    aa3 = data.frame(aa3$pval)
+    
+    index = 20
+    pvs = data.frame(aa1[, index], aa2[, index], aa3[, index])
+    rownames(pvs) = gsub('x', '', rownames(aa1))
+    
+    print(rownames(pv)[which(pv[, index]<0.01)])
+    
+    print(pvs[grep('SOX9|MEIS|RXR|RAR|HOXA13', rownames(pvs)), ])
+    
+    pval.cutoff = 0.01
+    ss = apply(pvs, 1, function(x) length(which(x < pval.cutoff)))
+    bb = pvs[which(ss>=1), ]
+    colnames(bb) = colnames(y)
+    bb = -log10(bb)
+    
+    for(n in 1:ncol(bb)){bb[which(bb[,n] < (-log10(pval.cutoff))) ,n] = NA}
+    #bb[which( bb< pval.cutoff)] = NA
+    
+    pheatmap(bb, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE, 
+             scale = 'none', cluster_cols=FALSE, main = paste0("motif significance (-log10 pval) by ridge regression"), 
+             na_col = "gray", fontsize_col = 12) 
+    
+    
   }
   
 }

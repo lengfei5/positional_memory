@@ -468,7 +468,7 @@ if(Grouping.atac.peaks){
     res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v2.rds'))
     
     # select the spatially dynamic peaks
-    jj = which(res$prob.M0.mature < 0.01 & res$log2FC.mature > 1  & res$min.mature < 1)
+    jj = which(res$prob.M0.mature < 0.01 & res$log2FC.mature > 2)
     cat(length(jj), ' peaks selected \n')
     
     xx = res[c(jj), ]
