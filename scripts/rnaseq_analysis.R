@@ -7,6 +7,29 @@
 # Date of creation: Mon Mar  1 14:07:23 2021
 ##########################################################################
 ##########################################################################
+rm(list = ls())
+
+RNA.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functions/RNAseq_functions.R'
+RNA.QC.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functions/RNAseq_QCs.R'
+source(RNA.functions)
+source(RNA.QC.functions)
+require(openxlsx)
+
+version.Data = 'rnaseq_RNAseqSamples_all';
+version.analysis = paste0("_", version.Data, "_20210628")
+
+## Directories to save results 
+design.file = "../exp_design/RNAseq_sampleInfos.xlsx"
+#dataDir = "../data/quantseq/featurecounts_R7183"
+
+resDir = paste0("../results/", version.Data)
+tabDir =  paste0(resDir, "/tables/")
+tfDir = '~/workspace/imp/positional_memory/results/motif_analysis'
+RdataDir = paste0(resDir, "/Rdata/")
+
+if(!dir.exists(resDir)){dir.create(resDir)}
+if(!dir.exists(tabDir)){dir.create(tabDir)}
+if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 
 ########################################################
 ########################################################
@@ -14,27 +37,21 @@
 # 
 ########################################################
 ########################################################
-rm(list = ls())
-
-# setup for data import and sequencing QCs
-version.analysis = 'Rxxxxold_202102020'
-
-resDir = paste0("../results/", version.analysis)
-RdataDir = paste0(resDir, '/Rdata')
-if(!dir.exists(resDir)) dir.create(resDir)
-if(!dir.exists(RdataDir)) dir.create(RdataDir)
-
-dataDir = '../Data/Rxxxx_rnaseq_old/'
 
 ##########################################
 # prepare design matrix, count table and QC table
+# here the statistics were collected batch by batch (request by request)
+# merge in the later steps
 ##########################################
-design = read.table(paste0(dataDir, 'sampleInfos_parsed.txt'), sep = '\t', header = TRUE)
+#dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/Rxxxx_rnaseq_old/'
+#design = read.table(paste0(dataDir, 'sampleInfos_parsed.txt'), sep = '\t', header = TRUE)
+dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/R161513_rnaseq/'
+design = read.csv(file = paste0(dataDir, 'sampleInfos.csv'))
 
+colnames(design) = c('sampleID', 'fileName')
 stats = read.delim(paste0(dataDir, 'nf_out_RNAseq/MultiQC/multiqc_data/multiqc_general_stats.txt'), sep = '\t', 
                    header = TRUE)
-alignment = read.delim(paste0(dataDir, 'nf_out_RNAseq/MultiQC/multiqc_data/multiqc_hisat2.txt')
-                       , sep = '\t')
+alignment = read.delim(paste0(dataDir, 'nf_out_RNAseq/MultiQC/multiqc_data/multiqc_hisat2.txt'), sep = '\t')
 
 stats = stats[, c(1, 2, 3, 4, 6, 8, 9, 10)]
 colnames(stats) = c('sample', 'pct.duplication', 'pct.GC', 'avg.seq.length', 'total.reads', 
@@ -44,7 +61,6 @@ stats = data.frame(stats, alignment[match(stats$sample, alignment$Sample), c(2, 
 colnames(stats)[c(9:11)] = c('trimmed.reads', 'unique.aligned', 'multimapper')
 stats = stats[, c(1:5, 9, 8, 10, 11, 7)]
 
-#design = design[order(design$fileName), ]
 ii = c()
 jj = c()
 for(n in 1:nrow(design))
@@ -61,9 +77,12 @@ for(n in 1:nrow(design))
 xx = data.frame(design[ii, ], stats[jj, ], stringsAsFactors = FALSE)
 xx = xx[order(xx$fileName), ]
 
-write.csv(xx, file = paste0(resDir, '/QCs_stats.csv'), row.names = FALSE)
+# write.csv(xx, file = paste0(resDir, '/QCs_stats.csv'), row.names = FALSE)
 
-design = data.frame(design, stats[kk, ], stringsAsFactors = FALSE)
+xx2 = xx
+xx1 = xx;
+
+design = xx 
 
 
 ########################################################
@@ -157,6 +176,7 @@ batch2 = read.delim('../Data/Rxxxx_rnaseq_old/nf_out_RNAseq/featureCounts/merged
 batch3 = batch2[, grep('HLVGMDRXX', colnames(batch2), invert = TRUE)]
 batch2 = batch2[, c(1, grep('HLVGMDRXX', colnames(batch2)))]
 
+
 source(RNA.functions)
 xx1 = process.countTable(all=batch1, design = design[which(design$batch == '3'), c(1:2)], ensToGeneSymbol = FALSE)
 colnames(xx1)[-1] = paste0(colnames(xx1)[-1], '.batch3')
@@ -230,28 +250,6 @@ save(design, all, file=paste0(RdataDir, 'Design_stats_readCounts_', version.anal
 # 
 ########################################################
 ########################################################
-rm(list = ls())
-
-RNA.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functions/RNAseq_functions.R'
-RNA.QC.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functions/RNAseq_QCs.R'
-source(RNA.functions)
-source(RNA.QC.functions)
-
-version.Data = 'rnaseq_RNAseqSamples_all';
-version.analysis = paste0("_", version.Data, "_20210301")
-
-## Directories to save results 
-design.file = "../exp_design/RNAseq_sampleInfos.xlsx"
-#dataDir = "../data/quantseq/featurecounts_R7183"
-
-resDir = paste0("../results/", version.Data)
-tabDir =  paste0(resDir, "/tables/")
-tfDir = '~/workspace/imp/positional_memory/results/motif_analysis'
-RdataDir = paste0(resDir, "/Rdata/")
-
-if(!dir.exists(resDir)){dir.create(resDir)}
-if(!dir.exists(tabDir)){dir.create(tabDir)}
-if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 
 ##########################################
 # gene annotation 
