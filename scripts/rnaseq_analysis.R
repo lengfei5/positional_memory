@@ -15,7 +15,7 @@ source(RNA.functions)
 source(RNA.QC.functions)
 require(openxlsx)
 
-version.Data = 'rnaseq_RNAseqSamples_all';
+version.Data = 'rnaseq_Rxxxx.old_R10724_R161513';
 version.analysis = paste0("_", version.Data, "_20210628")
 
 ## Directories to save results 
@@ -79,10 +79,9 @@ xx = xx[order(xx$fileName), ]
 
 # write.csv(xx, file = paste0(resDir, '/QCs_stats.csv'), row.names = FALSE)
 
-xx2 = xx
-xx1 = xx;
-
-design = xx 
+#xx2 = xx
+#xx1 = xx;
+#design = xx 
 
 
 ########################################################
@@ -160,18 +159,16 @@ if(Saturation.test){
 ##################################################
 ## Import design matrix and prepare count table
 ##################################################
-Processing.design.matrix = TRUE
-if(Processing.design.matrix){
-  library(openxlsx)
-  design = read.xlsx(design.file, sheet = 1)
-}
+design = read.xlsx(design.file, sheet = 1) # all samples included in this file
 
 colnames(design)[1] = 'SampleID'
 design$conds = paste0(design$conditions, '_', design$SampleID,  '.batch', design$batch)
 
 # prepare the data table for different batches
-batch1 = read.delim('../Data/R10724_rnaseq/nf_out_RNAseq/featureCounts/merged_gene_counts.txt', sep = '\t',  header = TRUE)
-batch2 = read.delim('../Data/Rxxxx_rnaseq_old/nf_out_RNAseq/featureCounts/merged_gene_counts.txt', sep = '\t',  header = TRUE)
+dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/'
+batch1 = read.delim(paste0(dataDir,  'R10724_rnaseq/nf_out_RNAseq/featureCounts/merged_gene_counts.txt'), sep = '\t',  header = TRUE)
+batch2 = read.delim(paste0(dataDir, 'Rxxxx_rnaseq_old/nf_out_RNAseq/featureCounts/merged_gene_counts.txt'), sep = '\t',  header = TRUE)
+batch4 = read.delim(paste0(dataDir, 'R161513_rnaseq/nf_out_RNAseq/featureCounts/merged_gene_counts.txt'), sep = '\t', header = TRUE)
 
 batch3 = batch2[, grep('HLVGMDRXX', colnames(batch2), invert = TRUE)]
 batch2 = batch2[, c(1, grep('HLVGMDRXX', colnames(batch2)))]
@@ -190,7 +187,12 @@ xx3 = process.countTable(all=batch3, design = design[which(design$batch == '1'),
 
 colnames(xx3)[-1] = paste0(colnames(xx3)[-1], '.batch1')
 
-all <- Reduce(function(dtf1, dtf2) merge(dtf1, dtf2, by = "gene", all = TRUE), list(xx1, xx2, xx3))
+xx4 = process.countTable(all=batch4, design = design[which(design$batch == '4'), c(1:2)], merge.technicalRep.sameID = FALSE,
+                         ensToGeneSymbol = FALSE)
+
+colnames(xx4)[-1] = paste0(colnames(xx4)[-1], '.batch4')
+
+all <- Reduce(function(dtf1, dtf2) merge(dtf1, dtf2, by = "gene", all = TRUE), list(xx1, xx2, xx3, xx4))
 
 # make sure that the sample order is the same in design and all matrix
 mm = match(design$conds, colnames(all))
@@ -206,6 +208,7 @@ save(design, all, file=paste0(RdataDir, 'Design_Raw_readCounts_', version.analys
 load(file=paste0(RdataDir, 'Design_Raw_readCounts_', version.analysis, '.Rdata'))
 stat0 = read.csv(file = '../results/R10724_rnaseq_202102019/QCs_stats.csv')
 stat1 = read.csv(file = '../results/Rxxxx.rnaseq.old_202102020/QCs_stats.csv')
+stat2 = read.csv(file = '../results/rnaseq_Rxxxx.old_R10724_R161513/QCs_stats.csv')
 
 xx = data.frame(design, matrix(NA, nrow = nrow(design), ncol = 9), stringsAsFactors = FALSE)
 colnames(xx)[7:15] = colnames(stat0)[-c(1:3)]
@@ -217,19 +220,27 @@ xx[mm, c(7:15)] = stat0[, -c(1:3)]
 for(n in 1:nrow(xx))
 {
   if(is.na(xx$pct.duplication[n])){
-    kk = which(stat1$sampleID == xx$SampleID[n])
+    # batch 1
     if(xx$batch[n] == 1) {
+      kk = which(stat1$sampleID == xx$SampleID[n])
       kk = kk[grep('HLVGMDRXX_', stat1$sample[kk], invert = TRUE)]
       if(length(kk) != 1) cat(n, ' -- Error \n')
       xx[n, c(7:15)] = stat1[kk, c(4:12)]
     }
+    # batch 2
     if(xx$batch[n] == 2) {
+      kk = which(stat1$sampleID == xx$SampleID[n])
       kk = kk[grep('HLVGMDRXX_', stat1$sample[kk])]
       if(length(kk) != 2) cat(n, ' -- Error \n')
       xx[n, c(7:9, 12)] = apply(stat1[kk, c(4:6, 9)], 2, mean)
       xx[n, c(10:11, 13:15)] = apply(stat1[kk, c(7:8, 10:12)], 2, sum)
     }
-    
+    # batch 4
+    if(xx$batch[n] == 4){
+     kk = which(stat2$sampleID == xx$SampleID[n])
+     if(length(kk) != 1) cat(n, ' -- Error \n')
+     xx[n, c(7:15)] = stat2[kk, c(4:12)]
+    }
   }
 }
 
@@ -241,7 +252,6 @@ xx = xx[, c(1:11, 13:15, 12, 17, 16)]
 
 design = xx
 
-
 save(design, all, file=paste0(RdataDir, 'Design_stats_readCounts_', version.analysis, '.Rdata'))
 
 ########################################################
@@ -250,17 +260,15 @@ save(design, all, file=paste0(RdataDir, 'Design_stats_readCounts_', version.anal
 # 
 ########################################################
 ########################################################
+load(file=paste0(RdataDir, 'Design_stats_readCounts_', version.analysis, '.Rdata'))
+design$batch = as.factor(design$batch)
+annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                       'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr.rds'))
+
 
 ##########################################
 # gene annotation 
 ##########################################
-load(file=paste0(RdataDir, 'Design_stats_readCounts_', version.analysis, '.Rdata'))
-
-annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
-                       'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr.rds'))
-
-design$batch = as.factor(design$batch)
-
 Select.genes.having.symbols = FALSE
 if(Select.genes.having.symbols){
   gene.mapping = gene.mapping[which(!is.na(gene.mapping$gene.symbol.nr) | !is.na(gene.mapping$gene.symbol.hs)), ]
@@ -307,18 +315,28 @@ library("ggplot2")
 raw = as.matrix(all[, -1])
 rownames(raw) = all$gene
 
-sels = which(design$batch != 1)
-
+# select samples 
+sels = which(design$batch != 1 & !(design$SampleID == '136150' & design$batch == 3))
 design.matrix = design[sels, ]
+
 raw = raw[, sels]
+
+rm(design)
 
 dds <- DESeqDataSetFromMatrix(raw, DataFrame(design.matrix), design = ~ conditions)
 
+dd0 = dds[ss > quantile(ss, probs = 0.75) , ]
+dd0 = estimateSizeFactors(dd0)
+sizefactors.UQ = sizeFactors(dd0)
+
+plot(sizeFactors(dd0), colSums(counts(dds)), log = 'xy')
+text(sizeFactors(dd0), colSums(counts(dds)), colnames(dd0), cex =0.4)
+
 ss = rowSums(counts(dds))
 
-hist(log2(ss), breaks = 200, main = 'log2(sum of reads for each gene)')
+hist(log10(ss), breaks = 200, main = 'log2(sum of reads for each gene)')
 
-cutoff.gene = 30
+cutoff.gene = 100
 cat(length(which(ss > cutoff.gene)), 'genes selected \n')
 
 dds <- dds[ss > cutoff.gene, ]
@@ -335,37 +353,69 @@ pca=plotPCA(vsd, intgroup = c('conditions', 'batch'), returnData = FALSE)
 print(pca)
 
 pca2save = as.data.frame(plotPCA(vsd, intgroup = c('conditions', 'batch'), returnData = TRUE))
-ggp = ggplot(data=pca2save, aes(PC1, PC2, label = name, color= conditions, shape = batch))  + 
+ggp = ggplot(data=pca2save[which(pca2save$batch == 4), ], aes(PC1, PC2, label = name, color= conditions, shape = batch))  + 
   geom_point(size=3) + 
   geom_text(hjust = 0.7, nudge_y = 1, size=2.5)
 
-plot(ggp) + ggsave(paste0(resDir, "/PCAplot_batch2.batch3.pdf"), width=12, height = 8)
+plot(ggp) + ggsave(paste0(resDir, "/PCAplot_batch4.pdf"), width=12, height = 8)
 
-library("glmpca")
-gpca <- glmpca(counts(dds), L=2)
 
-gpca.dat <- gpca$factors
-gpca.dat$conditions <- dds$conditions
-gpca.dat$batch <- dds$batch
-gpca.dat$name = rownames(gpca.dat)
+##########################################
+# try to correct batches 
+##########################################
+require("sva")
+bc = droplevels(design.matrix$batch)
+#bc = levelsdroplevels(bc)
+mod = model.matrix(~ as.factor(conditions), data = design.matrix)
+cpm = log2(fpm + 2^-8)
+cpm.bc = ComBat(dat=cpm, batch=bc, mod=mod, par.prior=TRUE, ref.batch = 4)    
 
-ggplot(gpca.dat, aes(x = dim1, y = dim2, label = name, color = conditions, shape = batch)) +
-  geom_point(size =3) + coord_fixed() + ggtitle("glmpca - Generalized PCA") +
-  geom_text(hjust = 0.7, nudge_y = 1, size=2.5) + 
-  ggsave(paste0(resDir, "/GPCAplot_batch2.batch3.pdf"), width=12, height = 8)
+ntop = 1000
+library(factoextra)
+xx = as.matrix(cpm.bc)
+vars = apply(xx, 1, var)
+xx = xx[order(-vars), ]
+xx = xx[1:ntop, ]
 
-sampleDists <- dist(t(assay(vsd)))
-sampleDistMatrix <- as.matrix( sampleDists )
-rownames(sampleDistMatrix) <- paste( vsd$conditions, vsd$batch, sep = " - " )
-colnames(sampleDistMatrix) <- NULL
+res.pca <- prcomp(t(xx[ ,grep('Mature', colnames(xx))]), scale = TRUE)
+#res.var <- get_pca_var(res.pca)
 
-mds <- as.data.frame(colData(vsd))  %>%
-  cbind(cmdscale(sampleDistMatrix))
-mds$name = rownames(mds)
+fviz_pca_ind(res.pca,
+             col.ind = "cos2", # Color by the quality of representation
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+)
 
-ggplot(mds, aes(x = `1`, y = `2`, label = name, color = conditions, shape = batch)) +
-  geom_point(size = 3) + coord_fixed() + ggtitle("MDS with VST data") +
-  geom_text(hjust = 0.7, nudge_y = 1, size=2.5) 
+
+Test.glmpca.mds = FALSE
+if(Test.glmpca.mds){
+  library("glmpca")
+  gpca <- glmpca(counts(dds), L=2)
+  
+  gpca.dat <- gpca$factors
+  gpca.dat$conditions <- dds$conditions
+  gpca.dat$batch <- dds$batch
+  gpca.dat$name = rownames(gpca.dat)
+  
+  ggplot(gpca.dat, aes(x = dim1, y = dim2, label = name, color = conditions, shape = batch)) +
+    geom_point(size =3) + coord_fixed() + ggtitle("glmpca - Generalized PCA") +
+    geom_text(hjust = 0.7, nudge_y = 1, size=2.5) + 
+    ggsave(paste0(resDir, "/GPCAplot_batch2.batch3.pdf"), width=12, height = 8)
+  
+  sampleDists <- dist(t(assay(vsd)))
+  sampleDistMatrix <- as.matrix( sampleDists )
+  rownames(sampleDistMatrix) <- paste( vsd$conditions, vsd$batch, sep = " - " )
+  colnames(sampleDistMatrix) <- NULL
+  
+  mds <- as.data.frame(colData(vsd))  %>%
+    cbind(cmdscale(sampleDistMatrix))
+  mds$name = rownames(mds)
+  
+  ggplot(mds, aes(x = `1`, y = `2`, label = name, color = conditions, shape = batch)) +
+    geom_point(size = 3) + coord_fixed() + ggtitle("MDS with VST data") +
+    geom_text(hjust = 0.7, nudge_y = 1, size=2.5) 
+  
+}
 
 ##########################################
 # dynamic genes  
