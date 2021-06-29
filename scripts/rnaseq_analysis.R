@@ -14,6 +14,10 @@ RNA.QC.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functio
 source(RNA.functions)
 source(RNA.QC.functions)
 require(openxlsx)
+require(ggplot2)
+require(DESeq2)
+library("dplyr")
+require(gridExtra)
 
 version.Data = 'rnaseq_Rxxxx.old_R10724_R161513';
 version.analysis = paste0("_", version.Data, "_20210628")
@@ -265,16 +269,22 @@ design$batch = as.factor(design$batch)
 annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
                        'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr.rds'))
 
+##########################################
+# convert gene names to gene symbols
+##########################################
+mm = match(all$gene, annot$geneID)
+ggs = paste0(annot$gene.symbol.hs[mm], '_',  annot$geneID[mm])
+all$gene[!is.na(mm)] = ggs[!is.na(mm)]
 
-##########################################
-# gene annotation 
-##########################################
 Select.genes.having.symbols = FALSE
 if(Select.genes.having.symbols){
   gene.mapping = gene.mapping[which(!is.na(gene.mapping$gene.symbol.nr) | !is.na(gene.mapping$gene.symbol.hs)), ]
   all = all[!is.na(match(all$gene, gene.mapping$gene.id)), ]
 }
 
+##########################################
+# general QC for RNA-seq
+##########################################
 QC.for.cpm = FALSE
 if(QC.for.cpm){
   
@@ -307,11 +317,6 @@ if(QC.for.cpm){
 # Dimensionality reduction to visulize the difference between time points
 # Here we select only the batch 3 and batch 2
 ##########################################
-require(ggplot2)
-require(DESeq2)
-library("dplyr")
-library("ggplot2")
-
 raw = as.matrix(all[, -1])
 rownames(raw) = all$gene
 
@@ -325,14 +330,16 @@ rm(design)
 
 dds <- DESeqDataSetFromMatrix(raw, DataFrame(design.matrix), design = ~ conditions)
 
-dd0 = dds[ss > quantile(ss, probs = 0.75) , ]
+ss = rowSums(counts(dds))
+
+length(which(ss > quantile(ss, probs = 0.85)))
+dd0 = dds[ss > quantile(ss, probs = 0.85) , ]
 dd0 = estimateSizeFactors(dd0)
 sizefactors.UQ = sizeFactors(dd0)
 
 plot(sizeFactors(dd0), colSums(counts(dds)), log = 'xy')
 text(sizeFactors(dd0), colSums(counts(dds)), colnames(dd0), cex =0.4)
 
-ss = rowSums(counts(dds))
 
 hist(log10(ss), breaks = 200, main = 'log2(sum of reads for each gene)')
 
@@ -345,7 +352,8 @@ dds <- dds[ss > cutoff.gene, ]
 dds <- estimateSizeFactors(dds)
 fpm = fpm(dds, robust = TRUE)
 
-save(fpm, design, file = paste0(tfDir, '/RNAseq_fpm_fitered.cutoff.', cutoff.gene, '.Rdata'))
+save(dds, design.matrix, file = paste0(RdataDir, 'RNAseq_design_dds.object.Rdata'))
+save(fpm, design.matrix, file = paste0(tfDir, '/RNAseq_fpm_fitered.cutoff.', cutoff.gene, '.Rdata'))
 
 vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
 
@@ -353,37 +361,41 @@ pca=plotPCA(vsd, intgroup = c('conditions', 'batch'), returnData = FALSE)
 print(pca)
 
 pca2save = as.data.frame(plotPCA(vsd, intgroup = c('conditions', 'batch'), returnData = TRUE))
-ggp = ggplot(data=pca2save[which(pca2save$batch == 4), ], aes(PC1, PC2, label = name, color= conditions, shape = batch))  + 
+ggp = ggplot(data=pca2save, aes(PC1, PC2, label = name, color= conditions, shape = batch))  + 
   geom_point(size=3) + 
   geom_text(hjust = 0.7, nudge_y = 1, size=2.5)
 
-plot(ggp) + ggsave(paste0(resDir, "/PCAplot_batch4.pdf"), width=12, height = 8)
+plot(ggp) + ggsave(paste0(resDir, "/PCAplot_batch2.3.4.pdf"), width=12, height = 8)
 
 
 ##########################################
 # try to correct batches 
 ##########################################
 require("sva")
-bc = droplevels(design.matrix$batch)
-#bc = levelsdroplevels(bc)
-mod = model.matrix(~ as.factor(conditions), data = design.matrix)
-cpm = log2(fpm + 2^-8)
-cpm.bc = ComBat(dat=cpm, batch=bc, mod=mod, par.prior=TRUE, ref.batch = 4)    
+sels = which(design.matrix$batch != 2)
+cpm = log2(fpm[, sels] + 2^-6)
 
-ntop = 1000
+bc = droplevels(design.matrix$batch[sels])
+#bc = levelsdroplevels(bc)
+mod = model.matrix(~ as.factor(conditions), data = design.matrix[sels, ])
+
+cpm.bc = ComBat(dat=cpm, batch=bc, mod=mod, par.prior=TRUE, ref.batch = 4, mean.only = FALSE)    
+
+ntop = 500
 library(factoextra)
 xx = as.matrix(cpm.bc)
 vars = apply(xx, 1, var)
 xx = xx[order(-vars), ]
 xx = xx[1:ntop, ]
 
-res.pca <- prcomp(t(xx[ ,grep('Mature', colnames(xx))]), scale = TRUE)
+#res.pca <- prcomp(t(xx[ ,grep('Mature', colnames(xx))]), scale = TRUE)
+res.pca <- prcomp(t(xx), scale = TRUE)
 #res.var <- get_pca_var(res.pca)
 
 fviz_pca_ind(res.pca,
              col.ind = "cos2", # Color by the quality of representation
              gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
-             repel = TRUE     # Avoid text overlapping
+             repel = FALSE     # Avoid text overlapping
 )
 
 
@@ -417,15 +429,37 @@ if(Test.glmpca.mds){
   
 }
 
-##########################################
-# dynamic genes  
-##########################################
+########################################################
+########################################################
+# Section : check the differential expressed genes in mature samples 
+# 
+########################################################
+########################################################
+load(file = paste0(RdataDir, 'RNAseq_design_dds.object.Rdata'))
+
+sels = intersect(which(design.matrix$batch == 4), grep('Mature', design.matrix$conditions))
+dds = dds[, sels]
+dds$conditions = droplevels(dds$conditions)
+cpm = log2(fpm(dds) + 2^-6)
 dds <- estimateDispersions(dds)
-plotDispEsts(dds, ymin = 10^-4)
+
+plotDispEsts(dds, ymin = 10^-3)
 
 dds <- nbinomLRT(dds, reduced = ~1 )
-res <- results(dds)
+res0 <- results(dds)
 
+library("pheatmap")
+select = which(res0$pvalue<0.01)
+
+xx = res0[select, ]
+xx = xx[order(xx$pvalue), ]
+
+df <- as.data.frame(colData(dds)[,c("conditions", 'batch')])
+o1 = c(grep('UA', df$conditions), grep('LA', df$conditions), grep('Hand', df$conditions), grep('Head', df$conditions))
+
+pheatmap(cpm[select, o1], cluster_rows=TRUE, show_rownames=FALSE, show_colnames = FALSE,
+         scale = 'row',
+         cluster_cols=FALSE, annotation_col=df[o1, ])
 
 
 
