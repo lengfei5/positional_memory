@@ -260,20 +260,48 @@ save(design, all, file=paste0(RdataDir, 'Design_stats_readCounts_', version.anal
 
 ########################################################
 ########################################################
-# Section II : analyze the RNA-seq data 
+# Section II : Analyze the RNA-seq data 
 # 
 ########################################################
 ########################################################
 load(file=paste0(RdataDir, 'Design_stats_readCounts_', version.analysis, '.Rdata'))
 design$batch = as.factor(design$batch)
 annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
-                       'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr.rds'))
+                       'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
+
+Refine.ax.gene.annot = FALSE
+if(Refine.ax.gene.annot){
+  annot$gene.symbol.toUse = NA
+  
+  length(which(is.na(annot$gene.symbol.toUse)))
+  kk = which(!is.na(annot$gene.evidence.synteny)) # synteny evidence
+  annot$gene.symbol.toUse[kk] = annot$gene.evidence.synteny[kk]
+  length(which(is.na(annot$gene.symbol.toUse)))
+  
+  kk = which(is.na(annot$gene.symbol.toUse) & !is.na(annot$gene.evidence.same.gene.symbol.hs.nr)) # shared names by hs and nr
+  annot$gene.symbol.toUse[kk] = annot$gene.evidence.same.gene.symbol.hs.nr[kk]
+  length(which(is.na(annot$gene.symbol.toUse)))
+  
+  kk = which(is.na(annot$gene.symbol.toUse) & !is.na(annot$gene.symbol.hs)) # with hs name
+  annot$gene.symbol.toUse[kk] = annot$gene.symbol.hs[kk]
+  length(which(is.na(annot$gene.symbol.toUse)))
+  
+  kk = which(is.na(annot$gene.symbol.toUse) & !is.na(annot$gene.symbol.nr)) # with hs name
+  annot$gene.symbol.toUse[kk] = annot$gene.symbol.nr[kk]
+  length(which(is.na(annot$gene.symbol.toUse)))
+  
+  saveRDS(annot, file = paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                               'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
+  
+}
+
+tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
 
 ##########################################
 # convert gene names to gene symbols
 ##########################################
 mm = match(all$gene, annot$geneID)
-ggs = paste0(annot$gene.symbol.hs[mm], '_',  annot$geneID[mm])
+ggs = paste0(annot$gene.symbol.toUse[mm], '_',  annot$geneID[mm])
 all$gene[!is.na(mm)] = ggs[!is.na(mm)]
 
 Select.genes.having.symbols = FALSE
@@ -333,13 +361,18 @@ dds <- DESeqDataSetFromMatrix(raw, DataFrame(design.matrix), design = ~ conditio
 ss = rowSums(counts(dds))
 
 length(which(ss > quantile(ss, probs = 0.85)))
+
 dd0 = dds[ss > quantile(ss, probs = 0.85) , ]
 dd0 = estimateSizeFactors(dd0)
 sizefactors.UQ = sizeFactors(dd0)
 
-plot(sizeFactors(dd0), colSums(counts(dds)), log = 'xy')
-text(sizeFactors(dd0), colSums(counts(dds)), colnames(dd0), cex =0.4)
+jj = c(1:length(sizefactors.UQ))
+jj = which(design.matrix$batch == 4)
 
+plot(sizefactors.UQ[jj], colSums(counts(dds))[jj], log = 'xy')
+text(sizefactors.UQ[jj], colSums(counts(dds))[jj], colnames(dd0), cex =0.6)
+
+design.matrix$sizefactor = sizefactors.UQ
 
 hist(log10(ss), breaks = 200, main = 'log2(sum of reads for each gene)')
 
@@ -347,9 +380,12 @@ cutoff.gene = 100
 cat(length(which(ss > cutoff.gene)), 'genes selected \n')
 
 dds <- dds[ss > cutoff.gene, ]
+design.matrix = design.matrix[with(design.matrix, order(conditions, SampleID)), ]
+
 
 # normalization and dimensionality reduction
-dds <- estimateSizeFactors(dds)
+sizeFactors(dds) = sizefactors.UQ
+
 fpm = fpm(dds, robust = TRUE)
 
 save(dds, design.matrix, file = paste0(RdataDir, 'RNAseq_design_dds.object.Rdata'))
@@ -367,12 +403,18 @@ ggp = ggplot(data=pca2save, aes(PC1, PC2, label = name, color= conditions, shape
 
 plot(ggp) + ggsave(paste0(resDir, "/PCAplot_batch2.3.4.pdf"), width=12, height = 8)
 
+ggp = ggplot(data=pca2save[which(pca2save$batch==4), ], aes(PC1, PC2, label = name, color= conditions, shape = batch))  + 
+  geom_point(size=3) + 
+  geom_text(hjust = 0.7, nudge_y = 1, size=2.5)
+
+plot(ggp) + ggsave(paste0(resDir, "/PCAplot_batch4.pdf"), width=12, height = 8)
+
 
 ##########################################
 # try to correct batches 
 ##########################################
 require("sva")
-sels = which(design.matrix$batch != 2)
+sels = c(1:nrow(design.matrix))
 cpm = log2(fpm[, sels] + 2^-6)
 
 bc = droplevels(design.matrix$batch[sels])
@@ -431,35 +473,164 @@ if(Test.glmpca.mds){
 
 ########################################################
 ########################################################
-# Section : check the differential expressed genes in mature samples 
+# Section III: check the differential expressed genes, 
+# mainly TFs that are changed in mature UA, LA and Hand (head as a control)
+# TFs that are changes in regeneration mature UA, BL.day5, BL.day9, BL.day13.proximal (Development as control)
 # 
 ########################################################
 ########################################################
 load(file = paste0(RdataDir, 'RNAseq_design_dds.object.Rdata'))
+dds0 = dds
+fpm0 = fpm(dds)
 
+# select mature samples
 sels = intersect(which(design.matrix$batch == 4), grep('Mature', design.matrix$conditions))
 dds = dds[, sels]
+cpm = log2(fpm0[, sels] + 2^-6)
+
 dds$conditions = droplevels(dds$conditions)
-cpm = log2(fpm(dds) + 2^-6)
 dds <- estimateDispersions(dds)
 
 plotDispEsts(dds, ymin = 10^-3)
 
-dds <- nbinomLRT(dds, reduced = ~1 )
-res0 <- results(dds)
+dds = nbinomWaldTest(dds, betaPrior = TRUE)
+resultsNames(dds)
+
+res.ii = results(dds, contrast=c("conditions", 'Mature_Hand', 'Mature_UA'))
+colnames(res.ii) = paste0(colnames(res.ii), "_Hand.vs.UA")
+res = data.frame(res.ii[, c(2, 5, 6)])
+
+res.ii = results(dds, contrast=c("conditions", 'Mature_Hand', 'Mature_LA'))
+colnames(res.ii) = paste0(colnames(res.ii), "_Hand.vs.LA")
+res = data.frame(res, res.ii[, c(2, 5, 6)])
+
+res.ii = results(dds, contrast=c("conditions", 'Mature_LA', 'Mature_UA'))
+colnames(res.ii) = paste0(colnames(res.ii), "_LA.vs.UA")
+res = data.frame(res, res.ii[, c(2, 5, 6)])
+
+
+#dds <- nbinomLRT(dds, reduced = ~1 )
+#res0 <- results(dds)
 
 library("pheatmap")
-select = which(res0$pvalue<0.01)
-
-xx = res0[select, ]
-xx = xx[order(xx$pvalue), ]
+pval.cutoff = 0.01
+select = which(res$pvalue_Hand.vs.LA < pval.cutoff | res$pvalue_Hand.vs.UA < pval.cutoff | res$pvalue_LA.vs.UA < pval.cutoff)
 
 df <- as.data.frame(colData(dds)[,c("conditions", 'batch')])
 o1 = c(grep('UA', df$conditions), grep('LA', df$conditions), grep('Hand', df$conditions), grep('Head', df$conditions))
 
-pheatmap(cpm[select, o1], cluster_rows=TRUE, show_rownames=FALSE, show_colnames = FALSE,
+yy = cpm[select, o1]
+ss = apply(as.matrix(yy), 1, mean)
+yy = yy[which(ss>-2), ]
+
+pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, show_colnames = FALSE,
          scale = 'row',
          cluster_cols=FALSE, annotation_col=df[o1, ])
+
+
+#xx = res[select, ]
+#xx = xx[order(xx$pvalue), ]
+#xx = cpm
+ggs = rownames(yy)
+ggs = sapply(ggs, function(x) unlist(strsplit(as.character(x), '_'))[1])
+
+mm = match(tfs[, 3], ggs)
+xx = yy[mm[!is.na(mm)], ]
+
+tf.sels = match(rownames(xx), rownames(res))
+df <- as.data.frame(colData(dds)[,c("conditions", 'batch')])
+o1 = c(grep('UA', df$conditions), grep('LA', df$conditions), grep('Hand', df$conditions), grep('Head', df$conditions))
+
+yy = cpm[tf.sels, o1]
+#ss = apply(as.matrix(yy), 1, mean)
+#yy = yy[which(ss>-2), ]
+
+pheatmap(yy, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
+         scale = 'row',
+         cluster_cols=FALSE, annotation_col=df[o1, ], fontsize_row = 8)
+
+
+##########################################
+# dynamic TFs in regeneration (development stages as contorls) 
+##########################################
+load(file = paste0(RdataDir, 'RNAseq_design_dds.object.Rdata'))
+dds0 = dds
+fpm0 = fpm(dds)
+
+# select mature samples
+sels = unique(c(which(design.matrix$batch == 3 & design.matrix$conditions != 'BL_UA_13days_distal'), 
+             which(design.matrix$conditions == 'Embryo_Stage46_proximal')))
+dds = dds[, sels]
+cpm = log2(fpm0[, sels] + 2^-6)
+
+dds$conditions = droplevels(dds$conditions)
+dds <- estimateDispersions(dds)
+
+plotDispEsts(dds, ymin = 10^-3)
+
+dds = nbinomWaldTest(dds, betaPrior = TRUE)
+resultsNames(dds)
+
+res.ii = results(dds, contrast=c("conditions", 'BL_UA_13days_proximal', 'Mature_UA'))
+colnames(res.ii) = paste0(colnames(res.ii), "_BL.D13.vs.UA")
+res = data.frame(res.ii[, c(2, 5, 6)])
+
+res.ii = results(dds, contrast=c("conditions", 'BL_UA_5days', 'Mature_UA'))
+colnames(res.ii) = paste0(colnames(res.ii), "_BL.D5.vs.LA")
+res = data.frame(res, res.ii[, c(2, 5, 6)])
+
+res.ii = results(dds, contrast=c("conditions", 'BL_UA_9days', 'Mature_UA'))
+colnames(res.ii) = paste0(colnames(res.ii), "_BL.D9.vs.UA")
+res = data.frame(res, res.ii[, c(2, 5, 6)])
+
+
+#dds <- nbinomLRT(dds, reduced = ~1 )
+#res0 <- results(dds)
+
+library("pheatmap")
+pval.cutoff = 0.01
+select = which(res$pvalue_BL.D13.vs.UA < pval.cutoff | res$pvalue_BL.D5.vs.LA < pval.cutoff | res$pvalue_BL.D9.vs.UA < pval.cutoff)
+
+df <- as.data.frame(colData(dds)[,c("conditions", 'batch')])
+o1 = c(grep('Mature_UA', df$conditions), grep('BL_UA_5days', df$conditions), grep('BL_UA_9days', df$conditions), 
+       grep('BL_UA_13days_proximal', df$conditions), grep('Embryo_Stage40', df$conditions), 
+       grep('Embryo_Stage46_proximal', df$conditions))
+
+yy = cpm[select, o1]
+ss = apply(as.matrix(yy), 1, mean)
+yy = yy[which(ss>-2), ]
+
+pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, show_colnames = FALSE,
+         scale = 'row',
+         cluster_cols=FALSE, annotation_col=df[o1, ])
+
+
+#xx = res[select, ]
+#xx = xx[order(xx$pvalue), ]
+#xx = cpm
+ggs = rownames(yy)
+ggs = sapply(ggs, function(x) unlist(strsplit(as.character(x), '_'))[1])
+
+mm = match(tfs[, 3], ggs)
+xx = yy[mm[!is.na(mm)], ]
+
+tf.sels = match(rownames(xx), rownames(res))
+df <- as.data.frame(colData(dds)[,c("conditions", 'batch')])
+
+yy = cpm[tf.sels, o1]
+vars = apply(yy[, c(1:7)],1, var)
+ss = apply(yy[, c(1:7)], 1, mean)
+yy = yy[which(vars>=1.5), ]
+#ss = apply(as.matrix(yy), 1, mean)
+#yy = yy[which(ss>-2), ]
+
+pheatmap(yy, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
+         scale = 'row',
+         cluster_cols=FALSE, annotation_col=df[o1, ], fontsize_row = 8, 
+         filename = paste0(resDir, '/heatmap_DE_TFs_mUA_regeneration.pdf'),
+         width = 12, height = 20)
+
+write.table(yy, file = paste0(resDir, '/DEtfs_mUA_regeneration_dev.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
 
 
 
