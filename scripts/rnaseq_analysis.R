@@ -269,6 +269,8 @@ design$batch = as.factor(design$batch)
 annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
                        'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
 
+tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
+
 Refine.ax.gene.annot = FALSE
 if(Refine.ax.gene.annot){
   annot$gene.symbol.toUse = NA
@@ -294,8 +296,6 @@ if(Refine.ax.gene.annot){
                                'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
   
 }
-
-tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
 
 ##########################################
 # convert gene names to gene symbols
@@ -380,7 +380,23 @@ cutoff.gene = 100
 cat(length(which(ss > cutoff.gene)), 'genes selected \n')
 
 dds <- dds[ss > cutoff.gene, ]
-design.matrix = design.matrix[with(design.matrix, order(conditions, SampleID)), ]
+#design.matrix = design.matrix[with(design.matrix, order(conditions, SampleID)), ]
+
+save.scalingFactors.for.deeptools = FALSE
+if(save.scalingFactors.for.deeptools){
+  ss = colSums(counts(dds))
+  plot(ss[jj], (design.matrix$alignment.rate*design.matrix$trimmed.reads)[jj])
+  
+  reads.mapped = design.matrix$trimmed.reads*design.matrix$alignment.rate/100
+  xx = data.frame(sampleID = design.matrix$SampleID,  
+                  scalingFactor = reads.mapped/(design.matrix$sizefactor*median(reads.mapped)),
+                  stringsAsFactors = FALSE)
+  xx = xx[jj,]
+  
+  write.table(xx, file = paste0(resDir, '/DESeq2_scalingFactor_forDeeptools.txt'), sep = '\t',
+              col.names = FALSE, row.names = FALSE, quote = FALSE)
+  
+}
 
 
 # normalization and dimensionality reduction
@@ -390,6 +406,10 @@ fpm = fpm(dds, robust = TRUE)
 
 save(dds, design.matrix, file = paste0(RdataDir, 'RNAseq_design_dds.object.Rdata'))
 save(fpm, design.matrix, file = paste0(tfDir, '/RNAseq_fpm_fitered.cutoff.', cutoff.gene, '.Rdata'))
+
+kk = intersect(which(design.matrix$batch == 4), grep('Mature_LA|Mature_Hand', design.matrix$conditions))
+plot.pair.comparison.plot(fpm[, kk[order(design.matrix$conditions[kk])]])
+
 
 vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
 
