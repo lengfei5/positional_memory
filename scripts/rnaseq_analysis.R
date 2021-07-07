@@ -411,6 +411,29 @@ kk = intersect(which(design.matrix$batch == 4), grep('Mature_LA|Mature_Hand', de
 plot.pair.comparison.plot(fpm[, kk[order(design.matrix$conditions[kk])]])
 
 
+ii = grep('HOXA13|MEIS2|SOX9', rownames(fpm))
+par(mfrow = c(2, 2))
+plot(fpm[, c(21, 28)], log='xy', cex = 0.5, main = 'LA before correction');
+points(fpm[ii, 21], fpm[ii, 28], cex = 2, col = 'red', pch = 16)
+text(fpm[ii, 21], fpm[ii, 28], c('Meis2', 'HOXA13', 'SOX9'), col = 'red', pos = 4, offset = 1, cex = 1.5)
+abline(0, 1, col='blue', lwd = 1.5)
+
+plot(fpm[, c(29, 32)], log='xy', cex = 0.5, main = 'Hand before correction');
+points(fpm[ii, 29], fpm[ii, 32], cex = 2, col = 'red', pch = 16)
+text(fpm[ii, 29], fpm[ii, 32], c('Meis2', 'HOXA13', 'SOX9'), col = 'red', pos = 4, offset = 1, cex = 1.5)
+abline(0, 1, col='blue', lwd = 1.5)
+
+plot(fpm[, c(28, 32)], log='xy', cex = 0.5, main = 'corrected LA');
+points(fpm[ii, 28], fpm[ii, 32], cex = 2, col = 'red', pch = 16)
+text(fpm[ii, 28], fpm[ii, 32], c('Meis2', 'HOXA13', 'SOX9'), col = 'red', pos = 4, offset = 1, cex = 1.5)
+abline(0, 1, col='blue', lwd = 1.5)
+
+plot(fpm[, c(21, 29)], log='xy', cex = 0.5, main = 'corrected Hand');
+points(fpm[ii, 21], fpm[ii, 29], cex = 2, col = 'red', pch = 16)
+text(fpm[ii, 21], fpm[ii, 29], c('Meis2', 'HOXA13', 'SOX9'), col = 'red', pos = 4, offset = 1, cex = 1.5)
+abline(0, 1, col='blue', lwd = 1.5)
+
+
 vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
 
 pca=plotPCA(vsd, intgroup = c('conditions', 'batch'), returnData = FALSE)
