@@ -35,7 +35,6 @@ if(!dir.exists(resDir)){dir.create(resDir)}
 if(!dir.exists(tabDir)){dir.create(tabDir)}
 if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 
-
 ########################################################
 ########################################################
 # Section I : data processing and sequencing quality controls
@@ -117,7 +116,6 @@ if(Saturation.test){
   }
   
   rownames(yy) = gsub('_junction.junctionSaturation_plot.r', '', basename(rseqc.file))
-  
   
   pdfname = paste0(resDir, '/saturation_curve_rseqc_knownJunctions.pdf')
   pdf(pdfname, width = 16, height = 8)

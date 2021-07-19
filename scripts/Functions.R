@@ -2583,3 +2583,27 @@ Grouping.peaks.for.promoters.enhancers = function()
   }
   
 }
+
+########################################################
+########################################################
+# Section : Identify potential LA- and Hand-specific genes
+# to try to solve the LA and Hand sample swapping issue
+########################################################
+########################################################
+Identify.LA.Hand.specific.genes.from.atacseq = function(xx)
+{
+  xx = fpm[, sample.sels]
+  lfc = apply(xx[, grep('Mature_LA', colnames(xx))], 1, mean) - apply(xx[, grep('Mature_Hand', colnames(xx))], 1, mean)
+  lfc  =data.frame(lfc = lfc, geneId = res$geneId, stringsAsFactors = FALSE)
+  
+  lfc = lfc[order(-abs(lfc$lfc)), ]
+  
+  save(lfc, file = '../results/Rdata/LA_Hand_potential.specific.genes_fromATACseq.rds')
+  
+}
+
+
+
+
+
+

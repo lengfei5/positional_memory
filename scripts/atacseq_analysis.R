@@ -272,7 +272,6 @@ if(Normalization.BatchCorrect){
 ########################################################
 Grouping.atac.peaks = FALSE
 if(Grouping.atac.peaks){
-  
   load(file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.withinPeaks.pval6.Rdata'))
   fpm = readRDS(file = paste0(RdataDir, '/fpm_TMM_combat.rds'))
   
@@ -394,23 +393,26 @@ if(Grouping.atac.peaks){
       cc = c(cc, rep(conds[n], length(kk)))
     }
     
-    # examples to test 
-    test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
-    #test.examples = c('Hoxa13')
-    ii.test = which(overlapsAny(pp, promoters[which(!is.na(match(promoters$geneSymbol, test.examples)))]))
-    #ii.Hox = which(overlapsAny(pp, Hoxs))
-    #ii.test = unique(c(ii.test, ii.Hox))
-    
-    library(tictoc)
-    ii.test = c(1:nrow(fpm)) # takes about 2 mins for 40k peaks
-    source('Functions.R')
-    tic() 
-    res = t(apply(fpm[ii.test, sample.sels], 1, spatial.peaks.test, c = cc, test.Dev.Reg = FALSE))
-    res = data.frame(res, pp.annots[ii.test, ], stringsAsFactors = FALSE)
-    toc()
-    
-    saveRDS(res, file = paste0(RdataDir, '/res_position_dependant_test_v2.rds'))
-    
+    Run.test.spatial.peaks = FALSE
+    if(Run.test.spatial.peaks){
+      # examples to test
+      test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
+      #test.examples = c('Hoxa13')
+      ii.test = which(overlapsAny(pp, promoters[which(!is.na(match(promoters$geneSymbol, test.examples)))]))
+      #ii.Hox = which(overlapsAny(pp, Hoxs))
+      #ii.test = unique(c(ii.test, ii.Hox))
+      
+      library(tictoc)
+      ii.test = c(1:nrow(fpm)) # takes about 2 mins for 40k peaks
+      source('Functions.R')
+      tic() 
+      res = t(apply(fpm[ii.test, sample.sels], 1, spatial.peaks.test, c = cc, test.Dev.Reg = FALSE))
+      res = data.frame(res, pp.annots[ii.test, ], stringsAsFactors = FALSE)
+      toc()
+      
+      saveRDS(res, file = paste0(RdataDir, '/res_position_dependant_test_v2.rds'))
+      
+    }
     ##########################################
     # select all positional-dependent loci with below threshold
     ##########################################
@@ -462,7 +464,7 @@ if(Grouping.atac.peaks){
     
     
     ##########################################
-    # first motif activity analysis for temporally dynamic peaks 
+    # first motif activity analysis for positional-dependent peaks 
     ##########################################
     source('MARA_functions.R')
     res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v2.rds'))
@@ -566,3 +568,5 @@ if(Grouping.atac.peaks){
   }
   
 }
+
+
