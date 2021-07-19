@@ -2593,12 +2593,15 @@ Grouping.peaks.for.promoters.enhancers = function()
 Identify.LA.Hand.specific.genes.from.atacseq = function(xx)
 {
   xx = fpm[, sample.sels]
-  lfc = apply(xx[, grep('Mature_LA', colnames(xx))], 1, mean) - apply(xx[, grep('Mature_Hand', colnames(xx))], 1, mean)
-  lfc  =data.frame(lfc = lfc, geneId = res$geneId, stringsAsFactors = FALSE)
+  xx = data.frame(mUA =  apply(xx[, grep('Mature_UA', colnames(xx))], 1, mean), 
+                  mLA =  apply(xx[, grep('Mature_LA', colnames(xx))], 1, mean), 
+                  mHand = apply(xx[, grep('Mature_Hand', colnames(xx))], 1, mean))
+  #lfc = apply(xx[, grep('Mature_LA', colnames(xx))], 1, mean) - apply(xx[, grep('Mature_Hand', colnames(xx))], 1, mean)
+  xx  =data.frame(xx, geneId = res$geneId, stringsAsFactors = FALSE)
   
-  lfc = lfc[order(-abs(lfc$lfc)), ]
+  #lfc = lfc[order(-abs(lfc$lfc)), ]
   
-  save(lfc, file = '../results/Rdata/LA_Hand_potential.specific.genes_fromATACseq.rds')
+  saveRDS(xx, file = '../results/Rdata/LA_Hand_potential.specific.genes_fromATACseq.rds')
   
 }
 

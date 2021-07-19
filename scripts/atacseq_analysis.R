@@ -15,7 +15,7 @@ source(RNA.functions)
 source(RNA.QC.functions)
 
 source('functions_chipSeq.R')
-source('Functions.R')
+source('Functions_atac.R')
 
 version.analysis = 'atac_rna_seq_integration_analysis_20210323'
 #peakDir = "Peaks/macs2_broad"

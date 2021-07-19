@@ -78,16 +78,81 @@ save.scalingFactors.for.deeptools = function(dds)
 ########################################################
 PCA.and.Pairwise.Comparison.mature.LA.Hand = function(dds, design.matrix)
 {
-  # PCA 
+  # PCA with all genes
   vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
   pca=plotPCA(vsd, intgroup = c('conditions', 'batch'), returnData = FALSE)
   print(pca)
-  ggp = ggplot(data=pca2save[which(pca2save$batch==4), ], aes(PC1, PC2, label = name, color= conditions, shape = batch))  + 
+  pca2save = as.data.frame(plotPCA(vsd, intgroup = c('conditions', 'batch'), returnData = TRUE))
+  
+  jj = which(pca2save$batch == 4 & 
+                     (pca2save$conditions == 'Mature_UA'| pca2save$conditions == 'Mature_LA'| pca2save$conditions == 'Mature_Hand'))
+  ggp = ggplot(data=pca2save[jj, ], aes(PC1, PC2, label = name, color= conditions, shape = batch))  + 
     geom_point(size=3) + 
     geom_text(hjust = 0.7, nudge_y = 1, size=2.5)
   
   plot(ggp) + ggsave(paste0(resDir, "/PCAplot_batch4.pdf"), width=12, height = 8)
   
+  
+  ## PCA with potenital position-dependent genes from RNA-seq data
+  load(file = '../results/Rdata/LA_Hand_potential.specific.genes_fromRNAseq.rds')
+  
+  xx = data.frame(rbind(xx1, xx2), gene = c(rownames(xx1), rownames(xx2)), stringsAsFactors = FALSE)
+  xx = xx[match(unique(xx$gene), xx$gene), ]
+  xx = xx[which(xx$mUA < 0 & xx$BL.day5<0 & (xx$BL.day9 > 2 | xx$BL.day13 >2)), ]
+  
+  
+  #xx1 = xx1[which((xx1$BL.day9 - xx1$mUA) >2 & (xx1$BL.day9 - xx1$BL.day5) >2), ]
+  mm = match(rownames(vsd), c(rownames(xx1), rownames(xx2)))
+    
+  pca2save = as.data.frame(plotPCA(vsd[which(!is.na(mm)), ], intgroup = c('conditions', 'batch'), returnData = TRUE))
+  
+  jj = which(pca2save$batch == 4 & 
+               (pca2save$conditions == 'Mature_UA'| pca2save$conditions == 'Mature_LA'| 
+                  pca2save$conditions == 'Mature_Hand'))
+  ggp = ggplot(data=pca2save[jj, ], aes(PC1, PC2, label = name, color= conditions, shape = batch))  + 
+    geom_point(size=3) + 
+    geom_text(hjust = 0.7, nudge_y = 1, size=2.5)
+  
+  plot(ggp) + ggsave(paste0(resDir, "/PCA_top60genes_LA.Hand_RNAtimecourse.pdf"), width=12, height = 8)
+  
+  ## PCA with potenital position-dependent genes from ATAC-seq data
+  aa = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                      'AmexT_v47_transcriptID_transcriptCotig_geneSymbol.nr_geneSymbol.hs_geneID.rds'))
+  fpm = fpm(dds, robust = TRUE)
+  
+  xx.m = readRDS(file = '../results/Rdata/LA_Hand_potential.specific.genes_fromATACseq.rds')
+  mns = apply(as.matrix(xx.m[, c(2:3)]), 1, min)
+  xx.m = xx.m[which(mns < 2), ]
+  xx.m$vars = apply(as.matrix(xx.m[, c(2:3)]), 1, var)
+  xx.m = xx.m[order(-xx.m$vars), ]
+  
+  #xx.m = xx.m[which(vars > 3), ]
+  xx.m = xx.m[c(1:100), ] 
+  
+  ggs = xx.m$geneId
+  ggs = sapply(ggs, function(x) {names = unlist(strsplit(as.character(x), '[|]')); return(names[length(names)])})
+ 
+  mm = match(ggs, aa$transcritID)
+  ggs = unique(aa$geneID[mm])
+  
+  axg = sapply(rownames(vsd), function(x) {names = unlist(strsplit(as.character(x), '_')); return(names[length(names)])})
+  
+  mm = which(!is.na(match(axg, ggs)))
+  pca2save = as.data.frame(plotPCA(vsd[mm, ], intgroup = c('conditions', 'batch'), returnData = TRUE))
+  jj = which(pca2save$batch == 4 & 
+               (pca2save$conditions == 'Mature_LA'| 
+                  pca2save$conditions == 'Mature_Hand'))
+  
+ 
+  ggp = ggplot(data=pca2save[jj, ], aes(PC1, PC2, label = name, color= conditions, shape = batch))  + 
+    geom_point(size=3) + 
+    geom_text(hjust = 0.2, nudge_y = 0.05, size=2.5)
+  
+  plot(ggp) + ggsave(paste0(resDir, "/PCA_top100genes_LA.Hand_ATACseq.pdf"), width=12, height = 8)
+  
+  cpm = fpm[mm, jj]
+  
+  plot.pair.comparison.plot(cpm)
   
   # pairwise comparisons
   fpm = fpm(dds, robust = TRUE)
@@ -116,9 +181,33 @@ PCA.and.Pairwise.Comparison.mature.LA.Hand = function(dds, design.matrix)
   text(fpm[ii, 21], fpm[ii, 29], c('Meis2', 'HOXA13', 'SOX9'), col = 'red', pos = 4, offset = 1, cex = 1.5)
   abline(0, 1, col='blue', lwd = 1.5)
   
-  
  
 }
 
-
+Identify.LA.Hand.specific.genes.from.UA.regeneration.timeCourse = function(dds, design.matrix)
+{
+  jj = which(design.matrix$batch == 3 & design.matrix$conditions != 'Embryo_Stage40')
+  
+  ddx = dds[, jj]
+  ddx$conditions = droplevels(ddx$conditions)
+  
+  cpm = fpm(ddx)
+  
+  xx = data.frame(mUA = apply(cpm[, grep('Mature_UA', colnames(cpm))], 1, mean), 
+                  BL.day5 = cpm[, grep('BL_UA_5days', colnames(cpm))], 
+                  BL.day9 = apply(cpm[, grep('BL_UA_9days', colnames(cpm))], 1, mean), 
+                  BL.day13 = apply(cpm[, grep('BL_UA_13days', colnames(cpm))], 1, mean))
+  xx = log2(xx + 2^-6)
+  
+  ss = apply(as.matrix(xx), 1, max)
+  xx = xx[which(ss>1), ]
+  
+  kk1 = which((xx$BL.day9 - xx$BL.day5) >1 & (xx$BL.day9 - xx$mUA) >1) 
+  kk2 = which((xx$BL.day13 - xx$BL.day5) >1 & (xx$BL.day13 - xx$mUA) >1 & (xx$BL.day13 - xx$BL.day9) > 1) 
+  
+  xx1 = xx[kk1, ]
+  xx2 = xx[kk2, ]
+  save(xx1, xx2, file = '../results/Rdata/LA_Hand_potential.specific.genes_fromRNAseq.rds')
+  
+}
 

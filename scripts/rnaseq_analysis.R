@@ -342,7 +342,6 @@ fpm = fpm(dds, robust = TRUE)
 save(dds, design.matrix, file = paste0(RdataDir, 'RNAseq_design_dds.object.Rdata'))
 save(fpm, design.matrix, file = paste0(tfDir, '/RNAseq_fpm_fitered.cutoff.', cutoff.gene, '.Rdata'))
 
-
 vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
 
 pca=plotPCA(vsd, intgroup = c('conditions', 'batch'), returnData = FALSE)
