@@ -13,6 +13,7 @@ RNA.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functions/
 RNA.QC.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functions/RNAseq_QCs.R'
 source(RNA.functions)
 source(RNA.QC.functions)
+source('Functions_rnaseq.R')
 require(openxlsx)
 require(ggplot2)
 require(DESeq2)
@@ -270,32 +271,6 @@ annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axo
 
 tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
 
-Refine.ax.gene.annot = FALSE
-if(Refine.ax.gene.annot){
-  annot$gene.symbol.toUse = NA
-  
-  length(which(is.na(annot$gene.symbol.toUse)))
-  kk = which(!is.na(annot$gene.evidence.synteny)) # synteny evidence
-  annot$gene.symbol.toUse[kk] = annot$gene.evidence.synteny[kk]
-  length(which(is.na(annot$gene.symbol.toUse)))
-  
-  kk = which(is.na(annot$gene.symbol.toUse) & !is.na(annot$gene.evidence.same.gene.symbol.hs.nr)) # shared names by hs and nr
-  annot$gene.symbol.toUse[kk] = annot$gene.evidence.same.gene.symbol.hs.nr[kk]
-  length(which(is.na(annot$gene.symbol.toUse)))
-  
-  kk = which(is.na(annot$gene.symbol.toUse) & !is.na(annot$gene.symbol.hs)) # with hs name
-  annot$gene.symbol.toUse[kk] = annot$gene.symbol.hs[kk]
-  length(which(is.na(annot$gene.symbol.toUse)))
-  
-  kk = which(is.na(annot$gene.symbol.toUse) & !is.na(annot$gene.symbol.nr)) # with hs name
-  annot$gene.symbol.toUse[kk] = annot$gene.symbol.nr[kk]
-  length(which(is.na(annot$gene.symbol.toUse)))
-  
-  saveRDS(annot, file = paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
-                               'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
-  
-}
-
 ##########################################
 # convert gene names to gene symbols
 ##########################################
@@ -309,34 +284,10 @@ if(Select.genes.having.symbols){
   all = all[!is.na(match(all$gene, gene.mapping$gene.id)), ]
 }
 
-##########################################
-# general QC for RNA-seq
-##########################################
+## general QC for RNA-seq
 QC.for.cpm = FALSE
 if(QC.for.cpm){
-  
-  #index.qc = c(4)
-  source(RNA.functions)
-  source(RNA.QC.functions)
-  
-  kk = grep('Mature_UA|Mature_LA|Mature_Hand', design$conditions)
-  kk = kk[which(design$batch[kk] == 1)]
-  raw = all[, -1]
-  raw = raw[, -kk]
-  
-  ss = apply(as.matrix(raw), 1, sum)
-  
-  
-  raw = raw[which(ss >10), ]
-  
-  pdfname = paste0(resDir, "/Data_qulity_assessment_remove.MatureBatch1_filterGenes.withoutSymbols_10", version.analysis, ".pdf")
-  pdf(pdfname, width = 12, height = 10)
-  
-  Check.RNAseq.Quality(read.count=raw, design.matrix = design[-kk, c(1, 2, 5)], 
-                       lowlyExpressed.readCount.threshold=500)
-  
-  dev.off()
-  
+  Run.QC.for.RNA.replicates(design, raw)
 }
 
 ##########################################
@@ -359,9 +310,9 @@ dds <- DESeqDataSetFromMatrix(raw, DataFrame(design.matrix), design = ~ conditio
 
 ss = rowSums(counts(dds))
 
-length(which(ss > quantile(ss, probs = 0.85)))
+length(which(ss > quantile(ss, probs = 0.75)))
 
-dd0 = dds[ss > quantile(ss, probs = 0.85) , ]
+dd0 = dds[ss > quantile(ss, probs = 0.75) , ]
 dd0 = estimateSizeFactors(dd0)
 sizefactors.UQ = sizeFactors(dd0)
 
@@ -381,22 +332,7 @@ cat(length(which(ss > cutoff.gene)), 'genes selected \n')
 dds <- dds[ss > cutoff.gene, ]
 #design.matrix = design.matrix[with(design.matrix, order(conditions, SampleID)), ]
 
-save.scalingFactors.for.deeptools = FALSE
-if(save.scalingFactors.for.deeptools){
-  ss = colSums(counts(dds))
-  plot(ss[jj], (design.matrix$alignment.rate*design.matrix$trimmed.reads)[jj])
-  
-  reads.mapped = design.matrix$trimmed.reads*design.matrix$alignment.rate/100
-  xx = data.frame(sampleID = design.matrix$SampleID,  
-                  scalingFactor = reads.mapped/(design.matrix$sizefactor*median(reads.mapped)),
-                  stringsAsFactors = FALSE)
-  xx = xx[jj,]
-  
-  write.table(xx, file = paste0(resDir, '/DESeq2_scalingFactor_forDeeptools.txt'), sep = '\t',
-              col.names = FALSE, row.names = FALSE, quote = FALSE)
-  
-}
-
+# save.scalingFactors.for.deeptools(dds)
 
 # normalization and dimensionality reduction
 sizeFactors(dds) = sizefactors.UQ
@@ -405,32 +341,6 @@ fpm = fpm(dds, robust = TRUE)
 
 save(dds, design.matrix, file = paste0(RdataDir, 'RNAseq_design_dds.object.Rdata'))
 save(fpm, design.matrix, file = paste0(tfDir, '/RNAseq_fpm_fitered.cutoff.', cutoff.gene, '.Rdata'))
-
-kk = intersect(which(design.matrix$batch == 4), grep('Mature_LA|Mature_Hand', design.matrix$conditions))
-plot.pair.comparison.plot(fpm[, kk[order(design.matrix$conditions[kk])]])
-
-
-ii = grep('HOXA13|MEIS2|SOX9', rownames(fpm))
-par(mfrow = c(2, 2))
-plot(fpm[, c(21, 28)], log='xy', cex = 0.5, main = 'LA before correction');
-points(fpm[ii, 21], fpm[ii, 28], cex = 2, col = 'red', pch = 16)
-text(fpm[ii, 21], fpm[ii, 28], c('Meis2', 'HOXA13', 'SOX9'), col = 'red', pos = 4, offset = 1, cex = 1.5)
-abline(0, 1, col='blue', lwd = 1.5)
-
-plot(fpm[, c(29, 32)], log='xy', cex = 0.5, main = 'Hand before correction');
-points(fpm[ii, 29], fpm[ii, 32], cex = 2, col = 'red', pch = 16)
-text(fpm[ii, 29], fpm[ii, 32], c('Meis2', 'HOXA13', 'SOX9'), col = 'red', pos = 4, offset = 1, cex = 1.5)
-abline(0, 1, col='blue', lwd = 1.5)
-
-plot(fpm[, c(28, 32)], log='xy', cex = 0.5, main = 'corrected LA');
-points(fpm[ii, 28], fpm[ii, 32], cex = 2, col = 'red', pch = 16)
-text(fpm[ii, 28], fpm[ii, 32], c('Meis2', 'HOXA13', 'SOX9'), col = 'red', pos = 4, offset = 1, cex = 1.5)
-abline(0, 1, col='blue', lwd = 1.5)
-
-plot(fpm[, c(21, 29)], log='xy', cex = 0.5, main = 'corrected Hand');
-points(fpm[ii, 21], fpm[ii, 29], cex = 2, col = 'red', pch = 16)
-text(fpm[ii, 21], fpm[ii, 29], c('Meis2', 'HOXA13', 'SOX9'), col = 'red', pos = 4, offset = 1, cex = 1.5)
-abline(0, 1, col='blue', lwd = 1.5)
 
 
 vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
