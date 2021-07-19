@@ -35,6 +35,7 @@ if(!dir.exists(resDir)){dir.create(resDir)}
 if(!dir.exists(tabDir)){dir.create(tabDir)}
 if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 
+
 ########################################################
 ########################################################
 # Section I : data processing and sequencing quality controls
