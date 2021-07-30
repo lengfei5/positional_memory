@@ -127,7 +127,10 @@ PCA.and.Pairwise.Comparison.mature.LA.Hand = function(dds, design.matrix)
   xx.m = xx.m[order(-xx.m$vars), ]
   
   #xx.m = xx.m[which(vars > 3), ]
-  xx.m = xx.m[c(1:100), ] 
+  xx.m = xx.m[c(1:50), ] 
+  
+  #write.table(xx.m, file = paste0(resDir, '/top100_LA.Hand.specific.genes.fromATACseq.matureSamples_usedforHand.LA.sampleSwapping.txt'), 
+  #             sep = '\t', row.names = TRUE, col.names = TRUE, quote = FALSE)
   
   ggs = xx.m$geneId
   ggs = sapply(ggs, function(x) {names = unlist(strsplit(as.character(x), '[|]')); return(names[length(names)])})
@@ -143,7 +146,6 @@ PCA.and.Pairwise.Comparison.mature.LA.Hand = function(dds, design.matrix)
                (pca2save$conditions == 'Mature_LA'| 
                   pca2save$conditions == 'Mature_Hand'))
   
- 
   ggp = ggplot(data=pca2save[jj, ], aes(PC1, PC2, label = name, color= conditions, shape = batch))  + 
     geom_point(size=3) + 
     geom_text(hjust = 0.2, nudge_y = 0.05, size=2.5)
