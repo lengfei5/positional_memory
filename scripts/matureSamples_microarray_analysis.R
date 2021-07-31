@@ -113,7 +113,90 @@ colnames(mapping) = c('transcript', 'start', 'end', 'probeName', 'match', 'stran
 # filter the probes with >=5 mismatches
 mapping = mapping[which(mapping$match > 55), ]
 
+annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
+annot.genes = readRDS(paste0(annotDir, 
+                       'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
+annot.transcript = readRDS(file = paste0(annotDir, 
+                'AmexT_v47_transcriptID_transcriptCotig_geneSymbol.nr_geneSymbol.hs_geneID_gtf.geneInfo_gtf.transcriptInfo.rds'))
+
+mm = match(mapping$transcript, annot.transcript$transcriptID)
+mapping$transcript.strand = annot.transcript$strand_transcript[mm]
+mapping$geneID = annot.transcript$geneID[mm]
+
+kk = match(mapping$geneID, annot$geneID)
+mapping$geneSymbol = annot$gene.symbol.toUse[kk]
+
+save(design, raw, mapping, file = paste0(RdataDir, 'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol.Rdata'))
 
 
+########################################################
+########################################################
+# Section : probe filtering and normalization
+# 
+########################################################
+########################################################
+load(file = paste0(RdataDir, 'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol.Rdata'))
 
+# select only probes mapped to the positive strand of transcripts
+cat(nrow(mapping), ' annotated mapping : keep only the positive strand probes \n')
+mapping = mapping[which(mapping$strand == '+'), ]
+cat(nrow(mapping), ' probes left \n')
+
+# filter unannotated probes
+cat(nrow(raw), ' probes in intensity matrix; now keep only those with annotated transcrips \n')
+mm = match(raw$probeName, mapping$probeName)
+raw = raw[!is.na(mm), ]
+cat(nrow(raw), ' probes left in intensity matrix \n')
+
+# combine the intensity matrix with transcript and genes
+mm = match(raw$probeName, mapping$probeName)
+
+raw = data.frame(mapping[mm, c(1,4, 5:6, 8:9)], raw, stringsAsFactors = FALSE)
+raw = raw[, -8] 
+
+mat = as.matrix(raw[, c(8:16)])
+mat = log2(mat)
+
+# background distribution; and keep the probes with >=2 probes above background with pvalue < 0.05
+hist(log2(tmp$gBGMeanSignal), breaks = 100)
+bg.cutoff = quantile(log2(tmp$gBGMeanSignal), 0.95)
+
+nb.pass.cutoff = apply(mat, 1, function(x) length(which(x > bg.cutoff)))
+
+sels = which(nb.pass.cutoff >= 2)
+
+mat = mat[sels, ]
+raw = raw[sels, ]
+
+mat = mat[, c(grep('UA', colnames(mat)), grep('LA', colnames(mat)), grep('Hand', colnames(mat)))]
+
+raw[, c(8:16)] = mat
+colnames(raw)[c(8:16)] = colnames(mat)
+
+##########################################
+# Qunatile normalization
+##########################################
+library(preprocessCore)
+mat = as.matrix(raw[, c(8:16)])
+
+mat.norm = normalize.quantiles(mat)
+colnames(mat.norm) = paste0(rep(c('mUA', 'mLA', 'mHand'), each = 3), '_', c(1:3))
+
+ggs = unique(raw$geneID)
+res = matrix(NA, ncol = ncol(mat.norm), nrow = length(ggs))
+colnames(res) = colnames(mat.norm)
+rownames(res) = ggs
+
+for(n in 1:nrow(res))
+{
+  if(n%%500 == 0) cat(n, '\n')
+  jj = which(raw$geneID == rownames(res)[n])
+  if(length(jj) > 1) {
+    res[n, ] = apply(mat.norm[jj, ], 2, median)
+  }else{
+    res[n, ] = mat.norm[jj, ]
+  }
+}
+
+         save(res, raw, file = paste0(RdataDir, 'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary.Rdata'))
 
