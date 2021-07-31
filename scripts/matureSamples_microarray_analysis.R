@@ -10,6 +10,11 @@
 rm(list = ls())
 
 source('functions_ExonsArray.R')
+library(Biobase)
+library(oligoClasses)
+library(oligo)
+library(arrayQualityMetrics)
+
 require(openxlsx)
 require(ggplot2)
 require(dplyr)
