@@ -11,10 +11,10 @@ rm(list = ls())
 
 source('functions_ExonsArray.R')
 library(Biobase)
-library(oligoClasses)
-library(oligo)
-library(arrayQualityMetrics)
-
+#library(oligoClasses)
+#library(oligo)
+#library(arrayQualityMetrics)
+require(limma)
 require(openxlsx)
 require(ggplot2)
 require(dplyr)
@@ -36,7 +36,6 @@ if(!dir.exists(resDir)){dir.create(resDir)}
 if(!dir.exists(tabDir)){dir.create(tabDir)}
 if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 
-
 ########################################################
 ########################################################
 # Section : import and process probe-to-transcript mapping and probe intensity
@@ -48,14 +47,19 @@ cat("Loading sample info file \n")
 dataDir = '/Volumes/groups/tanaka/Data/microarrays/Prayag/Proximal.Distal_Dunja.Prayag/ExpressionData'
 
 design = read.xlsx(design.file)
+#design = readTargets(file = design.file)
 design = design[, c(1:7)]
 design = design[which(design$`Mat/Bl` == 'mat'), ]
 design = design[, c(1, 7, 2:6)]
 colnames(design)[2] = 'condition'
 design$condition = gsub('Mat ', 'm', design$condition)
 design$condition = gsub('mW', 'mHand', design$condition) # cleaned sample info and condition design
+#design$sample = paste0(dataDir, '/', design$sample, '.txt')
+#design = design[, c(1, 2)]
+#colnames(design)[1] = 'FileName'
 
 # probe intensity
+#all <- read.maimages(files = design, source = 'agilent', )
 files = list.files(path = dataDir, full.names = TRUE)
 
 for(n in 1:nrow(design))
@@ -89,9 +93,11 @@ for(n in 1:nrow(design))
     # colnames(ma_data) = ma_ids;
     # rownames(ma_data) = tmp$ProbeName;
     if(n == 1){
-      raw = data.frame(featureNum = tmp$FeatureNum,  probeName = tmp$ProbeName, tmp$gProcessedSignal, stringsAsFactors = FALSE)
+      raw = data.frame(featureNum = tmp$FeatureNum, probeName = tmp$ProbeName, tmp$gProcessedSignal, 
+                       tmp$gBGMeanSignal, stringsAsFactors = FALSE)
     }else{
-      raw = data.frame(raw, tmp$gProcessedSignal[match(raw$featureNum, tmp$FeatureNum)], stringsAsFactors = FALSE)
+      raw = data.frame(raw, tmp$gProcessedSignal[match(raw$featureNum, tmp$FeatureNum)], 
+                       tmp$gBGMeanSignal[match(raw$featureNum, tmp$FeatureNum)], stringsAsFactors = FALSE)
     }
     
   }else{
@@ -102,7 +108,9 @@ for(n in 1:nrow(design))
 
 ## clean the probe intensity table
 raw = data.frame(raw, stringsAsFactors = FALSE)
-colnames(raw)[c(3:ncol(raw))] = paste0(design$sample, '_', design$condition) 
+
+colnames(raw)[seq(3, ncol(raw), by=2)] = paste0(design$sample, '_', design$condition) 
+colnames(raw)[seq(4, ncol(raw), by=2)] = paste0(design$sample, '_', design$condition, '_BG') 
 #rownames(raw) = raw[, 1]
 #raw = raw[, -1]
 
@@ -128,11 +136,10 @@ mm = match(mapping$transcript, annot.transcript$transcriptID)
 mapping$transcript.strand = annot.transcript$strand_transcript[mm]
 mapping$geneID = annot.transcript$geneID[mm]
 
-kk = match(mapping$geneID, annot$geneID)
-mapping$geneSymbol = annot$gene.symbol.toUse[kk]
+kk = match(mapping$geneID, annot.genes$geneID)
+mapping$geneSymbol = annot.genes$gene.symbol.toUse[kk]
 
 save(design, raw, mapping, file = paste0(RdataDir, 'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol.Rdata'))
-
 
 ########################################################
 ########################################################
@@ -159,33 +166,63 @@ mm = match(raw$probeName, mapping$probeName)
 raw = data.frame(mapping[mm, c(1,4, 5:6, 8:9)], raw, stringsAsFactors = FALSE)
 raw = raw[, -8] 
 
-mat = as.matrix(raw[, c(8:16)])
+mat = as.matrix(raw[, c(8:ncol(raw))])
 mat = log2(mat)
+bg = mat[, grep('_BG', colnames(mat))]
+mat = mat[, grep('_BG', colnames(mat), invert = TRUE)]
+
 
 # background distribution; and keep the probes with >=2 probes above background with pvalue < 0.05
-hist(log2(tmp$gBGMeanSignal), breaks = 100)
-bg.cutoff = quantile(log2(tmp$gBGMeanSignal), 0.95)
+par(mfrow = c(1, 2))
+hist(bg[, 1], breaks = 100)
+hist(bg[, 2], breaks = 100)
 
-nb.pass.cutoff = apply(mat, 1, function(x) length(which(x > bg.cutoff)))
+Correct.Background.limma = FALSE
+if(Correct.Background){
+  mat.bc = limma::backgroundCorrect.matrix(E = 2^mat, Eb = 2^bg, method = 'normexp', offset = 0, normexp.method = 'rma')
+  mat.bc = log2(mat.bc)
+  bg.cutoff = quantile(log2(tmp$gBGMeanSignal), 0.95)
+}
 
-sels = which(nb.pass.cutoff >= 2)
+Correct.Background.manual = FALSE
+if(Correct.Background.manual){
+  mat.bc = mat
+  ss = apply(bg, 2, mean)
+  ss = ss - mean(ss)
+  for(n in 1:ncol(mat.bc)) mat.bc[,n] = mat.bc[,n] - ss[n]
+}
 
-mat = mat[sels, ]
+bg.cutoff = quantile(bg, prob = 0.95)
+nb.pass.cutoff = apply(mat.bc, 1, function(x) length(which(x > bg.cutoff)))
+
+sels = which(nb.pass.cutoff >= 3)
+
+mat.bc = mat.bc[sels, ]
 raw = raw[sels, ]
 
-mat = mat[, c(grep('UA', colnames(mat)), grep('LA', colnames(mat)), grep('Hand', colnames(mat)))]
+## change the colomun order to put replicates together
+mat.bc = mat.bc[, c(grep('UA', colnames(mat.bc)), grep('LA', colnames(mat.bc)), grep('Hand', colnames(mat.bc)))]
+colnames(mat.bc) = paste0(rep(c('mUA', 'mLA', 'mHand'), each = 3), '_', c(1:3))
 
-raw[, c(8:16)] = mat
-colnames(raw)[c(8:16)] = colnames(mat)
+raw = data.frame(raw[, c(1:7)], mat.bc) 
+#colnames(raw)[c(8:16)] = colnames(mat)
+
+save(design, raw, mapping, file = paste0(RdataDir, 'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_BgCorrected.Rdata'))
 
 ##########################################
 # Qunatile normalization
 ##########################################
+load(file = paste0(RdataDir, 'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_BgCorrected.Rdata'))
+
 library(preprocessCore)
 mat = as.matrix(raw[, c(8:16)])
 
 mat.norm = normalize.quantiles(mat)
+#mat.norm = limma::normalizeBetweenArrays(mat, )
 colnames(mat.norm) = paste0(rep(c('mUA', 'mLA', 'mHand'), each = 3), '_', c(1:3))
+
+mat.norm[grep('HOXA13', raw$geneSymbol),]
+mat.norm[grep('RARRES1', raw$geneSymbol),]
 
 ggs = unique(raw$geneID)
 res = matrix(NA, ncol = ncol(mat.norm), nrow = length(ggs))
@@ -203,5 +240,10 @@ for(n in 1:nrow(res))
   }
 }
 
-         save(res, raw, file = paste0(RdataDir, 'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary.Rdata'))
+save(res, raw, file = paste0(RdataDir, 'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary.Rdata'))
+
+
+
+
+
 
