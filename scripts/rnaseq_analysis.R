@@ -340,7 +340,7 @@ sizeFactors(dds) = sizefactors.UQ
 fpm = fpm(dds, robust = TRUE)
 
 save(dds, design.matrix, file = paste0(RdataDir, 'RNAseq_design_dds.object.Rdata'))
-save(fpm, design.matrix, file = paste0(tfDir, '/RNAseq_fpm_fitered.cutoff.', cutoff.gene, '.Rdata'))
+#save(fpm, design.matrix, file = paste0(tfDir, '/RNAseq_fpm_fitered.cutoff.', cutoff.gene, '.Rdata'))
 
 vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
 
@@ -582,6 +582,7 @@ pheatmap(yy, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
          width = 12, height = 20)
 
 write.table(yy, file = paste0(resDir, '/DEtfs_mUA_regeneration_dev.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
+
 
 
 

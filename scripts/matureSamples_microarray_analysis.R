@@ -171,22 +171,22 @@ mat = log2(mat)
 bg = mat[, grep('_BG', colnames(mat))]
 mat = mat[, grep('_BG', colnames(mat), invert = TRUE)]
 
-
 # background distribution; and keep the probes with >=2 probes above background with pvalue < 0.05
 par(mfrow = c(1, 2))
 hist(bg[, 1], breaks = 100)
 hist(bg[, 2], breaks = 100)
 
 Correct.Background.limma = FALSE
-if(Correct.Background){
+if(Correct.Background.limma){
   mat.bc = limma::backgroundCorrect.matrix(E = 2^mat, Eb = 2^bg, method = 'normexp', offset = 0, normexp.method = 'rma')
   mat.bc = log2(mat.bc)
   bg.cutoff = quantile(log2(tmp$gBGMeanSignal), 0.95)
 }
 
-Correct.Background.manual = FALSE
+Correct.Background.manual = TRUE
+mat.bc = mat
 if(Correct.Background.manual){
-  mat.bc = mat
+
   ss = apply(bg, 2, mean)
   ss = ss - mean(ss)
   for(n in 1:ncol(mat.bc)) mat.bc[,n] = mat.bc[,n] - ss[n]
@@ -219,7 +219,7 @@ mat = as.matrix(raw[, c(8:16)])
 
 mat.norm = normalize.quantiles(mat)
 #mat.norm = limma::normalizeBetweenArrays(mat, )
-colnames(mat.norm) = paste0(rep(c('mUA', 'mLA', 'mHand'), each = 3), '_', c(1:3))
+colnames(mat.norm) = colnames(mat)
 
 mat.norm[grep('HOXA13', raw$geneSymbol),]
 mat.norm[grep('RARRES1', raw$geneSymbol),]
@@ -243,7 +243,39 @@ for(n in 1:nrow(res))
 save(res, raw, file = paste0(RdataDir, 'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary.Rdata'))
 
 
+##########################################
+# position-dependent genes from microarray
+# original code were from limma manual section 9.3
+##########################################
+require(limma)
+load(file = paste0(RdataDir, 'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary.Rdata'))
+annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                       'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
+mm = match(rownames(res), annot$geneID)
+ggs = paste0(annot$gene.symbol.toUse[mm], '_',  annot$geneID[mm])
+rownames(res)[!is.na(mm)] = ggs[!is.na(mm)]
 
+f <- factor(rep(c('mUA', 'mLA', 'mHand'), each = 3), levels=c("mUA","mLA","mHand")) 
+design <- model.matrix(~0+f)
+colnames(design) <- c("mUA","mLA","mHand")
 
+#To make all pair-wise comparisons between the three groups one could proceed
+fit <- lmFit(res, design)
+contrast.matrix <- makeContrasts(mLA-mUA, mHand-mUA, mHand-mLA, levels=design)
+fit2 <- contrasts.fit(fit, contrast.matrix)
+fit2 <- eBayes(fit2)
 
+#A list of top genes for RNA2 versus RNA1 can be obtained from
+topTable(fit2, coef=1, adjust="BH")
+
+#The outcome of each hypothesis test can be assigned using
+results <- decideTests(fit2)
+
+xx = data.frame(fit2$p.value)
+colnames(xx) = c('mLA.vs.mUA', 'mHand.vs.mUA', 'mHand.vs.mLA')
+
+res = data.frame(res, xx)
+
+save(res, raw, fit2, file = paste0(RdataDir, 
+                             'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_DEpval.Rdata'))
 
