@@ -306,6 +306,7 @@ raw = raw[, sels]
 
 rm(design)
 
+
 dds <- DESeqDataSetFromMatrix(raw, DataFrame(design.matrix), design = ~ conditions)
 
 ss = rowSums(counts(dds))
