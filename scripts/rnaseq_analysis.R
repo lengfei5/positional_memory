@@ -88,7 +88,6 @@ xx = xx[order(xx$fileName), ]
 #xx1 = xx;
 #design = xx 
 
-
 ########################################################
 # saturation curve from rseqc
 # the r code from rseqc output
@@ -260,7 +259,7 @@ save(design, all, file=paste0(RdataDir, 'Design_stats_readCounts_', version.anal
 
 ########################################################
 ########################################################
-# Section II : Analyze the RNA-seq data 
+# Section II : Normalize the RNA-seq data and PCA plots 
 # 
 ########################################################
 ########################################################
@@ -270,6 +269,21 @@ annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axo
                        'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
 
 tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
+sps = readRDS(file = '~/workspace/imp/organoid_patterning/results/Rdata/curated_signaling.pathways_gene.list_v2.rds')
+
+Correct_swapped.mature.samples = TRUE
+if(Correct_swapped.mature.samples){
+  jj = which(design$SampleID == '161517')  
+  design$conditions[jj] = 'Mature_Hand'
+  design$conds[jj] = 'Mature_Hand_161517.batch4'
+  
+  jj = which(design$SampleID == '161518')  
+  design$conditions[jj] = 'Mature_LA'
+  design$conds[jj] = 'Mature_LA_161518.batch4'
+  
+  colnames(all)[-1] = design$conds
+  
+}
 
 ##########################################
 # convert gene names to gene symbols
@@ -305,7 +319,6 @@ design.matrix = design[sels, ]
 raw = raw[, sels]
 
 rm(design)
-
 
 dds <- DESeqDataSetFromMatrix(raw, DataFrame(design.matrix), design = ~ conditions)
 
@@ -373,9 +386,9 @@ bc = droplevels(design.matrix$batch[sels])
 #bc = levelsdroplevels(bc)
 mod = model.matrix(~ as.factor(conditions), data = design.matrix[sels, ])
 
-cpm.bc = ComBat(dat=cpm, batch=bc, mod=mod, par.prior=TRUE, ref.batch = 4, mean.only = FALSE)    
+cpm.bc = ComBat(dat=cpm, batch=bc, mod=mod, par.prior=TRUE, ref.batch = 3, mean.only = FALSE)    
 
-ntop = 500
+ntop = 5000
 library(factoextra)
 xx = as.matrix(cpm.bc)
 vars = apply(xx, 1, var)
@@ -448,15 +461,15 @@ plotDispEsts(dds, ymin = 10^-3)
 dds = nbinomWaldTest(dds, betaPrior = TRUE)
 resultsNames(dds)
 
-res.ii = results(dds, contrast=c("conditions", 'Mature_Hand', 'Mature_UA'))
+res.ii = results(dds, contrast=c("conditions", 'Mature_Hand', 'Mature_UA'), alpha = 0.1)
 colnames(res.ii) = paste0(colnames(res.ii), "_Hand.vs.UA")
 res = data.frame(res.ii[, c(2, 5, 6)])
 
-res.ii = results(dds, contrast=c("conditions", 'Mature_Hand', 'Mature_LA'))
+res.ii = results(dds, contrast=c("conditions", 'Mature_Hand', 'Mature_LA'), alpha = 0.01)
 colnames(res.ii) = paste0(colnames(res.ii), "_Hand.vs.LA")
 res = data.frame(res, res.ii[, c(2, 5, 6)])
 
-res.ii = results(dds, contrast=c("conditions", 'Mature_LA', 'Mature_UA'))
+res.ii = results(dds, contrast=c("conditions", 'Mature_LA', 'Mature_UA'), alpha = 0.01)
 colnames(res.ii) = paste0(colnames(res.ii), "_LA.vs.UA")
 res = data.frame(res, res.ii[, c(2, 5, 6)])
 
@@ -465,46 +478,72 @@ res = data.frame(res, res.ii[, c(2, 5, 6)])
 #res0 <- results(dds)
 
 library("pheatmap")
-pval.cutoff = 0.01
+pval.cutoff = 0.001
 select = which(res$pvalue_Hand.vs.LA < pval.cutoff | res$pvalue_Hand.vs.UA < pval.cutoff | res$pvalue_LA.vs.UA < pval.cutoff)
 
 df <- as.data.frame(colData(dds)[,c("conditions", 'batch')])
-o1 = c(grep('UA', df$conditions), grep('LA', df$conditions), grep('Hand', df$conditions), grep('Head', df$conditions))
+o1 = c(grep('UA', df$conditions), grep('LA', df$conditions), grep('Hand', df$conditions))
 
 yy = cpm[select, o1]
 ss = apply(as.matrix(yy), 1, mean)
 yy = yy[which(ss>-2), ]
 
-pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, show_colnames = FALSE,
+pheatmap(yy, cluster_rows=TRUE, show_rownames=TRUE, fontsize_row = 6,
+         show_colnames = FALSE,
          scale = 'row',
-         cluster_cols=FALSE, annotation_col=df[o1, ])
+         cluster_cols=FALSE, annotation_col=df[o1, ], 
+         width = 10, height = 18, filename = paste0(resDir, '/heatmap_DEgenes_mature_pval.0.001.pdf')) 
 
 
 #xx = res[select, ]
 #xx = xx[order(xx$pvalue), ]
 #xx = cpm
+pval.cutoff = 0.01
+select = which(res$pvalue_Hand.vs.LA < pval.cutoff | res$pvalue_Hand.vs.UA < pval.cutoff | res$pvalue_LA.vs.UA < pval.cutoff)
+
+df <- as.data.frame(colData(dds)[,c("conditions", 'batch')])
+o1 = c(grep('UA', df$conditions), grep('LA', df$conditions), grep('Hand', df$conditions))
+yy = cpm[select, o1]
+
+#ss = apply(as.matrix(yy), 1, max)
+#yy = yy[which(ss>-2), ]
 ggs = rownames(yy)
 ggs = sapply(ggs, function(x) unlist(strsplit(as.character(x), '_'))[1])
 
-mm = match(tfs[, 3], ggs)
+mm = match(unique(c(tfs[, 3], sps$gene)), ggs)
 xx = yy[mm[!is.na(mm)], ]
 
-tf.sels = match(rownames(xx), rownames(res))
-df <- as.data.frame(colData(dds)[,c("conditions", 'batch')])
-o1 = c(grep('UA', df$conditions), grep('LA', df$conditions), grep('Hand', df$conditions), grep('Head', df$conditions))
+#tf.sels = match(rownames(xx), rownames(res))
+#df <- as.data.frame(colData(dds)[,c("conditions", 'batch')])
+#o1 = c(grep('UA', df$conditions), grep('LA', df$conditions), grep('Hand', df$conditions), grep('Head', df$conditions))
 
-yy = cpm[tf.sels, o1]
+#yy = cpm[tf.sels, o1]
 #ss = apply(as.matrix(yy), 1, mean)
 #yy = yy[which(ss>-2), ]
 
-pheatmap(yy, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
+pheatmap(xx, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
          scale = 'row',
-         cluster_cols=FALSE, annotation_col=df[o1, ], fontsize_row = 8)
+         cluster_cols=FALSE, annotation_col=df[o1, ], fontsize_row = 8, 
+         width = 10, height = 10,
+         filename = paste0(resDir, '/heatmap_DE.tfs.sps_mature_pval.0.01.pdf')) 
 
 
+write.table(data.frame(cpm, res, stringsAsFactors = FALSE), 
+            file = paste0(resDir, '/position_dependent_genes_from_matureSamples.txt'), 
+            sep = '\t', quote = FALSE, col.names = TRUE, row.names = TRUE)
+
 ##########################################
-# dynamic TFs in regeneration (development stages as contorls) 
+# position-dependent genes from microarray 
 ##########################################
+
+
+
+########################################################
+########################################################
+# Section : dynamic gene and TFs, SPs in regeneration (development stages as contorls) 
+# 
+########################################################
+########################################################
 load(file = paste0(RdataDir, 'RNAseq_design_dds.object.Rdata'))
 dds0 = dds
 fpm0 = fpm(dds)
