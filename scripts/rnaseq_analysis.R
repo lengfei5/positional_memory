@@ -529,15 +529,76 @@ pheatmap(xx, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
 
 
 write.table(data.frame(cpm, res, stringsAsFactors = FALSE), 
-            file = paste0(resDir, '/position_dependent_genes_from_matureSamples.txt'), 
+            file = paste0(resDir, '/position_dependent_genes_from_matureSamples_RNAseq.txt'), 
             sep = '\t', quote = FALSE, col.names = TRUE, row.names = TRUE)
 
 ##########################################
 # position-dependent genes from microarray 
 ##########################################
+require(limma)
+# load microarray analysis results: log2 signal (res), comparison (fit2), and raw data (raw)
+load(file = paste0("../results/microarray/Rdata/", 
+                   'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_DEpval.Rdata'))
+
+tops = topTable(fit2, coef=1, adjust="BH", number = nrow(res), genelist = rownames(res))[, c(2, 5,6)]
+colnames(tops) = paste0(colnames(tops), '_mLA.vs.mUA')
+res = data.frame(res, tops[match(rownames(res), rownames(tops)), ])
+
+tops = topTable(fit2, coef=2, adjust="BH", number = nrow(res), genelist = rownames(res))[, c(2, 5,6)]
+colnames(tops) = paste0(colnames(tops), '_mHand.vs.mUA')
+res = data.frame(res, tops[match(rownames(res), rownames(tops)), ])
+
+tops = topTable(fit2, coef=3, adjust="BH", number = nrow(res), genelist = rownames(res))[, c(2, 5,6)]
+colnames(tops) = paste0(colnames(tops), '_mHand.vs.mLA')
+res = data.frame(res, tops[match(rownames(res), rownames(tops)), ])
+
+write.table(res,
+            file = paste0(resDir, '/position_dependent_genes_from_matureSamples_microarray.txt'), 
+            sep = '\t', quote = FALSE, col.names = TRUE, row.names = TRUE)
+
+# plot all position-dependent genes
+library("pheatmap")
+pval.cutoff = 0.001
+select = which(res$P.Value_mLA.vs.mUA < pval.cutoff | res$P.Value_mHand.vs.mUA < pval.cutoff | 
+                 res$P.Value_mHand.vs.mLA < pval.cutoff)
+
+yy = res[select, c(1:9)]
+df <- data.frame(conditions = rep(c('mUA', 'mLA', 'mHand'), each = 3))
+rownames(df) = colnames(yy)
+
+#ss = apply(as.matrix(yy), 1, mean)
+#yy = yy[which(ss>-2), ]
+
+pheatmap(yy, cluster_rows=TRUE, show_rownames=TRUE, fontsize_row = 3,
+         show_colnames = FALSE,
+         scale = 'row',
+         cluster_cols=FALSE, annotation_col=df,
+         width = 10, height = 30, filename = paste0(resDir, '/heatmap_DEgenes_mature_pval.0.001_microarray.pdf')) 
 
 
+# plot only TFs and SPs
+pval.cutoff = 0.001
+select = which(res$P.Value_mLA.vs.mUA < pval.cutoff | res$P.Value_mHand.vs.mUA < pval.cutoff | 
+                 res$P.Value_mHand.vs.mLA < pval.cutoff)
 
+yy = res[select, c(1:9)]
+df <- data.frame(conditions = rep(c('mUA', 'mLA', 'mHand'), each = 3))
+rownames(df) = colnames(yy)
+
+#ss = apply(as.matrix(yy), 1, max)
+#yy = yy[which(ss>-2), ]
+ggs = rownames(yy)
+ggs = sapply(ggs, function(x) unlist(strsplit(as.character(x), '_'))[1])
+
+mm = match(unique(c(tfs[, 3], sps$gene)), ggs)
+xx = yy[mm[!is.na(mm)], ]
+
+
+pheatmap(xx, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
+         scale = 'row',
+         cluster_cols=FALSE, annotation_col=df, fontsize_row = 8, 
+         width = 10, height = 10,
+         filename = paste0(resDir, '/heatmap_DE.tfs.sps_mature_pval.0.001_microarray.pdf')) 
 
 
 ########################################################
