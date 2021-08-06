@@ -89,76 +89,6 @@ xx = xx[order(xx$fileName), ]
 #xx1 = xx;
 #design = xx 
 
-########################################################
-# saturation curve from rseqc
-# the r code from rseqc output
-########################################################
-Saturation.test = FALSE
-if(Saturation.test){
-  
-  rseqc.file = list.files('../Data/R10724_rnaseq/saturation_rseqc', pattern = 'junctionSaturation_plot.r', 
-                          full.names = TRUE)
-  library(stringr)
-  
-  yy = c()
-  for(n in 1:length(rseqc.file))
-  {
-    cat(n, '\n')
-    xx = read.delim(rseqc.file[n])
-    xx = xx[grep('y=', xx[, 1 ]), ]
-    #xx = gsub('y=c', '', xx)
-    # Get the parenthesis and what is inside
-    k <- str_extract_all(xx, "\\([^()]+\\)")[[1]]
-    # Remove parenthesis
-    k <- substring(k, 2, nchar(k)-1)
-    #k = gsub('["]', '', k)
-    k = as.numeric(unlist(strsplit(as.character(k), ',')))
-    yy = rbind(yy, k)
-  }
-  
-  rownames(yy) = gsub('_junction.junctionSaturation_plot.r', '', basename(rseqc.file))
-  
-  pdfname = paste0(resDir, '/saturation_curve_rseqc_knownJunctions.pdf')
-  pdf(pdfname, width = 16, height = 8)
-  par(cex = 1.0, las = 1,  mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0), tcl = -0.3)
-  
-  yy = yy[which(rownames(yy) != '136150_TTAACCTTCGAGGCCAGACA_HNF3KDSXY_3_20201223B_20201223'), ]
-  span = 0.75
-  # saturation curve with nb of peaks
-  xlims = c(0, 120)
-  ylims = range(yy/10^3)
-  frac = c(5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100)/100
-  
-  library(RColorBrewer)
-  cols = colorRampPalette( rev(brewer.pal(9, "RdBu")) )(nrow(yy))
-  plot(0, 0, xlim = xlims, ylim = ylims, type ='n', xlab = 'nb of TOTAL reads (Million)', 
-       ylab = 'nb of known junctions (K)', main = paste0('saturation curve from rseqc'))
-  abline(v = c(20, 30, 40, 50), col = 'blue', lwd = 1.0, lty =2)
-  
-  #legend('topleft', legend = sample.uniq, col = cols, bty = 'n', lwd = 2.0, cex = 0.7)
-  
-  for(n in 1:nrow(yy))
-  {
-    # n = 1
-    cat(n, '\n')
-    
-    kk = which(design$sample == rownames(yy)[n])
-    
-    satt = data.frame(nb.reads = design$total.reads[kk]*frac/10^6, nb.junctions = yy[n, ]/10^3)
-    
-    points(satt[,1], satt[,2], type= 'p', col = cols[n])
-    loessMod <- loess(nb.junctions ~ nb.reads, data=satt, span=span)
-    smoothed <- predict(loessMod)
-    lines(smoothed, x=satt$nb.reads, col=cols[n], lwd = 3.0)
-    
-    text(satt[nrow(satt), 1], smoothed[length(smoothed)], labels = paste0(design$fileName[kk], '_', design$sampleID[kk]), 
-         cex = 0.7, pos = 4, offset = 0.2)
-    
-  }
-  
-  dev.off()
-  
-}
 
 ##################################################
 ## Import design matrix and prepare count table
@@ -457,6 +387,8 @@ sps = readRDS(file = '~/workspace/imp/organoid_patterning/results/Rdata/curated_
 dds0 = dds
 fpm0 = fpm(dds)
 
+saveTables = TRUE
+
 # select mature samples
 sels = intersect(which(design.matrix$batch == 4), grep('Mature', design.matrix$conditions))
 dds = dds[, sels]
@@ -486,60 +418,44 @@ res = data.frame(res, res.ii[, c(2, 5, 6)])
 #dds <- nbinomLRT(dds, reduced = ~1 )
 #res0 <- results(dds)
 
+##########################################
+# heatmap to visualize all positional genes and regulators (TFs and SPs)
+##########################################
 library("pheatmap")
-pval.cutoff = 0.001
+pval.cutoff = 0.01
 select = which(res$pvalue_Hand.vs.LA < pval.cutoff | res$pvalue_Hand.vs.UA < pval.cutoff | res$pvalue_LA.vs.UA < pval.cutoff)
+cat(length(select), ' positional genes found \n')
 
 df <- as.data.frame(colData(dds)[,c("conditions", 'batch')])
 o1 = c(grep('UA', df$conditions), grep('LA', df$conditions), grep('Hand', df$conditions))
 
 yy = cpm[select, o1]
 ss = apply(as.matrix(yy), 1, mean)
-yy = yy[which(ss>-2), ]
 
-pheatmap(yy, cluster_rows=TRUE, show_rownames=TRUE, fontsize_row = 6,
+#yy = yy[which(ss>-2), ]
+pheatmap(yy, cluster_rows=TRUE, show_rownames=TRUE, fontsize_row = 5,
          show_colnames = FALSE,
          scale = 'row',
          cluster_cols=FALSE, annotation_col=df[o1, ], 
-         width = 10, height = 18, filename = paste0(resDir, '/heatmap_DEgenes_mature_pval.0.001.pdf')) 
+         width = 10, height = 50, filename = paste0(shareDir, '/heatmap_DEgenes_mature_pval.0.01.pdf'))
 
+# narrow down to TFs and SPs
+ggs = sapply(rownames(yy), function(x) unlist(strsplit(as.character(x), '_'))[1])
+mm = match(ggs, unique(c(tfs[, 3], toupper(sps$gene))))
+yy1 = yy[!is.na(mm), ]
 
-#xx = res[select, ]
-#xx = xx[order(xx$pvalue), ]
-#xx = cpm
-pval.cutoff = 0.01
-select = which(res$pvalue_Hand.vs.LA < pval.cutoff | res$pvalue_Hand.vs.UA < pval.cutoff | res$pvalue_LA.vs.UA < pval.cutoff)
-
-df <- as.data.frame(colData(dds)[,c("conditions", 'batch')])
-o1 = c(grep('UA', df$conditions), grep('LA', df$conditions), grep('Hand', df$conditions))
-yy = cpm[select, o1]
-
-#ss = apply(as.matrix(yy), 1, max)
-#yy = yy[which(ss>-2), ]
-ggs = rownames(yy)
-ggs = sapply(ggs, function(x) unlist(strsplit(as.character(x), '_'))[1])
-
-mm = match(unique(c(tfs[, 3], sps$gene)), ggs)
-xx = yy[mm[!is.na(mm)], ]
-
-#tf.sels = match(rownames(xx), rownames(res))
-#df <- as.data.frame(colData(dds)[,c("conditions", 'batch')])
-#o1 = c(grep('UA', df$conditions), grep('LA', df$conditions), grep('Hand', df$conditions), grep('Head', df$conditions))
-
-#yy = cpm[tf.sels, o1]
-#ss = apply(as.matrix(yy), 1, mean)
-#yy = yy[which(ss>-2), ]
-
-pheatmap(xx, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
+pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
          scale = 'row',
          cluster_cols=FALSE, annotation_col=df[o1, ], fontsize_row = 8, 
-         width = 10, height = 10,
-         filename = paste0(resDir, '/heatmap_DE.tfs.sps_mature_pval.0.01.pdf')) 
+         width = 10, height = 15,
+         filename = paste0(shareDir, '/heatmap_DE.tfs.sps_mature_pval.0.01.pdf')) 
 
-
-write.table(data.frame(cpm, res, stringsAsFactors = FALSE), 
-            file = paste0(resDir, '/position_dependent_genes_from_matureSamples_RNAseq.txt'), 
-            sep = '\t', quote = FALSE, col.names = TRUE, row.names = TRUE)
+if(saveTables){
+  xx = data.frame(gene = rownames(yy), yy, res[match(rownames(yy), rownames(res)), ], stringsAsFactors = FALSE)
+  write.csv(xx, file = paste0(shareDir, '/position_dependent_genes_from_matureSamples_RNAseq_pval.0.01.csv'), 
+            quote = FALSE, col.names = TRUE, row.names = TRUE)
+  
+}
 
 ##########################################
 # position-dependent genes from microarray 
@@ -548,6 +464,8 @@ require(limma)
 # load microarray analysis results: log2 signal (res), comparison (fit2), and raw data (raw)
 load(file = paste0("../results/microarray/Rdata/", 
                    'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_DEpval.Rdata'))
+
+res = res[, c(1:9)] # drop the pval kept previously
 
 tops = topTable(fit2, coef=1, adjust="BH", number = nrow(res), genelist = rownames(res))[, c(2, 5,6)]
 colnames(tops) = paste0(colnames(tops), '_mLA.vs.mUA')
@@ -561,15 +479,13 @@ tops = topTable(fit2, coef=3, adjust="BH", number = nrow(res), genelist = rownam
 colnames(tops) = paste0(colnames(tops), '_mHand.vs.mLA')
 res = data.frame(res, tops[match(rownames(res), rownames(tops)), ])
 
-write.table(res,
-            file = paste0(resDir, '/position_dependent_genes_from_matureSamples_microarray.txt'), 
-            sep = '\t', quote = FALSE, col.names = TRUE, row.names = TRUE)
-
 # plot all position-dependent genes
 library("pheatmap")
-pval.cutoff = 0.001
-select = which(res$P.Value_mLA.vs.mUA < pval.cutoff | res$P.Value_mHand.vs.mUA < pval.cutoff | 
-                 res$P.Value_mHand.vs.mLA < pval.cutoff)
+qv.cutoff = 0.1
+select = which(res$adj.P.Val_mHand.vs.mLA < qv.cutoff |
+                 res$adj.P.Val_mLA.vs.mUA < qv.cutoff | 
+                 res$adj.P.Val_mHand.vs.mLA < qv.cutoff)
+cat(length(select), ' positional genes found \n')
 
 yy = res[select, c(1:9)]
 df <- data.frame(conditions = rep(c('mUA', 'mLA', 'mHand'), each = 3))
@@ -578,37 +494,31 @@ rownames(df) = colnames(yy)
 #ss = apply(as.matrix(yy), 1, mean)
 #yy = yy[which(ss>-2), ]
 
-pheatmap(yy, cluster_rows=TRUE, show_rownames=TRUE, fontsize_row = 3,
+pheatmap(yy, cluster_rows=TRUE, show_rownames=TRUE, fontsize_row = 5,
          show_colnames = FALSE,
          scale = 'row',
          cluster_cols=FALSE, annotation_col=df,
-         width = 10, height = 30, filename = paste0(resDir, '/heatmap_DEgenes_mature_pval.0.001_microarray.pdf')) 
-
+         width = 10, height = 50, filename = paste0(shareDir, '/heatmap_DEgenes_mature_qv.0.1_microarray.pdf')) 
 
 # plot only TFs and SPs
-pval.cutoff = 0.001
-select = which(res$P.Value_mLA.vs.mUA < pval.cutoff | res$P.Value_mHand.vs.mUA < pval.cutoff | 
-                 res$P.Value_mHand.vs.mLA < pval.cutoff)
-
-yy = res[select, c(1:9)]
-df <- data.frame(conditions = rep(c('mUA', 'mLA', 'mHand'), each = 3))
-rownames(df) = colnames(yy)
-
-#ss = apply(as.matrix(yy), 1, max)
-#yy = yy[which(ss>-2), ]
 ggs = rownames(yy)
 ggs = sapply(ggs, function(x) unlist(strsplit(as.character(x), '_'))[1])
 
-mm = match(unique(c(tfs[, 3], sps$gene)), ggs)
-xx = yy[mm[!is.na(mm)], ]
+mm = match(ggs, unique(c(tfs[, 3], toupper(sps$gene))))
+yy1 = yy[!is.na(mm), ]
 
-
-pheatmap(xx, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
+pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
          scale = 'row',
          cluster_cols=FALSE, annotation_col=df, fontsize_row = 8, 
-         width = 10, height = 10,
-         filename = paste0(resDir, '/heatmap_DE.tfs.sps_mature_pval.0.001_microarray.pdf')) 
+         width = 10, height = 20,
+         filename = paste0(shareDir, '/heatmap_DE.tfs.sps_mature_qv.0.1_microarray.pdf')) 
 
+if(saveTables){
+  write.csv(res[select, ],
+              file = paste0(shareDir, '/position_dependent_genes_from_matureSamples_microarray_qv.0.1.csv'), 
+              quote = FALSE, col.names = TRUE, row.names = TRUE)
+  
+}
 
 
 ########################################################

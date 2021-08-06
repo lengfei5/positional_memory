@@ -53,6 +53,79 @@ Run.QC.for.RNA.replicates = function(design, raw)
   
 }
 
+
+########################################################
+# saturation curve from rseqc
+# the r code from rseqc output
+########################################################
+RNAseq.sequence.saturation.test = function()
+{
+  rseqc.file = list.files('../Data/R10724_rnaseq/saturation_rseqc', pattern = 'junctionSaturation_plot.r', 
+                          full.names = TRUE)
+  library(stringr)
+  
+  yy = c()
+  for(n in 1:length(rseqc.file))
+  {
+    cat(n, '\n')
+    xx = read.delim(rseqc.file[n])
+    xx = xx[grep('y=', xx[, 1 ]), ]
+    #xx = gsub('y=c', '', xx)
+    # Get the parenthesis and what is inside
+    k <- str_extract_all(xx, "\\([^()]+\\)")[[1]]
+    # Remove parenthesis
+    k <- substring(k, 2, nchar(k)-1)
+    #k = gsub('["]', '', k)
+    k = as.numeric(unlist(strsplit(as.character(k), ',')))
+    yy = rbind(yy, k)
+  }
+  
+  rownames(yy) = gsub('_junction.junctionSaturation_plot.r', '', basename(rseqc.file))
+  
+  pdfname = paste0(resDir, '/saturation_curve_rseqc_knownJunctions.pdf')
+  pdf(pdfname, width = 16, height = 8)
+  par(cex = 1.0, las = 1,  mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0), tcl = -0.3)
+  
+  yy = yy[which(rownames(yy) != '136150_TTAACCTTCGAGGCCAGACA_HNF3KDSXY_3_20201223B_20201223'), ]
+  span = 0.75
+  # saturation curve with nb of peaks
+  xlims = c(0, 120)
+  ylims = range(yy/10^3)
+  frac = c(5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100)/100
+  
+  library(RColorBrewer)
+  cols = colorRampPalette( rev(brewer.pal(9, "RdBu")) )(nrow(yy))
+  plot(0, 0, xlim = xlims, ylim = ylims, type ='n', xlab = 'nb of TOTAL reads (Million)', 
+       ylab = 'nb of known junctions (K)', main = paste0('saturation curve from rseqc'))
+  abline(v = c(20, 30, 40, 50), col = 'blue', lwd = 1.0, lty =2)
+  
+  #legend('topleft', legend = sample.uniq, col = cols, bty = 'n', lwd = 2.0, cex = 0.7)
+  
+  for(n in 1:nrow(yy))
+  {
+    # n = 1
+    cat(n, '\n')
+    
+    kk = which(design$sample == rownames(yy)[n])
+    
+    satt = data.frame(nb.reads = design$total.reads[kk]*frac/10^6, nb.junctions = yy[n, ]/10^3)
+    
+    points(satt[,1], satt[,2], type= 'p', col = cols[n])
+    loessMod <- loess(nb.junctions ~ nb.reads, data=satt, span=span)
+    smoothed <- predict(loessMod)
+    lines(smoothed, x=satt$nb.reads, col=cols[n], lwd = 3.0)
+    
+    text(satt[nrow(satt), 1], smoothed[length(smoothed)], labels = paste0(design$fileName[kk], '_', design$sampleID[kk]), 
+         cex = 0.7, pos = 4, offset = 0.2)
+    
+  }
+  
+  dev.off()
+  
+}
+
+
+
 save.scalingFactors.for.deeptools = function(dds)
 {
   ss = colSums(counts(dds))
