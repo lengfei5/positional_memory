@@ -17,7 +17,7 @@ source('Functions_rnaseq.R')
 require(openxlsx)
 require(ggplot2)
 require(DESeq2)
-library("dplyr")
+require(dplyr)
 require(gridExtra)
 
 version.Data = 'rnaseq_Rxxxx.old_R10724_R161513';
@@ -82,13 +82,6 @@ for(n in 1:nrow(design))
 
 xx = data.frame(design[ii, ], stats[jj, ], stringsAsFactors = FALSE)
 xx = xx[order(xx$fileName), ]
-
-# write.csv(xx, file = paste0(resDir, '/QCs_stats.csv'), row.names = FALSE)
-
-#xx2 = xx
-#xx1 = xx;
-#design = xx 
-
 
 ##################################################
 ## Import design matrix and prepare count table
@@ -190,6 +183,17 @@ save(design, all, file=paste0(RdataDir, 'Design_stats_readCounts_', version.anal
 
 ########################################################
 ########################################################
+# Section 1.5 :
+# Here we update two samples 160343 and 160344 that were resequenced 
+# due to Arabdobisis contamination
+########################################################
+########################################################
+source('Functions_rnaseq.R')
+Update.samples.160343.160344()
+
+
+########################################################
+########################################################
 # Section II : Normalize the RNA-seq data and PCA plots 
 # 
 ########################################################
@@ -203,19 +207,6 @@ tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_T
 sps = readRDS(file = '~/workspace/imp/organoid_patterning/results/Rdata/curated_signaling.pathways_gene.list_v2.rds')
 
 
-Correct_swapped.mature.samples = TRUE
-if(Correct_swapped.mature.samples){
-  jj = which(design$SampleID == '161517')  
-  design$conditions[jj] = 'Mature_Hand'
-  design$conds[jj] = 'Mature_Hand_161517.batch4'
-  
-  jj = which(design$SampleID == '161518')  
-  design$conditions[jj] = 'Mature_LA'
-  design$conds[jj] = 'Mature_LA_161518.batch4'
-  
-  colnames(all)[-1] = design$conds
-  
-}
 
 ##########################################
 # convert gene names to gene symbols

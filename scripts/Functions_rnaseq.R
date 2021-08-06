@@ -124,8 +124,9 @@ RNAseq.sequence.saturation.test = function()
   
 }
 
-
-
+##########################################
+# save scaling factors in DESeq2 for deeptools
+##########################################
 save.scalingFactors.for.deeptools = function(dds)
 {
   ss = colSums(counts(dds))
@@ -466,6 +467,66 @@ compare.mature.samples.RNAseq.with.microarray = function()
   
 }
 
-
-
-
+########################################################
+########################################################
+# Section : Update or add newly sequenced samples
+# 
+########################################################
+########################################################
+Update.samples.160343.160344 = function()
+{
+  load(file=paste0(RdataDir, 'Design_stats_readCounts_', version.analysis, '.Rdata'))
+  
+  Correct_swapped.mature.samples = TRUE
+  if(Correct_swapped.mature.samples){
+    jj = which(design$SampleID == '161517')  
+    design$conditions[jj] = 'Mature_Hand'
+    design$conds[jj] = 'Mature_Hand_161517.batch4'
+    
+    jj = which(design$SampleID == '161518')  
+    design$conditions[jj] = 'Mature_LA'
+    design$conds[jj] = 'Mature_LA_161518.batch4'
+    
+    colnames(all)[-1] = design$conds
+    
+  }
+  
+  dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/R11635_rnaseq_redo.no.arab/'
+  
+  # update counts
+  countFile = paste0(dataDir, 'nf_out/featureCounts/merged_gene_counts.txt')
+  counts = read.delim(file = countFile, sep = '\t', header = TRUE)
+  counts = counts[match(all$gene, counts$ENSEMBL_ID), ]
+  
+  par(mfrow = c(1, 2))
+  plot(counts[, 2], all[, which(design$SampleID == '106343' & design$batch == '4')], cex = 0.6, log ='xy');
+  abline(0, 1, lwd = 2.0, col = 'red')
+  
+  plot(counts[, 3], all[, which(design$SampleID == '106344' & design$batch == '4')], cex = 0.6, log ='xy');
+  abline(0, 1, lwd = 2.0, col = 'red')
+  
+  all[, which(design$SampleID == '106343' & design$batch == '4')] = counts[, 2]
+  all[, which(design$SampleID == '106344' & design$batch == '4')] = counts[, 3]
+  
+  # update the sequence statistics
+  stat = read.delim(file = paste0(dataDir, '/nf_out/MultiQC/multiqc_data/multiqc_general_stats.txt'))
+  
+  #xx = data.frame(design, matrix(NA, nrow = nrow(design), ncol = 9), stringsAsFactors = FALSE)
+  #colnames(xx)[7:15] = colnames(stat0)[-c(1:3)]
+  #mm = match(stat0$sampleID, design$SampleID)
+  #xx[mm, c(7:15)] = stat0[, -c(1:3)]
+  
+  kk = c(which(design$SampleID == '106343' & design$batch == '4'), which(design$SampleID == '106344' & design$batch == '4'))
+  design$pct.duplication[kk] = stat$FastQC_mqc.generalstats.fastqc.percent_duplicates
+  design$pct.GC[kk] = stat$FastQC_mqc.generalstats.fastqc.percent_gc
+  design$readType[kk] = 'SE'
+  design$avg.seq.length[kk] = stat$FastQC_mqc.generalstats.fastqc.avg_sequence_length
+  design$total.reads[kk] = stat$FastQC_mqc.generalstats.fastqc.total_sequences
+  design$trimmed.reads[kk] = NA
+  design$assigned.reads[kk] = stat$featureCounts_mqc.generalstats.featurecounts.Assigned
+  design$alignment.rate[kk] = stat$HISAT2_mqc.generalstats.hisat2.overall_alignment_rate
+  design$pct.assigned.to.features[kk] = stat$featureCounts_mqc.generalstats.featurecounts.percent_assigned
+ 
+  save(design, all, file=paste0(RdataDir, 'Design_stats_readCounts_updatedResequenced', version.analysis, '.Rdata'))
+   
+}
