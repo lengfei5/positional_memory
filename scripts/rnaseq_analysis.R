@@ -454,7 +454,6 @@ annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axo
 tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
 sps = readRDS(file = '~/workspace/imp/organoid_patterning/results/Rdata/curated_signaling.pathways_gene.list_v2.rds')
 
-
 dds0 = dds
 fpm0 = fpm(dds)
 
@@ -462,12 +461,12 @@ fpm0 = fpm(dds)
 sels = intersect(which(design.matrix$batch == 4), grep('Mature', design.matrix$conditions))
 dds = dds[, sels]
 
-cpm = log2(fpm0[, sels] + 2^-6)
+cpm = fpm(dds)
+cpm = log2(cpm + 2^-4)
 
 dds$conditions = droplevels(dds$conditions)
-dds <- estimateDispersions(dds)
-
-plotDispEsts(dds, ymin = 10^-3)
+dds <- estimateDispersions(dds, fitType = 'local')
+plotDispEsts(dds, ymin = 10^-3); abline(h = 0.1, col = 'blue', lwd = 2.0)
 
 dds = nbinomWaldTest(dds, betaPrior = TRUE)
 resultsNames(dds)
@@ -483,7 +482,6 @@ res = data.frame(res, res.ii[, c(2, 5, 6)])
 res.ii = results(dds, contrast=c("conditions", 'Mature_LA', 'Mature_UA'), alpha = 0.01)
 colnames(res.ii) = paste0(colnames(res.ii), "_LA.vs.UA")
 res = data.frame(res, res.ii[, c(2, 5, 6)])
-
 
 #dds <- nbinomLRT(dds, reduced = ~1 )
 #res0 <- results(dds)
