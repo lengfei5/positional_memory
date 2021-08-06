@@ -31,6 +31,7 @@ resDir = paste0("../results/", version.Data)
 tabDir =  paste0(resDir, "/tables/")
 tfDir = '~/workspace/imp/positional_memory/results/motif_analysis'
 RdataDir = paste0(resDir, "/Rdata/")
+shareDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/AkaneToJingkuiShareFiles/results_rnaseq/positional_genes'
 
 if(!dir.exists(resDir)){dir.create(resDir)}
 if(!dir.exists(tabDir)){dir.create(tabDir)}
@@ -271,6 +272,7 @@ annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axo
 tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
 sps = readRDS(file = '~/workspace/imp/organoid_patterning/results/Rdata/curated_signaling.pathways_gene.list_v2.rds')
 
+
 Correct_swapped.mature.samples = TRUE
 if(Correct_swapped.mature.samples){
   jj = which(design$SampleID == '161517')  
@@ -444,13 +446,22 @@ if(Test.glmpca.mds){
 # 
 ########################################################
 ########################################################
+# load dds normalized object and annotations
 load(file = paste0(RdataDir, 'RNAseq_design_dds.object.Rdata'))
+annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                       'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
+
+tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
+sps = readRDS(file = '~/workspace/imp/organoid_patterning/results/Rdata/curated_signaling.pathways_gene.list_v2.rds')
+
+
 dds0 = dds
 fpm0 = fpm(dds)
 
 # select mature samples
 sels = intersect(which(design.matrix$batch == 4), grep('Mature', design.matrix$conditions))
 dds = dds[, sels]
+
 cpm = log2(fpm0[, sels] + 2^-6)
 
 dds$conditions = droplevels(dds$conditions)
@@ -601,9 +612,10 @@ pheatmap(xx, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
          filename = paste0(resDir, '/heatmap_DE.tfs.sps_mature_pval.0.001_microarray.pdf')) 
 
 
+
 ########################################################
 ########################################################
-# Section : dynamic gene and TFs, SPs in regeneration (development stages as contorls) 
+# Section IV : dynamic gene and TFs, SPs in regeneration (development stages as contorls) 
 # 
 ########################################################
 ########################################################
