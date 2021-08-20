@@ -2610,5 +2610,17 @@ Identify.LA.Hand.specific.genes.from.atacseq = function(xx)
 
 
 
-
+########################################################
+########################################################
+# Section : some handy utility functions
+# 
+########################################################
+########################################################
+check.atacseq.sample.ratios = function()
+{
+  aa = read.delim(file = '../data/ed_AK_countStatTable_manualCleaned.txt', sep = '\t', header = TRUE)
+  
+  
+  
+}
 
