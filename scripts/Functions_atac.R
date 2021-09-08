@@ -2618,8 +2618,20 @@ Identify.LA.Hand.specific.genes.from.atacseq = function(xx)
 ########################################################
 check.atacseq.sample.ratios = function()
 {
-  aa = read.delim(file = '../data/ed_AK_countStatTable_manualCleaned.txt', sep = '\t', header = TRUE)
+  aa = read.table(file = '../data/ed_AK_countStatTable_manualCleaned.txt', sep = '\t', header = TRUE)
+  xx = aa[which(aa$Name != ''), ]
+  colnames(xx)[2] = 'condition'
+  colnames(xx)[8:10] = c('percent.required', 'percent.total.reads', 'percent.unique.reads')
   
+  aa = xx
+  aa$pct.total = aa$Total/sum(aa$Total)
+  aa$pct.usable = aa$unique.rmdup/sum(aa$unique.rmdup)
+  aa$pct.desired = as.numeric(as.character(aa$percent.required))
+  plot(aa$pct.desired, aa$pct.total, log = '');
+  text(aa$pct.desired, aa$pct.total, aa$condition)
+  abline(0, 1, lwd = 2.0, col = 'red')
+ 
+  aa$read.pred = aa$pct.total* 3.7*10^9/10^6
   
   
 }
