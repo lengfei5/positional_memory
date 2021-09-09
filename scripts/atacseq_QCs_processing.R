@@ -19,6 +19,7 @@ if(!dir.exists(RdataDir)) dir.create(RdataDir)
 
 dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/R11637_atac/'
 #dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/R11876_cut.run/'
+
 ########################################################
 ########################################################
 # Section : sequencing quality controls
@@ -98,7 +99,14 @@ stats$pct.usable = stats$unique.rmdup / stats$total
 
 write.csv(stats, file = paste0(resDir, '/R11876_CutTag_QCs_stats.csv'), row.names = FALSE)
 
-save(stats, file = paste0(RdataDir, '/R11876_CutTag_samples_design_stats.Rdata'))
+stats$usable = stats$unique.rmdup/10^6
+colnames(stats)[c(2,3)] = c('condition', 'samples')
+stats$samples = paste0(stats$condition, '_', stats$sampleID)
+
+plot(stats$usable, stats$mapped); text(stats$usable, stats$mapped, stats$samples)
+
+#save(stats, file = paste0(RdataDir, '/R11876_CutTag_samples_design_stats.Rdata'))
+save(stats, file = paste0(RdataDir, '/R11637_atacseq_samples_design_stats.Rdata'))
 
 ##########################################
 # fragment size distribution
@@ -317,77 +325,91 @@ if(Sequence.Saturation.Analysis){
 
 ########################################################
 ########################################################
-# Section : QCs after peak calling
+# Section : Quantify peak signals
 # 1) merge peaks
 # 2) quantify the read counts within merged peaks
 # 3) overview sample quality with PCA
 ########################################################
 ########################################################
 source('functions_chipSeq.R')
-peakDir = '../Data/R10723_atac/calledPeaks_pval.0.001/'
 
-peak.files = list.files(path = paste0(peakDir, 'macs2'), 
-                        pattern = '*macs2_peaks.xls', full.names = TRUE)
-peak.files = peak.files[grep('90392|90393|108072|108073|108070|108071', peak.files, invert = TRUE)]
+peakDir = paste0(dataDir,  'nf_out/peaks_macs2')
+peak.files = list.files(path = peakDir,
+                        pattern = '*_peaks.xls', full.names = TRUE)
+
+#peak.files = peak.files[grep('90392|90393|108072|108073|108070|108071', peak.files, invert = TRUE)]
 
 #bam.list = list.files(path = '../Data/R10723_atac/alignments/BAMs_uniq_rmdup', pattern = '*.bam$', full.names = TRUE)
 
 peak.merged = merge.peaks.macs2(peak.files, pcutoff = 6)
 
-dim(peak.merged)
 
 # clean peaks
 peaks = peak.merged
 peaks = data.frame(peaks)
 colnames(peaks)[c(1:3)] = c("chr", "start", "end")
 
+dim(peaks)
+
 peaks$peak.name = paste0(peaks$chr, ":", peaks$start, "_", peaks$end)
 
 jj = match(unique(peaks$peak.name), peaks$peak.name)
-df = peaks[jj, ];
-df = df[which(df$chr != 'chrM'), ]
+peaks = peaks[jj, ];
+dim(peaks)
 
-bb = data.frame(df[ ,c(1, 2, 3, 6, 5)])
-write.table(bb, file = paste0(peakDir, 'merge_peak_usedBams_pval.6.bed'), sep = '\t', row.names = FALSE, 
-            col.names = FALSE, quote = FALSE)
+peaks = peaks[which(peaks$chr != 'chrM'), ]
 
-saveRDS(bb, file = paste0(RdataDir, '/merged_peaks_usedBams_pval.6.rds'))
-
-
-bb = readRDS(file = paste0(RdataDir, '/merged_peaks_usedBams_pval.6.rds'))
-
-bb = readRDS(file = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/
-                           positional_memory/results/R10723_Rxxxx_atacseq_bowtie2.newParam_mtDNA_picardrmdup_20210208/
-                           Rdata/merged_peaks_usedBams_pval.6.rds'))
-
-source('functions_chipSeq.R')
-peaks = annotatePeak.curateAxolotl(bb) 
-
-kk = which(!is.na(peaks$promoters))
-peaks.promoter = peaks[kk, c(1:5)]
-peaks.nonpromters = peaks[-kk, c(1:5)]
-
-write.table(peaks.promoter, file = paste0(peakDir, 'merge_peak_usedBams_pval.6_promoters.1000bpUp.200bpDown.bed'), 
-            sep = '\t', row.names = FALSE, 
-            col.names = FALSE, quote = FALSE)
-
-write.table(peaks.nonpromters, file = paste0(peakDir, 'merge_peak_usedBams_pval.6_nonPromoters.1000bpUp.200bpDown.bed'), 
-            sep = '\t', row.names = FALSE, 
-            col.names = FALSE, quote = FALSE)
-
+dim(peaks)
 
 # preapre SAF input for featureCounts
 require(Rsubread)
-df = peaks
-
-df$peak.name = paste0(df$chr, ":", df$start, "_", df$end)
 
 #counts = quantify.signals.within.peaks(peaks = peak.merged, bam.list=bam.list, rpkm.normalization = FALSE, isPairedEnd = FALSE)
-SAF = data.frame(GeneID=df$peak.name, Chr=df$chr, Start=df$start, End=df$end, Strand=df$strand, stringsAsFactors = FALSE)
+SAF = data.frame(GeneID=peaks$peak.name, 
+                 Chr=peaks$chr, 
+                 Start=peaks$start, 
+                 End=peaks$end, 
+                 Strand=peaks$strand, stringsAsFactors = FALSE)
 
 write.table(SAF, file = paste0(peakDir, 'merge_peak.saf'), sep = '\t', row.names = FALSE, 
             col.names = TRUE, quote = FALSE) 
 
+Save.Peaklist = FALSE
+if(Save.Peaklist){
+  
+  df = peaks
+  
+  bb = data.frame(df[ ,c(1, 2, 3, 6, 5)])
+  
+  write.table(bb, file = paste0(peakDir, 'merge_peak_usedBams_pval.6.bed'), sep = '\t', row.names = FALSE, 
+              col.names = FALSE, quote = FALSE)
+  
+  saveRDS(bb, file = paste0(RdataDir, '/merged_peaks_usedBams_pval.6.rds'))
+  
+  
+  bb = readRDS(file = paste0(RdataDir, '/merged_peaks_usedBams_pval.6.rds'))
+  
+  bb = readRDS(file = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/
+                             positional_memory/results/R10723_Rxxxx_atacseq_bowtie2.newParam_mtDNA_picardrmdup_20210208/
+                             Rdata/merged_peaks_usedBams_pval.6.rds'))
+  
+  
+  source('functions_chipSeq.R')
+  peaks = annotatePeak.curateAxolotl(bb) 
+  
+  kk = which(!is.na(peaks$promoters))
+  peaks.promoter = peaks[kk, c(1:5)]
+  peaks.nonpromters = peaks[-kk, c(1:5)]
+  
+  write.table(peaks.promoter, file = paste0(peakDir, 'merge_peak_usedBams_pval.6_promoters.1000bpUp.200bpDown.bed'), 
+              sep = '\t', row.names = FALSE, 
+              col.names = FALSE, quote = FALSE)
+  
+  write.table(peaks.nonpromters, file = paste0(peakDir, 'merge_peak_usedBams_pval.6_nonPromoters.1000bpUp.200bpDown.bed'), 
+              sep = '\t', row.names = FALSE, 
+              col.names = FALSE, quote = FALSE)
+  
+}
 
 ##########################################
 # run DESeq2 for QC and detect DE peaks
@@ -396,31 +418,35 @@ RNA.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functions/
 RNA.QC.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functions/RNAseq_QCs.R'
 source(RNA.functions)
 source(RNA.QC.functions)
+load(file = paste0(RdataDir, '/R11637_atacseq_samples_design_stats.Rdata'))
+design = stats
 
-xlist<-list.files(path=paste0('../Data/R10723_atac/featurecounts.Q30'), 
+xlist<-list.files(path=paste0(dataDir, 'nf_out/featurecounts_peaks.Q30'),
                   pattern = "*_featureCounts.txt$", full.names = TRUE) ## list of data set to merge
 
 all = cat.countTable(xlist, countsfrom = 'featureCounts')
 
 colnames(design)[1] = 'SampleID'
-design = design[grep('90392|90393|108072|108073|108070|108071', design$SampleID, invert = TRUE),]
+#design = design[grep('90392|90393|108072|108073|108070|108071', design$SampleID, invert = TRUE),]
 
-counts = process.countTable(all=all, design = design)
+counts = process.countTable(all=all, design = design[, c(1,2)])
 
-design$conds = design$fileName
+design$conds = design$condition
 
-index = c()
-for(n in 1:nrow(design))
-{
-  index = c(index, grep(design$SampleID[n], stats$samples))
-}
-
-design = data.frame(design, stats, stringsAsFactors = FALSE)
+#index = c()
+# for(n in 1:nrow(design))
+# {
+#   index = c(index, grep(design$SampleID[n], stats$samples))
+# }
+# 
+# design = data.frame(design, stats, stringsAsFactors = FALSE)
 
 save(design, counts, file = paste0(RdataDir, '/samplesDesign_readCounts.withinPeaks.pval6.Rdata'))
 
-
-load(file = paste0(RdataDir, '/samplesDesign_readCounts.withinPeaks.Rdata'))
+##########################################
+#  peak signal normalization
+##########################################
+load(file = paste0(RdataDir, '/samplesDesign_readCounts.withinPeaks.pval6.Rdata'))
 
 ss = apply(as.matrix(counts[, -1]), 1, mean)
 
@@ -441,9 +467,10 @@ hist(design$pct.reads.in.peaks, main = 'distribution of pct of usable reads with
 #norms = apply(counts[, -1], 2, sum)
 #norms = norms/median(norms)
 
-ss = apply(as.matrix(counts[, -1]), 1, sum)
+ss = apply(as.matrix(counts[, -1]), 1, max)
+hist(log10(ss), breaks = 200)
 
-cutoff = 200
+cutoff = 100
 kk = which(ss>cutoff)
 length(which(ss>cutoff))
 
@@ -454,26 +481,52 @@ pdf(pdfname, width = 12, height = 10)
 require(ggplot2)
 require(DESeq2)
 dds <- DESeqDataSetFromMatrix(as.matrix(counts[kk, -1]), DataFrame(design), design = ~ conds)
+
+#dds = dds[ss > cutoff, ]
+
+# length(which(ss > quantile(ss, probs = 0.75)))
+# 
+# dd0 = dds[ss > quantile(ss, probs = 0.6) , ]
+# dd0 = estimateSizeFactors(dd0)
+# sizefactors.UQ = sizeFactors(dd0)
+
 dds <- estimateSizeFactors(dds)
 fpm = fpm(dds, robust = TRUE)
 vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
 
-pca=plotPCA(vsd, intgroup = colnames(design)[3], returnData = FALSE)
+pca=plotPCA(vsd, intgroup = colnames(design)[2], returnData = FALSE)
 print(pca)
 
-pca2save = as.data.frame(plotPCA(vsd, intgroup = colnames(design)[3], returnData = TRUE))
-pca2save$name = paste0(design$conds, '_', design$SampleID)
-pca2save$batch = 'old'
-pca2save$batch[grep('1361|1373', pca2save$name)] = 'new'
+pca2save = as.data.frame(plotPCA(vsd, intgroup = colnames(design)[2], returnData = TRUE))
+#pca2save$name = paste0(design$conds, '_', design$SampleID)
+#pca2save$batch = 'old'
+#pca2save$batch[grep('1361|1373', pca2save$name)] = 'new'
 
-ggp = ggplot(data=pca2save, aes(PC1, PC2, label = name, color=conds, shape=batch)) + 
+ggp = ggplot(data=pca2save, aes(PC1, PC2, label = name, color=condition)) + 
   geom_point(size=3) + 
-  geom_text(hjust = 0.7, nudge_y = 1, size=3)
+  geom_text(hjust = 0.2, nudge_y = 0.5, size=3)
 
 plot(ggp) + ggsave(paste0(resDir, "/PCA_allatacseq.pdf"), width = 16, height = 10)
 
+plot(sizeFactors(dds), design$mapped, log = '')
+plot(sizeFactors(dds), design$unique.rmdup, log = 'xy')
+text(sizeFactors(dds), design$unique.rmdup, labels = design$samples, cex = 0.7)
+
+#plot(sizeFactors(dds), design$mapped, log = 'xy')
+#text(sizeFactors(dds), design$mapped, labels = design$samples, cex = 0.7)
 
 dev.off()
+
+save.scalingFactors.for.deeptools = FALSE
+if(save.scalingFactors.for.deeptools){
+  xx = data.frame(sampleID = design$SampleID,  
+                  scalingFactor = design$unique.rmdup/(sizeFactors(dds)*median(design$unique.rmdup)),
+                  stringsAsFactors = FALSE)
+  
+  write.table(xx, file = paste0(dataDir, '/DESeq2_scalingFactor_forDeeptools.txt'), sep = '\t',
+              col.names = FALSE, row.names = FALSE, quote = FALSE)
+  
+}
 
 
 ##########################################
