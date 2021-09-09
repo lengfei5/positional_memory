@@ -1,13 +1,15 @@
 ##########################################################################
 ##########################################################################
 # Project: positional memory
-# Script purpose: QCs for ATAC-seq data
+# Script purpose: QCs and processing for ATAC-seq data before the real analysis
 # Usage example: 
 # Author: Jingkui Wang (jingkui.wang@imp.ac.at)
 # Date of creation: Thu Jan 28 10:56:54 2021
 ##########################################################################
 ##########################################################################
-version.analysis = 'R10723_Rxxxx_atacseq_bowtie2.newParam_mtDNA_picardrmdup_20210208'
+rm(list=ls())
+
+version.analysis = 'R10723_Rxxxx_R11637_atacseq_R11876_CutTag'
 #peakDir = "Peaks/macs2_broad"
 
 resDir = paste0("../results/", version.analysis)
@@ -15,115 +17,131 @@ RdataDir = paste0(resDir, '/Rdata')
 if(!dir.exists(resDir)) dir.create(resDir)
 if(!dir.exists(RdataDir)) dir.create(RdataDir)
 
-
+dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/R11637_atac/'
+#dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/R11876_cut.run/'
 ########################################################
 ########################################################
 # Section : sequencing quality controls
-# 
+# fragment size distribution 
+# sequence saturation analysis
 ########################################################
 ########################################################
-design = read.table('../Data/R10723_atac/sample_infos_parsed.txt', sep = '\t', header = TRUE)
+design = read.table(paste0(dataDir, 'sampleInfo_parsed.txt'), sep = '\t', header = TRUE)
 
-files.stat = list.files(path = '../Data//R10723_atac/QCs/BamStat', pattern = '*.txt', full.names = TRUE)
-cnts = list.files(path = '../Data//R10723_atac/QCs/cnt_raw', pattern = '*.txt', full.names = TRUE)
+stats = read.table(paste0(dataDir, 'nf_out/result/countStatTable.txt'), sep = '\t', header = TRUE)
+colnames(stats)[c(1, 3)] = c('fileName', 'trimmed')
 
-design = design[order(design$fileName), ]
-stats = c()
-samples = c()
+#cnts = list.files(path = '../Data//R10723_atac/QCs/cnt_raw', pattern = '*.txt', full.names = TRUE)
+
+#design = design[order(design$fileName), ]
+
+index = c()
 
 for(n in 1:nrow(design))
 {
   # n = 1;
   cat(n, '\n')
-  cc.files = cnts[grep(design$sampleID[n], cnts)]
-  
-  total = 0
-  for(m in 1:length(cc.files))
-  {
-    #cat(m, '\n')
-    total = total + read.table(cc.files[m], sep = '\t', header = FALSE)
+  #cc.files = cnts[grep(design$sampleID[n], cnts)]
+  ii = grep(design$sampleID[n], stats$fileName)
+  if(length(ii) == 1){
+    index = c(index, ii)
+  }else{
+    index = c(index, NA)
+    cat(length(ii), 'fileName Found for ', design$sampleID[n], '\n')
   }
- 
-  ss = read.table(files.stat[grep(design$sampleID[n], files.stat)], sep = '\t', header = TRUE)
-  samples = c(samples, as.character(ss[1, 1]))
-  stats = rbind(stats, c(total, ss[1, -1]))
+  
+  # total = 0
+  # for(m in 1:length(cc.files))
+  # {
+  #   #cat(m, '\n')
+  #   total = total + read.table(cc.files[m], sep = '\t', header = FALSE)
+  # }
+  # 
+  # ss = read.table(files.stat[grep(design$sampleID[n], files.stat)], sep = '\t', header = TRUE)
+  # samples = c(samples, as.character(ss[1, 1]))
+  # stats = rbind(stats, c(total, ss[1, -1]))
   
 }
 
-stats = data.frame(samples, as.matrix(stats), stringsAsFactors = FALSE)
-colnames(stats) = c('samples', 'total',  'adapter.trimmed', 'mapped', 'chrM.rm', 'unique', 'unique.rmdup')
+
+stats = data.frame(design, stats[index, ], stringsAsFactors = FALSE)
+colnames(stats) = c('sampleID', 'samples', 'fileName', 'total',  'adapter.trimmed', 'mapped', 'chrM.rm', 'unique', 'unique.rmdup')
 
 stats$trimming.pct = as.numeric(stats$adapter.trimmed)/as.numeric(stats$total)
 stats$mapped.pct = as.numeric(stats$mapped)/as.numeric(stats$adapter.trimmed)
-stats$mito.pct = 1- as.numeric(stats$chrM.rm)/as.numeric(stats$mapped)
-stats$multimapper.pct = 1- as.numeric(stats$unique) / as.numeric(stats$chrM.rm)
+stats$mito.pct = as.numeric(stats$chrM.rm)/as.numeric(stats$adapter.trimmed)
+stats$multimapper.pct = 1- as.numeric(stats$unique) / as.numeric(stats$mapped)
 stats$dup.rate = 1.0 - as.numeric(stats$unique.rmdup)/as.numeric(stats$unique)
+stats$pct.usable = stats$unique.rmdup / stats$total
 
 #stats$sample = gsub('_sorted', '', stats$sample)
 #stats = stats[, c(1, 2, 3, 6, 4, 7, 5, 8)]
 #colnames(stats)[c(5, 7)] = c('uniq.mapped', 'uniq.mapped.rmdup')
-library(ggplot2)
-library(dplyr)
-
-xx = stats[, c(8:12)]
-
-# Create data
-data <- data.frame(
-  name=c(rep(colnames(xx), each = nrow(xx))),
-  value=as.numeric(unlist(xx)) %>% round(2)
-)
-
-
-ggplot(data, aes(x=name, y=value, fill=name)) + 
-  geom_violin()
-
-#boxplot(stats[, c(8:12)])
-df <- apply(stats,2,as.character)
-
+# library(ggplot2)
+# library(dplyr)
+# 
+# xx = stats[, c(8:12)]
+# 
+# # Create data
+# data <- data.frame(
+#   name=c(rep(colnames(xx), each = nrow(xx))),
+#   value=as.numeric(unlist(xx)) %>% round(2)
+# )
+# 
+# 
+# ggplot(data, aes(x=name, y=value, fill=name)) + 
+#   geom_violin()
+# 
+# #boxplot(stats[, c(8:12)])
+# df <- apply(stats,2,as.character)
 #stats = as.data.frame(stats)
-write.csv(df, file = paste0(resDir, '/QCs_stats.csv'), row.names = FALSE)
 
-save(design, stats, file = paste0(RdataDir, '/samples_design_stats.Rdata'))
+write.csv(stats, file = paste0(resDir, '/R11876_CutTag_QCs_stats.csv'), row.names = FALSE)
+
+save(stats, file = paste0(RdataDir, '/R11876_CutTag_samples_design_stats.Rdata'))
 
 ##########################################
 # fragment size distribution
 ##########################################
-files.insertion = list.files(path = '../Data/R10723_atac/QCs/frag_sizes', pattern = '*.txt', full.names = TRUE)
-
-design = design[order(design$fileName), ]
-
-conds = unique(design$fileName)
-
-
-pdfname = paste0(resDir, '/fragment_size_distribution.pdf')
-pdf(pdfname, width = 12, height = 10)
-
-for(n in 1:length(conds))
-{
-  # n = 1
-  cat(n, '--', as.character(conds[n]), '\n')
+Make.fragsize.distribution = FALSE
+if(Make.fragsize.distribution){
+  files.insertion = list.files(path = '../Data/R10723_atac/QCs/frag_sizes', pattern = '*.txt', full.names = TRUE)
   
-  jj = which(design$fileName == conds[n])
+  design = design[order(design$fileName), ]
   
-  par(mfrow=c(2,2))
-  #if(length(jj) == 4) 
-  #if(length(jj) == 2) par(mfrow = c(1, 2))
+  conds = unique(design$fileName)
   
-  for(m in jj){
-    #cat(m, '\n')
-    ff = files.insertion[grep(design$sampleID[m], files.insertion)]
-    frag = read.delim(ff, sep = '\t', header = FALSE, comment.char = "#")[-c(1:3), c(1, 2)]
+  
+  pdfname = paste0(resDir, '/fragment_size_distribution.pdf')
+  pdf(pdfname, width = 12, height = 10)
+  
+  for(n in 1:length(conds))
+  {
+    # n = 1
+    cat(n, '--', as.character(conds[n]), '\n')
     
-    xx = as.numeric(as.character(frag$V1))
-    yy = as.numeric(as.character(frag$V2))
-    plot(xx, yy, type = 'l', lwd =2.0,  col = 'red', main = paste0(design$fileName[m], '_',  design$sampleID[m]), 
-         xlab = 'fragment size (bp)', ylab = 'counts of usable reads')
+    jj = which(design$fileName == conds[n])
+    
+    par(mfrow=c(2,2))
+    #if(length(jj) == 4) 
+    #if(length(jj) == 2) par(mfrow = c(1, 2))
+    
+    for(m in jj){
+      #cat(m, '\n')
+      ff = files.insertion[grep(design$sampleID[m], files.insertion)]
+      frag = read.delim(ff, sep = '\t', header = FALSE, comment.char = "#")[-c(1:3), c(1, 2)]
+      
+      xx = as.numeric(as.character(frag$V1))
+      yy = as.numeric(as.character(frag$V2))
+      plot(xx, yy, type = 'l', lwd =2.0,  col = 'red', main = paste0(design$fileName[m], '_',  design$sampleID[m]), 
+           xlab = 'fragment size (bp)', ylab = 'counts of usable reads')
+      
+    }
     
   }
+  dev.off()
   
 }
-dev.off()
-
 
 ########################################################
 ########################################################
@@ -131,168 +149,171 @@ dev.off()
 # 
 ########################################################
 ########################################################
-library("ChIPseeker");
-library("rtracklayer")
-load(file = paste0(RdataDir, '/samples_design_stats.Rdata'))
-
-sampleUsed = 'mergedRep_downsample.Picard'
-Dir.downsampledBam = '../Data/R10723_atac/saturation/bams_downsampled_picard'
-Dir.called.peaks = '../Data/R10723_atac/saturation/calledPeaks_downsampledPicard/macs2'
-
-peak.files = list.files(path = Dir.called.peaks, 
-                        pattern = '*macs2_peaks.xls', full.names = TRUE)
-total.files = list.files(path = Dir.downsampledBam , 
-                         pattern = '*bam.counts.txt', full.names = TRUE)
-
-macs.peaks.stats = function(f)
-{
-  p = readPeakFile(f, as = "GRanges")
-  p10 <- p[mcols(p)[,"X.log10.pvalue."] > 10]
-  return(c(length(p), sum(width(p)), length(p10), sum(width(p10))))
+Sequence.Saturation.Analysis = FALSE
+if(Sequence.Saturation.Analysis){
+  library("ChIPseeker");
+  library("rtracklayer")
+  load(file = paste0(RdataDir, '/samples_design_stats.Rdata'))
+  
+  sampleUsed = 'mergedRep_downsample.Picard'
+  Dir.downsampledBam = '../Data/R10723_atac/saturation/bams_downsampled_picard'
+  Dir.called.peaks = '../Data/R10723_atac/saturation/calledPeaks_downsampledPicard/macs2'
+  
+  peak.files = list.files(path = Dir.called.peaks, 
+                          pattern = '*macs2_peaks.xls', full.names = TRUE)
+  total.files = list.files(path = Dir.downsampledBam , 
+                           pattern = '*bam.counts.txt', full.names = TRUE)
+  
+  macs.peaks.stats = function(f)
+  {
+    p = readPeakFile(f, as = "GRanges")
+    p10 <- p[mcols(p)[,"X.log10.pvalue."] > 10]
+    return(c(length(p), sum(width(p)), length(p10), sum(width(p10))))
+  }
+  
+  #test = sapply(peak.files[1:10], macs.peaks.stats)
+  test = matrix(NA, ncol = 4, nrow = length(peak.files))
+  for(n in 1:length(peak.files)){
+    # n =1
+    cat(n, '\n')
+    #p = readPeakFile(peak.files[n], as = "GRanges")
+    #peak.nbs = c(peak.nbs, length(p))
+    #widths = c(widths, sum(width(p)))
+    test[n, ] = macs.peaks.stats(peak.files[n])
+  }
+  
+  colnames(test) = c('peaks.nb', 'peaks.width', 'peaks.nb.p10', 'peaks.width.p10')
+  save(test, file = paste0(RdataDir, '/saturation_data_peak.nbs_widths_', sampleUsed, '.Rdata'))
+  
+  sat = data.frame(gsub('_macs2_peaks.xls', '', basename(peak.files)), test,  stringsAsFactors = FALSE)
+  colnames(sat)[1] = c('samples')
+  
+  sat$peaks.nb = sat$peaks.nb/10^3
+  sat$peaks.nb.p10 = sat$peaks.nb.p10/10^3
+  sat$peaks.width = sat$peaks.width/10^6
+  sat$peaks.width.p10 = sat$peaks.width.p10/10^6
+  
+  #pct.downsample = gsub('uniq_rmdup_downsampled.', '', sat$samples)
+  
+  sat$ss = NA
+  sat$pcts = NA
+  sat$reads = NA
+  
+  for(n in 1:nrow(sat))
+  {
+    # n = 20
+    cat(n, '\n')
+    sample.pcts = gsub('downsampled.', '', sat$samples[n])
+    sample.pcts = unlist(strsplit(as.character(sample.pcts), '_'))
+    
+    sat$pcts[n] = as.numeric(sample.pcts[length(sample.pcts)])
+    sat$ss[n] = paste0(sample.pcts[-length(sample.pcts)], collapse = "_")
+    sat$reads[n] = as.numeric(read.table(total.files[grep(paste0(sat$samples[n], '.bam.counts'), total.files)])[1, 1])/10^6
+    
+  }
+  
+  save(sat, file = paste0(RdataDir, '/saturation_data_peak.nbs_widths_downsample.ptc_', sampleUsed, '.Rdata'))
+  
+  load(file = paste0(RdataDir, '/saturation_data_peak.nbs_widths_downsample.ptc_', sampleUsed, '.Rdata'))
+  
+  sample.uniq = unique(sat$ss)
+  
+  pdfname = paste0(resDir, '/saturation_curve_sequencing_depth_mergedReplicates_', sampleUsed, '.pdf')
+  pdf(pdfname, width = 20, height = 16)
+  par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+  
+  par(mfrow=c(2,2))
+  
+  span = 0.5
+  
+  for(n in 1:length(sample.uniq))
+  {
+    # n = 1
+    cat(n, '\n')
+    
+    # saturation curve with nb of peaks 
+    # usable.reads = stats$unique.rmdup[which(stats$samples == sample.uniq[n])][[1]]
+    kk = which(sat$ss == sample.uniq[n])
+    xlims = c(0, max(105, max(sat$reads[kk])))
+    
+    plot(sat$reads[kk], sat$peaks.nb[kk], type= 'p', col = 'blue', lwd = 2.0,  main = sample.uniq[n], log = '', 
+         xlab = 'nb of usable reads (Million)', ylab = 'nb of peaks (K)', xlim = xlims)
+    sat1 = data.frame(nb.reads = sat$reads[kk], nb.peaks = sat$peaks.nb[kk])
+    loessMod <- loess(nb.peaks ~ nb.reads, data=sat1, span=span)
+    smoothed <- predict(loessMod)
+    lines(smoothed, x=sat1$nb.reads, col="red", lwd = 2.0)
+    #points(sat$pcts[kk] * usable.reads/10^6, sat$nb.peaks[kk]/10^3, type = 'p', col = 'darkblue', pch =1, cex = 1.5)
+    abline(v = 100, col = 'blue', lwd = 2.0)
+    
+    sat2 = data.frame(nb.reads = sat$reads[kk], peak.width = sat$peaks.width[kk])
+    loessMod2 <- loess(peak.width ~ nb.reads, data=sat2, span=span)
+    smoothed2 <- predict(loessMod2) 
+    
+    plot(sat2$nb.reads, sat2$peak.width, type= 'p', col = 'blue', lwd = 2.0,  main = sample.uniq[n], log = '', 
+         xlab = 'nb of usable reads (Million)', ylab = 'total peak width (M)', xlim = xlims)
+    lines(smoothed2, x=sat2$nb.reads, col="red", lwd = 2.0)
+    abline(v = 100, col = 'blue', lwd = 2.0)
+    
+    
+    plot(sat$reads[kk], sat$peaks.nb.p10[kk], type= 'p', col = 'blue', lwd = 2.0,  main = sample.uniq[n], log = '', 
+         xlab = 'nb of usable reads (Million)', ylab = 'nb of peaks.p10 (K)', xlim = xlims)
+    sat1 = data.frame(nb.reads = sat$reads[kk], nb.peaks = sat$peaks.nb.p10[kk])
+    loessMod <- loess(nb.peaks ~ nb.reads, data=sat1, span=span)
+    smoothed <- predict(loessMod)
+    lines(smoothed, x=sat1$nb.reads, col="red", lwd = 2.0)
+    #points(sat$pcts[kk] * usable.reads/10^6, sat$nb.peaks[kk]/10^3, type = 'p', col = 'darkblue', pch =1, cex = 1.5)
+    abline(v = 100, col = 'blue', lwd = 2.0)
+    
+    sat2 = data.frame(nb.reads = sat$reads[kk], peak.width = sat$peaks.width.p10[kk])
+    loessMod2 <- loess(peak.width ~ nb.reads, data=sat2, span=span)
+    smoothed2 <- predict(loessMod2) 
+    
+    plot(sat2$nb.reads, sat2$peak.width, type= 'p', col = 'blue', lwd = 2.0,  main = sample.uniq[n], log = '', 
+         xlab = 'nb of usable reads (Million)', ylab = 'total peak.p10 width (M)', xlim = xlims)
+    lines(smoothed2, x=sat2$nb.reads, col="red", lwd = 2.0)
+    abline(v = 100, col = 'blue', lwd = 2.0)
+    
+    
+  }
+  
+  dev.off()
+  
+  
+  pdfname = paste0(resDir, '/saturation_curve_sequencing_depth_mergedReplicates_', sampleUsed, '_all_stringentPeaks.pdf')
+  pdf(pdfname, width = 16, height = 8)
+  par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+  
+  sample.uniq = unique(sat$ss)
+  span = 0.75
+  # saturation curve with nb of peaks
+  xlims = c(0, 300)
+  ylims = range(sat$peaks.nb.p10)
+  library(RColorBrewer)
+  cols = colorRampPalette( rev(brewer.pal(9, "RdBu")) )(length(sample.uniq))
+  plot(0, 0, xlim = xlims, ylim = ylims, type ='n', xlab = 'nb of usable reads (Million)', 
+       ylab = 'nb of peaks (K)', main = paste0('saturation curve of old and new samples - ', sampleUsed, '- p10 peaks'))
+  abline(v = c(100, 150, 200), col = 'blue', lwd = 1.0, lty =2)
+  
+  #legend('topleft', legend = sample.uniq, col = cols, bty = 'n', lwd = 2.0, cex = 0.7)
+  
+  for(n in 1:length(sample.uniq))
+  {
+    # n = 1
+    cat(n, '\n')
+    kk = which(sat$ss == sample.uniq[n])
+    satt = data.frame(nb.reads = sat$reads[kk], nb.peaks = sat$peaks.nb.p10[kk])
+    
+    points(satt[,1], satt[,2], type= 'p', col = cols[n])
+    loessMod <- loess(nb.peaks ~ nb.reads, data=satt, span=span)
+    smoothed <- predict(loessMod)
+    text(satt[length(kk), 1], smoothed[length(smoothed)], labels = sample.uniq[n], cex = 0.7, pos = 4, offset = 0.2)
+    lines(smoothed, x=satt$nb.reads, col=cols[n], lwd = 3.0)
+    
+  }
+  
+  dev.off()
+  
 }
-
-#test = sapply(peak.files[1:10], macs.peaks.stats)
-test = matrix(NA, ncol = 4, nrow = length(peak.files))
-for(n in 1:length(peak.files)){
-  # n =1
-  cat(n, '\n')
-  #p = readPeakFile(peak.files[n], as = "GRanges")
-  #peak.nbs = c(peak.nbs, length(p))
-  #widths = c(widths, sum(width(p)))
-  test[n, ] = macs.peaks.stats(peak.files[n])
-}
-
-colnames(test) = c('peaks.nb', 'peaks.width', 'peaks.nb.p10', 'peaks.width.p10')
-save(test, file = paste0(RdataDir, '/saturation_data_peak.nbs_widths_', sampleUsed, '.Rdata'))
-
-sat = data.frame(gsub('_macs2_peaks.xls', '', basename(peak.files)), test,  stringsAsFactors = FALSE)
-colnames(sat)[1] = c('samples')
-
-sat$peaks.nb = sat$peaks.nb/10^3
-sat$peaks.nb.p10 = sat$peaks.nb.p10/10^3
-sat$peaks.width = sat$peaks.width/10^6
-sat$peaks.width.p10 = sat$peaks.width.p10/10^6
-
-#pct.downsample = gsub('uniq_rmdup_downsampled.', '', sat$samples)
-
-sat$ss = NA
-sat$pcts = NA
-sat$reads = NA
-
-for(n in 1:nrow(sat))
-{
-  # n = 20
-  cat(n, '\n')
-  sample.pcts = gsub('downsampled.', '', sat$samples[n])
-  sample.pcts = unlist(strsplit(as.character(sample.pcts), '_'))
-  
-  sat$pcts[n] = as.numeric(sample.pcts[length(sample.pcts)])
-  sat$ss[n] = paste0(sample.pcts[-length(sample.pcts)], collapse = "_")
-  sat$reads[n] = as.numeric(read.table(total.files[grep(paste0(sat$samples[n], '.bam.counts'), total.files)])[1, 1])/10^6
-  
-}
-
-save(sat, file = paste0(RdataDir, '/saturation_data_peak.nbs_widths_downsample.ptc_', sampleUsed, '.Rdata'))
-
-load(file = paste0(RdataDir, '/saturation_data_peak.nbs_widths_downsample.ptc_', sampleUsed, '.Rdata'))
-
-sample.uniq = unique(sat$ss)
-
-pdfname = paste0(resDir, '/saturation_curve_sequencing_depth_mergedReplicates_', sampleUsed, '.pdf')
-pdf(pdfname, width = 20, height = 16)
-par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
-
-par(mfrow=c(2,2))
-
-span = 0.5
-
-for(n in 1:length(sample.uniq))
-{
-  # n = 1
-  cat(n, '\n')
-  
-  # saturation curve with nb of peaks 
-  # usable.reads = stats$unique.rmdup[which(stats$samples == sample.uniq[n])][[1]]
-  kk = which(sat$ss == sample.uniq[n])
-  xlims = c(0, max(105, max(sat$reads[kk])))
-  
-  plot(sat$reads[kk], sat$peaks.nb[kk], type= 'p', col = 'blue', lwd = 2.0,  main = sample.uniq[n], log = '', 
-       xlab = 'nb of usable reads (Million)', ylab = 'nb of peaks (K)', xlim = xlims)
-  sat1 = data.frame(nb.reads = sat$reads[kk], nb.peaks = sat$peaks.nb[kk])
-  loessMod <- loess(nb.peaks ~ nb.reads, data=sat1, span=span)
-  smoothed <- predict(loessMod)
-  lines(smoothed, x=sat1$nb.reads, col="red", lwd = 2.0)
-  #points(sat$pcts[kk] * usable.reads/10^6, sat$nb.peaks[kk]/10^3, type = 'p', col = 'darkblue', pch =1, cex = 1.5)
-  abline(v = 100, col = 'blue', lwd = 2.0)
-  
-  sat2 = data.frame(nb.reads = sat$reads[kk], peak.width = sat$peaks.width[kk])
-  loessMod2 <- loess(peak.width ~ nb.reads, data=sat2, span=span)
-  smoothed2 <- predict(loessMod2) 
-  
-  plot(sat2$nb.reads, sat2$peak.width, type= 'p', col = 'blue', lwd = 2.0,  main = sample.uniq[n], log = '', 
-       xlab = 'nb of usable reads (Million)', ylab = 'total peak width (M)', xlim = xlims)
-  lines(smoothed2, x=sat2$nb.reads, col="red", lwd = 2.0)
-  abline(v = 100, col = 'blue', lwd = 2.0)
-  
-  
-  plot(sat$reads[kk], sat$peaks.nb.p10[kk], type= 'p', col = 'blue', lwd = 2.0,  main = sample.uniq[n], log = '', 
-       xlab = 'nb of usable reads (Million)', ylab = 'nb of peaks.p10 (K)', xlim = xlims)
-  sat1 = data.frame(nb.reads = sat$reads[kk], nb.peaks = sat$peaks.nb.p10[kk])
-  loessMod <- loess(nb.peaks ~ nb.reads, data=sat1, span=span)
-  smoothed <- predict(loessMod)
-  lines(smoothed, x=sat1$nb.reads, col="red", lwd = 2.0)
-  #points(sat$pcts[kk] * usable.reads/10^6, sat$nb.peaks[kk]/10^3, type = 'p', col = 'darkblue', pch =1, cex = 1.5)
-  abline(v = 100, col = 'blue', lwd = 2.0)
-  
-  sat2 = data.frame(nb.reads = sat$reads[kk], peak.width = sat$peaks.width.p10[kk])
-  loessMod2 <- loess(peak.width ~ nb.reads, data=sat2, span=span)
-  smoothed2 <- predict(loessMod2) 
-  
-  plot(sat2$nb.reads, sat2$peak.width, type= 'p', col = 'blue', lwd = 2.0,  main = sample.uniq[n], log = '', 
-       xlab = 'nb of usable reads (Million)', ylab = 'total peak.p10 width (M)', xlim = xlims)
-  lines(smoothed2, x=sat2$nb.reads, col="red", lwd = 2.0)
-  abline(v = 100, col = 'blue', lwd = 2.0)
-  
-  
-}
-
-dev.off()
-
-
-pdfname = paste0(resDir, '/saturation_curve_sequencing_depth_mergedReplicates_', sampleUsed, '_all_stringentPeaks.pdf')
-pdf(pdfname, width = 16, height = 8)
-par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
-
-sample.uniq = unique(sat$ss)
-span = 0.75
-# saturation curve with nb of peaks
-xlims = c(0, 300)
-ylims = range(sat$peaks.nb.p10)
-library(RColorBrewer)
-cols = colorRampPalette( rev(brewer.pal(9, "RdBu")) )(length(sample.uniq))
-plot(0, 0, xlim = xlims, ylim = ylims, type ='n', xlab = 'nb of usable reads (Million)', 
-     ylab = 'nb of peaks (K)', main = paste0('saturation curve of old and new samples - ', sampleUsed, '- p10 peaks'))
-abline(v = c(100, 150, 200), col = 'blue', lwd = 1.0, lty =2)
-
-#legend('topleft', legend = sample.uniq, col = cols, bty = 'n', lwd = 2.0, cex = 0.7)
-
-for(n in 1:length(sample.uniq))
-{
-  # n = 1
-  cat(n, '\n')
-  kk = which(sat$ss == sample.uniq[n])
-  satt = data.frame(nb.reads = sat$reads[kk], nb.peaks = sat$peaks.nb.p10[kk])
-  
-  points(satt[,1], satt[,2], type= 'p', col = cols[n])
-  loessMod <- loess(nb.peaks ~ nb.reads, data=satt, span=span)
-  smoothed <- predict(loessMod)
-  text(satt[length(kk), 1], smoothed[length(smoothed)], labels = sample.uniq[n], cex = 0.7, pos = 4, offset = 0.2)
-  lines(smoothed, x=satt$nb.reads, col=cols[n], lwd = 3.0)
-  
-}
-
-dev.off()
-
 
 ########################################################
 ########################################################
@@ -453,7 +474,6 @@ plot(ggp) + ggsave(paste0(resDir, "/PCA_allatacseq.pdf"), width = 16, height = 1
 
 
 dev.off()
-
 
 
 ##########################################
