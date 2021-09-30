@@ -17,8 +17,12 @@ RdataDir = paste0(resDir, '/Rdata')
 if(!dir.exists(resDir)) dir.create(resDir)
 if(!dir.exists(RdataDir)) dir.create(RdataDir)
 
+source('Functions_atac.R')
+
 dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/R11637_atac/'
 #dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/R11876_cut.run/'
+
+design_file = paste0(dataDir, 'design_sampleInfo_all.txt')
 
 ########################################################
 ########################################################
@@ -27,86 +31,94 @@ dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memo
 # sequence saturation analysis
 ########################################################
 ########################################################
-design = read.table(paste0(dataDir, 'sampleInfo_parsed.txt'), sep = '\t', header = TRUE)
-
-stats = read.table(paste0(dataDir, 'nf_out/result/countStatTable.txt'), sep = '\t', header = TRUE)
-colnames(stats)[c(1, 3)] = c('fileName', 'trimmed')
-
-#cnts = list.files(path = '../Data//R10723_atac/QCs/cnt_raw', pattern = '*.txt', full.names = TRUE)
-
-#design = design[order(design$fileName), ]
-
-index = c()
-
-for(n in 1:nrow(design))
-{
-  # n = 1;
-  cat(n, '\n')
-  #cc.files = cnts[grep(design$sampleID[n], cnts)]
-  ii = grep(design$sampleID[n], stats$fileName)
-  if(length(ii) == 1){
-    index = c(index, ii)
-  }else{
-    index = c(index, NA)
-    cat(length(ii), 'fileName Found for ', design$sampleID[n], '\n')
+Collect.design.stat.nf.out = TRUE
+if(Collect.design.stat.nf.out){
+  design = read.table(paste0(dataDir, 'sampleInfo_parsed.txt'), sep = '\t', header = TRUE)
+  
+  stats = read.table(paste0(dataDir, 'nf_out/result/countStatTable.txt'), sep = '\t', header = TRUE)
+  colnames(stats)[c(1, 3)] = c('fileName', 'trimmed')
+  
+  #cnts = list.files(path = '../Data//R10723_atac/QCs/cnt_raw', pattern = '*.txt', full.names = TRUE)
+  
+  #design = design[order(design$fileName), ]
+  
+  index = c()
+  
+  for(n in 1:nrow(design))
+  {
+    # n = 1;
+    cat(n, '\n')
+    #cc.files = cnts[grep(design$sampleID[n], cnts)]
+    ii = grep(design$sampleID[n], stats$fileName)
+    if(length(ii) == 1){
+      index = c(index, ii)
+    }else{
+      index = c(index, NA)
+      cat(length(ii), 'fileName Found for ', design$sampleID[n], '\n')
+    }
+    
+    # total = 0
+    # for(m in 1:length(cc.files))
+    # {
+    #   #cat(m, '\n')
+    #   total = total + read.table(cc.files[m], sep = '\t', header = FALSE)
+    # }
+    # 
+    # ss = read.table(files.stat[grep(design$sampleID[n], files.stat)], sep = '\t', header = TRUE)
+    # samples = c(samples, as.character(ss[1, 1]))
+    # stats = rbind(stats, c(total, ss[1, -1]))
+    
   }
   
-  # total = 0
-  # for(m in 1:length(cc.files))
-  # {
-  #   #cat(m, '\n')
-  #   total = total + read.table(cc.files[m], sep = '\t', header = FALSE)
-  # }
+  
+  stats = data.frame(design, stats[index, ], stringsAsFactors = FALSE)
+  colnames(stats) = c('sampleID', 'samples', 'fileName', 'total',  'adapter.trimmed', 'mapped', 'chrM.rm', 'unique', 'unique.rmdup')
+  
+  stats$trimming.pct = as.numeric(stats$adapter.trimmed)/as.numeric(stats$total)
+  stats$mapped.pct = as.numeric(stats$mapped)/as.numeric(stats$adapter.trimmed)
+  stats$mito.pct = as.numeric(stats$chrM.rm)/as.numeric(stats$adapter.trimmed)
+  stats$multimapper.pct = 1- as.numeric(stats$unique) / as.numeric(stats$mapped)
+  stats$dup.rate = 1.0 - as.numeric(stats$unique.rmdup)/as.numeric(stats$unique)
+  stats$pct.usable = stats$unique.rmdup / stats$total
+  
+  #stats$sample = gsub('_sorted', '', stats$sample)
+  #stats = stats[, c(1, 2, 3, 6, 4, 7, 5, 8)]
+  #colnames(stats)[c(5, 7)] = c('uniq.mapped', 'uniq.mapped.rmdup')
+  # library(ggplot2)
+  # library(dplyr)
   # 
-  # ss = read.table(files.stat[grep(design$sampleID[n], files.stat)], sep = '\t', header = TRUE)
-  # samples = c(samples, as.character(ss[1, 1]))
-  # stats = rbind(stats, c(total, ss[1, -1]))
+  # xx = stats[, c(8:12)]
+  # 
+  # # Create data
+  # data <- data.frame(
+  #   name=c(rep(colnames(xx), each = nrow(xx))),
+  #   value=as.numeric(unlist(xx)) %>% round(2)
+  # )
+  # 
+  # 
+  # ggplot(data, aes(x=name, y=value, fill=name)) + 
+  #   geom_violin()
+  # 
+  # #boxplot(stats[, c(8:12)])
+  # df <- apply(stats,2,as.character)
+  #stats = as.data.frame(stats)
+  
+  write.csv(stats, file = paste0(resDir, '/R11876_CutTag_QCs_stats.csv'), row.names = FALSE)
+  
+  stats$usable = stats$unique.rmdup/10^6
+  colnames(stats)[c(2,3)] = c('condition', 'samples')
+  stats$samples = paste0(stats$condition, '_', stats$sampleID)
+  
+  plot(stats$usable, stats$mapped); text(stats$usable, stats$mapped, stats$samples)
+  
+  #save(stats, file = paste0(RdataDir, '/R11876_CutTag_samples_design_stats.Rdata'))
+  save(stats, file = paste0(RdataDir, '/R11637_atacseq_samples_design_stats.Rdata'))
+  
+}else{
+  
+  extract.stat.for.samples.manual(design_file, dataDir)
   
 }
-
-
-stats = data.frame(design, stats[index, ], stringsAsFactors = FALSE)
-colnames(stats) = c('sampleID', 'samples', 'fileName', 'total',  'adapter.trimmed', 'mapped', 'chrM.rm', 'unique', 'unique.rmdup')
-
-stats$trimming.pct = as.numeric(stats$adapter.trimmed)/as.numeric(stats$total)
-stats$mapped.pct = as.numeric(stats$mapped)/as.numeric(stats$adapter.trimmed)
-stats$mito.pct = as.numeric(stats$chrM.rm)/as.numeric(stats$adapter.trimmed)
-stats$multimapper.pct = 1- as.numeric(stats$unique) / as.numeric(stats$mapped)
-stats$dup.rate = 1.0 - as.numeric(stats$unique.rmdup)/as.numeric(stats$unique)
-stats$pct.usable = stats$unique.rmdup / stats$total
-
-#stats$sample = gsub('_sorted', '', stats$sample)
-#stats = stats[, c(1, 2, 3, 6, 4, 7, 5, 8)]
-#colnames(stats)[c(5, 7)] = c('uniq.mapped', 'uniq.mapped.rmdup')
-# library(ggplot2)
-# library(dplyr)
-# 
-# xx = stats[, c(8:12)]
-# 
-# # Create data
-# data <- data.frame(
-#   name=c(rep(colnames(xx), each = nrow(xx))),
-#   value=as.numeric(unlist(xx)) %>% round(2)
-# )
-# 
-# 
-# ggplot(data, aes(x=name, y=value, fill=name)) + 
-#   geom_violin()
-# 
-# #boxplot(stats[, c(8:12)])
-# df <- apply(stats,2,as.character)
-#stats = as.data.frame(stats)
-
-write.csv(stats, file = paste0(resDir, '/R11876_CutTag_QCs_stats.csv'), row.names = FALSE)
-
-stats$usable = stats$unique.rmdup/10^6
-colnames(stats)[c(2,3)] = c('condition', 'samples')
-stats$samples = paste0(stats$condition, '_', stats$sampleID)
-
-plot(stats$usable, stats$mapped); text(stats$usable, stats$mapped, stats$samples)
-
-#save(stats, file = paste0(RdataDir, '/R11876_CutTag_samples_design_stats.Rdata'))
-save(stats, file = paste0(RdataDir, '/R11637_atacseq_samples_design_stats.Rdata'))
 
 ##########################################
 # fragment size distribution
@@ -333,16 +345,14 @@ if(Sequence.Saturation.Analysis){
 ########################################################
 source('functions_chipSeq.R')
 
-peakDir = paste0(dataDir,  'nf_out/peaks_macs2')
+peakDir = paste0(dataDir,  'calledPeaks/macs2')
 peak.files = list.files(path = peakDir,
                         pattern = '*_peaks.xls', full.names = TRUE)
 
 #peak.files = peak.files[grep('90392|90393|108072|108073|108070|108071', peak.files, invert = TRUE)]
 
 #bam.list = list.files(path = '../Data/R10723_atac/alignments/BAMs_uniq_rmdup', pattern = '*.bam$', full.names = TRUE)
-
 peak.merged = merge.peaks.macs2(peak.files, pcutoff = 6)
-
 
 # clean peaks
 peaks = peak.merged
@@ -418,10 +428,12 @@ RNA.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functions/
 RNA.QC.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functions/RNAseq_QCs.R'
 source(RNA.functions)
 source(RNA.QC.functions)
-load(file = paste0(RdataDir, '/R11637_atacseq_samples_design_stats.Rdata'))
-design = stats
 
-xlist<-list.files(path=paste0(dataDir, 'nf_out/featurecounts_peaks.Q30'),
+#load(file = paste0(RdataDir, '/R11637_atacseq_samples_design_stats.Rdata'))
+#design = stats
+design = readRDS(file = paste0(RdataDir, '/design_merged_technicalReplicates.rds'))
+
+xlist<-list.files(path=paste0(dataDir, '/featurecounts_peaks.Q30'),
                   pattern = "*_featureCounts.txt$", full.names = TRUE) ## list of data set to merge
 
 all = cat.countTable(xlist, countsfrom = 'featureCounts')
@@ -431,7 +443,7 @@ colnames(design)[1] = 'SampleID'
 
 counts = process.countTable(all=all, design = design[, c(1,2)])
 
-design$conds = design$condition
+#design$conds = design$condition
 
 #index = c()
 # for(n in 1:nrow(design))
@@ -441,12 +453,79 @@ design$conds = design$condition
 # 
 # design = data.frame(design, stats, stringsAsFactors = FALSE)
 
-save(design, counts, file = paste0(RdataDir, '/samplesDesign_readCounts.withinPeaks.pval6.Rdata'))
+save(design, counts, file = paste0(RdataDir, '/samplesDesign_readCounts.withinPeaks.pval6_mergedTechnical.Rdata'))
+
+Compare.with.Old.mature.resequencing = FALSE
+if(Compare.with.Old.mature.resequencing){
+  
+  xlist = list.files(path=paste0(dataDir, 'featurecounts_peaks.Q30'),
+                     pattern = "*_featureCounts.txt$", full.names = TRUE) ## list of data set to merge
+  
+  all = cat.countTable(xlist, countsfrom = 'featureCounts')
+  
+  design = colnames(all)[-1]
+  design = gsub('_uniq_rmdup_featureCounts.txt', '', design)
+  design = data.frame(sample = design, stringsAsFactors = FALSE)
+  design$sampleID = sapply(design$sample, function(x) {test = unlist(strsplit(as.character(x), '_')); return(test[length(test)])})
+  design$condition = sapply(design$sample, function(x) {
+    test = unlist(strsplit(as.character(x), '_')); 
+    return(paste0(test[-length(test)], collapse = '_'))})
+  
+  design = design[, c(2,3, 1)]
+  
+  colnames(design)[1] = 'SampleID'
+  
+  counts = process.countTable(all=all, design = design[, c(1,2)])
+  
+  design$conds = design$condition
+  
+  design0 = design
+  counts0 = counts
+  
+  save(design0, counts0, file = paste0(RdataDir, '/samplesDesign_readCounts.withinPeaks.pval6_oldMature.Embryo.Regeneration.Rdata'))
+  
+}
 
 ##########################################
 #  peak signal normalization
 ##########################################
-load(file = paste0(RdataDir, '/samplesDesign_readCounts.withinPeaks.pval6.Rdata'))
+load( file = paste0(RdataDir, '/samplesDesign_readCounts.withinPeaks.pval6_mergedTechnical.Rdata'))
+design$batch = 1
+design = design[, c(1, 2, 6, 3:5)]
+
+
+if(Compare.with.Old.mature.resequencing){
+  
+   load(file = paste0(RdataDir, '/samplesDesign_readCounts.withinPeaks.pval6_oldMature.Embryo.Regeneration.Rdata'))
+   design = design[, c(1,2)]
+   design$batch = 3
+   
+   colnames(counts)[-1] = paste0(design[, 2], '_', design[,1], '_', design[, 3])
+   
+   design0 = design0[, c(1, 2)]
+   design0$batch = 2
+   colnames(counts0)[-1] = paste0(design0[, 2], '_', design0[,1], '_', design0[, 3])
+   
+   mm = match(counts$gene, counts0$gene)
+   counts = cbind(counts, counts0[mm, -1])
+   
+   colnames(design0) = colnames(design)
+   design = rbind(design, design0)
+    
+   design$condition[grep('EMbryo_Stage40', design$condition)] = 'Embryo_Stage40'
+   
+   cc = unique(design$condition[which(design$batch == 3)])
+   
+   kk = which(!is.na(match(design$condition, cc)))
+   
+   xx = design[, c(1, 2)]
+   xx = xx[match(unique(xx$SampleID), design$SampleID), ]
+   colnames(xx) = c('sampleID', 'fileName')
+   write.table(xx, file = paste0(dataDir, 'design_sampleInfo_all.txt'), sep = '\t', col.names = TRUE, row.names = FALSE,
+               quote = FALSE)
+   
+      
+}
 
 ss = apply(as.matrix(counts[, -1]), 1, mean)
 
@@ -457,7 +536,7 @@ plot(ecdf(log10(as.matrix(counts[, -1]) + 0.1)), xlab = 'log10(nb of reads withi
 ss = apply(as.matrix(counts[, -1]), 2, sum)
 design$usable.reads.withinPeaks = ss
 
-design$pct.reads.in.peaks = design$usable.reads.withinPeaks/as.numeric(as.character(design$unique.rmdup))
+design$pct.reads.in.peaks = design$usable.reads.withinPeaks/10^6/as.numeric(as.character(design$usable))
 
 par(mfrow=c(1,1))
 
@@ -470,64 +549,67 @@ hist(design$pct.reads.in.peaks, main = 'distribution of pct of usable reads with
 ss = apply(as.matrix(counts[, -1]), 1, max)
 hist(log10(ss), breaks = 200)
 
-cutoff = 100
+cutoff = 50
 kk = which(ss>cutoff)
 length(which(ss>cutoff))
 
-pdfname = paste0(resDir, "/atacseq_normalization_assessment_allSamples.pdf")
-pdf(pdfname, width = 12, height = 10)
+#pdfname = paste0(resDir, "/atacseq_normalization_assessment_allSamples.pdf")
+#pdf(pdfname, width = 12, height = 10)
 
 #Check.RNAseq.Quality(read.count=counts[kk, -1], design.matrix = data.frame(design$SampleID, design$conds), norms = norms)
 require(ggplot2)
 require(DESeq2)
-dds <- DESeqDataSetFromMatrix(as.matrix(counts[kk, -1]), DataFrame(design), design = ~ conds)
+
+rownames(counts) = counts$gene
+dds <- DESeqDataSetFromMatrix(as.matrix(counts[kk, -1]), DataFrame(design), design = ~ condition)
 
 #dds = dds[ss > cutoff, ]
+ss = rowSums(counts(dds))
+length(which(ss > quantile(ss, probs = 0.65)))
 
-# length(which(ss > quantile(ss, probs = 0.75)))
-# 
-# dd0 = dds[ss > quantile(ss, probs = 0.6) , ]
-# dd0 = estimateSizeFactors(dd0)
-# sizefactors.UQ = sizeFactors(dd0)
+dd0 = dds[ss > quantile(ss, probs = 0.65) , ]
+dd0 = estimateSizeFactors(dd0)
+sizefactors.UQ = sizeFactors(dd0)
 
-dds <- estimateSizeFactors(dds)
+sizeFactors(dds) <- sizefactors.UQ
 fpm = fpm(dds, robust = TRUE)
 vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
 
-pca=plotPCA(vsd, intgroup = colnames(design)[2], returnData = FALSE)
+pca=plotPCA(vsd, intgroup = colnames(design)[2], ntop = 3000, returnData = FALSE)
 print(pca)
 
-pca2save = as.data.frame(plotPCA(vsd, intgroup = colnames(design)[2], returnData = TRUE))
-#pca2save$name = paste0(design$conds, '_', design$SampleID)
+
+pca2save = as.data.frame(plotPCA(vsd, intgroup = colnames(design)[c(2, 3)], returnData = TRUE, ntop = 3000))
+pca2save$name = paste0(design$condition, '_', design$SampleID, '_', design$batch)
 #pca2save$batch = 'old'
 #pca2save$batch[grep('1361|1373', pca2save$name)] = 'new'
+pca2save$batch = as.factor(pca2save$batch)
 
-ggp = ggplot(data=pca2save, aes(PC1, PC2, label = name, color=condition)) + 
+ggp = ggplot(data=pca2save, aes(PC1, PC2, label = name, color=condition, shape = batch)) + 
   geom_point(size=3) + 
   geom_text(hjust = 0.2, nudge_y = 0.5, size=3)
 
-plot(ggp) + ggsave(paste0(resDir, "/PCA_allatacseq.pdf"), width = 16, height = 10)
+plot(ggp) + ggsave(paste0(resDir, "/PCA_allatacseq_new.old.merged_ntop3000.pdf"), width = 16, height = 10)
 
 plot(sizeFactors(dds), design$mapped, log = '')
-plot(sizeFactors(dds), design$unique.rmdup, log = 'xy')
-text(sizeFactors(dds), design$unique.rmdup, labels = design$samples, cex = 0.7)
+plot(sizeFactors(dds), design$usable, log = 'xy')
+text(sizeFactors(dds), design$usable, labels = design$fileName, cex = 0.7)
 
 #plot(sizeFactors(dds), design$mapped, log = 'xy')
 #text(sizeFactors(dds), design$mapped, labels = design$samples, cex = 0.7)
 
-dev.off()
+#dev.off()
 
 save.scalingFactors.for.deeptools = FALSE
 if(save.scalingFactors.for.deeptools){
   xx = data.frame(sampleID = design$SampleID,  
-                  scalingFactor = design$unique.rmdup/(sizeFactors(dds)*median(design$unique.rmdup)),
+                  scalingFactor = design$usable/(sizeFactors(dds)*median(design$usable)),
                   stringsAsFactors = FALSE)
   
   write.table(xx, file = paste0(dataDir, '/DESeq2_scalingFactor_forDeeptools.txt'), sep = '\t',
               col.names = FALSE, row.names = FALSE, quote = FALSE)
   
 }
-
 
 ##########################################
 # cost estimate for Batch 1 

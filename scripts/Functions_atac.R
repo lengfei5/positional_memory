@@ -2608,8 +2608,6 @@ Identify.LA.Hand.specific.genes.from.atacseq = function(xx)
 
 
 
-
-
 ########################################################
 ########################################################
 # Section : some handy utility functions
@@ -2632,6 +2630,105 @@ check.atacseq.sample.ratios = function()
   abline(0, 1, lwd = 2.0, col = 'red')
  
   aa$read.pred = aa$pct.total* 3.7*10^9/10^6
+  
+  
+}
+
+extract.stat.for.samples.manual = function()
+{
+  design = read.table(design_file, sep = '\t', header = TRUE)
+  colnames(design)[2] = 'condition'
+  design$fileName = paste0(design$condition, '_', design$sampleID)
+  
+  #stats = read.table(paste0(dataDir, 'nf_out/result/countStatTable.txt'), sep = '\t', header = TRUE)
+  #colnames(stats)[c(1, 3)] = c('fileName', 'trimmed')
+  
+  #cnts = list.files(path = '../Data//R10723_atac/QCs/cnt_raw', pattern = '*.txt', full.names = TRUE)
+  
+  #design = design[order(design$fileName), ]
+  stats = list.files(path = paste0(dataDir, '/merged_bam_QCs/BamStat'), pattern = '*_stat.txt', full.names = TRUE)
+  
+  #design = design[order(design$fileName), ]
+  design$unique = NA
+  design$usable = NA
+  for(n in 1:nrow(design))
+  {
+    # n = 1;
+    cat(n, '\n')
+    #cc.files = cnts[grep(design$sampleID[n], cnts)]
+    ii = grep(design$sampleID[n], stats)
+    if(length(ii) == 1){
+      #index = c(index, ii)
+      ss = read.table(file = stats[ii], sep = '\t', header = TRUE)
+      design$unique[n] = ss$uniq
+      design$usable[n] = ss$rmdup_uniq
+    }else{
+      #index = c(index, NA)
+      cat(length(ii), ' fileName Found for ', design$sampleID[n], '\n')
+    }
+    
+    # total = 0
+    # for(m in 1:length(cc.files))
+    # {
+    #   #cat(m, '\n')
+    #   total = total + read.table(cc.files[m], sep = '\t', header = FALSE)
+    # }
+    # 
+    # ss = read.table(files.stat[grep(design$sampleID[n], files.stat)], sep = '\t', header = TRUE)
+    # samples = c(samples, as.character(ss[1, 1]))
+    # stats = rbind(stats, c(total, ss[1, -1]))
+    
+  }
+  
+  design$usable = design$usable/10^6
+  
+  saveRDS(design, file = paste0(RdataDir, '/design_merged_technicalReplicates.rds'))
+  
+  write.table(design, file = paste0(resDir, '/QCs_nb.usableReads_mergedResequenced.samples.txt'), 
+              col.names = TRUE, row.names = FALSE, quote = FALSE, sep = '\t')
+  
+  #stats = data.frame(design, stats[index, ], stringsAsFactors = FALSE)
+  #colnames(stats) = c('sampleID', 'samples', 'fileName', 'total',  'adapter.trimmed', 'mapped', 'chrM.rm', 'unique', 'unique.rmdup')
+  
+  #stats$trimming.pct = as.numeric(stats$adapter.trimmed)/as.numeric(stats$total)
+  # stats$mapped.pct = as.numeric(stats$mapped)/as.numeric(stats$adapter.trimmed)
+  # stats$mito.pct = as.numeric(stats$chrM.rm)/as.numeric(stats$adapter.trimmed)
+  # stats$multimapper.pct = 1- as.numeric(stats$unique) / as.numeric(stats$mapped)
+  # stats$dup.rate = 1.0 - as.numeric(stats$unique.rmdup)/as.numeric(stats$unique)
+  # stats$pct.usable = stats$unique.rmdup / stats$total
+  # 
+  #stats$sample = gsub('_sorted', '', stats$sample)
+  #stats = stats[, c(1, 2, 3, 6, 4, 7, 5, 8)]
+  #colnames(stats)[c(5, 7)] = c('uniq.mapped', 'uniq.mapped.rmdup')
+  # library(ggplot2)
+  # library(dplyr)
+  # 
+  # xx = stats[, c(8:12)]
+  # 
+  # # Create data
+  # data <- data.frame(
+  #   name=c(rep(colnames(xx), each = nrow(xx))),
+  #   value=as.numeric(unlist(xx)) %>% round(2)
+  # )
+  # 
+  # 
+  # ggplot(data, aes(x=name, y=value, fill=name)) + 
+  #   geom_violin()
+  # 
+  # #boxplot(stats[, c(8:12)])
+  # df <- apply(stats,2,as.character)
+  #stats = as.data.frame(stats)
+  
+  write.csv(stats, file = paste0(resDir, '/R11876_CutTag_QCs_stats.csv'), row.names = FALSE)
+  
+  stats$usable = stats$unique.rmdup/10^6
+  colnames(stats)[c(2,3)] = c('condition', 'samples')
+  stats$samples = paste0(stats$condition, '_', stats$sampleID)
+  
+  plot(stats$usable, stats$mapped); text(stats$usable, stats$mapped, stats$samples)
+  
+  #save(stats, file = paste0(RdataDir, '/R11876_CutTag_samples_design_stats.Rdata'))
+  save(stats, file = paste0(RdataDir, '/R11637_atacseq_samples_design_stats.Rdata'))
   
   
 }
