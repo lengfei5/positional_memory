@@ -362,8 +362,8 @@ Comparison.overlapping.peaks = function(design.matrix, peaks.list, toCompare="fa
       cat("Error --- less than 2 samples selected to compare for ", sels2compare[nn], "\n")
     }
   }
-  
 }
+
 
 find.sample.names = function(x, n1=1, n2=3)
 {
