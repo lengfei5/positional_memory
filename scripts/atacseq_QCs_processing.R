@@ -343,11 +343,77 @@ if(Sequence.Saturation.Analysis){
 # 3) overview sample quality with PCA
 ########################################################
 ########################################################
-source('functions_chipSeq.R')
-
 peakDir = paste0(dataDir,  'calledPeaks/macs2')
 peak.files = list.files(path = peakDir,
                         pattern = '*_peaks.xls', full.names = TRUE)
+design = readRDS(file = paste0(RdataDir, '/design_merged_technicalReplicates.rds'))
+
+mm = match(design$sampleID, as.character(c(161523:161526)))
+design = design[is.na(mm), ]
+
+index  = c()
+for(n in 1:nrow(design))
+{
+  test = grep(design$sampleID[n], peak.files)
+  if(length(test) != 1) {
+    cat(length(test), 'peak files Found \n')
+  }else{
+    index = c(index, test)
+  }
+}
+peak.files = peak.files[index]
+
+peaks = c()
+pval.cutoff = 4
+for(n in 1:length(peak.files)) 
+{
+  cat(n, '\n')
+  p = readPeakFile(peak.files[n], as = "GRanges");
+  #eval(parse(text = paste0("p = pp.", k)));
+  with.p.values = "X.log10.pvalue." %in% colnames(mcols(p))
+  if(with.p.values) {
+    p <- p[mcols(p)[,"X.log10.pvalue."] > pval.cutoff];
+    p = reduce(p);
+    #peaks10= c(peaks10, p10);
+  }else{ 
+    cat("no p values conlumn found for -- ", design.matrix$file.name[k], "\n");
+    PLOT.p10 = FALSE;
+  }
+  #p = reduce(p)
+  peaks= c(peaks, p)
+}
+
+# try to merge BL time series
+kk = which(design$condition == 'BL_UA_13days_proximal')
+bld13.p = peaks[[3]][overlapsAny(peaks[[3]], peaks[[4]])]
+
+kk = which(design$condition == 'BL_UA_13days_distal')
+bld13.d = peaks[[1]][overlapsAny(peaks[[1]], peaks[[2]])]
+
+kk = which(design$condition == 'BL_UA_9days')
+bld9 = peaks[[9]]
+bld9 = bld9[overlapsAny(bld9, peaks[[10]])]
+
+kk = which(design$condition == 'BL_UA_5days')
+bld5 = peaks[[7]]
+bld5 = bld5[overlapsAny(bld5, peaks[[8]])]
+bld52 = peaks[[5]]
+bld52 = bld52[overlapsAny(bld52, peaks[[6]])]
+
+length(bld5[overlapsAny(bld5, bld52)])
+bld5 = bld52
+
+
+
+pdfname = paste0(resDir, '/compare_peakOverlapping_betweenReplicates.pdf')
+pdf(pdfname, width = 16, height = 8)
+par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+
+source('functions_chipSeq.R')
+
+#Comparison.overlapping.peaks(design.matrix = design, peaks.list = peak.files, toCompare = 'condition', pval = 3, PLOT.p10 = FALSE)
+
+dev.off()
 
 #peak.files = peak.files[grep('90392|90393|108072|108073|108070|108071', peak.files, invert = TRUE)]
 

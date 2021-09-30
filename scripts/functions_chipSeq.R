@@ -297,8 +297,21 @@ make.design.matrix.from.file.list = function(peak.files, varnames = c('condition
   
 }
 
-Comparison.overlapping.peaks = function(design.matrix, peaks.list, toCompare="factor.condition", pval=10, PLOT.p10 = FALSE, qval=0.1) 
+Comparison.overlapping.peaks = function(design.matrix, peaks.list, toCompare="condition", pval=10, PLOT.p10 = FALSE, qval=0.1) 
 {
+  # design.matrix = design; peaks.list = peak.files; toCompare = 'condition'; pval = 10; PLOT.p10 = FALSE
+  cat('-- Compare peak overlapping with ', toCompare, '--\n')
+  index  = c()
+  for(n in 1:nrow(design.matrix))
+  {
+    test = grep(design.matrix$sampleID[n], peaks.list)
+    if(length(test) != 1) {
+      cat(length(test), 'peak files Found \n')
+    }else{
+      index = c(index, test)
+    }
+  }
+  peaks.list = peaks.list[index]
   
   if(toCompare == "factor"){
     cat("Warning ---- DB analysis for each factor across condition \n")
@@ -315,25 +328,20 @@ Comparison.overlapping.peaks = function(design.matrix, peaks.list, toCompare="fa
   
   for(nn in sels2compare)
   {
-    #nn = "H3K27me3_AN312"
-    #nn = "90min"
+    # nn = "BL_UA_5days"
+    
     cat(nn, '\n')
     kk = which(design.matrix[, which(colnames(design.matrix)==toCompare)]==nn)
-    #if(DB.Analysis){
-    #  kk = which(ff$sample==nn)
-    #}else{
-     
-    #}
     
     if(length(kk)>1)
     {
       peaks = c()
       peaks10 = c()
-      peaknames = design.matrix$file.name[kk]
+      peaknames = paste0(nn, '_', design.matrix$sampleID[kk])
+      
       for(k in kk) 
       {
-        p = peaks.list[[k]]
-        #p = readPeakFile(ff$file.path[k], as = "GRanges");
+        p = readPeakFile(peaks.list[[k]], as = "GRanges");
         #eval(parse(text = paste0("p = pp.", k)));
         with.p.values = "X.log10.pvalue." %in% colnames(mcols(p))
         if(with.p.values) {
@@ -363,6 +371,7 @@ Comparison.overlapping.peaks = function(design.matrix, peaks.list, toCompare="fa
     }
   }
 }
+
 
 
 find.sample.names = function(x, n1=1, n2=3)
