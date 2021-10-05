@@ -338,11 +338,13 @@ if(Sequence.Saturation.Analysis){
 ########################################################
 ########################################################
 # Section : Quantify peak signals
-# 1) merge peaks
+# 1) consensus peaks
 # 2) quantify the read counts within merged peaks
 # 3) overview sample quality with PCA
 ########################################################
 ########################################################
+source('functions_chipSeq.R')
+
 peakDir = paste0(dataDir,  'calledPeaks/macs2')
 peak.files = list.files(path = peakDir,
                         pattern = '*_peaks.xls', full.names = TRUE)
@@ -363,63 +365,242 @@ for(n in 1:nrow(design))
 }
 peak.files = peak.files[index]
 
-peaks = c()
-pval.cutoff = 4
-for(n in 1:length(peak.files)) 
-{
-  cat(n, '\n')
-  p = readPeakFile(peak.files[n], as = "GRanges");
-  #eval(parse(text = paste0("p = pp.", k)));
-  with.p.values = "X.log10.pvalue." %in% colnames(mcols(p))
-  if(with.p.values) {
-    p <- p[mcols(p)[,"X.log10.pvalue."] > pval.cutoff];
-    p = reduce(p);
-    #peaks10= c(peaks10, p10);
-  }else{ 
-    cat("no p values conlumn found for -- ", design.matrix$file.name[k], "\n");
-    PLOT.p10 = FALSE;
-  }
-  #p = reduce(p)
-  peaks= c(peaks, p)
-}
-
-# try to merge BL time series
-kk = which(design$condition == 'BL_UA_13days_proximal')
-bld13.p = peaks[[3]][overlapsAny(peaks[[3]], peaks[[4]])]
-
-kk = which(design$condition == 'BL_UA_13days_distal')
-bld13.d = peaks[[1]][overlapsAny(peaks[[1]], peaks[[2]])]
-
-kk = which(design$condition == 'BL_UA_9days')
-bld9 = peaks[[9]]
-bld9 = bld9[overlapsAny(bld9, peaks[[10]])]
-
-kk = which(design$condition == 'BL_UA_5days')
-bld5 = peaks[[7]]
-bld5 = bld5[overlapsAny(bld5, peaks[[8]])]
-bld52 = peaks[[5]]
-bld52 = bld52[overlapsAny(bld52, peaks[[6]])]
-
-length(bld5[overlapsAny(bld5, bld52)])
-bld5 = bld52
-
-
-
-pdfname = paste0(resDir, '/compare_peakOverlapping_betweenReplicates.pdf')
-pdf(pdfname, width = 16, height = 8)
-par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
-
-source('functions_chipSeq.R')
-
-#Comparison.overlapping.peaks(design.matrix = design, peaks.list = peak.files, toCompare = 'condition', pval = 3, PLOT.p10 = FALSE)
-
-dev.off()
-
-#peak.files = peak.files[grep('90392|90393|108072|108073|108070|108071', peak.files, invert = TRUE)]
-
-#bam.list = list.files(path = '../Data/R10723_atac/alignments/BAMs_uniq_rmdup', pattern = '*.bam$', full.names = TRUE)
+# union of all peaks from all replicates
 peak.merged = merge.peaks.macs2(peak.files, pcutoff = 6)
 
+##########################################
+# Manually identify consensus peaks across replicates taking into account of different batches and sequencing depth
+##########################################
+Manually.identify.peak.consensus = FALSE
+
+if(Manually.identify.peak.consensus){
+  peaks = c()
+  pval.cutoff = 3
+  for(n in 1:length(peak.files)) 
+  {
+    cat(n, '\n')
+    p = readPeakFile(peak.files[n], as = "GRanges");
+    #eval(parse(text = paste0("p = pp.", k)));
+    with.p.values = "X.log10.pvalue." %in% colnames(mcols(p))
+    if(with.p.values) {
+      p <- p[mcols(p)[,"X.log10.pvalue."] > pval.cutoff];
+      p = reduce(p);
+      #peaks10= c(peaks10, p10);
+    }else{ 
+      cat("no p values conlumn found for -- ", design.matrix$file.name[k], "\n");
+      PLOT.p10 = FALSE;
+    }
+    #p = reduce(p)
+    peaks= c(peaks, p)
+  }
+  
+  names(peaks) = design$fileName
+  saveRDS(peaks, file = paste0(RdataDir, '/macs2_peaks_mergedTechnialReps_30samples_pval0.001.rds'))
+  
+  
+  #xx = readRDS(file = paste0(RdataDir, '/macs2_peaks_mergedTechnialReps_30samples.rds'))
+  peaks = readRDS(file = paste0(RdataDir, '/macs2_peaks_mergedTechnialReps_30samples_pval0.001.rds'))
+  # try to merge BL time series
+  kk = which(design$condition == 'BL_UA_13days_proximal')
+  
+  source('functions_chipSeq.R')
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main='BL_UA_day13_proximal')
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  #bld13.p = peaks[[3]][overlapsAny(peaks[[3]], peaks[[4]])]
+  bld13.p = GenomicRanges::intersect(peaks[[3]], peaks[[4]])
+  
+  kk = which(design$condition == 'BL_UA_13days_distal')
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main='BL_UA_day13_distal')
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  #bld13.d = peaks[[1]][overlapsAny(peaks[[1]], peaks[[2]])]
+  bld13.d = GenomicRanges::intersect(peaks[[1]], peaks[[2]])
+  
+  kk = which(design$condition == 'BL_UA_9days')
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main='BL_UA_day13_distal')
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  #bld9 = peaks[[10]][overlapsAny(peaks[[10]], peaks[[9]])]
+  bld9 = GenomicRanges::intersect(peaks[[10]], peaks[[9]])
+  
+  kk = which(design$condition == 'BL_UA_5days')
+  
+  kk = c(7, 8)
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main='BL_UA_day13_distal')
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  #bld5 = peaks[[7]]
+  #bld5 = bld5[overlapsAny(bld5, peaks[[8]])]
+  bld5 = GenomicRanges::intersect(peaks[[7]], peaks[[8]])
+  
+  kk = c(5, 6)
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main='BL_UA_day13_distal')
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  #bld52 = peaks[[5]]
+  #bld52 = bld52[overlapsAny(bld52, peaks[[6]])]
+  bld52 = GenomicRanges::intersect(peaks[[5]], peaks[[6]])
+  
+  ol.peaks <- makeVennDiagram(list(bld5, bld52), NameOfPeaks=c('day5.old', 'day5.new'), connectedPeaks="keepAll", main='BL_UA_day13_distal')
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  #length(bld5[overlapsAny(bld5, bld52)])
+  bld5 = bld52
+  
+  kk = which(design$condition == 'Embryo_Stage40')
+  kk = c(11, 12)
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main='BL_UA_day13_proximal')
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  es40.new = GenomicRanges::intersect(peaks[[11]], peaks[[12]])
+ 
+  kk = c(13, 14)
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main='BL_UA_day13_proximal')
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  es40.old = GenomicRanges::intersect(peaks[[13]], peaks[[14]])
+  
+  ol.peaks <- makeVennDiagram(list(es40.old, es40.new), NameOfPeaks=c('es40.old', 'es40.new'), connectedPeaks="keepAll")
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  # here for Embryo.stage40, old and new batche peaks merged  
+  es40 = union(es40.new, es40.old)
+  
+  kk = which(design$condition == 'Embryo_Stage44_proximal')
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main='BL_UA_day13_proximal')
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  es44.p = intersect(peaks[[17]], peaks[[18]])
+  
+  kk = which(design$condition == 'Embryo_Stage44_distal')
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll")
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+    
+  es44.d = intersect(peaks[[15]], peaks[[16]])
+  
+  
+  kk = which(design$condition == 'Mature_UA')
+  kk = c(27, 30)
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main='BL_UA_day13_distal')
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  ua0 = GenomicRanges::intersect(peaks[[30]], peaks[[27]])
+  
+  kk = c(26, 28, 29)
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main='BL_UA_day13_distal')
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  # for the moment, ua peaks overlapped by two replicates will be saved here 
+  #ua = peaks[[29]][overlapsAny(peaks[[29]], peaks[[26]])|overlapsAny(peaks[[29]], peaks[[28]])]
+  ua1 = intersect(peaks[[26]], peaks[[28]])
+  ua2 = intersect(peaks[[26]], peaks[[29]])
+  ua3 = intersect(peaks[[29]], peaks[[28]])
+  
+  ua = union(union(ua1, ua2), ua3)
+  ua = reduce(ua)
+  
+  kk = which(design$condition == 'Mature_LA')
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll")
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  # for the moment, mLA peak consensus are peaks covered by > 2 out of three replicates
+  la1 = intersect(peaks[[23]], peaks[[24]])
+  la2 = intersect(peaks[[25]], peaks[[24]])
+  la3 = intersect(peaks[[23]], peaks[[25]])
+  
+  la = union(union(la1, la2), la3)
+  la = reduce(la)
+  
+  # for the moment, mHand peak consensus are peaks covered by > 2 out of three replicates
+  kk = which(design$condition == 'Mature_Hand')
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll")
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  hd1 = intersect(peaks[[20]], peaks[[21]])
+  hd2 = intersect(peaks[[22]], peaks[[21]])
+  hd3 = intersect(peaks[[20]], peaks[[22]])
+  
+  hd = union(union(hd1, hd2), hd3)
+  hd = reduce(hd)
+  
+  # for the moment head control only one sample
+  kk = which(design$condition == 'HEAD')
+  hc = peaks[[kk]]
+  
+  ## here  es40, es44.d, es44.p, bld5, bld9, bld13.p, bld13.d data are complete
+  ## in contrast, ua (not sure), la, hd, ua, hc and hand regeneration time points will have new data
+  ## when new data comes, the peak consensue will start from here
+  save(bld5, bld9, bld13.p, bld13.d, es40, es44.d, es44.p, 
+       ua, la, hd, hc, 
+       file = paste0(RdataDir, '/consensus_peaks_intersectReplicates.Rdata'))
+  
+  peak.merged = union(bld5, bld9)
+  peak.merged = union(peak.merged, bld13.p)
+  peak.merged = union(peak.merged, bld13.d)
+  peak.merged = union(peak.merged, es40)
+  peak.merged = union(peak.merged, es44.d)
+  peak.merged = union(peak.merged, es44.p)
+  peak.merged = union(peak.merged, ua)
+  peak.merged = union(peak.merged, la)
+  peak.merged = union(peak.merged, hd)
+  peak.merged = union(peak.merged, hc)
+  ##########################################
+  # compare the peak overlapping in the UA regeneration
+  ##########################################
+  Compare.peak.overlapping.UA.regeneration = FALSE
+  if(Compare.peak.overlapping.UA.regeneration){
+    ol.peaks <- makeVennDiagram(list(ua, bld5), NameOfPeaks=c('mUA', 'BL.day5'), connectedPeaks="keepAll", main='BL_UA_day13_distal')
+    v <- venn_cnt2venn(ol.peaks$vennCounts)
+    try(plot(v))
+    
+    ol.peaks <- makeVennDiagram(list(ua, bld9), NameOfPeaks=c('mUA', 'BL.day9'), connectedPeaks="keepAll", main='BL_UA_day13_distal')
+    v <- venn_cnt2venn(ol.peaks$vennCounts)
+    try(plot(v))
+    
+    ol.peaks <- makeVennDiagram(list(ua, bld5, bld9), NameOfPeaks=c('mUA', 'BL.day5', 'BL.day9'), connectedPeaks="keepAll", main='BL_UA_day13_distal')
+    v <- venn_cnt2venn(ol.peaks$vennCounts)
+    try(plot(v))
+    
+    ol.peaks <- makeVennDiagram(list(bld5, bld9), NameOfPeaks=c('BL.day5', 'BL.day9'), connectedPeaks="keepAll", main='BL_UA_day13_distal')
+    v <- venn_cnt2venn(ol.peaks$vennCounts)
+    try(plot(v))
+    
+    ol.peaks <- makeVennDiagram(list(bld5, bld13.p), NameOfPeaks=c('BL.day5', 'BL.d13.p'), connectedPeaks="keepAll", main='BL_UA_day13_distal')
+    v <- venn_cnt2venn(ol.peaks$vennCounts)
+    try(plot(v))
+    
+    ol.peaks <- makeVennDiagram(list(bld5, bld13.d), NameOfPeaks=c('BL.day5', 'BL.d13.d'), connectedPeaks="keepAll", main='BL_UA_day13_distal')
+    v <- venn_cnt2venn(ol.peaks$vennCounts)
+    try(plot(v))
+    
+    pdfname = paste0(resDir, '/compare_peakOverlapping_betweenReplicates.pdf')
+    pdf(pdfname, width = 16, height = 8)
+    par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+    
+    #Comparison.overlapping.peaks(design.matrix = design, peaks.list = peak.files, toCompare = 'condition', pval = 3, PLOT.p10 = FALSE)
+    
+    dev.off()
+    
+  }
+ 
+}
+  
 # clean peaks
 peaks = peak.merged
 peaks = data.frame(peaks)
@@ -486,6 +667,7 @@ if(Save.Peaklist){
               col.names = FALSE, quote = FALSE)
   
 }
+
 
 ##########################################
 # run DESeq2 for QC and detect DE peaks
@@ -629,16 +811,39 @@ require(DESeq2)
 rownames(counts) = counts$gene
 dds <- DESeqDataSetFromMatrix(as.matrix(counts[kk, -1]), DataFrame(design), design = ~ condition)
 
+dds = dds[, grep('1361', design$SampleID)]
+
+dds$condition = droplevels(dds$condition)
+
+ss0 = rowMaxs(counts(dds))
+dds = dds[ss0 > 50, ]
 #dds = dds[ss > cutoff, ]
 ss = rowSums(counts(dds))
-length(which(ss > quantile(ss, probs = 0.65)))
+length(which(ss > quantile(ss, probs = 0.6)))
 
-dd0 = dds[ss > quantile(ss, probs = 0.65) , ]
+dd0 = dds[ss > quantile(ss, probs = 0.6) , ]
 dd0 = estimateSizeFactors(dd0)
 sizefactors.UQ = sizeFactors(dd0)
 
 sizeFactors(dds) <- sizefactors.UQ
 fpm = fpm(dds, robust = TRUE)
+
+dds <- estimateDispersions(dds, fitType = 'parametric')
+plotDispEsts(dds, ymin = 10^-3, main = 'RA')
+
+dds <- nbinomWaldTest(dds)
+resultsNames(dds)  
+
+res1 = results(dds, contrast=c("condition", 'BL_UA_5days', 'Mature_UA'), alpha = 0.1)
+res2 = results(dds, contrast=c("condition", 'BL_UA_9days', 'BL_UA_5days'), alpha = 0.1)
+res2 = results(dds, contrast=c("condition", 'BL_UA_9days', 'Mature_UA'), alpha = 0.1)
+res2 = results(dds, contrast=c("condition", 'BL_UA_13days_proximal', 'Mature_UA'), alpha = 0.1)
+
+res2 = results(dds, contrast=c("condition", 'BL_UA_13days_proximal', 'BL_UA_9days'), alpha = 0.1)
+
+res2 = results(dds, contrast=c("condition", 'BL_UA_13days_distal', 'BL_UA_9days'), alpha = 0.1)
+
+
 vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
 
 pca=plotPCA(vsd, intgroup = colnames(design)[2], ntop = 3000, returnData = FALSE)
