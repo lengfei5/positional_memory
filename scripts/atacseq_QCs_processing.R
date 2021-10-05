@@ -490,7 +490,7 @@ counts = process.countTable(all=all, design = design[, c(1,2)])
 # 
 # design = data.frame(design, stats, stringsAsFactors = FALSE)
 
-save(design, counts, file = paste0(RdataDir, '/samplesDesign_readCounts.withinPeaks.pval6_mergedTechnical.Rdata'))
+save(design, counts, file = paste0(RdataDir, '/samplesDesign_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical.Rdata'))
 
 Compare.with.Old.mature.resequencing = FALSE
 if(Compare.with.Old.mature.resequencing){
@@ -526,43 +526,10 @@ if(Compare.with.Old.mature.resequencing){
 ##########################################
 #  peak signal normalization
 ##########################################
-load( file = paste0(RdataDir, '/samplesDesign_readCounts.withinPeaks.pval6_mergedTechnical.Rdata'))
-design$batch = 1
-design = design[, c(1, 2, 6, 3:5)]
+load(file = paste0(RdataDir, '/samplesDesign_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical.Rdata'))
 
-
-if(Compare.with.Old.mature.resequencing){
-  
-   load(file = paste0(RdataDir, '/samplesDesign_readCounts.withinPeaks.pval6_oldMature.Embryo.Regeneration.Rdata'))
-   design = design[, c(1,2)]
-   design$batch = 3
-   
-   colnames(counts)[-1] = paste0(design[, 2], '_', design[,1], '_', design[, 3])
-   
-   design0 = design0[, c(1, 2)]
-   design0$batch = 2
-   colnames(counts0)[-1] = paste0(design0[, 2], '_', design0[,1], '_', design0[, 3])
-   
-   mm = match(counts$gene, counts0$gene)
-   counts = cbind(counts, counts0[mm, -1])
-   
-   colnames(design0) = colnames(design)
-   design = rbind(design, design0)
-    
-   design$condition[grep('EMbryo_Stage40', design$condition)] = 'Embryo_Stage40'
-   
-   cc = unique(design$condition[which(design$batch == 3)])
-   
-   kk = which(!is.na(match(design$condition, cc)))
-   
-   xx = design[, c(1, 2)]
-   xx = xx[match(unique(xx$SampleID), design$SampleID), ]
-   colnames(xx) = c('sampleID', 'fileName')
-   write.table(xx, file = paste0(dataDir, 'design_sampleInfo_all.txt'), sep = '\t', col.names = TRUE, row.names = FALSE,
-               quote = FALSE)
-   
-      
-}
+#design$batch = 1
+#design = design[, c(1, 2, 6, 3:5)]
 
 ss = apply(as.matrix(counts[, -1]), 1, mean)
 
@@ -584,9 +551,10 @@ hist(design$pct.reads.in.peaks, main = 'distribution of pct of usable reads with
 #norms = norms/median(norms)
 
 ss = apply(as.matrix(counts[, -1]), 1, max)
-hist(log10(ss), breaks = 200)
 
 cutoff = 50
+hist(log10(ss), breaks = 200)
+abline(v = log10(cutoff), col = 'red')
 kk = which(ss>cutoff)
 length(which(ss>cutoff))
 
@@ -600,12 +568,11 @@ require(DESeq2)
 rownames(counts) = counts$gene
 dds <- DESeqDataSetFromMatrix(as.matrix(counts[kk, -1]), DataFrame(design), design = ~ condition)
 
-dds = dds[, grep('1361', design$SampleID)]
+#dds = dds[, grep('1361', design$SampleID)]
+#dds$condition = droplevels(dds$condition)
 
-dds$condition = droplevels(dds$condition)
-
-ss0 = rowMaxs(counts(dds))
-dds = dds[ss0 > 50, ]
+#ss0 = rowMaxs(counts(dds))
+#dds = dds[ss0 > 50, ]
 #dds = dds[ss > cutoff, ]
 ss = rowSums(counts(dds))
 length(which(ss > quantile(ss, probs = 0.6)))
@@ -618,20 +585,19 @@ sizeFactors(dds) <- sizefactors.UQ
 fpm = fpm(dds, robust = TRUE)
 
 dds <- estimateDispersions(dds, fitType = 'parametric')
-plotDispEsts(dds, ymin = 10^-3, main = 'RA')
-
-dds <- nbinomWaldTest(dds)
-resultsNames(dds)  
-
-res1 = results(dds, contrast=c("condition", 'BL_UA_5days', 'Mature_UA'), alpha = 0.1)
-res2 = results(dds, contrast=c("condition", 'BL_UA_9days', 'BL_UA_5days'), alpha = 0.1)
-res2 = results(dds, contrast=c("condition", 'BL_UA_9days', 'Mature_UA'), alpha = 0.1)
-res2 = results(dds, contrast=c("condition", 'BL_UA_13days_proximal', 'Mature_UA'), alpha = 0.1)
-
-res2 = results(dds, contrast=c("condition", 'BL_UA_13days_proximal', 'BL_UA_9days'), alpha = 0.1)
-
-res2 = results(dds, contrast=c("condition", 'BL_UA_13days_distal', 'BL_UA_9days'), alpha = 0.1)
-
+# plotDispEsts(dds, ymin = 10^-3, main = 'RA')
+# 
+# dds <- nbinomWaldTest(dds)
+# resultsNames(dds)  
+# 
+# res1 = results(dds, contrast=c("condition", 'BL_UA_5days', 'Mature_UA'), alpha = 0.1)
+# res2 = results(dds, contrast=c("condition", 'BL_UA_9days', 'BL_UA_5days'), alpha = 0.1)
+# res2 = results(dds, contrast=c("condition", 'BL_UA_9days', 'Mature_UA'), alpha = 0.1)
+# res2 = results(dds, contrast=c("condition", 'BL_UA_13days_proximal', 'Mature_UA'), alpha = 0.1)
+# 
+# res2 = results(dds, contrast=c("condition", 'BL_UA_13days_proximal', 'BL_UA_9days'), alpha = 0.1)
+# 
+# res2 = results(dds, contrast=c("condition", 'BL_UA_13days_distal', 'BL_UA_9days'), alpha = 0.1)
 
 vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
 
