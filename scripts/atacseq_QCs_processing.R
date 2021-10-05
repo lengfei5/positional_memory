@@ -466,6 +466,9 @@ source(RNA.QC.functions)
 #load(file = paste0(RdataDir, '/R11637_atacseq_samples_design_stats.Rdata'))
 #design = stats
 design = readRDS(file = paste0(RdataDir, '/design_merged_technicalReplicates.rds'))
+mm = match(design$sampleID, as.character(c(161523:161526)))
+design = design[is.na(mm), ]
+
 
 xlist<-list.files(path=paste0(dataDir, '/featurecounts_peaks.Q30'),
                   pattern = "*_featureCounts.txt$", full.names = TRUE) ## list of data set to merge
@@ -666,24 +669,5 @@ if(save.scalingFactors.for.deeptools){
   write.table(xx, file = paste0(dataDir, '/DESeq2_scalingFactor_forDeeptools.txt'), sep = '\t',
               col.names = FALSE, row.names = FALSE, quote = FALSE)
   
-}
-
-##########################################
-# cost estimate for Batch 1 
-# experiment design by Elly (Feb 22th 2021)
-# Batch 0 (done): mature.UA, Blastema.UA.day5, Blastema.UA.day9, Blastema.UA.day13.proxomial, Blastema.UA.day13.distal 
-# Batch 1:  mature.UA,  mature.LA,  mature.Hand, head (control)
-# Batch 2:  mature.Hand, Blastema.Hand.day5, Blastema.Hand.day9, Blastema.Hand.day13 
-##########################################
-Cost.estimation = FALSE
-if(Cost.estimation){
-  
-  xx = design
-  xx = xx[grep('Mature', xx$fileName), ]
-  xx = xx[xx$batch == '2020', ]
-  
-  xx$nb.reads.to.add = (90*10^6 - xx$unique.rmdup)/xx$pct.usable/10^6
-  
-  sum(xx$nb.reads.to.add)
 }
 
