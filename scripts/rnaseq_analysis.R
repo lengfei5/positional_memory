@@ -191,7 +191,6 @@ save(design, all, file=paste0(RdataDir, 'Design_stats_readCounts_', version.anal
 source('Functions_rnaseq.R')
 Update.samples.160343.160344()
 
-
 ########################################################
 ########################################################
 # Section II : Normalize the RNA-seq data and PCA plots 
@@ -595,7 +594,4 @@ pheatmap(yy, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
          width = 12, height = 20)
 
 write.table(yy, file = paste0(resDir, '/DEtfs_mUA_regeneration_dev.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
-
-
-
 
