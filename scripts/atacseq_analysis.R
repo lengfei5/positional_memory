@@ -13,11 +13,10 @@ RNA.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functions/
 RNA.QC.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functions/RNAseq_QCs.R'
 source(RNA.functions)
 source(RNA.QC.functions)
-
 source('functions_chipSeq.R')
 source('Functions_atac.R')
 
-version.analysis = 'atac_rna_seq_integration_analysis_20210323'
+version.analysis = 'atac_rna_chipseq_analysis_20211007'
 #peakDir = "Peaks/macs2_broad"
 
 resDir = paste0("../results/", version.analysis)
@@ -26,6 +25,7 @@ if(!dir.exists(resDir)) dir.create(resDir)
 if(!dir.exists(RdataDir)) dir.create(RdataDir)
 
 annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
+gtf.file =  paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf')
 
 require(ggplot2)
 require(DESeq2)
@@ -36,8 +36,6 @@ require("pheatmap")
 # some annotations for all analysis 
 ##########################################
 Import.HoxCluster.annotation = TRUE
-
-gtf.file =  paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf')
 
 if(Import.HoxCluster.annotation){
   HoxA = data.frame(chr = 'chr2p', start = 873085043, end = 884416919, strand = '*', stringsAsFactors = FALSE)
@@ -57,7 +55,8 @@ if(Import.HoxCluster.annotation){
 # Here import design matrix and read counts of pooled peaks across conditions (pval < 10^-6)
 # in the future the IDR will be used to select the peaks across replicates and and then pool peaks
 ##########################################
-load(file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.withinPeaks.pval6.Rdata'))
+load(file = paste0("../results/R10723_Rxxxx_R11637_atacseq_R11876_CutTag/Rdata",
+                   '/samplesDesign_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical.Rdata'))
 
 ##########################################
 # Quick check the sample infos

@@ -19,8 +19,7 @@ if(!dir.exists(RdataDir)) dir.create(RdataDir)
 
 source('Functions_atac.R')
 
-dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/R11637_atac/'
-#dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/R11876_cut.run/'
+dataDir = '/Volumes//groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/'
 
 design_file = paste0(dataDir, 'design_sampleInfo_all.txt')
 
@@ -636,4 +635,3 @@ if(save.scalingFactors.for.deeptools){
               col.names = FALSE, row.names = FALSE, quote = FALSE)
   
 }
-
