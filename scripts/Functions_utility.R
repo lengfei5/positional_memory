@@ -358,6 +358,40 @@ Compare.CutandRun.controls = function()
   # design$fileName = paste0(design$samples, '_', design$sampleID)
   # names(peaks) = design$fileName
   
+  # clean peaks
+  peaks = peak.merged
+  peaks = data.frame(peaks)
+  colnames(peaks)[c(1:3)] = c("chr", "start", "end")
+  
+  dim(peaks)
+  
+  peaks$peak.name = paste0(peaks$chr, ":", peaks$start, "_", peaks$end)
+  
+  jj = match(unique(peaks$peak.name), peaks$peak.name)
+  peaks = peaks[jj, ];
+  dim(peaks)
+  
+  peaks = peaks[which(peaks$chr != 'chrM'), ]
+  
+  dim(peaks)
+  
+  # preapre SAF input for featureCounts
+  require(Rsubread)
+  
+  #counts = quantify.signals.within.peaks(peaks = peak.merged, bam.list=bam.list, rpkm.normalization = FALSE, isPairedEnd = FALSE)
+  SAF = data.frame(GeneID=peaks$peak.name, 
+                   Chr=peaks$chr, 
+                   Start=peaks$start, 
+                   End=peaks$end, 
+                   Strand=peaks$strand, stringsAsFactors = FALSE)
+  
+  write.table(SAF, file = paste0(peakDir, 'merge_peak.saf'), sep = '\t', row.names = FALSE, 
+              col.names = TRUE, quote = FALSE) 
+  
+  ##########################################
+  # compare the normalized peak signals 
+  ##########################################
+  
   
    
 }
