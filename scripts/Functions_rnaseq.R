@@ -127,19 +127,22 @@ RNAseq.sequence.saturation.test = function()
 ##########################################
 # save scaling factors in DESeq2 for deeptools
 ##########################################
-save.scalingFactors.for.deeptools = function(dds)
+save.scalingFactors.for.deeptools = function(dds, saveDir)
 {
-  ss = colSums(counts(dds))
-  plot(ss[jj], (design.matrix$alignment.rate*design.matrix$trimmed.reads)[jj])
+  saveDir = dataDir
+  #ss = colSums(counts(dds))
+  #plot(ss[jj], (design.matrix$alignment.rate*design.matrix$trimmed.reads)[jj])
   
-  reads.mapped = design.matrix$trimmed.reads*design.matrix$alignment.rate/100
+  #reads.mapped = design.matrix$trimmed.reads*design.matrix$alignment.rate/100
+  reads.mapped = design.matrix$mapped
   xx = data.frame(sampleID = design.matrix$SampleID,  
                   scalingFactor = reads.mapped/(design.matrix$sizefactor*median(reads.mapped)),
                   stringsAsFactors = FALSE)
-  xx = xx[jj,]
+  xx[grep('161514|161517', xx[1, ]), ]
   
-  write.table(xx, file = paste0(resDir, '/DESeq2_scalingFactor_forDeeptools.txt'), sep = '\t',
+  write.table(xx, file = paste0(saveDir, '/DESeq2_scalingFactor_forDeeptools.txt'), sep = '\t',
               col.names = FALSE, row.names = FALSE, quote = FALSE)
+  
   
 }
 

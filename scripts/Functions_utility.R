@@ -242,3 +242,79 @@ Cost.estimation = function()
 }
 
 
+########################################################
+########################################################
+# Section : test if CT (cut & tag) controls are similar or not
+# Is it necessary to make control samples each time point and each condition
+########################################################
+########################################################
+Compare.CutandRun.controls = function()
+{
+  rm(list=ls())
+  
+  version.analysis = 'R10723_Rxxxx_R11637_atacseq_R11876_CutTag'
+  #peakDir = "Peaks/macs2_broad"
+  
+  resDir = paste0("../results/", version.analysis)
+  RdataDir = paste0(resDir, '/Rdata')
+  if(!dir.exists(resDir)) dir.create(resDir)
+  if(!dir.exists(RdataDir)) dir.create(RdataDir)
+  
+  source('Functions_atac.R')
+  
+  dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/R11876_cut.run/'
+  
+  design_file = paste0(dataDir, 'sampleInfo_parsed.txt')
+  
+  design = read.table(paste0(dataDir, 'sampleInfo_parsed.txt'), sep = '\t', header = TRUE)
+  
+  stats = read.table(paste0(dataDir, 'nf_out/result/countStatTable.txt'), sep = '\t', header = TRUE)
+  colnames(stats)[c(1, 3)] = c('fileName', 'trimmed')
+  
+  index = c()
+  
+  for(n in 1:nrow(design))
+  {
+    # n = 1;
+    cat(n, '\n')
+    #cc.files = cnts[grep(design$sampleID[n], cnts)]
+    ii = grep(design$sampleID[n], stats$fileName)
+    if(length(ii) == 1){
+      index = c(index, ii)
+    }else{
+      index = c(index, NA)
+      cat(length(ii), 'fileName Found for ', design$sampleID[n], '\n')
+    }
+    
+    # total = 0
+    # for(m in 1:length(cc.files))
+    # {
+    #   #cat(m, '\n')
+    #   total = total + read.table(cc.files[m], sep = '\t', header = FALSE)
+    # }
+    # 
+    # ss = read.table(files.stat[grep(design$sampleID[n], files.stat)], sep = '\t', header = TRUE)
+    # samples = c(samples, as.character(ss[1, 1]))
+    # stats = rbind(stats, c(total, ss[1, -1]))
+    
+  }
+  
+  
+  stats = data.frame(design, stats[index, ], stringsAsFactors = FALSE)
+  colnames(stats) = c('sampleID', 'samples', 'fileName', 'total',  'adapter.trimmed', 'mapped', 'chrM.rm', 'unique', 'unique.rmdup')
+  
+  stats$trimming.pct = as.numeric(stats$adapter.trimmed)/as.numeric(stats$total)
+  stats$mapped.pct = as.numeric(stats$mapped)/as.numeric(stats$adapter.trimmed)
+  stats$mito.pct = as.numeric(stats$chrM.rm)/as.numeric(stats$adapter.trimmed)
+  stats$multimapper.pct = 1- as.numeric(stats$unique) / as.numeric(stats$mapped)
+  stats$dup.rate = 1.0 - as.numeric(stats$unique.rmdup)/as.numeric(stats$unique)
+  stats$pct.usable = stats$unique.rmdup / stats$total
+  
+  
+  
+   
+}
+
+
+
+

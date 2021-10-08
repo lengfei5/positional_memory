@@ -20,12 +20,12 @@ require(DESeq2)
 require(dplyr)
 require(gridExtra)
 
-version.Data = 'rnaseq_Rxxxx.old_R10724_R161513';
-version.analysis = paste0("_", version.Data, "_20210628")
+version.Data = 'rnaseq_Rxxxx.old_R10724_R161513_mergedTechRep';
+version.analysis = paste0("_", version.Data, "_20211007")
 
 ## Directories to save results 
-design.file = "../exp_design/RNAseq_sampleInfos.xlsx"
-#dataDir = "../data/quantseq/featurecounts_R7183"
+dataDir = "/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/rnaseq_using/"
+design.file = paste0(dataDir, 'sampleInfos_parsed.txt')
 
 resDir = paste0("../results/", version.Data)
 tabDir =  paste0(resDir, "/tables/")
@@ -43,143 +43,199 @@ if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 # 
 ########################################################
 ########################################################
+#dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/Rxxxx_rnaseq_old/'
+#design = read.table(paste0(dataDir, 'sampleInfos_parsed.txt'), sep = '\t', header = TRUE)
+#dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/R161513_rnaseq/'
+#design = read.csv(file = paste0(dataDir, 'sampleInfos.csv'))
+design = read.table(design.file, header = TRUE)
+colnames(design) = c('sampleID', 'fileName')
 
 ##########################################
 # prepare design matrix, count table and QC table
 # here the statistics were collected batch by batch (request by request)
 # merge in the later steps
 ##########################################
-#dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/Rxxxx_rnaseq_old/'
-#design = read.table(paste0(dataDir, 'sampleInfos_parsed.txt'), sep = '\t', header = TRUE)
-dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/R161513_rnaseq/'
-design = read.csv(file = paste0(dataDir, 'sampleInfos.csv'))
+xlist = list.files(path=paste0(dataDir, 'featurecounts_Q10'),
+                   pattern = "*_featureCounts.txt$", full.names = TRUE) ## list of data set to merge
 
-colnames(design) = c('sampleID', 'fileName')
-stats = read.delim(paste0(dataDir, 'nf_out_RNAseq/MultiQC/multiqc_data/multiqc_general_stats.txt'), sep = '\t', 
-                   header = TRUE)
-alignment = read.delim(paste0(dataDir, 'nf_out_RNAseq/MultiQC/multiqc_data/multiqc_hisat2.txt'), sep = '\t')
+all = cat.countTable(xlist, countsfrom = 'featureCounts')
 
-stats = stats[, c(1, 2, 3, 4, 6, 8, 9, 10)]
-colnames(stats) = c('sample', 'pct.duplication', 'pct.GC', 'avg.seq.length', 'total.reads', 
-                    'pct.assign', 'assigned.reads', 'alignment.rate')
-
-stats = data.frame(stats, alignment[match(stats$sample, alignment$Sample), c(2, 4, 5)], stringsAsFactors = FALSE)
-colnames(stats)[c(9:11)] = c('trimmed.reads', 'unique.aligned', 'multimapper')
-stats = stats[, c(1:5, 9, 8, 10, 11, 7)]
-
-ii = c()
-jj = c()
-for(n in 1:nrow(design))
-{
-  # n = 1;
-  cat(n, '\n')
-  kk = grep(design$sampleID[n], stats$sample)
-  ii = c(ii, rep(n, length(kk)))
-  jj = c(jj, kk)
-  #kk = c(kk, grep(design$sampleID[n], stats$sample))
-  #kk = c(kk, which(design$sampleID == ))
-}
-
-xx = data.frame(design[ii, ], stats[jj, ], stringsAsFactors = FALSE)
-xx = xx[order(xx$fileName), ]
-
-##################################################
-## Import design matrix and prepare count table
-##################################################
-design = read.xlsx(design.file, sheet = 1) # all samples included in this file
+# design = colnames(all)[-1]
+# design = gsub('_uniq_rmdup_featureCounts.txt', '', design)
+# design = data.frame(sample = design, stringsAsFactors = FALSE)
+# design$sampleID = sapply(design$sample, function(x) {test = unlist(strsplit(as.character(x), '_')); return(test[length(test)])})
+# design$condition = sapply(design$sample, function(x) {
+#   test = unlist(strsplit(as.character(x), '_')); 
+#   return(paste0(test[-length(test)], collapse = '_'))})
+# design = design[, c(2,3, 1)]
 
 colnames(design)[1] = 'SampleID'
-design$conds = paste0(design$conditions, '_', design$SampleID,  '.batch', design$batch)
 
-# prepare the data table for different batches
-dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/'
-batch1 = read.delim(paste0(dataDir,  'R10724_rnaseq/nf_out_RNAseq/featureCounts/merged_gene_counts.txt'), sep = '\t',  header = TRUE)
-batch2 = read.delim(paste0(dataDir, 'Rxxxx_rnaseq_old/nf_out_RNAseq/featureCounts/merged_gene_counts.txt'), sep = '\t',  header = TRUE)
-batch4 = read.delim(paste0(dataDir, 'R161513_rnaseq/nf_out_RNAseq/featureCounts/merged_gene_counts.txt'), sep = '\t', header = TRUE)
+counts = process.countTable(all=all, design = design[, c(1,2)])
 
-batch3 = batch2[, grep('HLVGMDRXX', colnames(batch2), invert = TRUE)]
-batch2 = batch2[, c(1, grep('HLVGMDRXX', colnames(batch2)))]
+design$condition = design$fileName
+design$fileName = paste0(design$fileName, '_', design$SampleID)
+design$conds = design$condition
+design$batch = NA
+design$batch[grep('8134', design$SampleID)] = 1
+design$batch[grep('1063', design$SampleID)] = 2
+design$batch[grep('1361', design$SampleID)] = 3
+design$batch[grep('1615', design$SampleID)] = 4
 
-
-source(RNA.functions)
-xx1 = process.countTable(all=batch1, design = design[which(design$batch == '3'), c(1:2)], ensToGeneSymbol = FALSE)
-colnames(xx1)[-1] = paste0(colnames(xx1)[-1], '.batch3')
-
-xx2 = process.countTable(all=batch2, design = design[which(design$batch == '2'), c(1:2)], merge.technicalRep.sameID = TRUE,
-                           ensToGeneSymbol = FALSE)
-colnames(xx2)[-1] = paste0(colnames(xx2)[-1], '.batch2')
-
-xx3 = process.countTable(all=batch3, design = design[which(design$batch == '1'), c(1:2)], merge.technicalRep.sameID = TRUE,
-                         ensToGeneSymbol = FALSE)
-
-colnames(xx3)[-1] = paste0(colnames(xx3)[-1], '.batch1')
-
-xx4 = process.countTable(all=batch4, design = design[which(design$batch == '4'), c(1:2)], merge.technicalRep.sameID = FALSE,
-                         ensToGeneSymbol = FALSE)
-
-colnames(xx4)[-1] = paste0(colnames(xx4)[-1], '.batch4')
-
-all <- Reduce(function(dtf1, dtf2) merge(dtf1, dtf2, by = "gene", all = TRUE), list(xx1, xx2, xx3, xx4))
-
-# make sure that the sample order is the same in design and all matrix
-mm = match(design$conds, colnames(all))
-all = all[, c(1, mm)]
-
-write.csv(design, file = paste0(resDir, '/designSampleInfos_QCstat.csv'), row.names = FALSE)
-
-save(design, all, file=paste0(RdataDir, 'Design_Raw_readCounts_', version.analysis, '.Rdata'))
-
-##########################################
-# add stats into design 
-##########################################
-load(file=paste0(RdataDir, 'Design_Raw_readCounts_', version.analysis, '.Rdata'))
-stat0 = read.csv(file = '../results/R10724_rnaseq_202102019/QCs_stats.csv')
-stat1 = read.csv(file = '../results/Rxxxx.rnaseq.old_202102020/QCs_stats.csv')
-stat2 = read.csv(file = '../results/rnaseq_Rxxxx.old_R10724_R161513/QCs_stats.csv')
-
-xx = data.frame(design, matrix(NA, nrow = nrow(design), ncol = 9), stringsAsFactors = FALSE)
-colnames(xx)[7:15] = colnames(stat0)[-c(1:3)]
-
-mm = match(stat0$sampleID, design$SampleID)
-
-xx[mm, c(7:15)] = stat0[, -c(1:3)]
-
-for(n in 1:nrow(xx))
-{
-  if(is.na(xx$pct.duplication[n])){
-    # batch 1
-    if(xx$batch[n] == 1) {
-      kk = which(stat1$sampleID == xx$SampleID[n])
-      kk = kk[grep('HLVGMDRXX_', stat1$sample[kk], invert = TRUE)]
-      if(length(kk) != 1) cat(n, ' -- Error \n')
-      xx[n, c(7:15)] = stat1[kk, c(4:12)]
-    }
-    # batch 2
-    if(xx$batch[n] == 2) {
-      kk = which(stat1$sampleID == xx$SampleID[n])
-      kk = kk[grep('HLVGMDRXX_', stat1$sample[kk])]
-      if(length(kk) != 2) cat(n, ' -- Error \n')
-      xx[n, c(7:9, 12)] = apply(stat1[kk, c(4:6, 9)], 2, mean)
-      xx[n, c(10:11, 13:15)] = apply(stat1[kk, c(7:8, 10:12)], 2, sum)
-    }
-    # batch 4
-    if(xx$batch[n] == 4){
-     kk = which(stat2$sampleID == xx$SampleID[n])
-     if(length(kk) != 1) cat(n, ' -- Error \n')
-     xx[n, c(7:15)] = stat2[kk, c(4:12)]
-    }
+add.featureCounts.summary = FALSE
+if(add.featureCounts.summary){
+  design$mapped = NA
+  design$mapped.QCs = NA
+  design$assigned = NA
+  xlist = list.files(path=paste0(dataDir, 'featurecounts_Q10'),
+                     pattern = "*_featureCounts.txt.summary$", full.names = TRUE) ## list of data set to merge
+  
+  for(n in 1:nrow(design))
+  {
+    # n = 1
+    xx = read.delim(xlist[grep(design$SampleID[n], xlist)], sep = '\t', row.names = c(1))
+    design$mapped.QCs[n] = sum(xx[which(rownames(xx) != 'Unassigned_MappingQuality'), 1])
+    design$mapped[n] = sum(xx)
+    design$assigned[n] = xx[1, 1]
+    
   }
+  
 }
 
-xx = data.frame(xx, stringsAsFactors = FALSE)
+save(design, counts, file=paste0(RdataDir, 'Design_stats_readCounts_updatedResequenced', version.analysis, '.Rdata'))
 
-xx$pct.assigned.to.features = xx$assigned.reads/xx$total.reads *100
-xx$alignment.uniq.rate = xx$unique.aligned/xx$trimmed.reads *100
-xx = xx[, c(1:11, 13:15, 12, 17, 16)]
+Add.Stat.QCs.for.design = FALSE
+if(Add.Stat.QCs.for.design){
+  
+  stats = read.delim(paste0(dataDir, 'nf_out_RNAseq/MultiQC/multiqc_data/multiqc_general_stats.txt'), sep = '\t', 
+                     header = TRUE)
+  alignment = read.delim(paste0(dataDir, 'nf_out_RNAseq/MultiQC/multiqc_data/multiqc_hisat2.txt'), sep = '\t')
+  
+  stats = stats[, c(1, 2, 3, 4, 6, 8, 9, 10)]
+  colnames(stats) = c('sample', 'pct.duplication', 'pct.GC', 'avg.seq.length', 'total.reads', 
+                      'pct.assign', 'assigned.reads', 'alignment.rate')
+  
+  stats = data.frame(stats, alignment[match(stats$sample, alignment$Sample), c(2, 4, 5)], stringsAsFactors = FALSE)
+  colnames(stats)[c(9:11)] = c('trimmed.reads', 'unique.aligned', 'multimapper')
+  stats = stats[, c(1:5, 9, 8, 10, 11, 7)]
+  
+  ii = c()
+  jj = c()
+  for(n in 1:nrow(design))
+  {
+    # n = 1;
+    cat(n, '\n')
+    kk = grep(design$sampleID[n], stats$sample)
+    ii = c(ii, rep(n, length(kk)))
+    jj = c(jj, kk)
+    #kk = c(kk, grep(design$sampleID[n], stats$sample))
+    #kk = c(kk, which(design$sampleID == ))
+  }
+  
+  xx = data.frame(design[ii, ], stats[jj, ], stringsAsFactors = FALSE)
+  xx = xx[order(xx$fileName), ]
+ 
+  ##################################################
+  ## Import design matrix and prepare count table
+  ##################################################
+  design = read.xlsx(design.file, sheet = 1) # all samples included in this file
+  
+  colnames(design)[1] = 'SampleID'
+  design$conds = paste0(design$conditions, '_', design$SampleID,  '.batch', design$batch)
+  
+  # prepare the data table for different batches
+  dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/'
+  
+  batch1 = read.delim(paste0(dataDir,  'R10724_rnaseq/nf_out_RNAseq/featureCounts/merged_gene_counts.txt'), sep = '\t',  header = TRUE)
+  batch2 = read.delim(paste0(dataDir, 'Rxxxx_rnaseq_old/nf_out_RNAseq/featureCounts/merged_gene_counts.txt'), sep = '\t',  header = TRUE)
+  batch4 = read.delim(paste0(dataDir, 'R161513_rnaseq/nf_out_RNAseq/featureCounts/merged_gene_counts.txt'), sep = '\t', header = TRUE)
+  
+  batch3 = batch2[, grep('HLVGMDRXX', colnames(batch2), invert = TRUE)]
+  batch2 = batch2[, c(1, grep('HLVGMDRXX', colnames(batch2)))]
+  
+  source(RNA.functions)
+  xx1 = process.countTable(all=batch1, design = design[which(design$batch == '3'), c(1:2)], ensToGeneSymbol = FALSE)
+  colnames(xx1)[-1] = paste0(colnames(xx1)[-1], '.batch3')
+  
+  xx2 = process.countTable(all=batch2, design = design[which(design$batch == '2'), c(1:2)], merge.technicalRep.sameID = TRUE,
+                           ensToGeneSymbol = FALSE)
+  colnames(xx2)[-1] = paste0(colnames(xx2)[-1], '.batch2')
+  
+  xx3 = process.countTable(all=batch3, design = design[which(design$batch == '1'), c(1:2)], merge.technicalRep.sameID = TRUE,
+                           ensToGeneSymbol = FALSE)
+  
+  colnames(xx3)[-1] = paste0(colnames(xx3)[-1], '.batch1')
+  
+  xx4 = process.countTable(all=batch4, design = design[which(design$batch == '4'), c(1:2)], merge.technicalRep.sameID = FALSE,
+                           ensToGeneSymbol = FALSE)
+  
+  colnames(xx4)[-1] = paste0(colnames(xx4)[-1], '.batch4')
+  
+  all <- Reduce(function(dtf1, dtf2) merge(dtf1, dtf2, by = "gene", all = TRUE), list(xx1, xx2, xx3, xx4))
+  
+  # make sure that the sample order is the same in design and all matrix
+  mm = match(design$conds, colnames(all))
+  all = all[, c(1, mm)]
+  
+  write.csv(design, file = paste0(resDir, '/designSampleInfos_QCstat.csv'), row.names = FALSE)
+  
+  save(design, all, file=paste0(RdataDir, 'Design_Raw_readCounts_', version.analysis, '.Rdata'))
+  
+  ##########################################
+  # add stats into design 
+  ##########################################
+  load(file=paste0(RdataDir, 'Design_Raw_readCounts_', version.analysis, '.Rdata'))
+  stat0 = read.csv(file = '../results/R10724_rnaseq_202102019/QCs_stats.csv')
+  stat1 = read.csv(file = '../results/Rxxxx.rnaseq.old_202102020/QCs_stats.csv')
+  stat2 = read.csv(file = '../results/rnaseq_Rxxxx.old_R10724_R161513/QCs_stats.csv')
+  
+  xx = data.frame(design, matrix(NA, nrow = nrow(design), ncol = 9), stringsAsFactors = FALSE)
+  colnames(xx)[7:15] = colnames(stat0)[-c(1:3)]
+  
+  mm = match(stat0$sampleID, design$SampleID)
+  
+  xx[mm, c(7:15)] = stat0[, -c(1:3)]
+  
+  for(n in 1:nrow(xx))
+  {
+    if(is.na(xx$pct.duplication[n])){
+      # batch 1
+      if(xx$batch[n] == 1) {
+        kk = which(stat1$sampleID == xx$SampleID[n])
+        kk = kk[grep('HLVGMDRXX_', stat1$sample[kk], invert = TRUE)]
+        if(length(kk) != 1) cat(n, ' -- Error \n')
+        xx[n, c(7:15)] = stat1[kk, c(4:12)]
+      }
+      # batch 2
+      if(xx$batch[n] == 2) {
+        kk = which(stat1$sampleID == xx$SampleID[n])
+        kk = kk[grep('HLVGMDRXX_', stat1$sample[kk])]
+        if(length(kk) != 2) cat(n, ' -- Error \n')
+        xx[n, c(7:9, 12)] = apply(stat1[kk, c(4:6, 9)], 2, mean)
+        xx[n, c(10:11, 13:15)] = apply(stat1[kk, c(7:8, 10:12)], 2, sum)
+      }
+      # batch 4
+      if(xx$batch[n] == 4){
+        kk = which(stat2$sampleID == xx$SampleID[n])
+        if(length(kk) != 1) cat(n, ' -- Error \n')
+        xx[n, c(7:15)] = stat2[kk, c(4:12)]
+      }
+    }
+  }
+  
+  xx = data.frame(xx, stringsAsFactors = FALSE)
+  
+  xx$pct.assigned.to.features = xx$assigned.reads/xx$total.reads *100
+  xx$alignment.uniq.rate = xx$unique.aligned/xx$trimmed.reads *100
+  xx = xx[, c(1:11, 13:15, 12, 17, 16)]
+  
+  design = xx
+  
+  save(design, all, file=paste0(RdataDir, 'Design_stats_readCounts_', version.analysis, '.Rdata'))
+  
+  
+}
 
-design = xx
-
-save(design, all, file=paste0(RdataDir, 'Design_stats_readCounts_', version.analysis, '.Rdata'))
 
 ########################################################
 ########################################################
@@ -188,8 +244,8 @@ save(design, all, file=paste0(RdataDir, 'Design_stats_readCounts_', version.anal
 # due to Arabdobisis contamination
 ########################################################
 ########################################################
-source('Functions_rnaseq.R')
-Update.samples.160343.160344()
+#source('Functions_rnaseq.R')
+#Update.samples.160343.160344()
 
 ########################################################
 ########################################################
@@ -197,7 +253,11 @@ Update.samples.160343.160344()
 # 
 ########################################################
 ########################################################
+source('Functions_rnaseq.R')
 load(file=paste0(RdataDir, 'Design_stats_readCounts_updatedResequenced', version.analysis, '.Rdata'))
+
+colnames(counts)[-1] = design$fileName
+
 design$batch = as.factor(design$batch)
 annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
                        'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
@@ -234,43 +294,52 @@ raw = as.matrix(all[, -1])
 rownames(raw) = all$gene
 
 # select samples 
-sels = which(design$batch != 1 & !(design$SampleID == '136150' & design$batch == 3))
+#sels = which(design$batch != 1 & !(design$SampleID == '136150' & design$batch == 3))
+sels = c(1:nrow(design))
 design.matrix = design[sels, ]
 
 raw = raw[, sels]
 
 rm(design)
 
-dds <- DESeqDataSetFromMatrix(raw, DataFrame(design.matrix), design = ~ conditions)
+dds <- DESeqDataSetFromMatrix(raw, DataFrame(design.matrix), design = ~ condition)
+
+ss = rowMaxs(counts(dds))
+hist(log10(ss), breaks = 100)
+dds = dds[which(ss > 20), ]
+
+dds = estimateSizeFactors(dds)
 
 ss = rowSums(counts(dds))
+length(which(ss > quantile(ss, probs = 0.6)))
 
-length(which(ss > quantile(ss, probs = 0.75)))
+#ss = rowMeans(counts(dds))
 
-dd0 = dds[ss > quantile(ss, probs = 0.75) , ]
+dd0 = dds[ss > quantile(ss, probs = 0.6) , ]
 dd0 = estimateSizeFactors(dd0)
-sizefactors.UQ = sizeFactors(dd0)
+
+sizefactors.UQ = sizeFactors(dds)
 
 jj = c(1:length(sizefactors.UQ))
-jj = which(design.matrix$batch == 4)
+#jj = which(design.matrix$batch == 4)
 
 plot(sizefactors.UQ[jj], colSums(counts(dds))[jj], log = 'xy')
-text(sizefactors.UQ[jj], colSums(counts(dds))[jj], colnames(dd0), cex =0.6)
+text(sizefactors.UQ[jj], colSums(counts(dds))[jj], colnames(dds), cex =0.6)
 
 design.matrix$sizefactor = sizefactors.UQ
 
-hist(log10(ss), breaks = 200, main = 'log2(sum of reads for each gene)')
+#hist(log10(ss), breaks = 200, main = 'log2(sum of reads for each gene)')
 
-cutoff.gene = 100
-cat(length(which(ss > cutoff.gene)), 'genes selected \n')
+#cutoff.gene = 100
+#cat(length(which(ss > cutoff.gene)), 'genes selected \n')
 
-dds <- dds[ss > cutoff.gene, ]
+#dds <- dds[ss > cutoff.gene, ]
 #design.matrix = design.matrix[with(design.matrix, order(conditions, SampleID)), ]
 
 # save.scalingFactors.for.deeptools(dds)
 
 # normalization and dimensionality reduction
-sizeFactors(dds) = sizefactors.UQ
+#sizeFactors(dds) = sizefactors.UQ
 
 fpm = fpm(dds, robust = TRUE)
 
@@ -446,6 +515,7 @@ if(saveTables){
             quote = FALSE, col.names = TRUE, row.names = TRUE)
   
 }
+
 
 ##########################################
 # position-dependent genes from microarray 

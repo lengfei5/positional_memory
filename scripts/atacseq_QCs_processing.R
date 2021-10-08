@@ -38,11 +38,9 @@ if(Collect.design.stat.nf.out){
   colnames(stats)[c(1, 3)] = c('fileName', 'trimmed')
   
   #cnts = list.files(path = '../Data//R10723_atac/QCs/cnt_raw', pattern = '*.txt', full.names = TRUE)
-  
   #design = design[order(design$fileName), ]
   
   index = c()
-  
   for(n in 1:nrow(design))
   {
     # n = 1;
