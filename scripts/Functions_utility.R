@@ -265,9 +265,11 @@ Compare.CutandRun.controls = function()
   dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/R11876_cut.run/'
   
   design_file = paste0(dataDir, 'sampleInfo_parsed.txt')
-  
   design = read.table(paste0(dataDir, 'sampleInfo_parsed.txt'), sep = '\t', header = TRUE)
   
+  ##########################################
+  # collect stats from QCs 
+  ##########################################
   stats = read.table(paste0(dataDir, 'nf_out/result/countStatTable.txt'), sep = '\t', header = TRUE)
   colnames(stats)[c(1, 3)] = c('fileName', 'trimmed')
   
@@ -310,6 +312,51 @@ Compare.CutandRun.controls = function()
   stats$dup.rate = 1.0 - as.numeric(stats$unique.rmdup)/as.numeric(stats$unique)
   stats$pct.usable = stats$unique.rmdup / stats$total
   
+  design = stats
+  
+  ##########################################
+  # compare peak overlapping
+  ##########################################
+  source('functions_chipSeq.R')
+  peakDir = paste0(dataDir,  'nf_out/peaks_macs2')
+  peak.files = list.files(path = peakDir,
+                          pattern = '*_peaks.xls', full.names = TRUE)
+  
+  index  = c()
+  for(n in 1:nrow(design))
+  {
+    test = grep(design$sampleID[n], peak.files)
+    if(length(test) != 1) {
+      cat(length(test), 'peak files Found \n')
+    }else{
+      index = c(index, test)
+    }
+  }
+  peak.files = peak.files[index]
+  
+  peak.merged = merge.peaks.macs2(peak.files, pcutoff = 6)
+  # peaks = c()
+  # pval.cutoff = 
+  # for(n in 1:length(peak.files)) 
+  # {
+  #   cat(n, '\n')
+  #   p = readPeakFile(peak.files[n], as = "GRanges");
+  #   #eval(parse(text = paste0("p = pp.", k)));
+  #   with.p.values = "X.log10.pvalue." %in% colnames(mcols(p))
+  #   if(with.p.values) {
+  #     p <- p[mcols(p)[,"X.log10.pvalue."] > pval.cutoff];
+  #     p = reduce(p);
+  #     #peaks10= c(peaks10, p10);
+  #   }else{ 
+  #     cat("no p values conlumn found for -- ", design.matrix$file.name[k], "\n");
+  #     PLOT.p10 = FALSE;
+  #   }
+  #   #p = reduce(p)
+  #   peaks= c(peaks, p)
+  # }
+  # 
+  # design$fileName = paste0(design$samples, '_', design$sampleID)
+  # names(peaks) = design$fileName
   
   
    
