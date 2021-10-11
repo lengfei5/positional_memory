@@ -1783,36 +1783,88 @@ plot.peak.profiles = function(peak.name, fpm = NULL, mains = NULL)
   
 }
 
-spatial.peaks.test = function(x, c = c("Mature_UA", "Mature_UA", "Mature_LA", "Mature_LA"), 
+spatial.peaks.test = function(cpm, c = c("Mature_UA", "Mature_UA", "Mature_LA", "Mature_LA"), 
                               test.Dev.Reg = FALSE, testPlot = FALSE)
 {
-  # x = fpm[ii.test[3], sample.sels]; c = cc; 
+  # cpm = fpm[, sample.sels];  c = cc; 
+  library(edgeR)
   library(qvalue)
+  
   if(length(x) != length(c)){
-    stop('nb of data is the same as nb of conditions')
+    stop('ncol of cpm is NOT the same as nb of conditions')
   }else{
-    # the main test of mature samples 
-    ii1 = which(cc == 'Mature_UA')
-    ii2 = which(cc == 'Mature_LA')
-    ii3 = which(cc == 'Mature_Hand')
-    y0 = as.numeric(x[c(ii1, ii2, ii3)])
-    tt = c(rep(1, length(ii1)), rep(2, length(ii2)), rep(3, length(ii3)))  
-    fit0 = lm (y0 ~ poly(tt, degree = 2, raw = TRUE))
-    #fit01 = lm(y0 ~ tt)
-    fit02 = lm(y0 ~ 1)
+    # the main test of mature samples
+    logCPM = cpm
     
-    bics = BIC(fit0, fit02)
-    scores = bics$BIC
-    scores.relavtive = scores-min(scores)
-    prob.model = exp(-0.5*scores.relavtive)
-    prob.model = prob.model/sum(prob.model)
+    #ii1 = which(cc == 'Mature_UA')
+    #ii2 = which(cc == 'Mature_LA')
+    #ii3 = which(cc == 'Mature_Hand')
+    #require("sva")
+    #bc = as.factor(design$batch)
+    #mod = model.matrix(~ as.factor(conds), data = design)
+    
+    f = factor(cc, levels= c('Mature_UA', 'Mature_LA', 'Mature_Hand'))
+    mod = model.matrix(~ 0 + f)
+    colnames(mod) = c('Mature_UA', 'Mature_LA', 'Mature_Hand')
+   
+    #To make all pair-wise comparisons between the three groups one could proceed
+    fit <- lmFit(logCPM, mod)
+    contrast.matrix <- makeContrasts(Mature_LA - Mature_UA, 
+                                     Mature_Hand - Mature_UA, 
+                                     Mature_Hand - Mature_LA, levels=mod)
+    fit2 <- contrasts.fit(fit, contrast.matrix)
+    fit2 <- eBayes(fit2)
+    
+    #fit <- lmFit(logCPM, mod)
+    #fit <- eBayes(fit, trend=TRUE)
+    #topTable(fit, coef=ncol(mod))
+    
+    #f <- factor(rep(c('mUA', 'mLA', 'mHand'), each = 3), levels=c("mUA","mLA","mHand")) 
+    #design <- model.matrix(~0+f)
+    #colnames(design) <- c("mUA","mLA","mHand")
+    
+    #results <- decideTests(fit2)
+    
+    res = data.frame(fit2$p.value)
+    colnames(res) = paste0(c('mLA.vs.mUA', 'mHand.vs.mUA', 'mHand.vs.mLA'), '.pval')
+    
+    xx = topTable(fit2, coef = 1, number = nrow(res))
+    xx = xx[, c(1, 4, 5)]
+    colnames(xx) = paste0(colnames(xx), '.mLA.vs.mUA')
+    res = data.frame(res, xx[match(rownames(res), rownames(xx)), ])
+    
+    xx = topTable(fit2, coef = 2, number = nrow(res))
+    xx = xx[, c(1, 4, 5)]
+    colnames(xx) = paste0(colnames(xx), '.mHand.vs.mUA')
+    res = data.frame(res, xx[match(rownames(res), rownames(xx)), ])
+    
+    xx = topTable(fit2, coef = 3, number = nrow(res))
+    xx = xx[, c(1, 4, 5)]
+    colnames(xx) = paste0(colnames(xx), '.mHand.vs.mLA')
+    res = data.frame(res, xx[match(rownames(res), rownames(xx)), ])
+    
+    #res <- as.data.frame(topTags(fit2, n=nrow(countdata)))
+    
+    #s
+    # y0 = as.numeric(x[c(ii1, ii2, ii3)])
+    # tt = c(rep(1, length(ii1)), rep(2, length(ii2)), rep(3, length(ii3)))  
+    # fit0 = lm (y0 ~ poly(tt, degree = 2, raw = TRUE))
+    # #fit01 = lm(y0 ~ tt)
+    # fit02 = lm(y0 ~ 1)
+    # 
+    # bics = BIC(fit0, fit02)
+    # scores = bics$BIC
+    # scores.relavtive = scores-min(scores)
+    # prob.model = exp(-0.5*scores.relavtive)
+    # prob.model = prob.model/sum(prob.model)
     
     # test UA, LA and Hand fitting values are above backgrounds
-    pred = predict(fit0)[match(unique(s0), s0)]
-    #pvals = empPvals(pred, bg.dist, pool = TRUE)
-    
-    res = c(prob.model[2],  max(pred), min(pred), (max(pred) - min(pred)))
-    names(res) = paste0(c('prob.M0', 'max', 'min', 'log2FC'), '.mature')
+    # pred = predict(fit0)[match(unique(s0), s0)]
+    # #pvals = empPvals(pred, bg.dist, pool = TRUE)
+    # 
+    # res = c(prob.model[2],  max(pred), min(pred), (max(pred) - min(pred)))
+    # names(res) = paste0(c('prob.M0', 'max', 'min', 'log2FC'), '.mature')
+    # 
     
     if(test.Dev.Reg){
       # test distal vs promixal in embryo.stage 44

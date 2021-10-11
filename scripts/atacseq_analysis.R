@@ -134,7 +134,8 @@ if(Normalization.BatchCorrect){
                                 start.field="X2", end.field="X3", strand.field="strand")
   ll = width(pp)
   
-  
+  save(counts, design, 
+       file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical_v1.Rdata'))
   ##########################################
   # filter peaks below certain thrshold of read counts
   # And also consider those filtered peaks as background
@@ -249,7 +250,7 @@ if(Normalization.BatchCorrect){
 ########################################################
 Grouping.atac.peaks = FALSE
 if(Grouping.atac.peaks){
-  load(file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.withinPeaks.pval6.Rdata'))
+  load(file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical_v1.Rdata'))
   fpm = readRDS(file = paste0(RdataDir, '/fpm_TMM_combat.rds'))
   
   # prepare the background distribution
@@ -272,7 +273,11 @@ if(Grouping.atac.peaks){
     
     # annotation from ucsc browser ambMex60DD_genes_putative
     amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
-    pp.annots = as.data.frame(annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript'))
+    pp.annots = annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+    #plotAnnoBar(pp.annots)
+    
+    pp.annots = as.data.frame(pp.annots)
+    rownames(pp.annots) = rownames(fpm)
     
   }
   
@@ -352,20 +357,24 @@ if(Grouping.atac.peaks){
   }
   
   ##########################################
-  # position-dependent test
+  # Position-dependent test
+  # mainly use the mature samples, mUA, mLA and mHand
+  # 
   ##########################################
   grouping.position.dependent.peaks = FALSE
   if(grouping.position.dependent.peaks){
     
     #conds = as.character(unique(design$conds))
-    conds = c("Mature_UA", "Mature_LA", "Mature_Hand", 
-              "Embryo_Stage44_proximal", "Embryo_Stage44_distal",
-              "BL_UA_13days_proximal", "BL_UA_13days_distal")
+    # conds = c("Mature_UA", "Mature_LA", "Mature_Hand", 
+    #           "Embryo_Stage44_proximal", "Embryo_Stage44_distal",
+    #           "BL_UA_13days_proximal", "BL_UA_13days_distal")
     
-    sample.sels = c()
-    cc = c()
+    conds = c("Mature_UA", "Mature_LA", "Mature_Hand")
+              
+    sample.sels = c();  cc = c()
     for(n in 1:length(conds)) {
-      kk = which(design$conds == conds[n] & design$SampleID != '136159')
+      #kk = which(design$conds == conds[n] & design$SampleID != '136159')
+      kk = which(design$conds == conds[n]) 
       sample.sels = c(sample.sels, kk)
       cc = c(cc, rep(conds[n], length(kk)))
     }
@@ -373,38 +382,47 @@ if(Grouping.atac.peaks){
     Run.test.spatial.peaks = FALSE
     if(Run.test.spatial.peaks){
       # examples to test
-      test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
+      #test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
       #test.examples = c('Hoxa13')
-      ii.test = which(overlapsAny(pp, promoters[which(!is.na(match(promoters$geneSymbol, test.examples)))]))
+      #ii.test = which(overlapsAny(pp, promoters[which(!is.na(match(promoters$geneSymbol, test.examples)))]))
       #ii.Hox = which(overlapsAny(pp, Hoxs))
       #ii.test = unique(c(ii.test, ii.Hox))
       
       library(tictoc)
       ii.test = c(1:nrow(fpm)) # takes about 2 mins for 40k peaks
-      source('Functions.R')
+      source('Functions_atac.R')
+      
       tic() 
-      res = t(apply(fpm[ii.test, sample.sels], 1, spatial.peaks.test, c = cc, test.Dev.Reg = FALSE))
+      res = spatial.peaks.test(cpm = fpm[, sample.sels], c = cc, test.Dev.Reg = FALSE)
       res = data.frame(res, pp.annots[ii.test, ], stringsAsFactors = FALSE)
       toc()
       
-      saveRDS(res, file = paste0(RdataDir, '/res_position_dependant_test_v2.rds'))
+      saveRDS(res, file = paste0(RdataDir, '/res_position_dependant_test_v3.rds'))
       
     }
     ##########################################
     # select all positional-dependent loci with below threshold
     ##########################################
-    res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v2.rds'))
+    res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v3.rds'))
+    res = data.frame(res, pp.annots[match(rownames(res), rownames(pp.annots)), ], stringsAsFactors = FALSE)
+    
+    res$fdr.mean = apply(as.matrix(res[, grep('adj.P.Val', colnames(res))]), 1, function(x) return(mean(-log10(x))))
+    res$logFC.mean =  apply(as.matrix(res[, grep('logFC', colnames(res))]), 1, function(x) return(mean(abs(x))))
     
     # select the spatially dynamic peaks
-    jj = which(res$prob.M0.mature < 0.01 & res$log2FC.mature > 1 )
+    fdr.cutoff = 0.01; logfc.cutoff = 1
+    jj = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & res$logFC.mLA.vs.mUA > logfc.cutoff) |
+                 (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & res$logFC.mHand.vs.mUA > logfc.cutoff)|
+                 (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & res$logFC.mHand.vs.mLA > logfc.cutoff)
+    )
     
     xx = res[c(jj), ]
-    xx = xx[order(-xx$log2FC.mature), ]
+    #xx = xx[order(-xx$log2FC.mature), ]
     
-    length(which(xx$min.mature <1.))
-    length(which(xx$min.mature <2.))
-    length(which(xx$min.mature <2.5))
-    length(which(xx$min.mature < 3.0))
+    # length(which(xx$min.mature <1.))
+    # length(which(xx$min.mature <2.))
+    # length(which(xx$min.mature <2.5))
+    # length(which(xx$min.mature < 3.0))
     
     keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
     keep = as.matrix(keep)
@@ -413,31 +431,39 @@ if(Grouping.atac.peaks){
     df <- data.frame(cc)
     rownames(df) = colnames(keep)
     
-    ii.gaps = c(7, 11)
+    ii.gaps = c(5, 8)
     pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
              cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps)
     
-    
     ##########################################
-    # # select loci that closes at some conditions
+    ## select top peaks 
     ##########################################
-    res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v2.rds'))
-    jj = which(res$prob.M0.mature < 0.01 & res$log2FC.mature > 3 & res$min.mature <1)
-    xx = res[jj, ]
+    #res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v2.rds'))
+    #jj = which(res$prob.M0.mature < 0.01 & res$log2FC.mature > 3 & res$min.mature <1)
+    #xx = res[jj, ]
     #xx = xx[order(-xx$log2FC.mature), ]
-    keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
+    #xx = data.frame(xx, pp.annots[match(rownames(xx), rownames(pp.annots)), ], stringsAsFactors = FALSE)
+    xx = xx[order(-xx$logFC.mean), ]
+    
+    #yy = xx[grep('Promoter', xx$annotation), ]
+    yy = xx
+    #yy = yy[c(1:50), ]
+    yy = yy[which(yy$logFC.mean>1.5), ]
+    
+    keep = fpm[!is.na(match(rownames(fpm), rownames(yy))), sample.sels]
     gg = res$geneId[match(rownames(keep), rownames(res))]
     grep('HOXA13', gg)
-    rownames(keep) = paste0(rownames(keep), '_', gg)
+    #rownames(keep) = paste0(rownames(keep), '_', gg)
+    rownames(keep) = gg
     keep = as.matrix(keep)
     
-    kk = grep('Mature', cc)
-    df <- data.frame(condition = cc[kk])
-    keep = keep[,kk]
-    rownames(df) = colnames(keep)
-    
+    #kk = grep('Mature', cc)
+    #df <- data.frame(condition = cc[kk])
+    #keep = keep[,kk]
+    #rownames(df) = colnames(keep)
+    ii.gaps = c(5, 8)
     pheatmap(keep, cluster_rows=TRUE, show_rownames=TRUE, scale = 'row', show_colnames = FALSE,
-             cluster_cols=FALSE, annotation_col = df, fontsize_row = 9)
+             cluster_cols=FALSE, annotation_col = df, fontsize_row = 4, gaps_col = ii.gaps)
     
     
     ##########################################
@@ -472,7 +498,6 @@ if(Grouping.atac.peaks){
    
     
   }
-  
   
   ##########################################
   # temporal-peaks test
