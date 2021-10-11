@@ -61,29 +61,35 @@ load(file = paste0("../results/R10723_Rxxxx_R11637_atacseq_R11876_CutTag/Rdata",
                    '/samplesDesign_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical.Rdata'))
 
 ##########################################
-# Quick check the sample infos
+# Quick check the sample infos and manually add batch information
 ##########################################
 Manual.change.sample.infos = FALSE
 if(Manual.change.sample.infos){
-  colnames(counts) = c('gene', paste0(design$fileName, '_', design$SampleID))
-  design$total = unlist(design$total)
-  design$unique.rmdup = unlist(design$unique.rmdup)
-  design$pct.usable = design$unique.rmdup/design$total
+  # colnames(counts) = c('gene', paste0(design$fileName, '_', design$SampleID))
+  #design$total = unlist(design$total)
+  #design$unique.rmdup = unlist(design$unique.rmdup)
+  #design$pct.usable = design$unique.rmdup/design$total
   
-  design$batch = '2020'
+  design$batch = NA
+  design$batch[grep('895|933|749|102', design$SampleID)] = '2020'
   design$batch[grep('136|137', design$SampleID)] = '2021'
+  design$batch[grep('161|166', design$SampleID)] = '2021S' # 2021 summer
   
   rownames(counts) = counts$gene
   counts = as.matrix(counts[, -1])
   
-  save(counts, design, file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.withinPeaks.pval6.Rdata'))
+  save(counts, design, 
+       file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical.Rdata'))
+  
 }
 
-hist(design$unique.rmdup/design$total, breaks = 16, main = 'pct of usable reads/total ')
+#hist(design$unique.rmdup/design$total, breaks = 16, main = 'pct of usable reads/total ')
 
 xx = design
-xx$unique.rmdup = xx$unique.rmdup/10^6
-ggplot(data = xx, aes(x = samples, y = unique.rmdup, color= conds)) +   
+xx$unique.rmdup = as.numeric(xx$usable)
+
+#xx$unique.rmdup = xx$unique.rmdup
+ggplot(data = xx, aes(x = fileName, y = unique.rmdup, color= condition)) +   
   geom_bar(aes(fill = batch), position = "dodge", stat="identity") +
   theme(axis.text.x = element_text(angle = 90, size = 8)) + 
   geom_hline(yintercept = c(20, 50, 100)) + ylab("unique.rmdup (M)")
@@ -99,6 +105,7 @@ Binary.peaks.QCs.analysis = FALSE
 if(Binary.peaks.QCs.analysis){
   source('Functions.R')
   ATACseq.peaks.binary.analysis()
+
 }
 
 ########################################################
@@ -108,7 +115,11 @@ if(Binary.peaks.QCs.analysis){
 ########################################################
 Normalization.BatchCorrect = FALSE
 if(Normalization.BatchCorrect){
-  sels = grep('Mature|Embryo|BL_UA', design$conds)
+  design$conds = design$condition
+  design$unique.rmdup = design$usable
+  colnames(design)[which(colnames(design) == 'fileName')] = 'samples'
+  #sels = grep('Mature|Embryo|BL_UA', design$conds)
+  sels = c(1:nrow(design))
   
   dds <- DESeqDataSetFromMatrix(as.matrix(counts[, sels]), DataFrame(design[sels, ]), design = ~ conds)
   
@@ -124,16 +135,20 @@ if(Normalization.BatchCorrect){
   ll = width(pp)
   
   
+  ##########################################
+  # filter peaks below certain thrshold of read counts
+  # And also consider those filtered peaks as background
+  ##########################################
   select.peaks.with.readThreshold = TRUE
   select.background.for.peaks = TRUE
   
   if(select.peaks.with.readThreshold){
     #ss = rowMax(counts(dds)[, grep('Embryo_', dds$conds)])
-    ss = rowMax(counts(dds))/ll*500
+    ss = rowMaxs(counts(dds))/ll*500
     
-    hist(log10(ss), breaks = 200, main = 'log2(sum of read within peaks) ')
-    
-    cutoff.peak = 40
+   
+    hist(log10(ss), breaks = 200, main = 'log2(max of read counts within peaks) ')
+    cutoff.peak = 30
     cutoff.bg = 10
     cat(length(which(ss >= cutoff.peak)), 'peaks selected with minimum read of the highest peak -- ', cutoff.peak,  '\n')
     cat(length(which(ss < cutoff.bg)), 'peaks selected with minimum read of the highest peak -- ', cutoff.bg,  '\n')
@@ -159,8 +174,8 @@ if(Normalization.BatchCorrect){
   
   plot(sizeFactors(dds), colSums(counts(dds))/median(colSums(counts(dds))), log = 'xy')
   
-  plot(sizeFactors(dds), design$unique.rmdup, log = 'xy')
-  text(sizeFactors(dds), design$unique.rmdup, labels = design$samples, cex = 0.7)
+  plot(sizeFactors(dds), design$usable, log = 'xy')
+  text(sizeFactors(dds), design$usable, labels = design$samples, cex = 0.7)
   
   save.scalingFactors.for.deeptools = FALSE
   if(save.scalingFactors.for.deeptools){
@@ -195,7 +210,7 @@ if(Normalization.BatchCorrect){
   ##########################################
   Test.atac.normalization.batch.correction = FALSE
   if(Test.atac.normalization.batch.correction){
-    source('Functions.R')
+    source('Functions_atac.R')
     
     #norms = normalize.batch.correct(dds, design, norm.batch.method ='TMM.combat')
     library(edgeR)
@@ -213,54 +228,15 @@ if(Normalization.BatchCorrect){
     fpm.bc = ComBat(dat=fpm, batch=bc, mod=mod, par.prior=TRUE, ref.batch = '2021')    
     fpm = fpm.bc
     
-    make.pca.plots(fpm.bc, ntop = 5000, conds.plot = 'all')
+    make.pca.plots(fpm.bc, ntop = 3000, conds.plot = 'all')
     make.pca.plots(fpm.bc, ntop = 3000, conds.plot = 'Dev.Mature')
     
     rm(fpm.bc)
     saveRDS(fpm, file = paste0(RdataDir, '/fpm_TMM_combat.rds'))
     
-    # normalize the peak width to have fpkm
-    FPKM.normalization = FALSE
-    if(FPKM.normalization){
-      library(preprocessCore)
-      
-      peakNames = rownames(fpm)
-      peakNames = gsub('bg_', '', peakNames)
-      peakNames = gsub('_', '-', peakNames)
-      
-      pp = data.frame(t(sapply(peakNames, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
-      
-      pp$strand = '*'
-      pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
-                                    start.field="X2", end.field="X3", strand.field="strand")
-      ll = width(pp)
-      
-      fpkm = fpm.bc
-      for(n in 1:ncol(fpkm))
-      {
-        fpkm[,n] = fpkm[,n]/ll*10^3
-      }
-      
-      fpkm.qn = normalize.quantiles(fpkm)
-      colnames(fpkm.qn) = colnames(fpkm)
-      rownames(fpkm.qn) = rownames(fpkm)
-      fpkm = fpkm.qn
-      #rm(fpm.qn)
-      make.pca.plots(fpkm.qn, ntop = 5000, conds.plot = 'all')
-      
-      rm(fpkm.qn)
-      
-      save(fpm, fpkm, file = paste0(RdataDir, '/fpm_TMM_combat_fpkm_quantileNorm.Rdata'))
-    }
-    
-    
   }
   
-  #dds <- estimateDispersions(dds)
-  #plotDispEsts(dds, ymin = 10^-4)
-  
 }
-
 
 ########################################################
 ########################################################

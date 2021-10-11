@@ -1210,9 +1210,9 @@ make.pca.plots = function(fpm, ntop = 1000, conds.plot = 'Dev.Mature')
   library(factoextra)
   
   if(conds.plot == 'all'){
-    conds.sel = c('Embryo_Stage40_93',  'Embryo_Stage40_13', 'Embryo_Stage44_proximal', 'Embryo_Stage44_distal',
-                  'Mature_UA_13', 'Mature_UA_74938|Mature_UA_102655', 'Mature_LA', 'Mature_Hand', 
-                  'BL_UA_5days_13', 'BL_UA_5days_89',  'BL_UA_9days_13', 'BL_UA_13days_proximal',  'BL_UA_13days_distal')
+    conds.sel = c('Embryo_Stage40',  'Embryo_Stage44_proximal', 'Embryo_Stage44_distal',
+                  'Mature_UA', 'Mature_LA', 'Mature_Hand', 'HEAD', 
+                  'BL_UA_5days_89',  'BL_UA_9days', 'BL_UA_13days_proximal',  'BL_UA_13days_distal')
   }
   
   if(conds.plot == 'Dev.Mature')
@@ -1252,6 +1252,41 @@ make.pca.plots = function(fpm, ntop = 1000, conds.plot = 'Dev.Mature')
                gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
                repel = TRUE     # Avoid text overlapping
   )
+  
+}
+
+# normalize the peak width to have fpkm
+FPKM.normalization.for.batchCorrection = function(fpm)
+{
+  library(preprocessCore)
+  
+  peakNames = rownames(fpm)
+  peakNames = gsub('bg_', '', peakNames)
+  peakNames = gsub('_', '-', peakNames)
+  
+  pp = data.frame(t(sapply(peakNames, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  
+  pp$strand = '*'
+  pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
+  ll = width(pp)
+  
+  fpkm = fpm.bc
+  for(n in 1:ncol(fpkm))
+  {
+    fpkm[,n] = fpkm[,n]/ll*10^3
+  }
+  
+  fpkm.qn = normalize.quantiles(fpkm)
+  colnames(fpkm.qn) = colnames(fpkm)
+  rownames(fpkm.qn) = rownames(fpkm)
+  fpkm = fpkm.qn
+  #rm(fpm.qn)
+  make.pca.plots(fpkm.qn, ntop = 5000, conds.plot = 'all')
+  
+  rm(fpkm.qn)
+  
+  save(fpm, fpkm, file = paste0(RdataDir, '/fpm_TMM_combat_fpkm_quantileNorm.Rdata'))
   
 }
 
