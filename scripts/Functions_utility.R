@@ -391,9 +391,57 @@ Compare.CutandRun.controls = function()
   ##########################################
   # compare the normalized peak signals 
   ##########################################
+  RNA.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functions/RNAseq_functions.R'
+  RNA.QC.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functions/RNAseq_QCs.R'
+  source(RNA.functions)
+  source(RNA.QC.functions)
   
+  xlist<-list.files(path=paste0(dataDir, 'nf_out/featurecounts_peaks.Q30'),
+                    pattern = "*_featureCounts.txt$", full.names = TRUE) ## list of data set to merge
   
-   
+  all = cat.countTable(xlist, countsfrom = 'featureCounts')
+  
+  colnames(design)[1] = 'SampleID'
+    
+  counts = process.countTable(all=all, design = design[, c(1,2)])
+  
+  save(design, counts, file = paste0(RdataDir, '/samplesDesign_readCounts.within_CutAndRUn.Rdata'))
+  
+  ##
+  load(file = paste0(RdataDir, '/samplesDesign_readCounts.within_CutAndRUn.Rdata'))
+  
+  require(ggplot2)
+  require(DESeq2)
+  
+  rownames(counts) = counts$gene
+  colnames(design)[2] = 'condition'
+  dds <- DESeqDataSetFromMatrix(as.matrix(counts[, -1]), DataFrame(design), design = ~ condition)
+  
+  jj = grep('IgG', design$condition)
+  dds = dds[, jj]
+  
+  #design = design[kk, ]
+  #counts = counts[]
+  
+  ss = rowMaxs(counts(dds))
+  
+  cutoff = 10
+  hist(log10(ss), breaks = 200)
+  abline(v = log10(cutoff), col = 'red')
+  length(which(ss>cutoff))
+  
+  kk = which(ss>cutoff)
+  
+  dds = dds[kk,]
+  fpm = fpm(dds, robust = FALSE)
+  
+  RNA.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functions/RNAseq_functions.R'
+  RNA.QC.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functions/RNAseq_QCs.R'
+  source(RNA.functions)
+  source(RNA.QC.functions)
+  
+  plot.pair.comparison.plot(fpm, linear.scale = TRUE) 
+  
 }
 
 
