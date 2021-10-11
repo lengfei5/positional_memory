@@ -19,6 +19,7 @@ source('Functions_atac.R')
 version.analysis = 'atac_rna_chipseq_analysis_20211007'
 #peakDir = "Peaks/macs2_broad"
 
+
 resDir = paste0("../results/", version.analysis)
 RdataDir = paste0(resDir, '/Rdata')
 if(!dir.exists(resDir)) dir.create(resDir)
