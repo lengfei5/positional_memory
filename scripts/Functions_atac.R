@@ -1783,27 +1783,20 @@ plot.peak.profiles = function(peak.name, fpm = NULL, mains = NULL)
   
 }
 
-spatial.peaks.test = function(cpm, c = c("Mature_UA", "Mature_UA", "Mature_LA", "Mature_LA"), 
+spatial.peaks.test = function(cpm, c = c("Mature_UA", "Mature_UA", "Mature_LA", "Mature_LA"), model.selection = TRUE,
                               test.Dev.Reg = FALSE, testPlot = FALSE)
 {
   # cpm = fpm[, sample.sels];  c = cc; 
   library(edgeR)
   library(qvalue)
   
-  if(length(x) != length(c)){
+  if(ncol(cpm) != length(c)){
     stop('ncol of cpm is NOT the same as nb of conditions')
   }else{
     # the main test of mature samples
     logCPM = cpm
     
-    #ii1 = which(cc == 'Mature_UA')
-    #ii2 = which(cc == 'Mature_LA')
-    #ii3 = which(cc == 'Mature_Hand')
-    #require("sva")
-    #bc = as.factor(design$batch)
-    #mod = model.matrix(~ as.factor(conds), data = design)
-    
-    f = factor(cc, levels= c('Mature_UA', 'Mature_LA', 'Mature_Hand'))
+    f = factor(c, levels= c('Mature_UA', 'Mature_LA', 'Mature_Hand'))
     mod = model.matrix(~ 0 + f)
     colnames(mod) = c('Mature_UA', 'Mature_LA', 'Mature_Hand')
    
@@ -1843,28 +1836,43 @@ spatial.peaks.test = function(cpm, c = c("Mature_UA", "Mature_UA", "Mature_LA", 
     colnames(xx) = paste0(colnames(xx), '.mHand.vs.mLA')
     res = data.frame(res, xx[match(rownames(res), rownames(xx)), ])
     
-    #res <- as.data.frame(topTags(fit2, n=nrow(countdata)))
+    res$fdr.mean = apply(as.matrix(res[, grep('adj.P.Val', colnames(res))]), 1, function(x) return(mean(-log10(x))))
+    res$logFC.mean =  apply(as.matrix(res[, grep('logFC', colnames(res))]), 1, function(x) return(mean(abs(x))))
     
-    #s
-    # y0 = as.numeric(x[c(ii1, ii2, ii3)])
-    # tt = c(rep(1, length(ii1)), rep(2, length(ii2)), rep(3, length(ii3)))  
-    # fit0 = lm (y0 ~ poly(tt, degree = 2, raw = TRUE))
-    # #fit01 = lm(y0 ~ tt)
-    # fit02 = lm(y0 ~ 1)
-    # 
-    # bics = BIC(fit0, fit02)
-    # scores = bics$BIC
-    # scores.relavtive = scores-min(scores)
-    # prob.model = exp(-0.5*scores.relavtive)
-    # prob.model = prob.model/sum(prob.model)
+    if(model.selection){
+      ii1 = which(c == 'Mature_UA')
+      ii2 = which(c == 'Mature_LA')
+      ii3 = which(c == 'Mature_Hand')
+      
+      res0 = matrix(NA, ncol = 4, nrow = nrow(cpm))
+      colnames(res0) = c('prob.M0', 'max', 'min', 'log2FC')
+      for(n in 1:nrow(cpm))
+      {
+        # n = 1
+        if(n%%200 == 0) cat(n, '\n')
+        y0 = as.numeric(cpm[n, c(ii1, ii2, ii3)])
+        tt = c(rep(1, length(ii1)), rep(2, length(ii2)), rep(3, length(ii3)))
+        fit0 = lm (y0 ~ poly(tt, degree = 2, raw = FALSE))
+        # #fit01 = lm(y0 ~ tt)
+        fit02 = lm(y0 ~ 1)
+        #
+        bics = BIC(fit0, fit02)
+        scores = bics$BIC
+        scores.relavtive = scores-min(scores)
+        prob.model = exp(-0.5*scores.relavtive)
+        prob.model = prob.model/sum(prob.model)
+
+        # test UA, LA and Hand fitting values are above backgrounds
+        pred = predict(fit0)[match(unique(tt), tt)]
+        # #pvals = empPvals(pred, bg.dist, pool = TRUE)
+        #
+        res0[n,] = c(prob.model[2],  max(pred), min(pred), (max(pred) - min(pred)))
+       
+      }
+      
+    }
     
-    # test UA, LA and Hand fitting values are above backgrounds
-    # pred = predict(fit0)[match(unique(s0), s0)]
-    # #pvals = empPvals(pred, bg.dist, pool = TRUE)
-    # 
-    # res = c(prob.model[2],  max(pred), min(pred), (max(pred) - min(pred)))
-    # names(res) = paste0(c('prob.M0', 'max', 'min', 'log2FC'), '.mature')
-    # 
+    res = data.frame(res, res0, stringsAsFactors = FALSE)
     
     if(test.Dev.Reg){
       # test distal vs promixal in embryo.stage 44

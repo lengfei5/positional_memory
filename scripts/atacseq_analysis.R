@@ -52,7 +52,6 @@ if(Import.HoxCluster.annotation){
   
 }
 
-
 ##########################################
 # Here import design matrix and read counts of pooled peaks across conditions (pval < 10^-6)
 # in the future the IDR will be used to select the peaks across replicates and and then pool peaks
@@ -113,6 +112,8 @@ if(Binary.peaks.QCs.analysis){
 # Section I : normalization and batch correction
 ########################################################
 ########################################################
+load(file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical.Rdata'))
+
 Normalization.BatchCorrect = FALSE
 if(Normalization.BatchCorrect){
   design$conds = design$condition
@@ -140,24 +141,26 @@ if(Normalization.BatchCorrect){
   # filter peaks below certain thrshold of read counts
   # And also consider those filtered peaks as background
   ##########################################
+  #load(file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical_v1.Rdata'))
   select.peaks.with.readThreshold = TRUE
   select.background.for.peaks = TRUE
   
   if(select.peaks.with.readThreshold){
     #ss = rowMax(counts(dds)[, grep('Embryo_', dds$conds)])
     ss = rowMaxs(counts(dds))/ll*500
-    
-   
     hist(log10(ss), breaks = 200, main = 'log2(max of read counts within peaks) ')
-    cutoff.peak = 30
+    cutoff.peak = 30 # 30 as peak cutoff looks good
     cutoff.bg = 10
     cat(length(which(ss >= cutoff.peak)), 'peaks selected with minimum read of the highest peak -- ', cutoff.peak,  '\n')
     cat(length(which(ss < cutoff.bg)), 'peaks selected with minimum read of the highest peak -- ', cutoff.bg,  '\n')
     abline(v= log10(cutoff.peak), col = 'red', lwd = 2.0)
     abline(v= log10(cutoff.bg), col = 'blue', lwd = 2.0)
     
+    nb.above.threshold = apply(counts(dds), 1, function(x) length(which(x>cutoff.peak)))
+    ii = which(ss >= cutoff.peak)
+    #ii = which(nb.above.threshold>=2)
+    
     if(select.background.for.peaks){
-      ii = which(ss >= cutoff.peak)
       ii.bg = which(ss < cutoff.bg)
       ii.bg = sample(ii.bg, size = 1000, replace = FALSE)
       rownames(dds)[ii.bg] = paste0('bg_', rownames(dds)[ii.bg])
@@ -165,14 +168,13 @@ if(Normalization.BatchCorrect){
       ll.sels = ll[c(ii, ii.bg)]
       
     }else{
-      dds <- dds[ss >= cutoff.peak, ]
+      dds <- dds[ii, ]
       ll.sels = ll[ss >= cutoff.peak]
     }
     
-    dds <- estimateSizeFactors(dds)
-      
   }
   
+  dds <- estimateSizeFactors(dds)
   plot(sizeFactors(dds), colSums(counts(dds))/median(colSums(counts(dds))), log = 'xy')
   
   plot(sizeFactors(dds), design$usable, log = 'xy')
@@ -209,11 +211,9 @@ if(Normalization.BatchCorrect){
   # test normalization and batch correction of ATAC-seq data
   # TMM and combat were selected for normalization and batch correction
   ##########################################
-  Test.atac.normalization.batch.correction = FALSE
-  if(Test.atac.normalization.batch.correction){
+  edgeR.normalization.batch.correction = FALSE
+  if(edgeR.normalization.batch.correction){
     source('Functions_atac.R')
-    
-    #norms = normalize.batch.correct(dds, design, norm.batch.method ='TMM.combat')
     library(edgeR)
     
     d <- DGEList(counts=counts(dds), group=design$conds)
@@ -226,11 +226,12 @@ if(Normalization.BatchCorrect){
     require("sva")
     bc = as.factor(design$batch)
     mod = model.matrix(~ as.factor(conds), data = design)
-    fpm.bc = ComBat(dat=fpm, batch=bc, mod=mod, par.prior=TRUE, ref.batch = '2021')    
+    fpm.bc = ComBat(dat=fpm, batch=bc, mod=mod, par.prior=TRUE, ref.batch = '2021S') # 2021S as reference is better for some reasons    
     fpm = fpm.bc
     
+    # fpm.bc = readRDS(file = paste0(RdataDir, '/fpm_TMM_combat.rds'))
     make.pca.plots(fpm.bc, ntop = 3000, conds.plot = 'all')
-    make.pca.plots(fpm.bc, ntop = 3000, conds.plot = 'Dev.Mature')
+    #make.pca.plots(fpm.bc, ntop = 3000, conds.plot = 'Dev.Mature')
     
     rm(fpm.bc)
     saveRDS(fpm, file = paste0(RdataDir, '/fpm_TMM_combat.rds'))
@@ -258,6 +259,10 @@ if(Grouping.atac.peaks){
   fpm = fpm[grep('bg_', rownames(fpm), invert = TRUE), ]
   rownames(fpm) = gsub('_', '-', rownames(fpm))
   
+  hist(fpm.bg, breaks = 100, main = 'background distribution')
+  abline(v = 1, col = 'red', lwd = 2.0)
+  quantile(fpm.bg, c(0.95, 0.99))
+  
   ##########################################
   ## make Granges and annotate peaks
   ##########################################
@@ -279,9 +284,10 @@ if(Grouping.atac.peaks){
     pp.annots = as.data.frame(pp.annots)
     rownames(pp.annots) = rownames(fpm)
     
+    promoters = select.promoters.regions(upstream = 2000, downstream = 2000, ORF.type.gtf = 'Putative', promoter.select = 'all')
+    
   }
   
-  promoters = select.promoters.regions(upstream = 2000, downstream = 2000, ORF.type.gtf = 'Putative', promoter.select = 'all')
   
   ##########################################
   # all-peaks test M0 (static peaks), M1 (dynamic peaks above background), M2 (dyanmic peaks with some condtions below background)
@@ -351,7 +357,6 @@ if(Grouping.atac.peaks){
       
       #DoubleCheck.promoter.peaks.enrichment(fpm) # double check those open promoters are not due to sample contamination
       
-      
     }
     
   }
@@ -392,22 +397,32 @@ if(Grouping.atac.peaks){
       ii.test = c(1:nrow(fpm)) # takes about 2 mins for 40k peaks
       source('Functions_atac.R')
       
+      # select the mature samples
+      cpm = fpm[, sample.sels]
+      
+      # select the peaks that are above background with >3 samples
+      quantile(fpm.bg, 0.99)
+      nb.above.threshold = apply(as.matrix(cpm), 1, function(x) length(which(x> 1.78)))
+      
+      hist(nb.above.threshold, breaks = c(-1:ncol(cpm)))
+      peak.sels = which(nb.above.threshold>=2)
+      cpm = cpm[peak.sels, ]
+      
       tic() 
-      res = spatial.peaks.test(cpm = fpm[, sample.sels], c = cc, test.Dev.Reg = FALSE)
+      res = spatial.peaks.test(cpm = cpm, c = cc, test.Dev.Reg = FALSE)
       res = data.frame(res, pp.annots[ii.test, ], stringsAsFactors = FALSE)
       toc()
       
-      saveRDS(res, file = paste0(RdataDir, '/res_position_dependant_test_v3.rds'))
+      saveRDS(res, file = paste0(RdataDir, '/res_position_dependant_test_v4.rds'))
       
     }
+    
     ##########################################
     # select all positional-dependent loci with below threshold
     ##########################################
-    res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v3.rds'))
+    res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v4.rds'))
     res = data.frame(res, pp.annots[match(rownames(res), rownames(pp.annots)), ], stringsAsFactors = FALSE)
     
-    res$fdr.mean = apply(as.matrix(res[, grep('adj.P.Val', colnames(res))]), 1, function(x) return(mean(-log10(x))))
-    res$logFC.mean =  apply(as.matrix(res[, grep('logFC', colnames(res))]), 1, function(x) return(mean(abs(x))))
     
     # select the spatially dynamic peaks
     fdr.cutoff = 0.01; logfc.cutoff = 1
@@ -433,7 +448,9 @@ if(Grouping.atac.peaks){
     
     ii.gaps = c(5, 8)
     pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
-             cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps)
+             cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps, 
+             filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_14K.pdf'), 
+             width = 8, height = 12)
     
     ##########################################
     ## select top peaks 
@@ -445,10 +462,11 @@ if(Grouping.atac.peaks){
     #xx = data.frame(xx, pp.annots[match(rownames(xx), rownames(pp.annots)), ], stringsAsFactors = FALSE)
     xx = xx[order(-xx$logFC.mean), ]
     
-    #yy = xx[grep('Promoter', xx$annotation), ]
-    yy = xx
-    #yy = yy[c(1:50), ]
-    yy = yy[which(yy$logFC.mean>1.5), ]
+    yy = xx[grep('Promoter', xx$annotation), ]
+    yy = yy[which(yy$min<1.78), ]
+    #yy = xx
+    yy = yy[c(1:50), ]
+    #yy = yy[which(yy$logFC.mean>1.5), ]
     
     keep = fpm[!is.na(match(rownames(fpm), rownames(yy))), sample.sels]
     gg = res$geneId[match(rownames(keep), rownames(res))]
@@ -463,7 +481,9 @@ if(Grouping.atac.peaks){
     #rownames(df) = colnames(keep)
     ii.gaps = c(5, 8)
     pheatmap(keep, cluster_rows=TRUE, show_rownames=TRUE, scale = 'row', show_colnames = FALSE,
-             cluster_cols=FALSE, annotation_col = df, fontsize_row = 4, gaps_col = ii.gaps)
+             cluster_cols=FALSE, annotation_col = df, fontsize_row = 8, gaps_col = ii.gaps,
+             filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_top50_atleast.oneCondition.belowbg.pdf'), 
+             width = 12, height = 12)
     
     
     ##########################################
@@ -504,8 +524,7 @@ if(Grouping.atac.peaks){
   ##########################################
   grouping.temporal.peaks = FALSE
   if(grouping.temporal.peaks){
-    conds = c("Embryo_Stage40", "Embryo_Stage44_proximal",
-              "Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal")
+    conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal", "Embryo_Stage40", "Embryo_Stage44_proximal")
     
     # examples to test
     test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
