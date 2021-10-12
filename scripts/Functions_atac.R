@@ -1923,12 +1923,14 @@ spatial.peaks.test = function(cpm, c = c("Mature_UA", "Mature_UA", "Mature_LA", 
 temporal.peaks.test = function(x, c = c("Mature_UA", "Mature_UA", "BL_UA_5days", "BL_UA_5days", 'BL_UA_9days', 'BL_UA_9days'), 
                                testPlot = FALSE)
 {
-  # x = fpm[ii.test[1], sample.sels]; c = cc; 
+  #  c = cc[sels]; x = cpm[1, sels]
   library(qvalue)
+  library('gam')
   
   if(length(x) != length(c)){
     stop('nb of data is the same as nb of conditions')
   }else{
+    
     # reorder the values with the time points
     ii1 = which(cc == 'Embryo_Stage40')
     ii2 = which(cc == 'Embryo_Stage44_proximal')
@@ -1937,11 +1939,12 @@ temporal.peaks.test = function(x, c = c("Mature_UA", "Mature_UA", "BL_UA_5days",
     ii5 = which(cc == 'BL_UA_9days')
     ii6 = which(cc == 'BL_UA_13days_proximal')
     
+    
     y0 = as.numeric(x[c(ii1, ii2, ii3, ii4, ii5, ii6)])
     tt = c(rep(1, length(ii1)), rep(2, length(ii2)), rep(3, length(ii3)), 
            rep(4, length(ii4)), rep(5, length(ii5)), rep(6, length(ii6)))
     
-    library('gam')
+    
     
     fit <- gam(y0 ~ s(tt, df=4), family = gaussian)
     fit0 = lm(y0 ~ 1)

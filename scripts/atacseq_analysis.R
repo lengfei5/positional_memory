@@ -537,7 +537,7 @@ if(Grouping.atac.peaks){
   ##########################################
   grouping.temporal.peaks = FALSE
   if(grouping.temporal.peaks){
-    conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal", "Embryo_Stage40", "Embryo_Stage44_proximal")
+    conds = c("Embryo_Stage40", "Embryo_Stage44_proximal", "Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal")
     
     # examples to test
     test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
@@ -546,51 +546,83 @@ if(Grouping.atac.peaks){
     #ii.Hox = which(overlapsAny(pp, Hoxs))
     #ii.test = unique(c(ii.test, ii.Hox))
     
-    sample.sels = c()
-    cc = c()
+    sample.sels = c(); cc = c()
     for(n in 1:length(conds)) {
-      kk = which(design$conds == conds[n] & design$SampleID != '136159')
+      kk = which(design$conds == conds[n])
       sample.sels = c(sample.sels, kk)
       cc = c(cc, rep(conds[n], length(kk)))
     }
     
     library(tictoc)
-    ii.test = c(1:nrow(fpm)) # takes about 2 mins for 40k peaks
+    # ii.test = c(1:nrow(fpm)) # takes about 2 mins for 40k peaks
     
     Run.temporal.peak.test = FALSE
     if(Run.temporal.peak.test)
     {
-      source('Functions.R')
-      tic() 
-      res = t(apply(fpm[ii.test, sample.sels], 1, temporal.peaks.test, c = cc))
-      res = data.frame(res, pp.annots[ii.test, ], stringsAsFactors = FALSE)
-      toc()
+      source('Functions_atac.R')
+      cpm = fpm[, sample.sels]
       
-      saveRDS(res, file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test.rds'))
+      quantile(fpm.bg, 0.99)
+      nb.above.threshold = apply(as.matrix(cpm), 1, function(x) length(which(x> 2)))
+      
+      hist(nb.above.threshold, breaks = c(-1:ncol(cpm)))
+      length(which(nb.above.threshold>6))
+      
+      peak.sels = which(nb.above.threshold>=3)
+      cpm = cpm[peak.sels, ]
+      
+      tic()
+      ## define the dynamic enhancers with mature UA and BL.UA and check them if embryo samples
+      sels = grep('Embryo', cc, invert = TRUE) 
+      res = t(apply(cpm[, sels], 1, temporal.peaks.test, c = cc[sels]))
+      
+      xx = data.frame(res, pp.annots[match(rownames(cpm), rownames(pp.annots)), ],  stringsAsFactors = FALSE)
+      toc()
+      res = xx
+      
+      saveRDS(res, file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v2.rds'))
       
     }
     
-    res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test.rds'))
+    
+    res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v2.rds'))
+    
     # select the temporal dynamic peaks
     length(which(res$prob.M0<0.05))
     length(which(res$prob.M0<0.05 & res$log2FC > 1))
+    length(which(res$prob.M0<0.01 & res$log2FC > 1))
+    length(which(res$prob.M0<0.01 & res$log2FC > 2))
+    
+    #length(which(res$prob.M0<0.001 & res$log2FC > 2))
+    
     jj = which(res$prob.M0 < 0.05 & res$log2FC >1 )
     
     jj = which(res$prob.M0 < 0.01 & res$log2FC > 2 )
+    
     xx = res[c(jj), ]
     xx = xx[order(-xx$log2FC), ]
+    xx = xx[which(xx$min < 1), ]
     
-    source('Functions.R')
+    source('Functions_atac.R')
     keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
     keep = as.matrix(keep)
     
-    df <- data.frame(cc)
+    
+    kk = c(grep('Embryo_Stage40', colnames(keep)), 
+           grep('Embryo_Stage44', colnames(keep)))
+    kk = c(setdiff(c(1:ncol(keep)), kk), kk)
+    
+    keep = keep[, kk]
+    df <- data.frame(cc[kk])
     rownames(df) = colnames(keep)
     
-    ii.gaps = c(6, 9)
+    ii.gaps = c(4, 8, 10, 12, 16)
     
     pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
-             cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps)
+             cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps,
+             filename = paste0(resDir, '/heatmap_regenerationPeaks_fdr0.01_log2FC.1.pdf'), 
+             width = 12, height = 12)
+    
     
     
     ##########################################
