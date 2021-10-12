@@ -462,28 +462,41 @@ if(Grouping.atac.peaks){
     #xx = data.frame(xx, pp.annots[match(rownames(xx), rownames(pp.annots)), ], stringsAsFactors = FALSE)
     xx = xx[order(-xx$logFC.mean), ]
     
-    yy = xx[grep('Promoter', xx$annotation), ]
-    yy = yy[which(yy$min<1.78), ]
+    yy = xx[grep('Promoter', xx$annotation), ] # peak close to promoters
+    
     #yy = xx
-    yy = yy[c(1:50), ]
+    #yy = yy[c(1:50), ]
     #yy = yy[which(yy$logFC.mean>1.5), ]
     
     keep = fpm[!is.na(match(rownames(fpm), rownames(yy))), sample.sels]
     gg = res$geneId[match(rownames(keep), rownames(res))]
     grep('HOXA13', gg)
-    #rownames(keep) = paste0(rownames(keep), '_', gg)
-    rownames(keep) = gg
+    rownames(keep) = paste0(rownames(keep), '_', gg)
+    #rownames(keep) = gg
     keep = as.matrix(keep)
     
+    # make sure max above the threshold
+    nb.above.threshold = apply(keep, 1, function(x) length(which(x>3)))
+    keep = keep[which(nb.above.threshold >=3), ] 
+    
+    
+    nb.below.bg = apply(keep, 1, function(x) length(which(x<2)))
+    keep = keep[which(nb.below.bg >=3), ] 
+    
+    gg = rownames(keep)
+    gg = sapply(gg, function(x) unlist(strsplit(as.character(x), '_'))[2])
+    gg = sapply(gg, function(x) unlist(strsplit(as.character(x), '[|]'))[1])
+    #keep = keep[1:50, ]
+    rownames(keep) = gg
     #kk = grep('Mature', cc)
     #df <- data.frame(condition = cc[kk])
     #keep = keep[,kk]
     #rownames(df) = colnames(keep)
     ii.gaps = c(5, 8)
     pheatmap(keep, cluster_rows=TRUE, show_rownames=TRUE, scale = 'row', show_colnames = FALSE,
-             cluster_cols=FALSE, annotation_col = df, fontsize_row = 8, gaps_col = ii.gaps,
+             cluster_cols=FALSE, annotation_col = df, fontsize_row = 9, gaps_col = ii.gaps,
              filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_top50_atleast.oneCondition.belowbg.pdf'), 
-             width = 12, height = 12)
+             width = 8, height = 12)
     
     
     ##########################################
