@@ -1932,21 +1932,30 @@ temporal.peaks.test = function(x, c = c("Mature_UA", "Mature_UA", "BL_UA_5days",
   }else{
     
     # reorder the values with the time points
-    ii1 = which(cc == 'Embryo_Stage40')
-    ii2 = which(cc == 'Embryo_Stage44_proximal')
-    ii3 = which(cc == 'Mature_UA')
-    ii4 = which(cc == 'BL_UA_5days')
-    ii5 = which(cc == 'BL_UA_9days')
-    ii6 = which(cc == 'BL_UA_13days_proximal')
+    c.uniq = unique(c)
     
+    y0 = c()
+    tt = c()
+    for(n in 1:length(c.uniq))
+    {
+      # ii1 = which(cc == 'Embryo_Stage40')
+      # ii2 = which(cc == 'Embryo_Stage44_proximal')
+      # ii3 = which(cc == 'Mature_UA')
+      # ii4 = which(cc == 'BL_UA_5days')
+      # ii5 = which(cc == 'BL_UA_9days')
+      # ii6 = which(cc == 'BL_UA_13days_proximal')
+      jj = which(c == c.uniq[n])
+      y0 = c(y0, x[jj])
+      tt = c(tt, rep(n, length(jj)))
+      
+      # y0 = as.numeric(x[c(ii1, ii2, ii3, ii4, ii5, ii6)])
+      # tt = c(rep(1, length(ii1)), rep(2, length(ii2)), rep(3, length(ii3)), 
+      #        rep(4, length(ii4)), rep(5, length(ii5)), rep(6, length(ii6)))
+    }
+    y0 = as.numeric(y0)
+    tt = as.numeric(tt)
     
-    y0 = as.numeric(x[c(ii1, ii2, ii3, ii4, ii5, ii6)])
-    tt = c(rep(1, length(ii1)), rep(2, length(ii2)), rep(3, length(ii3)), 
-           rep(4, length(ii4)), rep(5, length(ii5)), rep(6, length(ii6)))
-    
-    
-    
-    fit <- gam(y0 ~ s(tt, df=4), family = gaussian)
+    fit <- gam(y0 ~ s(tt, df=(length(c.uniq)-2)), family = gaussian)
     fit0 = lm(y0 ~ 1)
     # summary(fit)
     #plot(fit)

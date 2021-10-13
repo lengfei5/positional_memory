@@ -463,7 +463,7 @@ if(Grouping.atac.peaks){
     xx = xx[order(-xx$logFC.mean), ]
     
     yy = xx[grep('Promoter', xx$annotation), ] # peak close to promoters
-    
+    yy = yy[which(yy$max > 3 & yy$min < 1.78), ]
     #yy = xx
     #yy = yy[c(1:50), ]
     #yy = yy[which(yy$logFC.mean>1.5), ]
@@ -475,13 +475,22 @@ if(Grouping.atac.peaks){
     #rownames(keep) = gg
     keep = as.matrix(keep)
     
-    # make sure max above the threshold
-    nb.above.threshold = apply(keep, 1, function(x) length(which(x>3)))
-    keep = keep[which(nb.above.threshold >=3), ] 
     
-    
-    nb.below.bg = apply(keep, 1, function(x) length(which(x<2)))
-    keep = keep[which(nb.below.bg >=3), ] 
+    # jj1 = grep('Embryo_Stage40', colnames(keep))
+    # jj2 = grep('Embryo_Stage44', colnames(keep))
+    # jj3 = grep('Mature_UA', colnames(keep))
+    # mean1 = apply(keep[, jj1], 1, mean)
+    # mean2 = apply(keep[, jj2], 1, mean)
+    # mean3 = apply(keep[, jj3], 1, mean)
+    # 
+    # kk = which(mean1< 1. & mean2 < 1. & mean3 < 1.)
+    # 
+    # # make sure max above the threshold
+    # nb.above.threshold = apply(keep, 1, function(x) length(which(x>3)))
+    # keep = keep[which(nb.above.threshold >=3), ] 
+    # 
+    # nb.below.bg = apply(keep, 1, function(x) length(which(x<2)))
+    # keep = keep[which(nb.below.bg >=3), ] 
     
     gg = rownames(keep)
     gg = sapply(gg, function(x) unlist(strsplit(as.character(x), '_'))[2])
@@ -494,23 +503,32 @@ if(Grouping.atac.peaks){
     #rownames(df) = colnames(keep)
     ii.gaps = c(5, 8)
     pheatmap(keep, cluster_rows=TRUE, show_rownames=TRUE, scale = 'row', show_colnames = FALSE,
-             cluster_cols=FALSE, annotation_col = df, fontsize_row = 9, gaps_col = ii.gaps,
-             filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_top50_atleast.oneCondition.belowbg.pdf'), 
-             width = 8, height = 12)
+             cluster_cols=FALSE, annotation_col = df, fontsize_row = 11, gaps_col = ii.gaps,
+             filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_top50_atleast.oneCondition.belowbg_withGeneNames.pdf'), 
+             width = 10, height = 12)
     
     
     ##########################################
     # first motif activity analysis for positional-dependent peaks 
     ##########################################
     source('MARA_functions.R')
-    res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v2.rds'))
+    res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v4.rds'))
+    res = data.frame(res, pp.annots[match(rownames(res), rownames(pp.annots)), ], stringsAsFactors = FALSE)
+    
     
     # select the spatially dynamic peaks
-    jj = which(res$prob.M0.mature < 0.01 & res$log2FC.mature > 2)
+    fdr.cutoff = 0.01; logfc.cutoff = 1
+    jj = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & res$logFC.mLA.vs.mUA > logfc.cutoff) |
+                 (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & res$logFC.mHand.vs.mUA > logfc.cutoff)|
+                 (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & res$logFC.mHand.vs.mLA > logfc.cutoff)
+    )
+    
+    # select the spatially dynamic peaks
+    jj = which(res$prob.M0 < 0.01 & res$log2FC > 2)
     cat(length(jj), ' peaks selected \n')
     
     xx = res[c(jj), ]
-    xx = xx[order(-xx$log2FC.mature), ]
+    xx = xx[order(-xx$log2FC), ]
     
     keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), ]
     keep = as.matrix(keep)
@@ -520,12 +538,14 @@ if(Grouping.atac.peaks){
     sample.sels = c()
     cc = c()
     for(n in 1:length(conds)) {
-      kk = which(design$conds == conds[n] & design$SampleID != '136159')
+      kk = which(design$conds == conds[n])
       sample.sels = c(sample.sels, kk)
       cc = c(cc, rep(conds[n], length(kk)))
     }
     
     keep = keep[ , sample.sels]
+    
+    saveRDS(keep, file = paste0(RdataDir, '/matrix.saved.for.spatial.MARA.rds'))
     
     xx = run.MARA.atac.spatial(keep, cc)
    
@@ -575,27 +595,29 @@ if(Grouping.atac.peaks){
       ## define the dynamic enhancers with mature UA and BL.UA and check them if embryo samples
       sels = grep('Embryo', cc, invert = TRUE) 
       res = t(apply(cpm[, sels], 1, temporal.peaks.test, c = cc[sels]))
+      toc()
       
       xx = data.frame(res, pp.annots[match(rownames(cpm), rownames(pp.annots)), ],  stringsAsFactors = FALSE)
-      toc()
+     
       res = xx
       
-      saveRDS(res, file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v2.rds'))
+      saveRDS(res, file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v3.rds'))
       
     }
     
     
-    res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v2.rds'))
+    res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v3.rds'))
     
     # select the temporal dynamic peaks
     length(which(res$prob.M0<0.05))
     length(which(res$prob.M0<0.05 & res$log2FC > 1))
     length(which(res$prob.M0<0.01 & res$log2FC > 1))
+    length(which(res$prob.M0<0.01 & res$log2FC > 1.5))
     length(which(res$prob.M0<0.01 & res$log2FC > 2))
     
     #length(which(res$prob.M0<0.001 & res$log2FC > 2))
     
-    jj = which(res$prob.M0 < 0.05 & res$log2FC >1 )
+    #jj = which(res$prob.M0 < 0.05 & res$log2FC >1 )
     
     jj = which(res$prob.M0 < 0.01 & res$log2FC > 2 )
     
@@ -607,7 +629,6 @@ if(Grouping.atac.peaks){
     keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
     keep = as.matrix(keep)
     
-    
     kk = c(grep('Embryo_Stage40', colnames(keep)), 
            grep('Embryo_Stage44', colnames(keep)))
     kk = c(setdiff(c(1:ncol(keep)), kk), kk)
@@ -616,14 +637,31 @@ if(Grouping.atac.peaks){
     df <- data.frame(cc[kk])
     rownames(df) = colnames(keep)
     
-    ii.gaps = c(4, 8, 10, 12, 16)
+    ii.gaps = c(4, 8, 10, 12, 16)+1
     
     pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
              cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps,
              filename = paste0(resDir, '/heatmap_regenerationPeaks_fdr0.01_log2FC.1.pdf'), 
              width = 12, height = 12)
     
+    ##########################################
+    # highligh potential regeneration peaks, not found in mUA and embryo stages only in regeneration process 
+    ##########################################
+    jj1 = grep('Embryo_Stage40', colnames(keep))
+    jj2 = grep('Embryo_Stage44', colnames(keep))
+    jj3 = grep('Mature_UA', colnames(keep))
+    mean1 = apply(keep[, jj1], 1, mean)
+    mean2 = apply(keep[, jj2], 1, mean)
+    mean3 = apply(keep[, jj3], 1, mean)
     
+    kk = which(mean1< 1. & mean2 < 1. & mean3 < 1.)
+    
+    pheatmap(keep[kk, ], cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
+             cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps,
+             filename = paste0(resDir, '/heatmap_regenerationPeaks_fdr0.01_log2FC.1_regeneartion.specific.pdf'), 
+             width = 8, height = 10)
+    
+    yy = keep[kk,]
     
     ##########################################
     # first motif activity analysis for temporally dynamic peaks 

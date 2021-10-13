@@ -288,7 +288,7 @@ generate.logos.for.motifs.pwm = function()
 ########################################################
 save.peak.bed.file.for.fimo = function()
 {
-  load(file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.withinPeaks.pval6.Rdata'))
+  #load(file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.withinPeaks.pval6.Rdata'))
   fpm = readRDS(file = paste0(RdataDir, '/fpm_TMM_combat.rds'))
   
   # prepare the background distribution
@@ -301,6 +301,11 @@ save.peak.bed.file.for.fimo = function()
   
   pp$name = rownames(fpm)
   pp$strand = '*'
+  
+  pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
+  ll = width(pp)
+  
   
   write.table(pp, file = '../results/motif_analysis/peaks/peaks_for_fimo.bed', row.names = FALSE, col.names = FALSE,
               quote = FALSE, sep = '\t')
