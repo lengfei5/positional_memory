@@ -288,7 +288,6 @@ if(Grouping.atac.peaks){
     
   }
   
-  
   ##########################################
   # all-peaks test M0 (static peaks), M1 (dynamic peaks above background), M2 (dyanmic peaks with some condtions below background)
   # we will also loci that are always open across all conditions
@@ -413,16 +412,16 @@ if(Grouping.atac.peaks){
       res = data.frame(res, pp.annots[ii.test, ], stringsAsFactors = FALSE)
       toc()
       
-      saveRDS(res, file = paste0(RdataDir, '/res_position_dependant_test_v4.rds'))
+      res = data.frame(res, pp.annots[match(rownames(res), rownames(pp.annots)), ], stringsAsFactors = FALSE)
+      
+      saveRDS(res, file = paste0(RdataDir, '/res_position_dependant_test_v5.rds'))
       
     }
     
     ##########################################
     # select all positional-dependent loci with below threshold
     ##########################################
-    res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v4.rds'))
-    res = data.frame(res, pp.annots[match(rownames(res), rownames(pp.annots)), ], stringsAsFactors = FALSE)
-    
+    res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v5.rds'))
     
     # select the spatially dynamic peaks
     fdr.cutoff = 0.01; logfc.cutoff = 1
@@ -441,6 +440,7 @@ if(Grouping.atac.peaks){
     
     keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
     keep = as.matrix(keep)
+    
     
     library(ggplot2)
     df <- data.frame(cc)
@@ -512,38 +512,6 @@ if(Grouping.atac.peaks){
     # first motif activity analysis for positional-dependent peaks 
     ##########################################
     source('MARA_functions.R')
-    res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v4.rds'))
-    res = data.frame(res, pp.annots[match(rownames(res), rownames(pp.annots)), ], stringsAsFactors = FALSE)
-    
-    
-    # select the spatially dynamic peaks
-    fdr.cutoff = 0.01; logfc.cutoff = 1
-    jj = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & res$logFC.mLA.vs.mUA > logfc.cutoff) |
-                 (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & res$logFC.mHand.vs.mUA > logfc.cutoff)|
-                 (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & res$logFC.mHand.vs.mLA > logfc.cutoff)
-    )
-    
-    # select the spatially dynamic peaks
-    jj = which(res$prob.M0 < 0.01 & res$log2FC > 2)
-    cat(length(jj), ' peaks selected \n')
-    
-    xx = res[c(jj), ]
-    xx = xx[order(-xx$log2FC), ]
-    
-    keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), ]
-    keep = as.matrix(keep)
-    
-    conds = c("Mature_UA", "Mature_LA", "Mature_Hand")
-    
-    sample.sels = c()
-    cc = c()
-    for(n in 1:length(conds)) {
-      kk = which(design$conds == conds[n])
-      sample.sels = c(sample.sels, kk)
-      cc = c(cc, rep(conds[n], length(kk)))
-    }
-    
-    keep = keep[ , sample.sels]
     
     saveRDS(keep, file = paste0(RdataDir, '/matrix.saved.for.spatial.MARA.rds'))
     
