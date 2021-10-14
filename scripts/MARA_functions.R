@@ -309,8 +309,8 @@ save.peak.bed.file.for.fimo = function()
   write.table(pp, file = '../results/motif_analysis/peaks/peaks_for_fimo.bed', row.names = FALSE, col.names = FALSE,
               quote = FALSE, sep = '\t')
   
+  
 }
-
 
 ##########################################
 # after running FIMO, make motif occurrency matrix  

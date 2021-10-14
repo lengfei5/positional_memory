@@ -141,7 +141,7 @@ if(Add.Stat.QCs.for.design){
   design = read.xlsx(design.file, sheet = 1) # all samples included in this file
   
   colnames(design)[1] = 'SampleID'
-  design$conds = paste0(design$conditions, '_', design$SampleID,  '.batch', design$batch)
+  design$conds = paste0(design$condition, '_', design$SampleID,  '.batch', design$batch)
   
   # prepare the data table for different batches
   dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/'
@@ -265,7 +265,7 @@ annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axo
 tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
 sps = readRDS(file = '~/workspace/imp/organoid_patterning/results/Rdata/curated_signaling.pathways_gene.list_v2.rds')
 
-
+all = counts
 ##########################################
 # convert gene names to gene symbols
 ##########################################
@@ -334,7 +334,7 @@ design.matrix$sizefactor = sizefactors.UQ
 #cat(length(which(ss > cutoff.gene)), 'genes selected \n')
 
 #dds <- dds[ss > cutoff.gene, ]
-#design.matrix = design.matrix[with(design.matrix, order(conditions, SampleID)), ]
+#design.matrix = design.matrix[with(design.matrix, order(condition, SampleID)), ]
 
 # save.scalingFactors.for.deeptools(dds)
 
@@ -346,54 +346,62 @@ fpm = fpm(dds, robust = TRUE)
 save(dds, design.matrix, file = paste0(RdataDir, 'RNAseq_design_dds.object.Rdata'))
 #save(fpm, design.matrix, file = paste0(tfDir, '/RNAseq_fpm_fitered.cutoff.', cutoff.gene, '.Rdata'))
 
-vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
-
-pca=plotPCA(vsd, intgroup = c('conditions', 'batch'), returnData = FALSE)
-print(pca)
-
-pca2save = as.data.frame(plotPCA(vsd, intgroup = c('conditions', 'batch'), returnData = TRUE))
-ggp = ggplot(data=pca2save, aes(PC1, PC2, label = name, color= conditions, shape = batch))  + 
-  geom_point(size=3) + 
-  geom_text(hjust = 0.7, nudge_y = 1, size=2.5)
-
-plot(ggp) + ggsave(paste0(resDir, "/PCAplot_batch2.3.4.pdf"), width=12, height = 8)
-
-ggp = ggplot(data=pca2save[which(pca2save$batch==4), ], aes(PC1, PC2, label = name, color= conditions, shape = batch))  + 
-  geom_point(size=3) + 
-  geom_text(hjust = 0.7, nudge_y = 1, size=2.5)
-
-plot(ggp) + ggsave(paste0(resDir, "/PCAplot_batch4.pdf"), width=12, height = 8)
+Make.pca.plots = FALSE
+if(Make.pca.plots){
+  vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
+  
+  pca=plotPCA(vsd, intgroup = c('condition', 'batch'), returnData = FALSE)
+  print(pca)
+  
+  pca2save = as.data.frame(plotPCA(vsd, intgroup = c('condition', 'batch'), returnData = TRUE))
+  ggp = ggplot(data=pca2save, aes(PC1, PC2, label = name, color= condition, shape = batch))  + 
+    geom_point(size=3) + 
+    geom_text(hjust = 0.7, nudge_y = 1, size=2.5)
+  
+  plot(ggp) + ggsave(paste0(resDir, "/PCAplot_batch2.3.4.pdf"), width=12, height = 8)
+  
+  ggp = ggplot(data=pca2save[which(pca2save$batch==4), ], aes(PC1, PC2, label = name, color= condition, shape = batch))  + 
+    geom_point(size=3) + 
+    geom_text(hjust = 0.7, nudge_y = 1, size=2.5)
+  
+  plot(ggp) + ggsave(paste0(resDir, "/PCAplot_batch4.pdf"), width=12, height = 8)
+  
+}
 
 
 ##########################################
 # try to correct batches 
 ##########################################
-require("sva")
-sels = c(1:nrow(design.matrix))
-cpm = log2(fpm[, sels] + 2^-6)
-
-bc = droplevels(design.matrix$batch[sels])
-#bc = levelsdroplevels(bc)
-mod = model.matrix(~ as.factor(conditions), data = design.matrix[sels, ])
-
-cpm.bc = ComBat(dat=cpm, batch=bc, mod=mod, par.prior=TRUE, ref.batch = 3, mean.only = FALSE)    
-
-ntop = 5000
-library(factoextra)
-xx = as.matrix(cpm.bc)
-vars = apply(xx, 1, var)
-xx = xx[order(-vars), ]
-xx = xx[1:ntop, ]
-
-#res.pca <- prcomp(t(xx[ ,grep('Mature', colnames(xx))]), scale = TRUE)
-res.pca <- prcomp(t(xx), scale = TRUE)
-#res.var <- get_pca_var(res.pca)
-
-fviz_pca_ind(res.pca,
-             col.ind = "cos2", # Color by the quality of representation
-             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
-             repel = FALSE     # Avoid text overlapping
-)
+Run.batch.correction = FALSE
+if(Run.batch.correction){
+  require("sva")
+  sels = c(1:nrow(design.matrix))
+  cpm = log2(fpm[, sels] + 2^-6)
+  
+  bc = droplevels(design.matrix$batch[sels])
+  #bc = levelsdroplevels(bc)
+  mod = model.matrix(~ as.factor(condition), data = design.matrix[sels, ])
+  
+  cpm.bc = ComBat(dat=cpm, batch=bc, mod=mod, par.prior=TRUE, ref.batch = 3, mean.only = FALSE)    
+  
+  ntop = 5000
+  library(factoextra)
+  xx = as.matrix(cpm.bc)
+  vars = apply(xx, 1, var)
+  xx = xx[order(-vars), ]
+  xx = xx[1:ntop, ]
+  
+  #res.pca <- prcomp(t(xx[ ,grep('Mature', colnames(xx))]), scale = TRUE)
+  res.pca <- prcomp(t(xx), scale = TRUE)
+  #res.var <- get_pca_var(res.pca)
+  
+  fviz_pca_ind(res.pca,
+               col.ind = "cos2", # Color by the quality of representation
+               gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+               repel = FALSE     # Avoid text overlapping
+  )
+  
+}
 
 
 Test.glmpca.mds = FALSE
@@ -402,25 +410,25 @@ if(Test.glmpca.mds){
   gpca <- glmpca(counts(dds), L=2)
   
   gpca.dat <- gpca$factors
-  gpca.dat$conditions <- dds$conditions
+  gpca.dat$condition <- dds$condition
   gpca.dat$batch <- dds$batch
   gpca.dat$name = rownames(gpca.dat)
   
-  ggplot(gpca.dat, aes(x = dim1, y = dim2, label = name, color = conditions, shape = batch)) +
+  ggplot(gpca.dat, aes(x = dim1, y = dim2, label = name, color = condition, shape = batch)) +
     geom_point(size =3) + coord_fixed() + ggtitle("glmpca - Generalized PCA") +
     geom_text(hjust = 0.7, nudge_y = 1, size=2.5) + 
     ggsave(paste0(resDir, "/GPCAplot_batch2.batch3.pdf"), width=12, height = 8)
   
   sampleDists <- dist(t(assay(vsd)))
   sampleDistMatrix <- as.matrix( sampleDists )
-  rownames(sampleDistMatrix) <- paste( vsd$conditions, vsd$batch, sep = " - " )
+  rownames(sampleDistMatrix) <- paste( vsd$condition, vsd$batch, sep = " - " )
   colnames(sampleDistMatrix) <- NULL
   
   mds <- as.data.frame(colData(vsd))  %>%
     cbind(cmdscale(sampleDistMatrix))
   mds$name = rownames(mds)
   
-  ggplot(mds, aes(x = `1`, y = `2`, label = name, color = conditions, shape = batch)) +
+  ggplot(mds, aes(x = `1`, y = `2`, label = name, color = condition, shape = batch)) +
     geom_point(size = 3) + coord_fixed() + ggtitle("MDS with VST data") +
     geom_text(hjust = 0.7, nudge_y = 1, size=2.5) 
   
@@ -449,28 +457,28 @@ fpm0 = fpm(dds)
 saveTables = TRUE
 
 # select mature samples
-sels = intersect(which(design.matrix$batch == 4), grep('Mature', design.matrix$conditions))
+sels = intersect(which(design.matrix$batch == 4), grep('Mature', design.matrix$condition))
 dds = dds[, sels]
 
 cpm = fpm(dds)
 cpm = log2(cpm + 2^-4)
 
-dds$conditions = droplevels(dds$conditions)
-dds <- estimateDispersions(dds, fitType = 'local')
+dds$condition = droplevels(dds$condition)
+dds <- estimateDispersions(dds, fitType = 'parametric')
 plotDispEsts(dds, ymin = 10^-3); abline(h = 0.1, col = 'blue', lwd = 2.0)
 
 dds = nbinomWaldTest(dds, betaPrior = TRUE)
 resultsNames(dds)
 
-res.ii = results(dds, contrast=c("conditions", 'Mature_Hand', 'Mature_UA'), alpha = 0.1)
+res.ii = results(dds, contrast=c("condition", 'Mature_Hand', 'Mature_UA'), alpha = 0.1)
 colnames(res.ii) = paste0(colnames(res.ii), "_Hand.vs.UA")
 res = data.frame(res.ii[, c(2, 5, 6)])
 
-res.ii = results(dds, contrast=c("conditions", 'Mature_Hand', 'Mature_LA'), alpha = 0.01)
+res.ii = results(dds, contrast=c("condition", 'Mature_Hand', 'Mature_LA'), alpha = 0.1)
 colnames(res.ii) = paste0(colnames(res.ii), "_Hand.vs.LA")
 res = data.frame(res, res.ii[, c(2, 5, 6)])
 
-res.ii = results(dds, contrast=c("conditions", 'Mature_LA', 'Mature_UA'), alpha = 0.01)
+res.ii = results(dds, contrast=c("condition", 'Mature_LA', 'Mature_UA'), alpha = 0.1)
 colnames(res.ii) = paste0(colnames(res.ii), "_LA.vs.UA")
 res = data.frame(res, res.ii[, c(2, 5, 6)])
 
@@ -485,18 +493,23 @@ pval.cutoff = 0.01
 select = which(res$pvalue_Hand.vs.LA < pval.cutoff | res$pvalue_Hand.vs.UA < pval.cutoff | res$pvalue_LA.vs.UA < pval.cutoff)
 cat(length(select), ' positional genes found \n')
 
-df <- as.data.frame(colData(dds)[,c("conditions", 'batch')])
-o1 = c(grep('UA', df$conditions), grep('LA', df$conditions), grep('Hand', df$conditions))
+pval.cutoff = 0.1
+select = which(res$padj_Hand.vs.LA < pval.cutoff | res$padj_Hand.vs.UA < pval.cutoff | res$padj_LA.vs.UA < pval.cutoff)
+cat(length(select), ' positional genes found \n')
+
+
+df <- as.data.frame(colData(dds)[,c("condition", 'batch')])
+o1 = c(grep('UA', df$condition), grep('LA', df$condition), grep('Hand', df$condition))
 
 yy = cpm[select, o1]
 ss = apply(as.matrix(yy), 1, mean)
 
 #yy = yy[which(ss>-2), ]
-pheatmap(yy, cluster_rows=TRUE, show_rownames=TRUE, fontsize_row = 5,
+pheatmap(yy, cluster_rows=TRUE, show_rownames=TRUE, fontsize_row = 10,
          show_colnames = FALSE,
          scale = 'row',
          cluster_cols=FALSE, annotation_col=df[o1, ], 
-         width = 10, height = 50, filename = paste0(shareDir, '/heatmap_DEgenes_mature_pval.0.01.pdf'))
+         width = 10, height = 50, filename = paste0(resDir, '/heatmap_DEgenes_mature_pval.0.01.pdf'))
 
 # narrow down to TFs and SPs
 ggs = sapply(rownames(yy), function(x) unlist(strsplit(as.character(x), '_'))[1])
@@ -505,9 +518,9 @@ yy1 = yy[!is.na(mm), ]
 
 pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
          scale = 'row',
-         cluster_cols=FALSE, annotation_col=df[o1, ], fontsize_row = 8, 
-         width = 10, height = 15,
-         filename = paste0(shareDir, '/heatmap_DE.tfs.sps_mature_pval.0.01.pdf')) 
+         cluster_cols=FALSE, annotation_col=df[o1, ], fontsize_row = 10, 
+         width = 8, height = 14,
+         filename = paste0(resDir, '/heatmap_DE.tfs.sps_mature_pval.0.01.pdf')) 
 
 if(saveTables){
   xx = data.frame(gene = rownames(yy), yy, res[match(rownames(yy), rownames(res)), ], stringsAsFactors = FALSE)
@@ -548,7 +561,7 @@ select = which(res$adj.P.Val_mHand.vs.mLA < qv.cutoff |
 cat(length(select), ' positional genes found \n')
 
 yy = res[select, c(1:9)]
-df <- data.frame(conditions = rep(c('mUA', 'mLA', 'mHand'), each = 3))
+df <- data.frame(condition = rep(c('mUA', 'mLA', 'mHand'), each = 3))
 rownames(df) = colnames(yy)
 
 #ss = apply(as.matrix(yy), 1, mean)
@@ -592,12 +605,12 @@ dds0 = dds
 fpm0 = fpm(dds)
 
 # select mature samples
-sels = unique(c(which(design.matrix$batch == 3 & design.matrix$conditions != 'BL_UA_13days_distal'), 
-             which(design.matrix$conditions == 'Embryo_Stage46_proximal')))
+sels = unique(c(which(design.matrix$batch == 3 & design.matrix$condition != 'BL_UA_13days_distal'), 
+             which(design.matrix$condition == 'Embryo_Stage46_proximal')))
 dds = dds[, sels]
 cpm = log2(fpm0[, sels] + 2^-6)
 
-dds$conditions = droplevels(dds$conditions)
+dds$condition = droplevels(dds$condition)
 dds <- estimateDispersions(dds)
 
 plotDispEsts(dds, ymin = 10^-3)
@@ -605,15 +618,15 @@ plotDispEsts(dds, ymin = 10^-3)
 dds = nbinomWaldTest(dds, betaPrior = TRUE)
 resultsNames(dds)
 
-res.ii = results(dds, contrast=c("conditions", 'BL_UA_13days_proximal', 'Mature_UA'))
+res.ii = results(dds, contrast=c("condition", 'BL_UA_13days_proximal', 'Mature_UA'))
 colnames(res.ii) = paste0(colnames(res.ii), "_BL.D13.vs.UA")
 res = data.frame(res.ii[, c(2, 5, 6)])
 
-res.ii = results(dds, contrast=c("conditions", 'BL_UA_5days', 'Mature_UA'))
+res.ii = results(dds, contrast=c("condition", 'BL_UA_5days', 'Mature_UA'))
 colnames(res.ii) = paste0(colnames(res.ii), "_BL.D5.vs.LA")
 res = data.frame(res, res.ii[, c(2, 5, 6)])
 
-res.ii = results(dds, contrast=c("conditions", 'BL_UA_9days', 'Mature_UA'))
+res.ii = results(dds, contrast=c("condition", 'BL_UA_9days', 'Mature_UA'))
 colnames(res.ii) = paste0(colnames(res.ii), "_BL.D9.vs.UA")
 res = data.frame(res, res.ii[, c(2, 5, 6)])
 
@@ -625,10 +638,10 @@ library("pheatmap")
 pval.cutoff = 0.01
 select = which(res$pvalue_BL.D13.vs.UA < pval.cutoff | res$pvalue_BL.D5.vs.LA < pval.cutoff | res$pvalue_BL.D9.vs.UA < pval.cutoff)
 
-df <- as.data.frame(colData(dds)[,c("conditions", 'batch')])
-o1 = c(grep('Mature_UA', df$conditions), grep('BL_UA_5days', df$conditions), grep('BL_UA_9days', df$conditions), 
-       grep('BL_UA_13days_proximal', df$conditions), grep('Embryo_Stage40', df$conditions), 
-       grep('Embryo_Stage46_proximal', df$conditions))
+df <- as.data.frame(colData(dds)[,c("condition", 'batch')])
+o1 = c(grep('Mature_UA', df$condition), grep('BL_UA_5days', df$condition), grep('BL_UA_9days', df$condition), 
+       grep('BL_UA_13days_proximal', df$condition), grep('Embryo_Stage40', df$condition), 
+       grep('Embryo_Stage46_proximal', df$condition))
 
 yy = cpm[select, o1]
 ss = apply(as.matrix(yy), 1, mean)
@@ -649,7 +662,7 @@ mm = match(tfs[, 3], ggs)
 xx = yy[mm[!is.na(mm)], ]
 
 tf.sels = match(rownames(xx), rownames(res))
-df <- as.data.frame(colData(dds)[,c("conditions", 'batch')])
+df <- as.data.frame(colData(dds)[,c("condition", 'batch')])
 
 yy = cpm[tf.sels, o1]
 vars = apply(yy[, c(1:7)],1, var)
