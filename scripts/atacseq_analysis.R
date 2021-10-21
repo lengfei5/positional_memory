@@ -18,7 +18,7 @@ source('Functions_atac.R')
 
 version.analysis = 'atac_rna_chipseq_analysis_20211007'
 #peakDir = "Peaks/macs2_broad"
-
+saveTable = TRUE
 
 resDir = paste0("../results/", version.analysis)
 RdataDir = paste0(resDir, '/Rdata')
@@ -439,8 +439,24 @@ if(Grouping.atac.peaks){
     
     xx = res[c(jj), ]
     #xx = xx[order(-xx$log2FC.mature), ]
+    xx[grep('HOXA13', xx$transcriptId), ]
     
-        
+    
+    Filtering.peaks.in.Head.samples = TRUE
+    if(Filtering.peaks.in.Head.samples){
+      p0 = pp[match(rownames(xx), names(pp))]
+      
+      ctl = fpm[, grep('HEAD', colnames(fpm))]
+      ctl = ctl[which(ctl>2.5)]
+      p.ctl = pp[match(names(ctl), names(pp))]
+      
+      non.overlap = !overlapsAny(p0, p.ctl)
+      
+      xx = xx[non.overlap, ]
+      
+    }
+    xx[grep('HOXA13', xx$transcriptId), ]
+    
     keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
     keep = as.matrix(keep)
     
@@ -451,11 +467,18 @@ if(Grouping.atac.peaks){
     ii.gaps = c(5, 8)
     pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
              cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps, 
-             filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_14K.pdf'), 
+             filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
              width = 8, height = 12)
     
+    if(saveTable){
+      yy = data.frame(keep, xx, stringsAsFactors = FALSE)
+      write.csv(yy, file = paste0(resDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head.csv'), 
+                quote = FALSE, row.names = TRUE)
+      
+    }
+    
     ##########################################
-    ## select top peaks 
+    ## select top peaks genome-wide and also promoter peaks
     ##########################################
     #res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v2.rds'))
     #jj = which(res$prob.M0.mature < 0.01 & res$log2FC.mature > 3 & res$min.mature <1)
@@ -464,11 +487,10 @@ if(Grouping.atac.peaks){
     #xx = data.frame(xx, pp.annots[match(rownames(xx), rownames(pp.annots)), ], stringsAsFactors = FALSE)
     xx = xx[order(-xx$logFC.mean), ]
     
-    yy = xx[grep('Promoter', xx$annotation), ] # peak close to promoters
-    yy = yy[which(yy$max > 3 & yy$min < 1.78), ]
-    #yy = xx
-    #yy = yy[c(1:50), ]
-    #yy = yy[which(yy$logFC.mean>1.5), ]
+    yy = xx
+    yy = yy[which(yy$max > 3 & yy$min < 1 & yy$res2.max< 0.1), ]
+    
+    yy = yy[order(yy$logFC.mean), ]
     
     keep = fpm[!is.na(match(rownames(fpm), rownames(yy))), sample.sels]
     gg = res$geneId[match(rownames(keep), rownames(res))]
@@ -477,6 +499,47 @@ if(Grouping.atac.peaks){
     #rownames(keep) = gg
     keep = as.matrix(keep)
     
+    gg = rownames(keep)
+    gg = sapply(gg, function(x) unlist(strsplit(as.character(x), '_'))[2])
+    gg = sapply(gg, function(x) unlist(strsplit(as.character(x), '[|]'))[1])
+    #keep = keep[1:50, ]
+    #rownames(keep) = gg
+    #kk = grep('Mature', cc)
+    #df <- data.frame(condition = cc[kk])
+    #keep = keep[,kk]
+    #rownames(df) = colnames(keep)
+    ii.gaps = c(5, 8)
+    
+    pheatmap(keep, cluster_rows=TRUE, show_rownames=TRUE, scale = 'row', show_colnames = FALSE,
+             cluster_cols=FALSE, annotation_col = df, fontsize_row = 8, gaps_col = ii.gaps,
+             filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_top300_genomewide.pdf'), 
+             width = 16, height = 40)
+    
+    if(saveTable){
+      write.csv(data.frame(keep, yy, stringsAsFactors = FALSE), 
+                file = paste0(resDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_top300_genomewide.csv'), 
+                quote = FALSE, row.names = TRUE)
+      
+    }
+    
+    ##########################################
+    # select top promoter peaks
+    ##########################################
+    yy = xx
+    
+    yy = yy[grep('Promoter', yy$annotation), ] # peak close to promoters
+    yy[grep('HOXA13', yy$transcriptId),]
+    #yy = xx
+    #yy = yy[c(1:50), ]
+    #yy = yy[which(yy$logFC.mean>1.5), ]
+    yy = yy[which(yy$max > 3 & yy$min < 2 & yy$res2.max< 0.1), ]
+    
+    keep = fpm[!is.na(match(rownames(fpm), rownames(yy))), sample.sels]
+    gg = res$geneId[match(rownames(keep), rownames(res))]
+    grep('HOXA13', gg)
+    rownames(keep) = paste0(rownames(keep), '_', gg)
+    #rownames(keep) = gg
+    keep = as.matrix(keep)
     
     # jj1 = grep('Embryo_Stage40', colnames(keep))
     # jj2 = grep('Embryo_Stage44', colnames(keep))
@@ -498,7 +561,7 @@ if(Grouping.atac.peaks){
     gg = sapply(gg, function(x) unlist(strsplit(as.character(x), '_'))[2])
     gg = sapply(gg, function(x) unlist(strsplit(as.character(x), '[|]'))[1])
     #keep = keep[1:50, ]
-    rownames(keep) = gg
+    #rownames(keep) = gg
     #kk = grep('Mature', cc)
     #df <- data.frame(condition = cc[kk])
     #keep = keep[,kk]
@@ -506,10 +569,16 @@ if(Grouping.atac.peaks){
     ii.gaps = c(5, 8)
     pheatmap(keep, cluster_rows=TRUE, show_rownames=TRUE, scale = 'row', show_colnames = FALSE,
              cluster_cols=FALSE, annotation_col = df, fontsize_row = 11, gaps_col = ii.gaps,
-             filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_top50_atleast.oneCondition.belowbg_withGeneNames.pdf'), 
-             width = 10, height = 12)
+             filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_top50_promoter.pdf'), 
+             width = 16, height = 12)
     
     
+    if(saveTable){
+      write.csv(data.frame(keep, yy, stringsAsFactors = FALSE), 
+                file = paste0(resDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_top50_promoterPeaks.csv'), 
+                quote = FALSE, row.names = TRUE)
+      
+    }
     ##########################################
     # first motif activity analysis for positional-dependent peaks 
     ##########################################
