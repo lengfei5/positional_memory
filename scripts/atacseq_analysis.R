@@ -400,11 +400,14 @@ if(Grouping.atac.peaks){
       cpm = fpm[, sample.sels]
       
       # select the peaks that are above background with >3 samples
-      quantile(fpm.bg, 0.99)
-      nb.above.threshold = apply(as.matrix(cpm), 1, function(x) length(which(x> 1.78)))
+      quantile(fpm.bg, 0.999)
       
+      hist(fpm.bg)
+      
+      # stringent here, with signal > 2.5 in >=3 samples 
+      nb.above.threshold = apply(as.matrix(cpm), 1, function(x) length(which(x> 2.5)))
       hist(nb.above.threshold, breaks = c(-1:ncol(cpm)))
-      peak.sels = which(nb.above.threshold>=2)
+      peak.sels = which(nb.above.threshold>=3)
       cpm = cpm[peak.sels, ]
       
       tic() 
@@ -412,35 +415,34 @@ if(Grouping.atac.peaks){
       res = data.frame(res, pp.annots[ii.test, ], stringsAsFactors = FALSE)
       toc()
       
-      res = data.frame(res, pp.annots[match(rownames(res), rownames(pp.annots)), ], stringsAsFactors = FALSE)
+      xx = data.frame(res, pp.annots[match(rownames(res), rownames(pp.annots)), ], stringsAsFactors = FALSE)
       
-      saveRDS(res, file = paste0(RdataDir, '/res_position_dependant_test_v5.rds'))
+      res = xx
+      saveRDS(res, file = paste0(RdataDir, '/res_position_dependant_test_v6.rds'))
       
     }
     
     ##########################################
     # select all positional-dependent loci with below threshold
     ##########################################
-    res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v5.rds'))
+    res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v6.rds'))
     
-    # select the spatially dynamic peaks
+    # select the positional peaks with 
     fdr.cutoff = 0.01; logfc.cutoff = 1
     jj = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & res$logFC.mLA.vs.mUA > logfc.cutoff) |
                  (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & res$logFC.mHand.vs.mUA > logfc.cutoff)|
                  (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & res$logFC.mHand.vs.mLA > logfc.cutoff)
     )
     
+    jj1 = which(res$prob.M0<0.01 & res$log2FC>1)
+    jj2 = which(res$pval.lrt < 0.001 & res$log2FC > 1)
+    
     xx = res[c(jj), ]
     #xx = xx[order(-xx$log2FC.mature), ]
     
-    # length(which(xx$min.mature <1.))
-    # length(which(xx$min.mature <2.))
-    # length(which(xx$min.mature <2.5))
-    # length(which(xx$min.mature < 3.0))
-    
+        
     keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
     keep = as.matrix(keep)
-    
     
     library(ggplot2)
     df <- data.frame(cc)

@@ -1797,6 +1797,7 @@ spatial.peaks.test = function(cpm, c = c("Mature_UA", "Mature_UA", "Mature_LA", 
     logCPM = cpm
     
     f = factor(c, levels= c('Mature_UA', 'Mature_LA', 'Mature_Hand'))
+    
     mod = model.matrix(~ 0 + f)
     colnames(mod) = c('Mature_UA', 'Mature_LA', 'Mature_Hand')
    
@@ -1840,12 +1841,13 @@ spatial.peaks.test = function(cpm, c = c("Mature_UA", "Mature_UA", "Mature_LA", 
     res$logFC.mean =  apply(as.matrix(res[, grep('logFC', colnames(res))]), 1, function(x) return(mean(abs(x))))
     
     if(model.selection){
+      library(lmtest)
       ii1 = which(c == 'Mature_UA')
       ii2 = which(c == 'Mature_LA')
       ii3 = which(c == 'Mature_Hand')
       
-      res0 = matrix(NA, ncol = 4, nrow = nrow(cpm))
-      colnames(res0) = c('prob.M0', 'max', 'min', 'log2FC')
+      res0 = matrix(NA, ncol = 7, nrow = nrow(cpm))
+      colnames(res0) = c('prob.M0', 'max', 'min', 'log2FC', 'pval.lrt', 'res2.mean', 'res2.max')
       for(n in 1:nrow(cpm))
       {
         # n = 1
@@ -1856,6 +1858,9 @@ spatial.peaks.test = function(cpm, c = c("Mature_UA", "Mature_UA", "Mature_LA", 
         # #fit01 = lm(y0 ~ tt)
         fit02 = lm(y0 ~ 1)
         #
+        lrt = lrtest(fit0, fit02)
+        resid2 = fit0$residuals^2
+        
         bics = BIC(fit0, fit02)
         scores = bics$BIC
         scores.relavtive = scores-min(scores)
@@ -1866,7 +1871,7 @@ spatial.peaks.test = function(cpm, c = c("Mature_UA", "Mature_UA", "Mature_LA", 
         pred = predict(fit0)[match(unique(tt), tt)]
         # #pvals = empPvals(pred, bg.dist, pool = TRUE)
         #
-        res0[n,] = c(prob.model[2],  max(pred), min(pred), (max(pred) - min(pred)))
+        res0[n,] = c(prob.model[2],  max(pred), min(pred), (max(pred) - min(pred)), lrt$`Pr(>Chisq)`[2], mean(resid2), max(resid2))
        
       }
       

@@ -493,8 +493,10 @@ pval.cutoff = 0.01
 select = which(res$pvalue_Hand.vs.LA < pval.cutoff | res$pvalue_Hand.vs.UA < pval.cutoff | res$pvalue_LA.vs.UA < pval.cutoff)
 cat(length(select), ' positional genes found \n')
 
-pval.cutoff = 0.1
-select = which(res$padj_Hand.vs.LA < pval.cutoff | res$padj_Hand.vs.UA < pval.cutoff | res$padj_LA.vs.UA < pval.cutoff)
+fdr.cutoff = 0.1
+select = which(res$padj_Hand.vs.LA < fdr.cutoff | 
+                 res$padj_Hand.vs.UA < fdr.cutoff |
+                 res$padj_LA.vs.UA < fdr.cutoff)
 cat(length(select), ' positional genes found \n')
 
 
@@ -509,7 +511,7 @@ pheatmap(yy, cluster_rows=TRUE, show_rownames=TRUE, fontsize_row = 10,
          show_colnames = FALSE,
          scale = 'row',
          cluster_cols=FALSE, annotation_col=df[o1, ], 
-         width = 10, height = 50, filename = paste0(resDir, '/heatmap_DEgenes_mature_pval.0.01.pdf'))
+         width = 10, height = 20, filename = paste0(resDir, '/heatmap_DEgenes_mature_fdr.0.1.pdf'))
 
 # narrow down to TFs and SPs
 ggs = sapply(rownames(yy), function(x) unlist(strsplit(as.character(x), '_'))[1])
@@ -519,16 +521,16 @@ yy1 = yy[!is.na(mm), ]
 pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
          scale = 'row',
          cluster_cols=FALSE, annotation_col=df[o1, ], fontsize_row = 10, 
-         width = 8, height = 14,
-         filename = paste0(resDir, '/heatmap_DE.tfs.sps_mature_pval.0.01.pdf')) 
+         width = 8, height = 4,
+         filename = paste0(resDir, '/heatmap_DE.tfs.sps_mature_fdr.0.1.pdf')) 
+
 
 if(saveTables){
   xx = data.frame(gene = rownames(yy), yy, res[match(rownames(yy), rownames(res)), ], stringsAsFactors = FALSE)
-  write.csv(xx, file = paste0(shareDir, '/position_dependent_genes_from_matureSamples_RNAseq_pval.0.01.csv'), 
-            quote = FALSE, col.names = TRUE, row.names = TRUE)
+  write.csv(xx, file = paste0(resDir, '/position_dependent_genes_from_matureSamples_RNAseq_fdr.0.1.csv'), 
+            quote = FALSE, col.names = TRUE, row.names = FALSE)
   
 }
-
 
 ##########################################
 # position-dependent genes from microarray 
