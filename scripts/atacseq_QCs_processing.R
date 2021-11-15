@@ -19,10 +19,6 @@ if(!dir.exists(RdataDir)) dir.create(RdataDir)
 
 source('Functions_atac.R')
 
-dataDir = '/Volumes//groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/'
-
-design_file = paste0(dataDir, 'design_sampleInfo_all.txt')
-
 ########################################################
 ########################################################
 # Section : sequencing quality controls
@@ -30,15 +26,16 @@ design_file = paste0(dataDir, 'design_sampleInfo_all.txt')
 # sequence saturation analysis
 ########################################################
 ########################################################
+dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/'
+design_file = paste0(dataDir, 'design_sampleInfo_all.txt')
+
 Collect.design.stat.nf.out = TRUE
+
 if(Collect.design.stat.nf.out){
   design = read.table(paste0(dataDir, 'sampleInfo_parsed.txt'), sep = '\t', header = TRUE)
   
   stats = read.table(paste0(dataDir, 'nf_out/result/countStatTable.txt'), sep = '\t', header = TRUE)
   colnames(stats)[c(1, 3)] = c('fileName', 'trimmed')
-  
-  #cnts = list.files(path = '../Data//R10723_atac/QCs/cnt_raw', pattern = '*.txt', full.names = TRUE)
-  #design = design[order(design$fileName), ]
   
   index = c()
   for(n in 1:nrow(design))
@@ -54,19 +51,7 @@ if(Collect.design.stat.nf.out){
       cat(length(ii), 'fileName Found for ', design$sampleID[n], '\n')
     }
     
-    # total = 0
-    # for(m in 1:length(cc.files))
-    # {
-    #   #cat(m, '\n')
-    #   total = total + read.table(cc.files[m], sep = '\t', header = FALSE)
-    # }
-    # 
-    # ss = read.table(files.stat[grep(design$sampleID[n], files.stat)], sep = '\t', header = TRUE)
-    # samples = c(samples, as.character(ss[1, 1]))
-    # stats = rbind(stats, c(total, ss[1, -1]))
-    
   }
-  
   
   stats = data.frame(design, stats[index, ], stringsAsFactors = FALSE)
   colnames(stats) = c('sampleID', 'samples', 'fileName', 'total',  'adapter.trimmed', 'mapped', 'chrM.rm', 'unique', 'unique.rmdup')
@@ -77,28 +62,6 @@ if(Collect.design.stat.nf.out){
   stats$multimapper.pct = 1- as.numeric(stats$unique) / as.numeric(stats$mapped)
   stats$dup.rate = 1.0 - as.numeric(stats$unique.rmdup)/as.numeric(stats$unique)
   stats$pct.usable = stats$unique.rmdup / stats$total
-  
-  #stats$sample = gsub('_sorted', '', stats$sample)
-  #stats = stats[, c(1, 2, 3, 6, 4, 7, 5, 8)]
-  #colnames(stats)[c(5, 7)] = c('uniq.mapped', 'uniq.mapped.rmdup')
-  # library(ggplot2)
-  # library(dplyr)
-  # 
-  # xx = stats[, c(8:12)]
-  # 
-  # # Create data
-  # data <- data.frame(
-  #   name=c(rep(colnames(xx), each = nrow(xx))),
-  #   value=as.numeric(unlist(xx)) %>% round(2)
-  # )
-  # 
-  # 
-  # ggplot(data, aes(x=name, y=value, fill=name)) + 
-  #   geom_violin()
-  # 
-  # #boxplot(stats[, c(8:12)])
-  # df <- apply(stats,2,as.character)
-  #stats = as.data.frame(stats)
   
   write.csv(stats, file = paste0(resDir, '/R11876_CutTag_QCs_stats.csv'), row.names = FALSE)
   
