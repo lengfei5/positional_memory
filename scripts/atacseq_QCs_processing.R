@@ -13,9 +13,12 @@ version.analysis = 'R10723_Rxxxx_R11637_atacseq_R11876_CutTag'
 #peakDir = "Peaks/macs2_broad"
 
 resDir = paste0("../results/", version.analysis)
+
 RdataDir = paste0(resDir, '/Rdata')
 if(!dir.exists(resDir)) dir.create(resDir)
 if(!dir.exists(RdataDir)) dir.create(RdataDir)
+
+dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/'
 
 source('Functions_atac.R')
 
@@ -26,7 +29,7 @@ source('Functions_atac.R')
 # sequence saturation analysis
 ########################################################
 ########################################################
-dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/'
+
 design_file = paste0(dataDir, 'design_sampleInfo_all.txt')
 
 Collect.design.stat.nf.out = TRUE
@@ -112,7 +115,7 @@ for(n in 1:nrow(design))
 peak.files = peak.files[index]
 
 # union of all peaks from all replicates
-peak.merged = merge.peaks.macs2(peak.files, pcutoff = 6)
+#peak.merged = merge.peaks.macs2(peak.files, pcutoff = 6)
 
 ##########################################
 # Manually identify consensus peaks across replicates taking into account of different batches and sequencing depth
@@ -121,7 +124,8 @@ Manually.identify.peak.consensus = FALSE
 
 if(Manually.identify.peak.consensus){
   peaks = c()
-  pval.cutoff = 3
+  pval.cutoff = 4
+  
   for(n in 1:length(peak.files)) 
   {
     cat(n, '\n')
@@ -141,11 +145,13 @@ if(Manually.identify.peak.consensus){
   }
   
   names(peaks) = design$fileName
-  saveRDS(peaks, file = paste0(RdataDir, '/macs2_peaks_mergedTechnialReps_30samples_pval0.001.rds'))
-  
+  saveRDS(peaks, file = paste0(RdataDir, '/macs2_peaks_mergedTechnialReps_30samples_pval.', pval.cutoff, '.rds'))
   
   #xx = readRDS(file = paste0(RdataDir, '/macs2_peaks_mergedTechnialReps_30samples.rds'))
-  peaks = readRDS(file = paste0(RdataDir, '/macs2_peaks_mergedTechnialReps_30samples_pval0.001.rds'))
+  #peaks = readRDS(file = paste0(RdataDir, '/macs2_peaks_mergedTechnialReps_30samples_pval0.001.rds'))
+  peaks = readRDS(file = paste0(RdataDir, '/macs2_peaks_mergedTechnialReps_30samples_pval.', pval.cutoff, '.rds'))
+  #peaks = readRDS(file = paste0(RdataDir, '/macs2_peaks_mergedTechnialReps_30samples_pval0.001.rds'))
+  
   # try to merge BL time series
   kk = which(design$condition == 'BL_UA_13days_proximal')
   
@@ -306,6 +312,7 @@ if(Manually.identify.peak.consensus){
   peak.merged = union(peak.merged, la)
   peak.merged = union(peak.merged, hd)
   peak.merged = union(peak.merged, hc)
+  
   ##########################################
   # compare the peak overlapping in the UA regeneration
   ##########################################
