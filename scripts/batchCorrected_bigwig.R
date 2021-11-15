@@ -49,7 +49,6 @@ pp$strand = '*'
 pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
                               start.field="X2", end.field="X3", strand.field="strand")
 
-
 ##########################################
 # read the orginial bw file
 ##########################################
@@ -88,8 +87,10 @@ bw = sort(bw)
 
 newb = bw
 
+##########################################
 # loop over the peaks and correct the bins within peaks
-overlaps = findOverlaps(pp, bw)
+##########################################
+overlaps = findOverlaps(bw, pp, type = 'within', select = 'all')
 mappings = match(names(pp), names(xx))
 
 library(tictoc)
@@ -97,29 +98,40 @@ tic()
 for(n in 1:length(pp))
 {
   # n = 7
-  kk = overlaps@to[which(overlaps@from == n)]
+  kk = overlaps@from[which(overlaps@to == n)]
   bins = bw[kk]
   
   if(length(bins) > 0){
+    
     sf = cpm[which(names(cpm) == names(pp)[n])]/sum(as.numeric(width(bins)) * bins$score) * 50 # 50 is constant to reflect the fragment size
     
     #tic()
     # scale the bigwig scores
-    if(!is.na(sf)){
+    if(!is.na(sf) & sf != Inf){
       mcols(newb)$score[kk] = mcols(bw)$score[kk] * sf
       # save the scaling factor
       xx$scalingfactor[mappings[n]] = sf
     }else{
-      print(paste0('NA scaling factor found for ',  n, '-- peak name : ', names(pp)[n]))
+      print(paste0('NA or Inf scaling factor found for ',  n, '-- peak name : ', names(pp)[n]))
     }
+  }else{
+    print(paste0('no bins within  ', n, '-- peak name : ', names(pp)[n]))
   }
-  
 }
 
 toc()
 
+##########################################
+# impute the missing scaling factors from previous steps due to the sf = NA or sf = Inf
+# impute them with the median of good sf values in a heuristic way so as to continue with the gap scaling
+##########################################
+index.missing.sf = mappings[which(is.na(xx$scalingfactor[mappings]) | xx$scalingfactor[mappings] == Inf)]
+index.good.sf = setdiff(mappings, index.missing.sf)
+xx$scalingfactor[index.missing.sf] = median(xx$scalingfactor[index.good.sf])
 
-# loop over the gaps between peaks, chr by chr 
+##########################################
+# # loop over the gaps between peaks, chr by chr 
+##########################################
 for(chr in seqlevels(xx))
 {
   # chr = 'chr10p'
@@ -133,6 +145,7 @@ for(chr in seqlevels(xx))
   #for(n in 1:20)
   {
     # n = length(xxchr) - 1
+    # n = 33
     if(mcols(xxchr)$score[n] == 0){
       
       jj = overlaps@to[which(overlaps@from == n)]
@@ -168,9 +181,13 @@ for(chr in seqlevels(xx))
             
             sf_final = sf_prev*(1.0-fractions) + sf_next*fractions 
             
-            if(all(!is.na(fractions))){
+            if(all(!is.na(sf_final)) & all(sf_final != Inf)){
               mcols(newb)$score[jj] = mcols(bw)$score[jj] * sf_final
+            }else{
+              print(paste0('NA scaling factor found ',  chr, '-- index -- ', n,  '-- gap : ', 
+                           seqnames(xxchr[n]), ':', start(xxchr[n]), '-', end(xxchr[n])))
             }
+            
             
           }
         } # end of gaps with flanking peaks
@@ -185,20 +202,44 @@ for(chr in seqlevels(xx))
 # export the batch-corrected bigwig file
 export.bw(newb, con = paste0(outDir, bw.name, '_bc.bw'))
 
-
 ##########################################
 # debugging the script run in cluster  
 ##########################################
 Debugging = FALSE
 if(Debugging){
+  # intermediate results from test example
+  dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/bigwigs_bc/'
+  bw.file = '/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/bigwigs_scalingFactor_consensusPeaks/Mature_LA_74939_mq_30.bw'
   
-  dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/bigwigs_bc/outs'
-  load(paste0(dataDir, '/Mature_LA_74939_bc_peaks.Rdata'))
+  load(file = paste0(dataDir, 'samplesDesign.cleaned_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical_v1.Rdata'))
+  fpm = readRDS(file = paste0(dataDir, 'fpm_TMM_combat.rds'))
   
-  kk = which(is.na(mcols(newb)$score))
-  head(which(mcols(bw)$score[kk]>0))
+  # prepare the background distribution
+  fpm.bg = fpm[grep('bg_', rownames(fpm), invert = FALSE), ]
+  fpm = fpm[grep('bg_', rownames(fpm), invert = TRUE), ]
+  rownames(fpm) = gsub('_', '-', rownames(fpm))
   
-  findOverlaps(bw[kk], pp)
+  fpm = 2^fpm
+  
+  bw.name = basename(bw.file)
+  bw.name = gsub('_mq_30.bw', '', bw.name)
+  
+  index.sample = which(colnames(fpm) == bw.name)
+  
+  if(length(index.sample) != 1){
+    print('Sample Not Found')
+    stop()
+  }
+  
+  cpm = fpm[, index.sample]
+  
+  
+  load(paste0(dataDir, 'outs/Mature_LA_74939_bc_peaks_gaps.Rdata'))
+  
+  jj = which(is.na(mcols(newb)$score))
+  head(which(mcols(bw)$score[jj]>0))
+  
+  findOverlaps(bw[jj], pp)
   
   
 }
