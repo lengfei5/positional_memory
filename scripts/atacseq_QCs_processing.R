@@ -378,7 +378,7 @@ if(Manually.identify.peak.consensus){
   ## when new data comes, the peak consensue will start from here
   save(ua, la, hd, hc, 
        file = paste0(RdataDir, '/consensus_peaks_intersectReplicates_pval', pval.cutoff, 'version_', version.analysis, 
-                     'Hand.Rdata'))
+                     'Mature.Rdata'))
   
   
   ##########################################
@@ -393,7 +393,12 @@ if(Manually.identify.peak.consensus){
   peak.merged = union(peak.merged, ua)
   peak.merged = union(peak.merged, la)
   peak.merged = union(peak.merged, hd)
-  peak.merged = union(peak.merged, hc)
+  
+  #peak.merged = union(peak.merged, hc) # probalby the peak from the negative controls heads are not included
+  peak.merged = dropSeqlevels(peak.merged, 'chrM', pruning.mode=c("coarse"))
+  
+  save(peak.merged, file = paste0(RdataDir, '/peaks_set_union_conditions_pval', pval.cutoff, 'version_', version.analysis, '.Rdata'))
+  
   
   ##########################################
   # compare the peak overlapping in the UA regeneration
@@ -437,6 +442,7 @@ if(Manually.identify.peak.consensus){
 }
   
 # clean peaks
+
 peaks = peak.merged
 peaks = data.frame(peaks)
 colnames(peaks)[c(1:3)] = c("chr", "start", "end")
@@ -452,6 +458,8 @@ dim(peaks)
 peaks = peaks[which(peaks$chr != 'chrM'), ]
 
 dim(peaks)
+
+
 
 # preapre SAF input for featureCounts
 require(Rsubread)
