@@ -280,6 +280,7 @@ if(Grouping.atac.peaks){
       write.table(bed, file = paste0(resDir, '/peakset_', version.analysis, '.bed'), col.names = FALSE, row.names = FALSE,
                   sep = '\t', quote = FALSE)
     }
+    
     pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
                                   start.field="X2", end.field="X3", strand.field="strand")
     
@@ -296,145 +297,333 @@ if(Grouping.atac.peaks){
     
   }
   
+}
+
+########################################################
+########################################################
+# Section :
+# ##########################################
+# all-peaks test M0 (static peaks), M1 (dynamic peaks above background), M2 (dyanmic peaks with some condtions below background)
+# we will also loci that are always open across all conditions
+########################################################
+########################################################
+make.test.All.Peaks = FALSE
+if(make.test.All.Peaks){
   
-  ##########################################
-  # all-peaks test M0 (static peaks), M1 (dynamic peaks above background), M2 (dyanmic peaks with some condtions below background)
-  # we will also loci that are always open across all conditions
-  ##########################################
-  make.test.All.Peaks = FALSE
-  if(make.test.All.Peaks){
+  Run.all.peaks.test = FALSE
+  if(Run.all.peaks.test){
     
-    Run.all.peaks.test = FALSE
-    if(Run.all.peaks.test){
-      
-      # all conditions included
-      conds = c("Embryo_Stage40", "Embryo_Stage44_proximal", "Embryo_Stage44_distal",
-                "Mature_UA",  "Mature_LA", "Mature_Hand", 
-                "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal", "BL_UA_13days_distal")
-      
-      # test examples
-      test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
-      #test.examples = c('Hoxa13')
-      ii.test = which(overlapsAny(pp, promoters[which(!is.na(match(promoters$geneSymbol, test.examples)))]))
-      #ii.Hox = which(overlapsAny(pp, Hoxs))
-      #ii.test = unique(c(ii.test, ii.Hox))
-      
-      sample.sels = c()
-      cc = c()
-      for(n in 1:length(conds)) {
-        kk = which(design$conds == conds[n] & design$SampleID != '136159')
-        sample.sels = c(sample.sels, kk)
-        cc = c(cc, rep(conds[n], length(kk)))
-      }
-      
-      library(tictoc)
-      ii.test = c(1:nrow(fpm)) # takes about 2 mins for 40k peaks
-      
-      source('Functions.R')
-      tic() 
-      res = t(apply(fpm[ii.test, sample.sels], 1, all.peaks.test, c = cc))
-      res = data.frame(res, pp.annots[ii.test, ], stringsAsFactors = FALSE)
-      toc()
-      
-      saveRDS(res, file = paste0(RdataDir, '/res_allPeaks_test.rds'))
-      
-    }else{
-      res = readRDS(file = paste0(RdataDir, '/res_allPeaks_test.rds'))
-      
-    }
+    # all conditions included
+    conds = c("Embryo_Stage40", "Embryo_Stage44_proximal", "Embryo_Stage44_distal",
+              "Mature_UA",  "Mature_LA", "Mature_Hand", 
+              "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal", "BL_UA_13days_distal")
     
-    jj = which(res$prob.M0 < 0.05 & res$log2FC >1)
-    xx = res[c(jj), ]
-    xx = xx[order(-xx$log2FC), ]
+    # test examples
+    test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
+    #test.examples = c('Hoxa13')
+    ii.test = which(overlapsAny(pp, promoters[which(!is.na(match(promoters$geneSymbol, test.examples)))]))
+    #ii.Hox = which(overlapsAny(pp, Hoxs))
+    #ii.test = unique(c(ii.test, ii.Hox))
     
-    length(which(xx$min <3.0))
-    length(which(xx$min <2.5))
-    length(which(xx$min <2.))
-    
-    bgs = data.frame(bg = as.numeric(fpm.bg))
-    
-    ggplot(bgs, aes(x=bg)) + geom_histogram(binwidth = 0.25, color="darkblue", fill="lightblue") +
-      theme(axis.text.x = element_text(angle = 0, size = 16)) + 
-      xlab(" background signals (log2)") 
-    
-    Test.promoter.openness = FALSE
-    if(Test.promoter.openness){
-      
-      source('Functions.R')
-      Test.promoter.openness.enrichment(res, bg) # two different methods to test nonHS promoters have tendancy to be open across conditions
-      
-      #DoubleCheck.promoter.peaks.enrichment(fpm) # double check those open promoters are not due to sample contamination
-      
-    }
-    
-  }
-  
-  ##########################################
-  # Position-dependent test
-  # mainly use the mature samples, mUA, mLA and mHand
-  # 
-  ##########################################
-  grouping.position.dependent.peaks = FALSE
-  if(grouping.position.dependent.peaks){
-    
-    #conds = as.character(unique(design$conds))
-    # conds = c("Mature_UA", "Mature_LA", "Mature_Hand", 
-    #           "Embryo_Stage44_proximal", "Embryo_Stage44_distal",
-    #           "BL_UA_13days_proximal", "BL_UA_13days_distal")
-    
-    conds = c("Mature_UA", "Mature_LA", "Mature_Hand")
-              
-    sample.sels = c();  cc = c()
+    sample.sels = c()
+    cc = c()
     for(n in 1:length(conds)) {
-      #kk = which(design$conds == conds[n] & design$SampleID != '136159')
-      kk = which(design$conds == conds[n]) 
+      kk = which(design$conds == conds[n] & design$SampleID != '136159')
       sample.sels = c(sample.sels, kk)
       cc = c(cc, rep(conds[n], length(kk)))
     }
     
-    Run.test.spatial.peaks = FALSE
-    if(Run.test.spatial.peaks){
-      # examples to test
-      #test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
-      #test.examples = c('Hoxa13')
-      #ii.test = which(overlapsAny(pp, promoters[which(!is.na(match(promoters$geneSymbol, test.examples)))]))
-      #ii.Hox = which(overlapsAny(pp, Hoxs))
-      #ii.test = unique(c(ii.test, ii.Hox))
-      
-      library(tictoc)
-      ii.test = c(1:nrow(fpm)) # takes about 2 mins for 40k peaks
-      source('Functions_atac.R')
-      
-      # select the mature samples
-      cpm = fpm[, sample.sels]
-      
-      # select the peaks that are above background with >3 samples
-      quantile(fpm.bg, 0.999)
-      
-      hist(fpm.bg)
-      
-      # stringent here, with signal > 2.5 in >=3 samples 
-      nb.above.threshold = apply(as.matrix(cpm), 1, function(x) length(which(x> 2.5)))
-      hist(nb.above.threshold, breaks = c(-1:ncol(cpm)))
-      peak.sels = which(nb.above.threshold>=3)
-      cpm = cpm[peak.sels, ]
-      
-      tic() 
-      res = spatial.peaks.test(cpm = cpm, c = cc, test.Dev.Reg = FALSE)
-      res = data.frame(res, pp.annots[ii.test, ], stringsAsFactors = FALSE)
-      toc()
-      
-      xx = data.frame(res, pp.annots[match(rownames(res), rownames(pp.annots)), ], stringsAsFactors = FALSE)
-      
-      res = xx
-      saveRDS(res, file = paste0(RdataDir, '/res_position_dependant_test_v6.rds'))
-      
+    library(tictoc)
+    ii.test = c(1:nrow(fpm)) # takes about 2 mins for 40k peaks
+    
+    source('Functions.R')
+    tic() 
+    res = t(apply(fpm[ii.test, sample.sels], 1, all.peaks.test, c = cc))
+    res = data.frame(res, pp.annots[ii.test, ], stringsAsFactors = FALSE)
+    toc()
+    
+    saveRDS(res, file = paste0(RdataDir, '/res_allPeaks_test.rds'))
+    
+  }else{
+    res = readRDS(file = paste0(RdataDir, '/res_allPeaks_test.rds'))
+    
+  }
+  
+  jj = which(res$prob.M0 < 0.05 & res$log2FC >1)
+  xx = res[c(jj), ]
+  xx = xx[order(-xx$log2FC), ]
+  
+  length(which(xx$min <3.0))
+  length(which(xx$min <2.5))
+  length(which(xx$min <2.))
+  
+  bgs = data.frame(bg = as.numeric(fpm.bg))
+  
+  ggplot(bgs, aes(x=bg)) + geom_histogram(binwidth = 0.25, color="darkblue", fill="lightblue") +
+    theme(axis.text.x = element_text(angle = 0, size = 16)) + 
+    xlab(" background signals (log2)") 
+  
+  Test.promoter.openness = FALSE
+  if(Test.promoter.openness){
+    
+    source('Functions.R')
+    Test.promoter.openness.enrichment(res, bg) # two different methods to test nonHS promoters have tendancy to be open across conditions
+    
+    #DoubleCheck.promoter.peaks.enrichment(fpm) # double check those open promoters are not due to sample contamination
+    
+  }
+  
+}
+
+########################################################
+########################################################
+# Section :
+# ##########################################
+# Position-dependent test
+# mainly use the mature samples, mUA, mLA and mHand
+# 
+##########################################
+########################################################
+########################################################
+grouping.position.dependent.peaks = FALSE
+if(grouping.position.dependent.peaks){
+  
+  #conds = as.character(unique(design$conds))
+  # conds = c("Mature_UA", "Mature_LA", "Mature_Hand", 
+  #           "Embryo_Stage44_proximal", "Embryo_Stage44_distal",
+  #           "BL_UA_13days_proximal", "BL_UA_13days_distal")
+  
+  conds = c("Mature_UA", "Mature_LA", "Mature_Hand")
+  
+  sample.sels = c();  cc = c()
+  for(n in 1:length(conds)) {
+    #kk = which(design$conds == conds[n] & design$SampleID != '136159')
+    kk = which(design$conds == conds[n]) 
+    sample.sels = c(sample.sels, kk)
+    cc = c(cc, rep(conds[n], length(kk)))
+  }
+  
+  Run.test.spatial.peaks = FALSE
+  if(Run.test.spatial.peaks){
+    # examples to test
+    #test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
+    #test.examples = c('Hoxa13')
+    #ii.test = which(overlapsAny(pp, promoters[which(!is.na(match(promoters$geneSymbol, test.examples)))]))
+    #ii.Hox = which(overlapsAny(pp, Hoxs))
+    #ii.test = unique(c(ii.test, ii.Hox))
+    
+    library(tictoc)
+    ii.test = c(1:nrow(fpm)) # takes about 2 mins for 40k peaks
+    source('Functions_atac.R')
+    
+    # select the mature samples
+    cpm = fpm[, sample.sels]
+    
+    # select the peaks that are above background with >3 samples
+    quantile(fpm.bg, 0.999)
+    
+    hist(fpm.bg)
+    
+    # stringent here, with signal > 2.5 in >=3 samples 
+    nb.above.threshold = apply(as.matrix(cpm), 1, function(x) length(which(x> 2.5)))
+    hist(nb.above.threshold, breaks = c(-1:ncol(cpm)))
+    peak.sels = which(nb.above.threshold>=3)
+    cpm = cpm[peak.sels, ]
+    
+    tic() 
+    res = spatial.peaks.test(cpm = cpm, c = cc, test.Dev.Reg = FALSE)
+    res = data.frame(res, pp.annots[ii.test, ], stringsAsFactors = FALSE)
+    toc()
+    
+    xx = data.frame(res, pp.annots[match(rownames(res), rownames(pp.annots)), ], stringsAsFactors = FALSE)
+    
+    res = xx
+    saveRDS(res, file = paste0(RdataDir, '/res_position_dependant_test_v6.rds'))
+    
+  }
+  
+  ##########################################
+  # select all positional-dependent loci with below threshold
+  ##########################################
+  res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v6.rds'))
+  
+  # select the positional peaks with 
+  fdr.cutoff = 0.01; logfc.cutoff = 1
+  jj = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & res$logFC.mLA.vs.mUA > logfc.cutoff) |
+               (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & res$logFC.mHand.vs.mUA > logfc.cutoff)|
+               (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & res$logFC.mHand.vs.mLA > logfc.cutoff)
+  )
+  
+  jj1 = which(res$prob.M0<0.01 & res$log2FC>1)
+  jj2 = which(res$pval.lrt < 0.001 & res$log2FC > 1)
+  
+  xx = res[c(jj), ]
+  #xx = xx[order(-xx$log2FC.mature), ]
+  xx[grep('HOXA13', xx$transcriptId), ]
+  
+  # filter the peaks from head control sample
+  Filtering.peaks.in.Head.samples = TRUE
+  if(Filtering.peaks.in.Head.samples){
+    p0 = pp[match(rownames(xx), names(pp))]
+    
+    ctl = fpm[, grep('HEAD', colnames(fpm))]
+    ctl = ctl[which(ctl>2.5)]
+    p.ctl = pp[match(names(ctl), names(pp))]
+    
+    non.overlap = !overlapsAny(p0, p.ctl)
+    
+    xx = xx[non.overlap, ]
+    
+  }
+  
+  xx[grep('HOXA13', xx$transcriptId), ]
+  
+  # sort positional peaks with logFC
+  #xx = xx[order(-xx$logFC.mean), ]
+  xx = xx[order(-xx$log2FC), ]
+  
+  keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
+  keep = as.matrix(keep)
+  
+  library(ggplot2)
+  df <- data.frame(cc)
+  rownames(df) = colnames(keep)
+  
+  ii.gaps = c(5, 8)
+  pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
+           cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps, 
+           filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
+           width = 8, height = 12)
+  
+  if(saveTable){
+    yy = data.frame(keep, xx, stringsAsFactors = FALSE)
+    write.csv(yy, file = paste0(resDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head.csv'), 
+              quote = FALSE, row.names = TRUE)
+    
+  }
+  
+  ##########################################
+  ## select top peaks genome-wide and also promoter peaks
+  ##########################################
+  #res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v2.rds'))
+  #jj = which(res$prob.M0.mature < 0.01 & res$log2FC.mature > 3 & res$min.mature <1)
+  #xx = res[jj, ]
+  #xx = xx[order(-xx$log2FC.mature), ]
+  #xx = data.frame(xx, pp.annots[match(rownames(xx), rownames(pp.annots)), ], stringsAsFactors = FALSE)
+  xx = xx[order(-xx$logFC.mean), ]
+  
+  yy = xx
+  yy = yy[which(yy$max > 3 & yy$min < 1 & yy$res2.max< 0.1), ]
+  
+  yy = yy[order(yy$logFC.mean), ]
+  
+  keep = fpm[!is.na(match(rownames(fpm), rownames(yy))), sample.sels]
+  gg = res$geneId[match(rownames(keep), rownames(res))]
+  grep('HOXA13', gg)
+  rownames(keep) = paste0(rownames(keep), '_', gg)
+  #rownames(keep) = gg
+  keep = as.matrix(keep)
+  
+  gg = rownames(keep)
+  gg = sapply(gg, function(x) unlist(strsplit(as.character(x), '_'))[2])
+  gg = sapply(gg, function(x) unlist(strsplit(as.character(x), '[|]'))[1])
+  #keep = keep[1:50, ]
+  #rownames(keep) = gg
+  #kk = grep('Mature', cc)
+  #df <- data.frame(condition = cc[kk])
+  #keep = keep[,kk]
+  #rownames(df) = colnames(keep)
+  ii.gaps = c(5, 8)
+  
+  pheatmap(keep, cluster_rows=TRUE, show_rownames=TRUE, scale = 'row', show_colnames = FALSE,
+           cluster_cols=FALSE, annotation_col = df, fontsize_row = 8, gaps_col = ii.gaps,
+           filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_top300_genomewide.pdf'), 
+           width = 16, height = 40)
+  
+  if(saveTable){
+    write.csv(data.frame(keep, yy, stringsAsFactors = FALSE), 
+              file = paste0(resDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_top300_genomewide.csv'), 
+              quote = FALSE, row.names = TRUE)
+    
+  }
+  
+  ##########################################
+  # select top promoter peaks
+  ##########################################
+  yy = xx
+  
+  yy = yy[grep('Promoter', yy$annotation), ] # peak close to promoters
+  yy[grep('HOXA13', yy$transcriptId),]
+  #yy = xx
+  #yy = yy[c(1:50), ]
+  #yy = yy[which(yy$logFC.mean>1.5), ]
+  yy = yy[which(yy$max > 3 & yy$min < 2 & yy$res2.max< 0.1), ]
+  
+  keep = fpm[!is.na(match(rownames(fpm), rownames(yy))), sample.sels]
+  gg = res$geneId[match(rownames(keep), rownames(res))]
+  grep('HOXA13', gg)
+  rownames(keep) = paste0(rownames(keep), '_', gg)
+  #rownames(keep) = gg
+  keep = as.matrix(keep)
+  
+  # jj1 = grep('Embryo_Stage40', colnames(keep))
+  # jj2 = grep('Embryo_Stage44', colnames(keep))
+  # jj3 = grep('Mature_UA', colnames(keep))
+  # mean1 = apply(keep[, jj1], 1, mean)
+  # mean2 = apply(keep[, jj2], 1, mean)
+  # mean3 = apply(keep[, jj3], 1, mean)
+  # 
+  # kk = which(mean1< 1. & mean2 < 1. & mean3 < 1.)
+  # 
+  # # make sure max above the threshold
+  # nb.above.threshold = apply(keep, 1, function(x) length(which(x>3)))
+  # keep = keep[which(nb.above.threshold >=3), ] 
+  # 
+  # nb.below.bg = apply(keep, 1, function(x) length(which(x<2)))
+  # keep = keep[which(nb.below.bg >=3), ] 
+  
+  gg = rownames(keep)
+  gg = sapply(gg, function(x) unlist(strsplit(as.character(x), '_'))[2])
+  gg = sapply(gg, function(x) unlist(strsplit(as.character(x), '[|]'))[1])
+  #keep = keep[1:50, ]
+  #rownames(keep) = gg
+  #kk = grep('Mature', cc)
+  #df <- data.frame(condition = cc[kk])
+  #keep = keep[,kk]
+  #rownames(df) = colnames(keep)
+  ii.gaps = c(5, 8)
+  pheatmap(keep, cluster_rows=TRUE, show_rownames=TRUE, scale = 'row', show_colnames = FALSE,
+           cluster_cols=FALSE, annotation_col = df, fontsize_row = 11, gaps_col = ii.gaps,
+           filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_top50_promoter.pdf'), 
+           width = 16, height = 12)
+  
+  
+  if(saveTable){
+    write.csv(data.frame(keep, yy, stringsAsFactors = FALSE), 
+              file = paste0(resDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_top50_promoterPeaks.csv'), 
+              quote = FALSE, row.names = TRUE)
+    
+  }
+  
+  
+  ##########################################
+  # first motif activity analysis for positional-dependent peaks 
+  ##########################################
+  source('MARA_functions.R')
+  
+  Prepare.Response = FALSE
+  if(Prepare.Response){
+    res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v6.rds'))
+    
+    conds = c("Mature_UA", "Mature_LA", "Mature_Hand")
+    sample.sels = c();  cc = c()
+    for(n in 1:length(conds)) {
+      kk = which(design$conds == conds[n] & design$SampleID != '74938' & design$SampleID != '102655')
+      #kk = which(design$conds == conds[n]) 
+      sample.sels = c(sample.sels, kk)
+      cc = c(cc, rep(conds[n], length(kk)))
     }
     
-    ##########################################
-    # select all positional-dependent loci with below threshold
-    ##########################################
-    res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v6.rds'))
     
     # select the positional peaks with 
     fdr.cutoff = 0.01; logfc.cutoff = 1
@@ -474,311 +663,144 @@ if(Grouping.atac.peaks){
     keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
     keep = as.matrix(keep)
     
-    library(ggplot2)
-    df <- data.frame(cc)
-    rownames(df) = colnames(keep)
-    
-    ii.gaps = c(5, 8)
-    pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
-             cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps, 
-             filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
-             width = 8, height = 12)
-    
-    if(saveTable){
-      yy = data.frame(keep, xx, stringsAsFactors = FALSE)
-      write.csv(yy, file = paste0(resDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head.csv'), 
-                quote = FALSE, row.names = TRUE)
-      
-    }
-    
-    ##########################################
-    ## select top peaks genome-wide and also promoter peaks
-    ##########################################
-    #res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v2.rds'))
-    #jj = which(res$prob.M0.mature < 0.01 & res$log2FC.mature > 3 & res$min.mature <1)
-    #xx = res[jj, ]
-    #xx = xx[order(-xx$log2FC.mature), ]
-    #xx = data.frame(xx, pp.annots[match(rownames(xx), rownames(pp.annots)), ], stringsAsFactors = FALSE)
-    xx = xx[order(-xx$logFC.mean), ]
-    
-    yy = xx
-    yy = yy[which(yy$max > 3 & yy$min < 1 & yy$res2.max< 0.1), ]
-    
-    yy = yy[order(yy$logFC.mean), ]
-    
-    keep = fpm[!is.na(match(rownames(fpm), rownames(yy))), sample.sels]
-    gg = res$geneId[match(rownames(keep), rownames(res))]
-    grep('HOXA13', gg)
-    rownames(keep) = paste0(rownames(keep), '_', gg)
-    #rownames(keep) = gg
-    keep = as.matrix(keep)
-    
-    gg = rownames(keep)
-    gg = sapply(gg, function(x) unlist(strsplit(as.character(x), '_'))[2])
-    gg = sapply(gg, function(x) unlist(strsplit(as.character(x), '[|]'))[1])
-    #keep = keep[1:50, ]
-    #rownames(keep) = gg
-    #kk = grep('Mature', cc)
-    #df <- data.frame(condition = cc[kk])
-    #keep = keep[,kk]
-    #rownames(df) = colnames(keep)
-    ii.gaps = c(5, 8)
-    
-    pheatmap(keep, cluster_rows=TRUE, show_rownames=TRUE, scale = 'row', show_colnames = FALSE,
-             cluster_cols=FALSE, annotation_col = df, fontsize_row = 8, gaps_col = ii.gaps,
-             filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_top300_genomewide.pdf'), 
-             width = 16, height = 40)
-    
-    if(saveTable){
-      write.csv(data.frame(keep, yy, stringsAsFactors = FALSE), 
-                file = paste0(resDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_top300_genomewide.csv'), 
-                quote = FALSE, row.names = TRUE)
-      
-    }
-    
-    ##########################################
-    # select top promoter peaks
-    ##########################################
-    yy = xx
-    
-    yy = yy[grep('Promoter', yy$annotation), ] # peak close to promoters
-    yy[grep('HOXA13', yy$transcriptId),]
-    #yy = xx
-    #yy = yy[c(1:50), ]
-    #yy = yy[which(yy$logFC.mean>1.5), ]
-    yy = yy[which(yy$max > 3 & yy$min < 2 & yy$res2.max< 0.1), ]
-    
-    keep = fpm[!is.na(match(rownames(fpm), rownames(yy))), sample.sels]
-    gg = res$geneId[match(rownames(keep), rownames(res))]
-    grep('HOXA13', gg)
-    rownames(keep) = paste0(rownames(keep), '_', gg)
-    #rownames(keep) = gg
-    keep = as.matrix(keep)
-    
-    # jj1 = grep('Embryo_Stage40', colnames(keep))
-    # jj2 = grep('Embryo_Stage44', colnames(keep))
-    # jj3 = grep('Mature_UA', colnames(keep))
-    # mean1 = apply(keep[, jj1], 1, mean)
-    # mean2 = apply(keep[, jj2], 1, mean)
-    # mean3 = apply(keep[, jj3], 1, mean)
-    # 
-    # kk = which(mean1< 1. & mean2 < 1. & mean3 < 1.)
-    # 
-    # # make sure max above the threshold
-    # nb.above.threshold = apply(keep, 1, function(x) length(which(x>3)))
-    # keep = keep[which(nb.above.threshold >=3), ] 
-    # 
-    # nb.below.bg = apply(keep, 1, function(x) length(which(x<2)))
-    # keep = keep[which(nb.below.bg >=3), ] 
-    
-    gg = rownames(keep)
-    gg = sapply(gg, function(x) unlist(strsplit(as.character(x), '_'))[2])
-    gg = sapply(gg, function(x) unlist(strsplit(as.character(x), '[|]'))[1])
-    #keep = keep[1:50, ]
-    #rownames(keep) = gg
-    #kk = grep('Mature', cc)
-    #df <- data.frame(condition = cc[kk])
-    #keep = keep[,kk]
-    #rownames(df) = colnames(keep)
-    ii.gaps = c(5, 8)
-    pheatmap(keep, cluster_rows=TRUE, show_rownames=TRUE, scale = 'row', show_colnames = FALSE,
-             cluster_cols=FALSE, annotation_col = df, fontsize_row = 11, gaps_col = ii.gaps,
-             filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_top50_promoter.pdf'), 
-             width = 16, height = 12)
-    
-    
-    if(saveTable){
-      write.csv(data.frame(keep, yy, stringsAsFactors = FALSE), 
-                file = paste0(resDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_top50_promoterPeaks.csv'), 
-                quote = FALSE, row.names = TRUE)
-      
-    }
-    ##########################################
-    # first motif activity analysis for positional-dependent peaks 
-    ##########################################
-    source('MARA_functions.R')
-    
-    Prepare.Response = FALSE
-    if(Prepare.Response){
-      
-      conds = c("Mature_UA", "Mature_LA", "Mature_Hand")
-      sample.sels = c();  cc = c()
-      for(n in 1:length(conds)) {
-        #kk = which(design$conds == conds[n] & design$SampleID != '136159')
-        kk = which(design$conds == conds[n]) 
-        sample.sels = c(sample.sels, kk)
-        cc = c(cc, rep(conds[n], length(kk)))
-      }
-      
-      res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v6.rds'))
-      
-      # select the positional peaks with 
-      fdr.cutoff = 0.01; logfc.cutoff = 1
-      jj = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & res$logFC.mLA.vs.mUA > logfc.cutoff) |
-                   (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & res$logFC.mHand.vs.mUA > logfc.cutoff)|
-                   (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & res$logFC.mHand.vs.mLA > logfc.cutoff)
-      )
-      
-      jj1 = which(res$prob.M0<0.01 & res$log2FC>1)
-      jj2 = which(res$pval.lrt < 0.001 & res$log2FC > 1)
-      
-      xx = res[c(jj), ]
-      #xx = xx[order(-xx$log2FC.mature), ]
-      xx[grep('HOXA13', xx$transcriptId), ]
-      
-      # filter the peaks from head control sample
-      Filtering.peaks.in.Head.samples = TRUE
-      if(Filtering.peaks.in.Head.samples){
-        p0 = pp[match(rownames(xx), names(pp))]
-        
-        ctl = fpm[, grep('HEAD', colnames(fpm))]
-        ctl = ctl[which(ctl>2.5)]
-        p.ctl = pp[match(names(ctl), names(pp))]
-        
-        non.overlap = !overlapsAny(p0, p.ctl)
-        
-        xx = xx[non.overlap, ]
-        
-      }
-      
-      xx[grep('HOXA13', xx$transcriptId), ]
-      
-      # sort positional peaks with logFC
-      #xx = xx[order(-xx$logFC.mean), ]
-      xx = xx[order(-xx$log2FC), ]
-      
-      keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
-      keep = as.matrix(keep)
-      
-      
-    }
-    
-    
-    saveRDS(keep, file = paste0(RdataDir, '/matrix.saved.for.spatial.MARA.rds'))
-    
-    xx = run.MARA.atac.spatial(keep, cc)
-   
     
   }
   
-  ##########################################
-  # temporal-peaks test
-  ##########################################
-  grouping.temporal.peaks = FALSE
-  if(grouping.temporal.peaks){
-    conds = c("Embryo_Stage40", "Embryo_Stage44_proximal", "Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal")
-    
-    # examples to test
-    test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
-    #test.examples = c('Hoxa13')
-    ii.test = which(overlapsAny(pp, promoters[which(!is.na(match(promoters$geneSymbol, test.examples)))]))
-    #ii.Hox = which(overlapsAny(pp, Hoxs))
-    #ii.test = unique(c(ii.test, ii.Hox))
-    
-    sample.sels = c(); cc = c()
-    for(n in 1:length(conds)) {
-      kk = which(design$conds == conds[n])
-      sample.sels = c(sample.sels, kk)
-      cc = c(cc, rep(conds[n], length(kk)))
-    }
-    
-    library(tictoc)
-    # ii.test = c(1:nrow(fpm)) # takes about 2 mins for 40k peaks
-    
-    Run.temporal.peak.test = FALSE
-    if(Run.temporal.peak.test)
-    {
-      source('Functions_atac.R')
-      cpm = fpm[, sample.sels]
-      
-      quantile(fpm.bg, 0.99)
-      nb.above.threshold = apply(as.matrix(cpm), 1, function(x) length(which(x> 2)))
-      
-      hist(nb.above.threshold, breaks = c(-1:ncol(cpm)))
-      length(which(nb.above.threshold>6))
-      
-      peak.sels = which(nb.above.threshold>=3)
-      cpm = cpm[peak.sels, ]
-      
-      tic()
-      ## define the dynamic enhancers with mature UA and BL.UA and check them if embryo samples
-      sels = grep('Embryo', cc, invert = TRUE) 
-      res = t(apply(cpm[, sels], 1, temporal.peaks.test, c = cc[sels]))
-      toc()
-      
-      xx = data.frame(res, pp.annots[match(rownames(cpm), rownames(pp.annots)), ],  stringsAsFactors = FALSE)
-     
-      res = xx
-      
-      saveRDS(res, file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v3.rds'))
-      
-    }
-    
-    
-    res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v3.rds'))
-    
-    # select the temporal dynamic peaks
-    length(which(res$prob.M0<0.05))
-    length(which(res$prob.M0<0.05 & res$log2FC > 1))
-    length(which(res$prob.M0<0.01 & res$log2FC > 1))
-    length(which(res$prob.M0<0.01 & res$log2FC > 1.5))
-    length(which(res$prob.M0<0.01 & res$log2FC > 2))
-    
-    #length(which(res$prob.M0<0.001 & res$log2FC > 2))
-    
-    #jj = which(res$prob.M0 < 0.05 & res$log2FC >1 )
-    
-    jj = which(res$prob.M0 < 0.01 & res$log2FC > 2 )
-    
-    xx = res[c(jj), ]
-    xx = xx[order(-xx$log2FC), ]
-    xx = xx[which(xx$min < 1), ]
-    
+  
+  saveRDS(keep, file = paste0(RdataDir, '/matrix.saved.for.spatial.MARA.rds'))
+  
+  xx = run.MARA.atac.spatial(keep, cc)
+  
+  
+}
+
+ 
+  
+  
+
+
+########################################################
+########################################################
+# Section : regeneration peaks
+# 
+########################################################
+########################################################
+##########################################
+# temporal-peaks test
+##########################################
+grouping.temporal.peaks = FALSE
+if(grouping.temporal.peaks){
+  conds = c("Embryo_Stage40", "Embryo_Stage44_proximal", "Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal")
+  
+  # examples to test
+  test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
+  #test.examples = c('Hoxa13')
+  ii.test = which(overlapsAny(pp, promoters[which(!is.na(match(promoters$geneSymbol, test.examples)))]))
+  #ii.Hox = which(overlapsAny(pp, Hoxs))
+  #ii.test = unique(c(ii.test, ii.Hox))
+  
+  sample.sels = c(); cc = c()
+  for(n in 1:length(conds)) {
+    kk = which(design$conds == conds[n])
+    sample.sels = c(sample.sels, kk)
+    cc = c(cc, rep(conds[n], length(kk)))
+  }
+  
+  library(tictoc)
+  # ii.test = c(1:nrow(fpm)) # takes about 2 mins for 40k peaks
+  
+  Run.temporal.peak.test = FALSE
+  if(Run.temporal.peak.test)
+  {
     source('Functions_atac.R')
-    keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
-    keep = as.matrix(keep)
+    cpm = fpm[, sample.sels]
     
-    kk = c(grep('Embryo_Stage40', colnames(keep)), 
-           grep('Embryo_Stage44', colnames(keep)))
-    kk = c(setdiff(c(1:ncol(keep)), kk), kk)
+    quantile(fpm.bg, 0.99)
+    nb.above.threshold = apply(as.matrix(cpm), 1, function(x) length(which(x> 2)))
     
-    keep = keep[, kk]
-    df <- data.frame(cc[kk])
-    rownames(df) = colnames(keep)
+    hist(nb.above.threshold, breaks = c(-1:ncol(cpm)))
+    length(which(nb.above.threshold>6))
     
-    ii.gaps = c(4, 8, 10, 12, 16)+1
+    peak.sels = which(nb.above.threshold>=3)
+    cpm = cpm[peak.sels, ]
     
-    pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
-             cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps,
-             filename = paste0(resDir, '/heatmap_regenerationPeaks_fdr0.01_log2FC.1.pdf'), 
-             width = 12, height = 12)
+    tic()
+    ## define the dynamic enhancers with mature UA and BL.UA and check them if embryo samples
+    sels = grep('Embryo', cc, invert = TRUE) 
+    res = t(apply(cpm[, sels], 1, temporal.peaks.test, c = cc[sels]))
+    toc()
     
-    ##########################################
-    # highligh potential regeneration peaks, not found in mUA and embryo stages only in regeneration process 
-    ##########################################
-    jj1 = grep('Embryo_Stage40', colnames(keep))
-    jj2 = grep('Embryo_Stage44', colnames(keep))
-    jj3 = grep('Mature_UA', colnames(keep))
-    mean1 = apply(keep[, jj1], 1, mean)
-    mean2 = apply(keep[, jj2], 1, mean)
-    mean3 = apply(keep[, jj3], 1, mean)
+    xx = data.frame(res, pp.annots[match(rownames(cpm), rownames(pp.annots)), ],  stringsAsFactors = FALSE)
     
-    kk = which(mean1< 1. & mean2 < 1. & mean3 < 1.)
+    res = xx
     
-    pheatmap(keep[kk, ], cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
-             cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps,
-             filename = paste0(resDir, '/heatmap_regenerationPeaks_fdr0.01_log2FC.1_regeneartion.specific.pdf'), 
-             width = 8, height = 10)
-    
-    yy = keep[kk,]
-    
-    ##########################################
-    # first motif activity analysis for temporally dynamic peaks 
-    ##########################################
-    source('MARA_functions.R')
-    xx = run.MARA.atac.temporal(keep, cc)
+    saveRDS(res, file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v3.rds'))
     
   }
+  
+  
+  res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v3.rds'))
+  
+  # select the temporal dynamic peaks
+  length(which(res$prob.M0<0.05))
+  length(which(res$prob.M0<0.05 & res$log2FC > 1))
+  length(which(res$prob.M0<0.01 & res$log2FC > 1))
+  length(which(res$prob.M0<0.01 & res$log2FC > 1.5))
+  length(which(res$prob.M0<0.01 & res$log2FC > 2))
+  
+  #length(which(res$prob.M0<0.001 & res$log2FC > 2))
+  
+  #jj = which(res$prob.M0 < 0.05 & res$log2FC >1 )
+  
+  jj = which(res$prob.M0 < 0.01 & res$log2FC > 2 )
+  
+  xx = res[c(jj), ]
+  xx = xx[order(-xx$log2FC), ]
+  xx = xx[which(xx$min < 1), ]
+  
+  source('Functions_atac.R')
+  keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
+  keep = as.matrix(keep)
+  
+  kk = c(grep('Embryo_Stage40', colnames(keep)), 
+         grep('Embryo_Stage44', colnames(keep)))
+  kk = c(setdiff(c(1:ncol(keep)), kk), kk)
+  
+  keep = keep[, kk]
+  df <- data.frame(cc[kk])
+  rownames(df) = colnames(keep)
+  
+  ii.gaps = c(4, 8, 10, 12, 16)+1
+  
+  pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
+           cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps,
+           filename = paste0(resDir, '/heatmap_regenerationPeaks_fdr0.01_log2FC.1.pdf'), 
+           width = 12, height = 12)
+  
+  ##########################################
+  # highligh potential regeneration peaks, not found in mUA and embryo stages only in regeneration process 
+  ##########################################
+  jj1 = grep('Embryo_Stage40', colnames(keep))
+  jj2 = grep('Embryo_Stage44', colnames(keep))
+  jj3 = grep('Mature_UA', colnames(keep))
+  mean1 = apply(keep[, jj1], 1, mean)
+  mean2 = apply(keep[, jj2], 1, mean)
+  mean3 = apply(keep[, jj3], 1, mean)
+  
+  kk = which(mean1< 1. & mean2 < 1. & mean3 < 1.)
+  
+  pheatmap(keep[kk, ], cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
+           cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps,
+           filename = paste0(resDir, '/heatmap_regenerationPeaks_fdr0.01_log2FC.1_regeneartion.specific.pdf'), 
+           width = 8, height = 10)
+  
+  yy = keep[kk,]
+  
+  ##########################################
+  # first motif activity analysis for temporally dynamic peaks 
+  ##########################################
+  source('MARA_functions.R')
+  xx = run.MARA.atac.temporal(keep, cc)
   
 }
 
