@@ -273,6 +273,13 @@ if(Grouping.atac.peaks){
     
     pp = data.frame(t(sapply(rownames(fpm), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
     pp$strand = '*'
+    
+    save.peak.bed = FALSE
+    if(save.peak.bed){
+      bed = data.frame(pp[, c(1:3)], rownames(pp), 0, pp[, 4], stringsAsFactors = FALSE)
+      write.table(bed, file = paste0(resDir, '/peakset_', version.analysis, '.bed'), col.names = FALSE, row.names = FALSE,
+                  sep = '\t', quote = FALSE)
+    }
     pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
                                   start.field="X2", end.field="X3", strand.field="strand")
     
@@ -286,7 +293,9 @@ if(Grouping.atac.peaks){
     
     promoters = select.promoters.regions(upstream = 2000, downstream = 2000, ORF.type.gtf = 'Putative', promoter.select = 'all')
     
+    
   }
+  
   
   ##########################################
   # all-peaks test M0 (static peaks), M1 (dynamic peaks above background), M2 (dyanmic peaks with some condtions below background)
@@ -441,7 +450,7 @@ if(Grouping.atac.peaks){
     #xx = xx[order(-xx$log2FC.mature), ]
     xx[grep('HOXA13', xx$transcriptId), ]
     
-    
+    # filter the peaks from head control sample
     Filtering.peaks.in.Head.samples = TRUE
     if(Filtering.peaks.in.Head.samples){
       p0 = pp[match(rownames(xx), names(pp))]
@@ -455,7 +464,12 @@ if(Grouping.atac.peaks){
       xx = xx[non.overlap, ]
       
     }
+    
     xx[grep('HOXA13', xx$transcriptId), ]
+    
+    # sort positional peaks with logFC
+    #xx = xx[order(-xx$logFC.mean), ]
+    xx = xx[order(-xx$log2FC), ]
     
     keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
     keep = as.matrix(keep)
@@ -583,6 +597,62 @@ if(Grouping.atac.peaks){
     # first motif activity analysis for positional-dependent peaks 
     ##########################################
     source('MARA_functions.R')
+    
+    Prepare.Response = FALSE
+    if(Prepare.Response){
+      
+      conds = c("Mature_UA", "Mature_LA", "Mature_Hand")
+      sample.sels = c();  cc = c()
+      for(n in 1:length(conds)) {
+        #kk = which(design$conds == conds[n] & design$SampleID != '136159')
+        kk = which(design$conds == conds[n]) 
+        sample.sels = c(sample.sels, kk)
+        cc = c(cc, rep(conds[n], length(kk)))
+      }
+      
+      res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v6.rds'))
+      
+      # select the positional peaks with 
+      fdr.cutoff = 0.01; logfc.cutoff = 1
+      jj = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & res$logFC.mLA.vs.mUA > logfc.cutoff) |
+                   (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & res$logFC.mHand.vs.mUA > logfc.cutoff)|
+                   (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & res$logFC.mHand.vs.mLA > logfc.cutoff)
+      )
+      
+      jj1 = which(res$prob.M0<0.01 & res$log2FC>1)
+      jj2 = which(res$pval.lrt < 0.001 & res$log2FC > 1)
+      
+      xx = res[c(jj), ]
+      #xx = xx[order(-xx$log2FC.mature), ]
+      xx[grep('HOXA13', xx$transcriptId), ]
+      
+      # filter the peaks from head control sample
+      Filtering.peaks.in.Head.samples = TRUE
+      if(Filtering.peaks.in.Head.samples){
+        p0 = pp[match(rownames(xx), names(pp))]
+        
+        ctl = fpm[, grep('HEAD', colnames(fpm))]
+        ctl = ctl[which(ctl>2.5)]
+        p.ctl = pp[match(names(ctl), names(pp))]
+        
+        non.overlap = !overlapsAny(p0, p.ctl)
+        
+        xx = xx[non.overlap, ]
+        
+      }
+      
+      xx[grep('HOXA13', xx$transcriptId), ]
+      
+      # sort positional peaks with logFC
+      #xx = xx[order(-xx$logFC.mean), ]
+      xx = xx[order(-xx$log2FC), ]
+      
+      keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
+      keep = as.matrix(keep)
+      
+      
+    }
+    
     
     saveRDS(keep, file = paste0(RdataDir, '/matrix.saved.for.spatial.MARA.rds'))
     
