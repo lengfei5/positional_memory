@@ -176,7 +176,7 @@ if(Make.Granges.and.peakAnnotation){
 }
 
 ##########################################
-# make plots
+# make heatmap
 ##########################################
 Make.Heatmap.positional.peaks = FALSE
 if(Make.Heatmap.positional.peaks){
@@ -321,8 +321,34 @@ if(Make.Heatmap.positional.peaks){
   
 }
 
-
-
+##########################################
+# MARA plots 
+##########################################
+Make.plot.motif.analysis = FALSE
+if(Make.plot.motif.analysis){
+  r = readRDS(file = paste0(resDir, '/MARA_Bayesian_ridge.rds'))
+  
+  zz = r$Zscore
+  zz = apply(as.matrix(zz), 1, max)
+  r$max.Zscore = zz
+  
+  # = sort(r$combined.Zscore, decreasing=TRUE)[1:50]
+  sort(r$combined.Zscore, decreasing=TRUE)[1:20]
+  
+  sort(r$max.Zscore, decreasing=TRUE)[1:20]
+  sort(r$max.Zscore, decreasing=TRUE)[1:30]
+  
+  top20 = sort(r$max.Zscore, decreasing = TRUE)[1:30]
+  motif.names = rownames(r$Zscore)
+  bb = r$Zscore[match(names(top20), motif.names), ]
+  
+  pheatmap(bb, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = FALSE, 
+           scale = 'none', cluster_cols=FALSE, main = paste0("Inferred z-scores (motif activity) by MARA"), 
+           na_col = "white", fontsize_row = 12, 
+           filename = paste0(figureDir, 'positional_peaks_MARA_ridge.pdf'), 
+           width = 8, height = 10) 
+  
+}
 
 
 

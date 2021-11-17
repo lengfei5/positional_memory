@@ -722,6 +722,7 @@ run.MARA.atac.spatial = function(keep, cc)
   require(glmnet)
   library(pheatmap)
   library(RColorBrewer)
+  library(scchicFuncs)
   
   # prepare Y response matrix
   Prepare.Response.Matrix = FALSE
@@ -734,17 +735,28 @@ run.MARA.atac.spatial = function(keep, cc)
     fpm = fpm[grep('bg_', rownames(fpm), invert = TRUE), ]
     rownames(fpm) = gsub('_', '-', rownames(fpm))
     
+    res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v6.rds'))
     
-    res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v5.rds'))
+    conds = c("Mature_UA", "Mature_LA", "Mature_Hand")
+    sample.sels = c();  cc = c()
+    for(n in 1:length(conds)) {
+      kk = which(design$conds == conds[n] & design$SampleID != '74938' & design$SampleID != '102655')
+      #kk = which(design$conds == conds[n]) 
+      sample.sels = c(sample.sels, kk)
+      cc = c(cc, rep(conds[n], length(kk)))
+    }
     
-    # select the spatially dynamic peaks
+    
+    # select the positional peaks with 
     fdr.cutoff = 0.01; logfc.cutoff = 1
     jj = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & res$logFC.mLA.vs.mUA > logfc.cutoff) |
                  (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & res$logFC.mHand.vs.mUA > logfc.cutoff)|
                  (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & res$logFC.mHand.vs.mLA > logfc.cutoff)
     )
     
-    # select the spatially dynamic peaks
+    jj1 = which(res$prob.M0<0.01 & res$log2FC>1)
+    jj2 = which(res$pval.lrt < 0.001 & res$log2FC > 1)
+    
     jj = which(res$prob.M0 <  0.01 & res$log2FC > 2)
     cat(length(jj), ' peaks selected \n')
     
@@ -757,20 +769,31 @@ run.MARA.atac.spatial = function(keep, cc)
     xx = res[c(jj), ]
     xx = xx[order(-xx$log2FC), ]
     
-    keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), ]
-    keep = as.matrix(keep)
+    xx[grep('HOXA13', xx$transcriptId), ]
     
-    conds = c("Mature_UA", "Mature_LA", "Mature_Hand")
-    
-    sample.sels = c()
-    cc = c()
-    for(n in 1:length(conds)) {
-      kk = which(design$conds == conds[n])
-      sample.sels = c(sample.sels, kk)
-      cc = c(cc, rep(conds[n], length(kk)))
+    # filter the peaks from head control sample
+    Filtering.peaks.in.Head.samples = TRUE
+    if(Filtering.peaks.in.Head.samples){
+      p0 = pp[match(rownames(xx), names(pp))]
+      
+      ctl = fpm[, grep('HEAD', colnames(fpm))]
+      ctl = ctl[which(ctl>2.5)]
+      p.ctl = pp[match(names(ctl), names(pp))]
+      
+      non.overlap = !overlapsAny(p0, p.ctl)
+      
+      xx = xx[non.overlap, ]
+      
     }
     
-    keep = keep[ , sample.sels]
+    xx[grep('HOXA13', xx$transcriptId), ]
+    
+    # sort positional peaks with logFC
+    #xx = xx[order(-xx$logFC.mean), ]
+    xx = xx[order(-xx$log2FC), ]
+    
+    keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
+    keep = as.matrix(keep)
     
     cc.uniq = unique(cc)
     Y = matrix(NA, ncol = length(cc.uniq), nrow = nrow(keep))
@@ -821,23 +844,26 @@ run.MARA.atac.spatial = function(keep, cc)
     opt =  scchicFuncs::optimize.lambda(N, E)
     
     r = ridge.regression(N, E, opt$lambda.opt)
+    
+    saveRDS(r, file = paste0(resDir, '/MARA_Bayesian_ridge.rds'))
     zz = r$Zscore
     zz = apply(as.matrix(zz), 1, max)
     r$max.Zscore = zz
     
     # = sort(r$combined.Zscore, decreasing=TRUE)[1:50]
-    sort(r$combined.Zscore, decreasing=TRUE)[1:50]
+    sort(r$combined.Zscore, decreasing=TRUE)[1:20]
     
-    sort(r$max.Zscore, decreasing=TRUE)[1:50]
+    sort(r$max.Zscore, decreasing=TRUE)[1:20]
+    sort(r$max.Zscore, decreasing=TRUE)[1:30]
     
-    top20 = sort(r$max.Zscore, decreasing = TRUE)[1:50]
+    top20 = sort(r$max.Zscore, decreasing = TRUE)[1:30]
     motif.names = rownames(r$Zscore)
     bb = r$Zscore[match(names(top20), motif.names), ]
     pheatmap(bb, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = FALSE, 
              scale = 'none', cluster_cols=FALSE, main = paste0("Inferred z-scores (motif activity) by MARA"), 
              na_col = "white", fontsize_row = 12, 
              filename = paste0(resDir, '/positional_peaks_MARA_ridge.pdf'), 
-             width = 8, height = 12) 
+             width = 8, height = 10) 
     
     
   }
