@@ -487,6 +487,6 @@ if(plot.MARA.temporal.peaks){
            scale = 'none', cluster_cols=FALSE, main = paste0("Inferred z-scores (motif activity) by MARA"), 
            na_col = "white", fontsize_row = 12, annotation_col = df, 
            filename = paste0(figureDir, '/MARA_bayesianRidge_temporalPeaks.pdf'), 
-           width = 12, height = 10) 
+           width = 12, height = 10)
   
 }
