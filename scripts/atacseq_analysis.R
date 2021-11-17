@@ -249,8 +249,8 @@ if(Normalization.BatchCorrect){
 # 
 ########################################################
 ########################################################
-Grouping.atac.peaks = FALSE
-if(Grouping.atac.peaks){
+Differentially.Binding.analysis = TRUE
+if(Differentially.Binding.analysis){
   load(file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical_v1.Rdata'))
   fpm = readRDS(file = paste0(RdataDir, '/fpm_TMM_combat.rds'))
   
@@ -294,14 +294,13 @@ if(Grouping.atac.peaks){
     
     promoters = select.promoters.regions(upstream = 2000, downstream = 2000, ORF.type.gtf = 'Putative', promoter.select = 'all')
     
-    
   }
   
 }
 
 ########################################################
 ########################################################
-# Section :
+# Section III: promoter analysis
 # ##########################################
 # all-peaks test M0 (static peaks), M1 (dynamic peaks above background), M2 (dyanmic peaks with some condtions below background)
 # we will also loci that are always open across all conditions
@@ -377,7 +376,7 @@ if(make.test.All.Peaks){
 
 ########################################################
 ########################################################
-# Section :
+# Section IV : positional peaks
 # ##########################################
 # Position-dependent test
 # mainly use the mature samples, mUA, mLA and mHand
@@ -611,85 +610,24 @@ if(grouping.position.dependent.peaks){
   ##########################################
   source('MARA_functions.R')
   
-  Prepare.Response = FALSE
-  if(Prepare.Response){
-    res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v6.rds'))
-    
-    conds = c("Mature_UA", "Mature_LA", "Mature_Hand")
-    sample.sels = c();  cc = c()
-    for(n in 1:length(conds)) {
-      kk = which(design$conds == conds[n] & design$SampleID != '74938' & design$SampleID != '102655')
-      #kk = which(design$conds == conds[n]) 
-      sample.sels = c(sample.sels, kk)
-      cc = c(cc, rep(conds[n], length(kk)))
-    }
-    
-    
-    # select the positional peaks with 
-    fdr.cutoff = 0.01; logfc.cutoff = 1
-    jj = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & res$logFC.mLA.vs.mUA > logfc.cutoff) |
-                 (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & res$logFC.mHand.vs.mUA > logfc.cutoff)|
-                 (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & res$logFC.mHand.vs.mLA > logfc.cutoff)
-    )
-    
-    jj1 = which(res$prob.M0<0.01 & res$log2FC>1)
-    jj2 = which(res$pval.lrt < 0.001 & res$log2FC > 1)
-    
-    xx = res[c(jj), ]
-    #xx = xx[order(-xx$log2FC.mature), ]
-    xx[grep('HOXA13', xx$transcriptId), ]
-    
-    # filter the peaks from head control sample
-    Filtering.peaks.in.Head.samples = TRUE
-    if(Filtering.peaks.in.Head.samples){
-      p0 = pp[match(rownames(xx), names(pp))]
-      
-      ctl = fpm[, grep('HEAD', colnames(fpm))]
-      ctl = ctl[which(ctl>2.5)]
-      p.ctl = pp[match(names(ctl), names(pp))]
-      
-      non.overlap = !overlapsAny(p0, p.ctl)
-      
-      xx = xx[non.overlap, ]
-      
-    }
-    
-    xx[grep('HOXA13', xx$transcriptId), ]
-    
-    # sort positional peaks with logFC
-    #xx = xx[order(-xx$logFC.mean), ]
-    xx = xx[order(-xx$log2FC), ]
-    
-    keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
-    keep = as.matrix(keep)
-    
-    
-  }
-  
-  
   saveRDS(keep, file = paste0(RdataDir, '/matrix.saved.for.spatial.MARA.rds'))
   
+  # prepare step is in the MARA_functions.R
   xx = run.MARA.atac.spatial(keep, cc)
   
   
 }
 
- 
-  
-  
-
-
 ########################################################
 ########################################################
 # Section : regeneration peaks
-# 
+# or temporal-peaks test
 ########################################################
 ########################################################
-##########################################
-# temporal-peaks test
 ##########################################
 grouping.temporal.peaks = FALSE
 if(grouping.temporal.peaks){
+  
   conds = c("Embryo_Stage40", "Embryo_Stage44_proximal", "Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal")
   
   # examples to test
@@ -705,6 +643,7 @@ if(grouping.temporal.peaks){
     sample.sels = c(sample.sels, kk)
     cc = c(cc, rep(conds[n], length(kk)))
   }
+  
   
   library(tictoc)
   # ii.test = c(1:nrow(fpm)) # takes about 2 mins for 40k peaks
