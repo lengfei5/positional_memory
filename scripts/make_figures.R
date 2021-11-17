@@ -350,5 +350,107 @@ if(Make.plot.motif.analysis){
   
 }
 
+##########################################
+# make heatmap for regeneration peaks 
+##########################################
+Make.Heatmap.regeneration.peaks = FALSE
+if(Make.Heatmap.regeneration.peaks){
+  
+  conds = c("Embryo_Stage40", "Embryo_Stage44_proximal", "Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal")
+  
+  sample.sels = c(); cc = c()
+  for(n in 1:length(conds)) {
+    kk = which(design$conds == conds[n])
+    sample.sels = c(sample.sels, kk)
+    cc = c(cc, rep(conds[n], length(kk)))
+  }
+  
+  res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v4.rds'))
+  
+  # select the temporal dynamic peaks
+  length(which(res$prob.M0<0.05))
+  length(which(res$prob.M0<0.05 & res$log2FC > 1))
+  length(which(res$prob.M0<0.01 & res$log2FC > 1))
+  length(which(res$prob.M0<0.01 & res$log2FC > 1.5))
+  length(which(res$prob.M0<0.01 & res$log2FC > 2))
+  
+  jj = which(res$prob.M0 < 0.01 & res$log2FC > 1.5 )
+  
+  xx = res[c(jj), ]
+  xx = xx[order(-xx$log2FC), ]
+  #xx = xx[which(xx$min < 1), ]
+  
+  source('Functions_atac.R')
+  keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
+  keep = as.matrix(keep)
+  
+  kk = c(grep('Embryo_Stage40', colnames(keep)), 
+         grep('Embryo_Stage44', colnames(keep)))
+  kk = c(setdiff(c(1:ncol(keep)), kk), kk)
+  
+  keep = keep[, kk]
+  df <- data.frame(cc[kk])
+  rownames(df) = colnames(keep)
+  colnames(df) = 'condition'
+  
+  ii.gaps = c(4, 8, 10, 12, 16) + 1
+  
+  pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
+           cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps,
+           filename = paste0(figureDir, '/heatmap_DBpeaks_fdr0.01_log2FC.1.5.pdf'), 
+           width = 10, height = 16)
+  
+  
+  ##########################################
+  # highligh potential regeneration peaks, those not found in mUA, mLA, mHand and embryo stages, only in regeneration process
+  # not in head control samples either
+  ##########################################
+  cpms = fpm[match(rownames(keep), rownames(fpm)), ]
+  
+  bg.cutoff = 1.0
+  kk = which(apply(cpms[, grep('Embryo_Stage40', colnames(cpms))], 1, mean) < bg.cutoff & 
+               apply(cpms[, grep('Embryo_Stage44_proximal', colnames(cpms))], 1, mean) < bg.cutoff &
+               apply(cpms[, grep('Embryo_Stage44_distal', colnames(cpms))], 1, mean) < bg.cutoff &
+               apply(cpms[, grep('Mature_UA', colnames(cpms))], 1, mean) < bg.cutoff &
+               apply(cpms[, grep('Mature_LA', colnames(cpms))], 1, mean) < bg.cutoff & 
+               apply(cpms[, grep('Mature_Hand', colnames(cpms))], 1, mean) < bg.cutoff 
+               & cpms[, grep('HEAD', colnames(cpms))] < bg.cutoff
+               )
+  
+  
+  pheatmap(keep[kk, ], cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
+           cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps,
+           filename = paste0(figureDir, '/heatmap_regenerationPeaks_fdr0.01_log2FC.1.5_regeneartion.specific.pdf'), 
+           width = 8, height = 10)
+  
+  if(saveTable){
+    yy = keep[kk, ]
+    yy = data.frame(yy, xx[match(rownames(yy), rownames(xx)), ], stringsAsFactors = FALSE)
+    yy = yy[order(-yy$log2FC), ]                
+    
+    write.csv(yy, 
+              file = paste0(tableDir, 'potential_regenerativepeaks.csv'), 
+              quote = FALSE, row.names = TRUE)
+    
+  }
+  
+  ##########################################
+  # if wannt to show something else, e.g. there is no regeneration enhancers
+  ##########################################
+  conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal", '')
+  sample.sels = c(); cc = c()
+  for(n in 1:length(conds)) {
+    kk = which(design$conds == conds[n])
+    sample.sels = c(sample.sels, kk)
+    cc = c(cc, rep(conds[n], length(kk)))
+  }
+  
+  df <- data.frame(cc[kk])
+  rownames(df) = colnames(keep)
+  colnames(df) = 'condition'
+  
+}
+
+
 
 

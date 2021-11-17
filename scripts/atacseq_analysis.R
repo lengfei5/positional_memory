@@ -31,7 +31,8 @@ gtf.file =  paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf')
 require(ggplot2)
 require(DESeq2)
 require(GenomicRanges)
-require("pheatmap")
+require(pheatmap)
+library(tictoc)
 
 ##########################################
 # some annotations for all analysis 
@@ -615,7 +616,6 @@ if(grouping.position.dependent.peaks){
   # prepare step is in the MARA_functions.R
   xx = run.MARA.atac.spatial(keep, cc)
   
-  
 }
 
 ########################################################
@@ -645,7 +645,6 @@ if(grouping.temporal.peaks){
   }
   
   
-  library(tictoc)
   # ii.test = c(1:nrow(fpm)) # takes about 2 mins for 40k peaks
   
   Run.temporal.peak.test = FALSE
@@ -673,12 +672,12 @@ if(grouping.temporal.peaks){
     
     res = xx
     
-    saveRDS(res, file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v3.rds'))
+    saveRDS(res, file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v4.rds'))
     
   }
   
   
-  res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v3.rds'))
+  res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v4.rds'))
   
   # select the temporal dynamic peaks
   length(which(res$prob.M0<0.05))
@@ -734,6 +733,7 @@ if(grouping.temporal.peaks){
            width = 8, height = 10)
   
   yy = keep[kk,]
+  
   
   ##########################################
   # first motif activity analysis for temporally dynamic peaks 
