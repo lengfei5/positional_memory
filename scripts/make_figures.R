@@ -326,7 +326,7 @@ if(Make.Heatmap.positional.peaks){
 ##########################################
 Make.plot.motif.analysis = FALSE
 if(Make.plot.motif.analysis){
-  r = readRDS(file = paste0(resDir, '/MARA_Bayesian_ridge.rds'))
+  r = readRDS(file = paste0(RdataDir, '/MARA_Bayesian_ridge.rds'))
   
   zz = r$Zscore
   zz = apply(as.matrix(zz), 1, max)
@@ -342,11 +342,14 @@ if(Make.plot.motif.analysis){
   motif.names = rownames(r$Zscore)
   bb = r$Zscore[match(names(top20), motif.names), ]
   
+  df <- data.frame(condition = colnames(bb))
+  rownames(df) = colnames(bb)
+  
   pheatmap(bb, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = FALSE, 
            scale = 'none', cluster_cols=FALSE, main = paste0("Inferred z-scores (motif activity) by MARA"), 
-           na_col = "white", fontsize_row = 12, 
+           na_col = "white", fontsize_row = 12, annotation_col = df, 
            filename = paste0(figureDir, 'positional_peaks_MARA_ridge.pdf'), 
-           width = 8, height = 10) 
+           width = 12, height = 10)
   
 }
 
@@ -452,5 +455,38 @@ if(Make.Heatmap.regeneration.peaks){
 }
 
 
-
-
+##########################################
+# motif ananlysis for temporal peaks 
+##########################################
+plot.MARA.temporal.peaks = FALSE
+if(plot.MARA.temporal.peaks){
+  r =  readRDS(file = paste0(RdataDir, '/MARA_Bayesian_ridge_regenerationPeaks.rds'))
+  
+  # exclude the zscore from mUA
+  zz = r$Zscore[, -1]
+  zz = apply(as.matrix(zz), 1, max)
+  r$max.Zscore = zz
+  
+  # = sort(r$combined.Zscore, decreasing=TRUE)[1:50]
+  sort(r$combined.Zscore, decreasing=TRUE)[1:20]
+  
+  sort(r$max.Zscore, decreasing=TRUE)[1:20]
+  sort(r$max.Zscore, decreasing=TRUE)[1:30]
+  sort(r$max.Zscore, decreasing=TRUE)[1:40]
+  sort(r$max.Zscore, decreasing=TRUE)[1:50]
+  
+  topMotifs = sort(r$max.Zscore, decreasing = TRUE)[1:30]
+  motif.names = rownames(r$Zscore)
+  bb = r$Zscore[match(names(topMotifs), motif.names), ]
+  
+  df <- data.frame(condition = colnames(bb))
+  rownames(df) = colnames(bb)
+  
+  
+  pheatmap(bb, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = FALSE, 
+           scale = 'none', cluster_cols=FALSE, main = paste0("Inferred z-scores (motif activity) by MARA"), 
+           na_col = "white", fontsize_row = 12, annotation_col = df, 
+           filename = paste0(figureDir, '/MARA_bayesianRidge_temporalPeaks.pdf'), 
+           width = 12, height = 10) 
+  
+}

@@ -190,6 +190,10 @@ if(Normalization.BatchCorrect){
     write.table(xx, file = paste0(resDir, '/DESeq2_scalingFactor_forDeeptools.txt'), sep = '\t',
                 col.names = FALSE, row.names = FALSE, quote = FALSE)
     
+    sfs = data.frame(sample = colnames(dds), sf = sizeFactors(dds)*median(colSums(counts(dds))), stringsAsFactors = FALSE)
+    
+    saveRDS(sfs, file = paste0(RdataDir, '/DESeq2_peaks.based_scalingFactors_forGenomicRanger.rds'))
+    
   }
   
   ##########################################

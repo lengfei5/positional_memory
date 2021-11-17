@@ -468,156 +468,6 @@ make.motif.oc.matrix.from.fimo.output = function()
 # 
 ########################################################
 ########################################################
-run.MARA.atac.temporal = function(keep, cc)
-{
-  library(pheatmap)
-  library(RColorBrewer)
-  require(glmnet)
-  
-  # prepare Y matrix 
-  cc.uniq = unique(cc)
-  Y = matrix(NA, ncol = length(cc.uniq), nrow = nrow(keep))
-  
-  for(n in 1:ncol(Y))
-  {
-    jj = which(cc == cc.uniq[n])
-    if(length(jj) == 1) {
-      Y[,n] = keep[,jj]
-    }else{
-      Y[,n] = apply(keep[ ,jj], 1, mean)
-    }
-  }
-  colnames(Y) = cc.uniq
-  rownames(Y) = rownames(keep)
-  
-  # X matrix
-  motif.oc = readRDS(file = '../results/motif_analysis/motif_oc_fimo.rds')
-  mm = match(rownames(motif.oc), rownames(Y))
-  motif.oc = motif.oc[!is.na(mm), ]
-  
-  ss.m = apply(motif.oc, 2, sum)
-  motif.oc = motif.oc[ , which(ss.m>0)]
-  
-  ss.p = apply(motif.oc, 1, sum)
-  motif.oc = motif.oc[which(ss.p>0), ]
-  
-  kk = match(rownames(motif.oc), rownames(Y))
-  Y = Y[kk, ]
-  
-  X = as.matrix(motif.oc)
-  Y = as.matrix(Y)
-  
-  alpha = 0.2
-  standardize = TRUE;
-  use.lambda.min = FALSE;
-  binarize.x = TRUE
-  standardize.response=FALSE
-  intercept=FALSE
-  family = 'mgaussian'
-  lambdas = 10^(seq(-4, 2, length.out = 100))
-  
-  x = X;
-  y = scale(Y, center = TRUE, scale = FALSE); # center response and standardize X (cf. elastic-net paper)
-  if(binarize.x) x = x > 0
-  #y = y[, c(2, 3)]
-  
-  library(doMC) 
-  registerDoMC(cores=6)
-  
-  library(tictoc)
-  tic()
-  cv.fit=cv.glmnet(x, y, family= family,
-                   alpha=alpha, lambda = lambdas, standardize=standardize, 
-                   standardize.response=standardize.response, parallel = TRUE)
-  
-  plot(cv.fit)
-  toc()
-  
-  
-  
-  #library(ridge)
-  #fit2 = linearRidge(y[,1] ~ x)
-  
-  tic()
-  fit=glmnet(x,y, alpha=alpha, lambda=cv.fit$lambda, family=family,
-             standardize=standardize, standardize.response=standardize.response, intercept=intercept, 
-             relax = FALSE)
-  plot(fit, xvar = "lambda", label = TRUE, type.coef = "2norm")
-  toc()
-    
-  if(use.lambda.min){
-    s.optimal = cv.fit$lambda.min
-  }else{
-    s.optimal = cv.fit$lambda.1se
-  }
-  
-  #s.optimal = fit$lambda[16]
-  
-  xx = coef(fit, s = s.optimal)
-  aa = c();  for(j in 1:length(xx)) { aa = cbind(aa, as.numeric(xx[[j]])); }
-  
-  rownames(aa) = rownames(xx[[1]])
-  colnames(aa) = colnames(y)
-  aa = as.data.frame(aa[-1, ]) # ignore the intercept
-  aa = scale(aa) # calculate z score here is probably not a good idea to do feature selection
-  #rownames(aa) = rownames(xx[[1]])[-1]
-  
-  cutoff.activity = 2.5
-  ss = apply(aa, 1, function(x) length(which(abs(x) > cutoff.activity)))
-  cat(length(which(ss>0)), ' nzero features \n')
-  
-  print(aa[which(ss>0), ])
-  
-  
-  pheatmap(aa[which(ss>0), ], cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE, breaks = NA,
-           scale = 'none', cluster_cols=FALSE, main = paste0("motif activity by MARA"), 
-           na_col = "white", fontsize_col = 12) 
-  
-  
-  # aa = as.data.frame(coef.glmnet(fit, s = s.optimal))
-  # aa = aa[-1, ] # remove intecept
-  # colnames(aa) = names(fit$beta)
-  # if(alpha > 0.0){
-  #   rownames(aa) = rownames(fit$beta[[2]])
-  #   res = aa;
-  #   ## collect result from the elastic-net
-  #   #kk = apply(aa, 1, function(x) !all(x==0))
-  #   #aa = aa[kk, ]
-  #   #colnames(x)[which(fit$beta[[1]][,optimal]!=0)]
-  #   #colnames(x)[which(fit$beta[[2]][,optimal]!=0)]
-  #   
-  #   # rerun lm with selected features
-  #   relax.fitting.lm = FALSE
-  #   if(relax.fitting.lm){
-  #     fit.lm = lm(y ~ x[, match(rownames(aa), colnames(x))])
-  #     res = data.frame(fit.lm$coefficients)
-  #     res = res[-1, ] # remove intercept
-  #     rownames(res) = rownames(aa)
-  #     
-  #     pheatmap(res, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE, breaks = NA,
-  #              scale = 'column', cluster_cols=FALSE, main = paste0("motif activity"), 
-  #              na_col = "white", fontsize_col = 10)
-  #   }
-  #   
-  # }else{
-  #   if(zscore.output) aa = apply(aa, 2, scale)
-  #   rownames(aa) = rownames(fit$beta[[2]])
-  #   #ss = apply(aa, 1, function(x) !all(x==0))
-  #   #aa = aa[ss, ]
-  #   #head(rownames(aa)[order(-abs(aa$MSxp))], 10)
-  #   #head(rownames(aa)[order(-abs(aa$MSxa))], 10)
-  #   res = aa
-  #   
-  #   if(Test){
-  #     ss = apply(aa, 1, function(x) length(which(abs(x) > Test.zscore.cutoff)))
-  #     aa = aa[which(ss>0), ]
-  #     print(aa)
-  #   }
-  # }
-  
-}
-
-
 run.RF.otherMethods = function()
 {
   library(randomForest)
@@ -1053,10 +903,234 @@ run.MARA.atac.spatial = function(keep, cc)
                na_col = "gray", fontsize_col = 12)
     }
     
+  }
+  
+}
+
+
+run.MARA.atac.temporal = function(keep, cc)
+{
+  require(glmnet)
+  library(pheatmap)
+  library(RColorBrewer)
+  library(scchicFuncs)
+  
+  # prepare Y response matrix
+  Prepare.Response.Matrix = FALSE
+  if(Prepare.Response.Matrix){
+    load(file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical_v1.Rdata'))
+    fpm = readRDS(file = paste0(RdataDir, '/fpm_TMM_combat.rds'))
+    
+    # prepare the background distribution
+    fpm.bg = fpm[grep('bg_', rownames(fpm), invert = FALSE), ]
+    fpm = fpm[grep('bg_', rownames(fpm), invert = TRUE), ]
+    rownames(fpm) = gsub('_', '-', rownames(fpm))
+    
+    res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v4.rds'))
+    
+    # select the temporal dynamic peaks
+    length(which(res$prob.M0<0.05))
+    length(which(res$prob.M0<0.05 & res$log2FC > 1))
+    length(which(res$prob.M0<0.01 & res$log2FC > 1))
+    length(which(res$prob.M0<0.01 & res$log2FC > 1.5))
+    length(which(res$prob.M0<0.01 & res$log2FC > 2))
+    
+    jj = which(res$prob.M0 < 0.01 & res$log2FC > 2 )
+    
+    conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal")
+    
+    sample.sels = c(); cc = c()
+    for(n in 1:length(conds)) {
+      kk = which(design$conds == conds[n])
+      sample.sels = c(sample.sels, kk)
+      cc = c(cc, rep(conds[n], length(kk)))
+    }
+    
+    xx = res[c(jj), ]
+    xx = xx[order(-xx$log2FC), ]
+    
+    keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
+    keep = as.matrix(keep)
+    
+    cc.uniq = unique(cc)
+    Y = matrix(NA, ncol = length(cc.uniq), nrow = nrow(keep))
+    
+    for(n in 1:ncol(Y))
+    {
+      jj = which(cc == cc.uniq[n])
+      if(length(jj) == 1) {
+        Y[,n] = keep[,jj]
+      }else{
+        Y[,n] = apply(keep[ ,jj], 1, mean)
+      }
+    }
+    
+    colnames(Y) = cc.uniq
+    rownames(Y) = rownames(keep)
     
   }
   
+  # prepare X matrix from motif occurrency matrix
+  motif.oc = readRDS(file = '../results/motif_analysis/motif_oc_fimo_v2.rds')
+  mm = match(rownames(motif.oc), rownames(Y))
+  motif.oc = motif.oc[!is.na(mm), ]
   
+  ss.m = apply(motif.oc, 2, sum)
+  motif.oc = motif.oc[ , which(ss.m>0)]
+  
+  ss.p = apply(motif.oc, 1, sum)
+  motif.oc = motif.oc[which(ss.p>0), ]
+  
+  kk = match(rownames(motif.oc), rownames(Y))
+  Y = Y[kk, ]
+  
+  X = as.matrix(motif.oc)
+  Y = as.matrix(Y)
+  
+  Run.Bayesian.ridge = FALSE
+  if(Run.Bayesian.ridge){ 
+    # the original code from Jake 
+    # https://github.com/jakeyeung/scchic-functions/blob/master/scripts/motevo_scripts/lib/run_ridge_regression2.R
+    
+    E = as.matrix(Y) # exp: matrix of expression, row centered.
+    N = as.matrix(X)
+    
+    E = t(apply(E, 1, scale, center = TRUE, scale = FALSE))
+    colnames(E) = colnames(Y)
+    
+    opt =  scchicFuncs::optimize.lambda(N, E)
+    
+    r = ridge.regression(N, E, opt$lambda.opt)
+    
+    saveRDS(r, file = paste0(RdataDir, '/MARA_Bayesian_ridge_regenerationPeaks.rds'))
+    
+    zz = r$Zscore
+    zz = apply(as.matrix(zz), 1, max)
+    r$max.Zscore = zz
+    
+    # = sort(r$combined.Zscore, decreasing=TRUE)[1:50]
+    sort(r$combined.Zscore, decreasing=TRUE)[1:20]
+    
+    sort(r$max.Zscore, decreasing=TRUE)[1:20]
+    sort(r$max.Zscore, decreasing=TRUE)[1:30]
+    sort(r$max.Zscore, decreasing=TRUE)[1:40]
+    sort(r$max.Zscore, decreasing=TRUE)[1:50]
+    
+    topMotifs = sort(r$max.Zscore, decreasing = TRUE)[1:30]
+    motif.names = rownames(r$Zscore)
+    bb = r$Zscore[match(names(topMotifs), motif.names), ]
+    pheatmap(bb, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = FALSE, 
+             scale = 'none', cluster_cols=FALSE, main = paste0("Inferred z-scores (motif activity) by MARA"), 
+             na_col = "white", fontsize_row = 12, 
+             filename = paste0(resDir, '/positional_peaks_MARA_ridge.pdf'), 
+             width = 8, height = 10) 
+    
+    
+  }
+  
+  Run.glmnet = FALSE
+  if(Run.glmnet){
+    # prepare Y matrix 
+    cc.uniq = unique(cc)
+    Y = matrix(NA, ncol = length(cc.uniq), nrow = nrow(keep))
+    
+    for(n in 1:ncol(Y))
+    {
+      jj = which(cc == cc.uniq[n])
+      if(length(jj) == 1) {
+        Y[,n] = keep[,jj]
+      }else{
+        Y[,n] = apply(keep[ ,jj], 1, mean)
+      }
+    }
+    colnames(Y) = cc.uniq
+    rownames(Y) = rownames(keep)
+    
+    # X matrix
+    motif.oc = readRDS(file = '../results/motif_analysis/motif_oc_fimo.rds')
+    mm = match(rownames(motif.oc), rownames(Y))
+    motif.oc = motif.oc[!is.na(mm), ]
+    
+    ss.m = apply(motif.oc, 2, sum)
+    motif.oc = motif.oc[ , which(ss.m>0)]
+    
+    ss.p = apply(motif.oc, 1, sum)
+    motif.oc = motif.oc[which(ss.p>0), ]
+    
+    kk = match(rownames(motif.oc), rownames(Y))
+    Y = Y[kk, ]
+    
+    X = as.matrix(motif.oc)
+    Y = as.matrix(Y)
+    
+    alpha = 0.2
+    standardize = TRUE;
+    use.lambda.min = FALSE;
+    binarize.x = TRUE
+    standardize.response=FALSE
+    intercept=FALSE
+    family = 'mgaussian'
+    lambdas = 10^(seq(-4, 2, length.out = 100))
+    
+    x = X;
+    y = scale(Y, center = TRUE, scale = FALSE); # center response and standardize X (cf. elastic-net paper)
+    if(binarize.x) x = x > 0
+    #y = y[, c(2, 3)]
+    
+    library(doMC) 
+    registerDoMC(cores=6)
+    
+    library(tictoc)
+    tic()
+    cv.fit=cv.glmnet(x, y, family= family,
+                     alpha=alpha, lambda = lambdas, standardize=standardize, 
+                     standardize.response=standardize.response, parallel = TRUE)
+    
+    plot(cv.fit)
+    toc()
+    
+    
+    
+    #library(ridge)
+    #fit2 = linearRidge(y[,1] ~ x)
+    
+    tic()
+    fit=glmnet(x,y, alpha=alpha, lambda=cv.fit$lambda, family=family,
+               standardize=standardize, standardize.response=standardize.response, intercept=intercept, 
+               relax = FALSE)
+    plot(fit, xvar = "lambda", label = TRUE, type.coef = "2norm")
+    toc()
+    
+    if(use.lambda.min){
+      s.optimal = cv.fit$lambda.min
+    }else{
+      s.optimal = cv.fit$lambda.1se
+    }
+    
+    #s.optimal = fit$lambda[16]
+    
+    xx = coef(fit, s = s.optimal)
+    aa = c();  for(j in 1:length(xx)) { aa = cbind(aa, as.numeric(xx[[j]])); }
+    
+    rownames(aa) = rownames(xx[[1]])
+    colnames(aa) = colnames(y)
+    aa = as.data.frame(aa[-1, ]) # ignore the intercept
+    aa = scale(aa) # calculate z score here is probably not a good idea to do feature selection
+    #rownames(aa) = rownames(xx[[1]])[-1]
+    
+    cutoff.activity = 2.5
+    ss = apply(aa, 1, function(x) length(which(abs(x) > cutoff.activity)))
+    cat(length(which(ss>0)), ' nzero features \n')
+    
+    print(aa[which(ss>0), ])
+    
+    
+    pheatmap(aa[which(ss>0), ], cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE, breaks = NA,
+             scale = 'none', cluster_cols=FALSE, main = paste0("motif activity by MARA"), 
+             na_col = "white", fontsize_col = 12) 
+    
+  }
   
 }
+
 
