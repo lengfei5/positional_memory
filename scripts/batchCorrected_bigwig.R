@@ -241,8 +241,71 @@ if(Debugging){
   
   findOverlaps(bw[jj], pp)
   
+}
+
+
+Test.scalingFactor.track.improvement = FALSE
+if(Test.scalingFactor.track.improvement){
+  
+  library(GenomicAlignments)
+  library(rtracklayer)
+  
+  sfs =  readRDS(file = paste0(RdataDir, '/DESeq2_peaks.based_scalingFactors_forGenomicRanger.rds'))
+  
+  Normalized.coverage = TRUE
+  Logtransform.coverage = FALSE
+  
+  baseDir = '/Volumes//groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/'
+  
+  InputDir = paste0(baseDir, '/bam_merged_using')
+  OutDir = paste0(baseDir, "bigwigs_reNormed/")
+  if(!dir.exists(OutDir)) dir.create(OutDir)
+  
+  bamlist = list.files(path = InputDir, pattern = "*.bam$", full.names = TRUE)
+  bamlist = bamlist[grep('Mature_LA', bamlist)]
+  
+  Pairend = TRUE
+  
+  for(n in c(1:length(bamlist)))
+  {
+    # n = 3
+    bam = bamlist[n]
+    bw.name = basename(bam)
+    bw.name = gsub(".bam", "", bw.name)
+    bw.name = gsub("_uniq_rmdup", '', bw.name)
+    bw.name = gsub('_mq_30.bw', '', bw.name)
+    
+    
+    
+    cat("bam file: ", bamlist[n], '-- ', "bw name: ", bw.name, "\n")
+    
+    if(!file.exists(paste0(OutDir, bw.name))){
+      if(Pairend){
+        ga = readGAlignmentPairs(bam)
+        #ga = readGAlignmentPairs(bam,param = ScanBamParam(flag=scanBamFlag(isDuplicate =FALSE))
+      }else{
+        ga = readGAlignments(bam)
+      }
+      
+      if(Normalized.coverage){
+        scalingfactor = sfs$sf[grep(bw.name, sfs$sample)]
+        xx = coverage(granges(ga))/scalingfactor
+        
+      }else{
+        xx = ga
+      }
+      
+      if(Logtransform.coverage) xx = log2(xx+2^-6)
+      
+      export.bw(xx, con = paste0(OutDir, bw.name, 'reNorm.bw'))
+      
+    }
+  }
+  
+  
   
 }
+
 
 
 

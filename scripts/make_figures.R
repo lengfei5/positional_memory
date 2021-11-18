@@ -489,4 +489,5 @@ if(plot.MARA.temporal.peaks){
            filename = paste0(figureDir, '/MARA_bayesianRidge_temporalPeaks.pdf'), 
            width = 12, height = 10)
   
+  
 }
