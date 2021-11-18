@@ -275,8 +275,6 @@ if(Test.scalingFactor.track.improvement){
     bw.name = gsub("_uniq_rmdup", '', bw.name)
     bw.name = gsub('_mq_30.bw', '', bw.name)
     
-    
-    
     cat("bam file: ", bamlist[n], '-- ', "bw name: ", bw.name, "\n")
     
     if(!file.exists(paste0(OutDir, bw.name))){
@@ -289,7 +287,7 @@ if(Test.scalingFactor.track.improvement){
       
       if(Normalized.coverage){
         scalingfactor = sfs$sf[grep(bw.name, sfs$sample)]
-        xx = coverage(granges(ga))/scalingfactor
+        xx = coverage(granges(ga))/scalingfactor*10^6
         
       }else{
         xx = ga
