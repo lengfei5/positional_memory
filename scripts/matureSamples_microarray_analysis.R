@@ -251,6 +251,7 @@ require(limma)
 load(file = paste0(RdataDir, 'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary.Rdata'))
 annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
                        'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
+
 mm = match(rownames(res), annot$geneID)
 ggs = paste0(annot$gene.symbol.toUse[mm], '_',  annot$geneID[mm])
 rownames(res)[!is.na(mm)] = ggs[!is.na(mm)]
