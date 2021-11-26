@@ -122,11 +122,13 @@ for(n in 1:length(pp))
 toc()
 
 ##########################################
-# impute the missing scaling factors from previous steps due to the sf = NA or sf = Inf
-# impute them with the median of good sf values in a heuristic way so as to continue with the gap scaling
+# 
+# 
+# 
 ##########################################
 index.missing.sf = mappings[which(is.na(xx$scalingfactor[mappings]) | xx$scalingfactor[mappings] == Inf)]
 index.good.sf = setdiff(mappings, index.missing.sf)
+
 xx$scalingfactor[index.missing.sf] = median(xx$scalingfactor[index.good.sf])
 
 ##########################################
@@ -188,7 +190,6 @@ for(chr in seqlevels(xx))
                            seqnames(xxchr[n]), ':', start(xxchr[n]), '-', end(xxchr[n])))
             }
             
-            
           }
         } # end of gaps with flanking peaks
       }
@@ -207,43 +208,55 @@ export.bw(newb, con = paste0(outDir, bw.name, '_bc.bw'))
 ##########################################
 Debugging = FALSE
 if(Debugging){
+  
+  rm(list =ls())
+  require(GenomicFeatures)
+  require(rtracklayer)
+  library(tools)
+  
   # intermediate results from test example
   dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/bigwigs_bc/'
-  bw.file = '/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/bigwigs_scalingFactor_consensusPeaks/Mature_LA_74939_mq_30.bw'
   
-  load(file = paste0(dataDir, 'samplesDesign.cleaned_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical_v1.Rdata'))
-  fpm = readRDS(file = paste0(dataDir, 'fpm_TMM_combat.rds'))
+  # load(file = paste0(dataDir, 'samplesDesign.cleaned_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical_v1.Rdata'))
+  # fpm = readRDS(file = paste0(dataDir, 'fpm_TMM_combat.rds'))
+  # 
+  # # prepare the background distribution
+  # fpm.bg = fpm[grep('bg_', rownames(fpm), invert = FALSE), ]
+  # fpm = fpm[grep('bg_', rownames(fpm), invert = TRUE), ]
+  # rownames(fpm) = gsub('_', '-', rownames(fpm))
+  # 
+  # fpm = 2^fpm
   
-  # prepare the background distribution
-  fpm.bg = fpm[grep('bg_', rownames(fpm), invert = FALSE), ]
-  fpm = fpm[grep('bg_', rownames(fpm), invert = TRUE), ]
-  rownames(fpm) = gsub('_', '-', rownames(fpm))
+  # bw.file = '/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/bigwigs_scalingFactor_consensusPeaks/Mature_LA_74939_mq_30.bw'
+  # 
+  # 
+  # bw.name = basename(bw.file)
+  # bw.name = gsub('_mq_30.bw', '', bw.name)
+  # 
+  # index.sample = which(colnames(fpm) == bw.name)
+  # 
+  # if(length(index.sample) != 1){
+  #   print('Sample Not Found')
+  #   stop()
+  # }
+  # 
+  # cpm = fpm[, index.sample]
   
-  fpm = 2^fpm
+  load(paste0(dataDir, 'outs_v3/Mature_Hand_74940_bc_peaks.Rdata'))
   
-  bw.name = basename(bw.file)
-  bw.name = gsub('_mq_30.bw', '', bw.name)
-  
-  index.sample = which(colnames(fpm) == bw.name)
-  
-  if(length(index.sample) != 1){
-    print('Sample Not Found')
-    stop()
-  }
-  
-  cpm = fpm[, index.sample]
-  
-  
-  load(paste0(dataDir, 'outs/Mature_LA_74939_bc_peaks_gaps.Rdata'))
   
   jj = which(is.na(mcols(newb)$score))
   head(which(mcols(bw)$score[jj]>0))
   
   findOverlaps(bw[jj], pp)
   
+  
 }
 
-
+##########################################
+# retest the scaling factors for bigwig files
+# conclusion: similar to Deeptools output
+##########################################
 Test.scalingFactor.track.improvement = FALSE
 if(Test.scalingFactor.track.improvement){
   
