@@ -90,14 +90,14 @@ newb = bw
 ##########################################
 # loop over the peaks and correct the bins within peaks
 ##########################################
-overlaps = findOverlaps(bw, pp, type = 'within', select = 'all')
+overlaps = findOverlaps(bw, pp, type = 'any', select = 'all')
 mappings = match(names(pp), names(xx))
 
 library(tictoc)
 tic()
 for(n in 1:length(pp))
 {
-  # n = 7
+  # n = 3
   kk = overlaps@from[which(overlaps@to == n)]
   bins = bw[kk]
   
@@ -128,6 +128,9 @@ toc()
 ##########################################
 index.missing.sf = mappings[which(is.na(xx$scalingfactor[mappings]) | xx$scalingfactor[mappings] == Inf)]
 index.good.sf = setdiff(mappings, index.missing.sf)
+
+cat(length(index.missing.sf), ' peaks with missing scaling factors out of ', length(mappings), '\n')
+
 
 xx$scalingfactor[index.missing.sf] = median(xx$scalingfactor[index.good.sf])
 
