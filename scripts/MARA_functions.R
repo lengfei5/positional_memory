@@ -607,14 +607,14 @@ run.MARA.atac.spatial = function(keep, cc)
     jj1 = which(res$prob.M0<0.01 & res$log2FC>1)
     jj2 = which(res$pval.lrt < 0.001 & res$log2FC > 1)
     
-    jj = which(res$prob.M0 <  0.01 & res$log2FC > 2)
+    jj = which(res$prob.M0 <  0.01 & res$log2FC > 2.5)
     cat(length(jj), ' peaks selected \n')
     
-    jj = which(res$prob.M0 <  0.01 & res$log2FC > 1.5)
-    cat(length(jj), ' peaks selected \n')
+    #jj = which(res$prob.M0 <  0.01 & res$log2FC > 1.5)
+    #cat(length(jj), ' peaks selected \n')
     
-    jj = which(res$fdr.mean> 2 & res$logFC.mean > 1.2)
-    cat(length(jj), ' peaks selected \n')
+    #jj = which(res$fdr.mean> 2 & res$logFC.mean > 1.2)
+    #cat(length(jj), ' peaks selected \n')
     
     xx = res[c(jj), ]
     xx = xx[order(-xx$log2FC), ]
@@ -622,7 +622,7 @@ run.MARA.atac.spatial = function(keep, cc)
     xx[grep('HOXA13', xx$transcriptId), ]
     
     # filter the peaks from head control sample
-    Filtering.peaks.in.Head.samples = TRUE
+    Filtering.peaks.in.Head.samples = FALSE
     if(Filtering.peaks.in.Head.samples){
       p0 = pp[match(rownames(xx), names(pp))]
       
@@ -634,9 +634,8 @@ run.MARA.atac.spatial = function(keep, cc)
       
       xx = xx[non.overlap, ]
       
+      xx[grep('HOXA13', xx$transcriptId), ]
     }
-    
-    xx[grep('HOXA13', xx$transcriptId), ]
     
     # sort positional peaks with logFC
     #xx = xx[order(-xx$logFC.mean), ]
@@ -697,14 +696,16 @@ run.MARA.atac.spatial = function(keep, cc)
     
     saveRDS(r, file = paste0(resDir, '/MARA_Bayesian_ridge.rds'))
     zz = r$Zscore
-    zz = apply(as.matrix(zz), 1, max)
+    zz = apply(as.matrix(zz), 1, function(x){x.abs = abs(x); return(x[which(x.abs == max(x.abs))][1]); })
     r$max.Zscore = zz
     
     # = sort(r$combined.Zscore, decreasing=TRUE)[1:50]
     sort(r$combined.Zscore, decreasing=TRUE)[1:20]
     
     sort(r$max.Zscore, decreasing=TRUE)[1:20]
-    sort(r$max.Zscore, decreasing=TRUE)[1:30]
+    sort(r$max.Zscore, decreasing=TRUE)[1:50]
+    
+    r$max.Zscore[grep('MEIS|RAR|RXR|SOX9', names(r$max.Zscore))]
     
     top20 = sort(r$max.Zscore, decreasing = TRUE)[1:30]
     motif.names = rownames(r$Zscore)
@@ -791,22 +792,22 @@ run.MARA.atac.spatial = function(keep, cc)
   Run.glmnet = FALSE
   if(Run.glmnet){
     ### specify glment parameters
-    alpha = 0
+    alpha = 0.1
     standardize = TRUE;
-    use.lambda.min = TRUE;
-    binarize.x = TRUE
+    use.lambda.min = FALSE;
+    binarize.x = FALSE
     standardize.response=FALSE
     intercept=FALSE
     family = 'mgaussian'
     
-    if(binarize.x) x = x > 0
+   
     library(doMC) 
     registerDoMC(cores=6)
     
     #x = t(scale(t(X), center = TRUE, scale = TRUE));
     x = X
     y = scale(Y, center = TRUE, scale = FALSE)
-    
+    if(binarize.x) x = x > 0
     #sels = c(1:5000)
     #x = x[sels, ]
     #y = y[sels, ]
@@ -843,6 +844,10 @@ run.MARA.atac.spatial = function(keep, cc)
     #colnames(aa) = c('E40', 'E44.P', 'mUA', 'BL.UA.D5', 'BL.UA.D9', 'BL.UA.D13.P')
     colnames(aa) = colnames(y)
     aa = as.data.frame(aa[-1, ]) # ignore the intercept
+    
+    aa = aa[apply(aa, 1, function(x) all(x !=0)), ]
+    
+    
     #aa = apply(aa, 2, scale)
     aa = scale(aa)
     rownames(aa) = rownames(xx[[1]])[-1] 
@@ -854,16 +859,17 @@ run.MARA.atac.spatial = function(keep, cc)
     #aa = aa[ss, ]
     #head(rownames(aa)[order(-abs(aa$MSxp))], 10)
     #head(rownames(aa)[order(-abs(aa$MSxa))], 10)
-    Test.zscore.cutoff = 2.5
+    Test.zscore.cutoff = 2.0
     ss = apply(aa, 1, function(x) length(which(abs(x) > Test.zscore.cutoff)))
     print(aa[which(ss>0), ])
-    print(aa[grep('MEIS|RXR|^HOX', rownames(aa)), ])
+    print(aa[grep('MEIS|RXR|HOXA13|HOXD13', rownames(aa)), ])
     
     bb = aa[which(ss>0), ]
     bb[which(abs(bb)<Test.zscore.cutoff)] = 0
     pheatmap(bb, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE, 
              scale = 'none', cluster_cols=FALSE, main = paste0("motif activity by MARA"), 
              na_col = "white", fontsize_col = 12) 
+    
     
     
     Test.ridge.package = FALSE

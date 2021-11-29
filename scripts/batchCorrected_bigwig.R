@@ -90,7 +90,7 @@ newb = bw
 ##########################################
 # loop over the peaks and correct the bins within peaks
 ##########################################
-overlaps = findOverlaps(bw, pp, type = 'any', select = 'all')
+overlaps = findOverlaps(bw, pp, type = 'any', select = 'all') # use the option type = 'any'; otherwise many peaks don't have bins within peaks
 mappings = match(names(pp), names(xx))
 
 library(tictoc)
@@ -103,17 +103,22 @@ for(n in 1:length(pp))
   
   if(length(bins) > 0){
     
-    sf = cpm[which(names(cpm) == names(pp)[n])]/sum(as.numeric(width(bins)) * bins$score) * 50 # 50 is constant to reflect the fragment size
+    sf = cpm[which(names(cpm) == names(pp)[n])]*50/sum(as.numeric(width(bins)) * bins$score) # 50 is constant to reflect the fragment size
     
-    #tic()
     # scale the bigwig scores
-    if(!is.na(sf) & sf != Inf){
-      mcols(newb)$score[kk] = mcols(bw)$score[kk] * sf
-      # save the scaling factor
-      xx$scalingfactor[mappings[n]] = sf
+    if(!is.na(sf)){ # test if sf = NA
+      if(sf != Inf){
+        mcols(newb)$score[kk] = mcols(bw)$score[kk] * sf
+        # save the scaling factor
+        xx$scalingfactor[mappings[n]] = sf
+      }else{ # sf = Inf, meaning the bins scores are 0; in this case just replace the expected valeus 
+        mcols(newb)$score[kk] = cpm[which(names(cpm) == names(pp)[n])]*50/sum(as.numeric(width(bins)))
+        xx$scalingfactor[mappings[n]] = Inf
+      }
     }else{
       print(paste0('NA or Inf scaling factor found for ',  n, '-- peak name : ', names(pp)[n]))
     }
+    
   }else{
     print(paste0('no bins within  ', n, '-- peak name : ', names(pp)[n]))
   }
@@ -122,86 +127,100 @@ for(n in 1:length(pp))
 toc()
 
 ##########################################
-# 
-# 
+# here estimate the global scaling factors for background and also the peaks with missing correction
 # 
 ##########################################
 index.missing.sf = mappings[which(is.na(xx$scalingfactor[mappings]) | xx$scalingfactor[mappings] == Inf)]
 index.good.sf = setdiff(mappings, index.missing.sf)
 
-cat(length(index.missing.sf), ' peaks with missing scaling factors out of ', length(mappings), '\n')
+cat(length(index.missing.sf), ' peaks (', length(index.missing.sf)/length(mappings) *100, 
+    '%) with missing scaling factors or Inf out of ', length(mappings), '\n')
 
+sf.global = median(xx$scalingfactor[index.good.sf])
 
-xx$scalingfactor[index.missing.sf] = median(xx$scalingfactor[index.good.sf])
+# xx$scalingfactor[index.missing.sf] = 
+
+gaps = xx[which(is.na(xx$scalingfactor))]
+gaps = reduce(gaps)
+
+overlaps.gaps =  findOverlaps(bw, gaps, type = 'within', select = 'all')
+
+binsIndex.gaps = unique(overlaps.gaps@from)
+
+mcols(newb)$score[binsIndex.gaps] = mcols(bw)$score[binsIndex.gaps] * sf.global
+
 
 ##########################################
-# # loop over the gaps between peaks, chr by chr 
+# loop over the gaps between peaks, chr by chr 
+#  not use anymore; 
+# use global scaling factors for all background and non-corrected peaks
 ##########################################
-for(chr in seqlevels(xx))
-{
-  # chr = 'chr10p'
-  print(chr)
-  xxchr = xx[which(seqnames(xx) == chr)]
-  
-  overlaps = findOverlaps(xxchr, bw)
-  
-  tic()
-  for(n in 1:length(xxchr))
-  #for(n in 1:20)
-  {
-    # n = length(xxchr) - 1
-    # n = 33
-    if(mcols(xxchr)$score[n] == 0){
-      
-      jj = overlaps@to[which(overlaps@from == n)]
-      bins = bw[jj]
-      
-      if(n == 1){ # first gap in chr
-        sf_final = mcols(xxchr)$scalingfactor[2]
-        if(!is.na(sf_final) & sf_final > 0){
-          mcols(newb)$score[jj] = mcols(bw)$score[jj] * sf_final
-        }
-        
-      }else{
-        if(n == length(xxchr)){  # last gap in chr
-          sf_final = mcols(xxchr)$scalingfactor[(n-1)]
-          if(!is.na(sf_final) & sf_final > 0){
-            mcols(newb)$score[jj] = mcols(bw)$score[jj] * sf_final
-          }
-        }else{ # gaps with flanking peaks
-          
-          # default values 
-          sf_prev = 1
-          sf_next = 1
-          sf_prev = mcols(xxchr)$scalingfactor[(n-1)]
-          sf_next = mcols(xxchr)$scalingfactor[(n+1)]
-          
-          if(!is.na(sf_prev) & !is.na(sf_next)){
-            #fractions = ((as.numeric(start(bins)) + as.numeric(end(bins)))/2.0 - start(xxchr)[n])/width(xxchr)[n]
-            fractions = ((as.numeric(start(bins)) + as.numeric(end(bins)))/2.0 - as.numeric(start(xxchr)[n]))/as.numeric(width(xxchr)[n])
-            
-            if(any(fractions<0)) fractions[which(fractions<0)] = 0
-            if(any(fractions>1)) fractions[which(fractions>1)] = 1
-            if(!all(is.na(fractions))) fractions[is.na(fractions)] = median(fractions, na.rm = TRUE)
-            
-            sf_final = sf_prev*(1.0-fractions) + sf_next*fractions 
-            
-            if(all(!is.na(sf_final)) & all(sf_final != Inf)){
-              mcols(newb)$score[jj] = mcols(bw)$score[jj] * sf_final
-            }else{
-              print(paste0('NA scaling factor found ',  chr, '-- index -- ', n,  '-- gap : ', 
-                           seqnames(xxchr[n]), ':', start(xxchr[n]), '-', end(xxchr[n])))
-            }
-            
-          }
-        } # end of gaps with flanking peaks
-      }
-    }
-    
-  } # end of loop over gaps in chr
-  toc()
-  
-}
+# for(chr in seqlevels(xx))
+# {
+#   # chr = 'chr10p'
+#   print(chr)
+#   xxchr = xx[which(seqnames(xx) == chr)]
+#   
+#   overlaps = findOverlaps(xxchr, bw)
+#   
+#   tic()
+#   for(n in 1:length(xxchr))
+#   #for(n in 1:20)
+#   {
+#     # n = length(xxchr) - 1
+#     # n = 33
+#     if(mcols(xxchr)$score[n] == 0){
+#       
+#       jj = overlaps@to[which(overlaps@from == n)]
+#       bins = bw[jj]
+#       
+#       if(n == 1){ # first gap in chr
+#         sf_final = mcols(xxchr)$scalingfactor[2]
+#         if(!is.na(sf_final) & sf_final > 0){
+#           mcols(newb)$score[jj] = mcols(bw)$score[jj] * sf_final
+#         }
+#         
+#       }else{
+#         if(n == length(xxchr)){  # last gap in chr
+#           sf_final = mcols(xxchr)$scalingfactor[(n-1)]
+#           if(!is.na(sf_final) & sf_final > 0){
+#             mcols(newb)$score[jj] = mcols(bw)$score[jj] * sf_final
+#           }
+#         }else{ # gaps with flanking peaks
+#           
+#           # default values 
+#           sf_prev = 1
+#           sf_next = 1
+#           sf_prev = mcols(xxchr)$scalingfactor[(n-1)]
+#           sf_next = mcols(xxchr)$scalingfactor[(n+1)]
+#           
+#           if(!is.na(sf_prev) & !is.na(sf_next)){
+#             #fractions = ((as.numeric(start(bins)) + as.numeric(end(bins)))/2.0 - start(xxchr)[n])/width(xxchr)[n]
+#             fractions = ((as.numeric(start(bins)) + as.numeric(end(bins)))/2.0 - as.numeric(start(xxchr)[n]))/as.numeric(width(xxchr)[n])
+#             
+#             if(any(fractions<0)) fractions[which(fractions<0)] = 0
+#             if(any(fractions>1)) fractions[which(fractions>1)] = 1
+#             if(!all(is.na(fractions))) fractions[is.na(fractions)] = median(fractions, na.rm = TRUE)
+#             
+#             sf_final = sf_prev*(1.0-fractions) + sf_next*fractions 
+#             
+#             if(all(!is.na(sf_final)) & all(sf_final != Inf)){
+#               mcols(newb)$score[jj] = mcols(bw)$score[jj] * sf_final
+#             }else{
+#               print(paste0('NA scaling factor found ',  chr, '-- index -- ', n,  '-- gap : ', 
+#                            seqnames(xxchr[n]), ':', start(xxchr[n]), '-', end(xxchr[n])))
+#             }
+#             
+#           }
+#         } # end of gaps with flanking peaks
+#       }
+#     }
+#     
+#   } # end of loop over gaps in chr
+#   toc()
+#   
+# }
+
 
 # export the batch-corrected bigwig file
 export.bw(newb, con = paste0(outDir, bw.name, '_bc.bw'))
@@ -245,7 +264,7 @@ if(Debugging){
   # 
   # cpm = fpm[, index.sample]
   
-  load(paste0(dataDir, 'outs_v3/Mature_Hand_74940_bc_peaks.Rdata'))
+  load(paste0(dataDir, 'outs_v3/Mature_LA_102657_bc_peaks.Rdata'))
   
   
   jj = which(is.na(mcols(newb)$score))

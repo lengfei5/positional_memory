@@ -450,6 +450,8 @@ annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axo
 
 tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
 sps = readRDS(file = '~/workspace/imp/organoid_patterning/results/Rdata/curated_signaling.pathways_gene.list_v2.rds')
+eps = readRDS(file = paste0('../data/human_chromatin_remodelers_Epifactors.database.rds'))
+rbp = readRDS(file = paste0('../data/human_RBPs_rbpdb.rds'))
 
 dds0 = dds
 fpm0 = fpm(dds)

@@ -274,8 +274,10 @@ results <- decideTests(fit2)
 
 xx = data.frame(fit2$p.value)
 colnames(xx) = c('mLA.vs.mUA', 'mHand.vs.mUA', 'mHand.vs.mLA')
+xx$pval.max = apply(as.matrix(-log10(xx)), 1, max)
 
 res = data.frame(res, xx)
+res = res[order(-res$pval.max), ]
 
 save(res, raw, fit2, file = paste0(RdataDir, 
                              'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_DEpval.Rdata'))

@@ -33,6 +33,30 @@ Refine.ax.gene.annot = function(annot)
   
 }
 
+
+##########################################
+# process human chromatin remodelers and RBPs  
+##########################################
+process_database_huamn_chromatin.remodelers_RBP = function()
+{
+  eps = read.delim(file = 
+      paste0('/Volumes/groups/tanaka/People/current/jiwang/annotations/mouse/mouse_chromatin.remodeler/Epifactors_database.csv'))
+  eps = unique(as.character(eps$HGNC.approved.symbol))
+  
+  rbp = read.csv(file = '/Volumes/groups/tanaka/People/current/jiwang/annotations/mouse/mouse_RBPDB/RBPDB_v1.3.1_human_2012-11-21_CSV/RBPDB_v1.3.1_proteins_human_2012-11-21.csv', 
+                   header = FALSE)
+  
+  rbp = unique(as.character(rbp$V5))
+  
+  saveRDS(eps, file = paste0('../data/human_chromatin_remodelers_Epifactors.database.rds'))
+  saveRDS(rbp, file = paste0('../data/human_RBPs_rbpdb.rds'))
+  
+}
+
+
+##########################################
+# some QC functions
+##########################################
 Run.QC.for.RNA.replicates = function(design, raw)
 {
   kk = grep('Mature_UA|Mature_LA|Mature_Hand', design$conditions)
