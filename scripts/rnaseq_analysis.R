@@ -32,6 +32,7 @@ tabDir =  paste0(resDir, "/tables/")
 tfDir = '~/workspace/imp/positional_memory/results/motif_analysis'
 RdataDir = paste0(resDir, "/Rdata/")
 shareDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/AkaneToJingkuiShareFiles/results_rnaseq/positional_genes'
+figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
 
 if(!dir.exists(resDir)){dir.create(resDir)}
 if(!dir.exists(tabDir)){dir.create(tabDir)}
@@ -452,6 +453,9 @@ tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_T
 sps = readRDS(file = '~/workspace/imp/organoid_patterning/results/Rdata/curated_signaling.pathways_gene.list_v2.rds')
 eps = readRDS(file = paste0('../data/human_chromatin_remodelers_Epifactors.database.rds'))
 rbp = readRDS(file = paste0('../data/human_RBPs_rbpdb.rds'))
+tfs = unique(tfs$`HGNC symbol`)
+sps = toupper(unique(sps$gene))
+
 
 dds0 = dds
 fpm0 = fpm(dds)
@@ -491,16 +495,33 @@ res = data.frame(res, res.ii[, c(2, 5, 6)])
 # heatmap to visualize all positional genes and regulators (TFs and SPs)
 ##########################################
 library("pheatmap")
-pval.cutoff = 0.01
-select = which(res$pvalue_Hand.vs.LA < pval.cutoff | res$pvalue_Hand.vs.UA < pval.cutoff | res$pvalue_LA.vs.UA < pval.cutoff)
-cat(length(select), ' positional genes found \n')
+pval.cutoff = 0.001
+res$pval.max = apply(-log10(res[, grep('pvalue_', colnames(res))]), 1, max)
+res$logFC.max = apply((res[, grep('log2FoldChange_', colnames(res))]), 1, function(x) return(x[which(abs(x)==max(abs(x)))][1]))
 
-fdr.cutoff = 0.1
-select = which(res$padj_Hand.vs.LA < fdr.cutoff | 
-                 res$padj_Hand.vs.UA < fdr.cutoff |
-                 res$padj_LA.vs.UA < fdr.cutoff)
-cat(length(select), ' positional genes found \n')
+o1 = order(-res$pval.max)
+res = res[o1, ]
+cpm = cpm[o1, ]
 
+ggs = sapply(rownames(res), function(x){unlist(strsplit(as.character(x), '_'))[1]})
+select = which(res$pval.max> 3 & abs(res$logFC.max)> 0)
+ggs = ggs[select]
+
+print(intersect(ggs, tfs))
+print(intersect(ggs, sps))
+print(intersect(ggs, eps))
+print(intersect(ggs, rbp))
+
+
+#select = which(res$pvalue_Hand.vs.LA < pval.cutoff | res$pvalue_Hand.vs.UA < pval.cutoff | res$pvalue_LA.vs.UA < pval.cutoff)
+#cat(length(select), ' positional genes found \n')
+
+
+# fdr.cutoff = 0.2
+# select = which(res$padj_Hand.vs.LA < fdr.cutoff | 
+#                  res$padj_Hand.vs.UA < fdr.cutoff |
+#                  res$padj_LA.vs.UA < fdr.cutoff)
+# cat(length(select), ' positional genes found \n')
 
 df <- as.data.frame(colData(dds)[,c("condition", 'batch')])
 o1 = c(grep('UA', df$condition), grep('LA', df$condition), grep('Hand', df$condition))
@@ -509,11 +530,31 @@ yy = cpm[select, o1]
 ss = apply(as.matrix(yy), 1, mean)
 
 #yy = yy[which(ss>-2), ]
-pheatmap(yy, cluster_rows=TRUE, show_rownames=TRUE, fontsize_row = 10,
+pheatmap(yy, cluster_rows=TRUE, show_rownames=TRUE, fontsize_row = 6,
          show_colnames = FALSE,
          scale = 'row',
          cluster_cols=FALSE, annotation_col=df[o1, ], 
-         width = 10, height = 20, filename = paste0(resDir, '/heatmap_DEgenes_mature_fdr.0.1.pdf'))
+         width = 8, height = 20, filename = paste0(figureDir, '/heatmap_DEgenes_matureSamples_pvalmax.3_log2FC.0_.pdf'))
+
+
+library(ggrepel)
+library(dplyr)
+library(tibble)
+res$gene = rownames(res)
+res$gene[select] = ggs
+
+examples.sel = unique(res$gene[which(res$pval.max > 3 & abs(res$logFC.max) > 1)])
+ggplot(data=res, aes(x=logFC.max, y=pval.max, label = gene)) +
+  geom_point(size = 1) + 
+  theme(axis.text.x = element_text(size = 12), 
+        axis.text.y = element_text(size = 12)) +
+  #geom_text_repel(data=subset(res, log2FoldChange > 2), size = 4) +
+  geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel),
+                   size = 3) + 
+  #scale_color_manual(values=c("blue", "black", "red")) +
+  geom_vline(xintercept=c(0), col="red") +
+  geom_hline(yintercept=5, col="red") +
+  ggsave(paste0(figureDir, "VolcanoPlot_logFC.max_pval.max_matureSamples.pdf"), width=12, height = 8)
 
 # narrow down to TFs and SPs
 ggs = sapply(rownames(yy), function(x) unlist(strsplit(as.character(x), '_'))[1])
@@ -558,11 +599,27 @@ res = data.frame(res, tops[match(rownames(res), rownames(tops)), ])
 
 # plot all position-dependent genes
 library("pheatmap")
-qv.cutoff = 0.1
-select = which(res$adj.P.Val_mHand.vs.mLA < qv.cutoff |
-                 res$adj.P.Val_mLA.vs.mUA < qv.cutoff | 
-                 res$adj.P.Val_mHand.vs.mLA < qv.cutoff)
-cat(length(select), ' positional genes found \n')
+#qv.cutoff = 0.1
+# select = which(res$adj.P.Val_mHand.vs.mLA < qv.cutoff |
+#                  res$adj.P.Val_mLA.vs.mUA < qv.cutoff | 
+#                  res$adj.P.Val_mHand.vs.mLA < qv.cutoff)
+# cat(length(select), ' positional genes found \n')
+
+res$fdr.max = apply(-log10(res[, grep('adj.P.Val_', colnames(res))]), 1, max)
+res$logFC.max = apply((res[, grep('logFC_', colnames(res))]), 1, function(x) return(x[which(abs(x)==max(abs(x)))][1]))
+
+o1 = order(-res$fdr.max)
+res = res[o1, ]
+
+ggs = sapply(rownames(res), function(x){unlist(strsplit(as.character(x), '_'))[1]})
+select = which(res$fdr.max> -log10(0.05) & abs(res$logFC.max)> 0)
+ggs = ggs[select]
+
+print(intersect(ggs, tfs))
+print(intersect(ggs, sps))
+print(intersect(ggs, eps))
+print(intersect(ggs, rbp))
+
 
 yy = res[select, c(1:9)]
 df <- data.frame(condition = rep(c('mUA', 'mLA', 'mHand'), each = 3))
@@ -575,25 +632,47 @@ pheatmap(yy, cluster_rows=TRUE, show_rownames=TRUE, fontsize_row = 5,
          show_colnames = FALSE,
          scale = 'row',
          cluster_cols=FALSE, annotation_col=df,
-         width = 10, height = 50, filename = paste0(shareDir, '/heatmap_DEgenes_mature_qv.0.1_microarray.pdf')) 
+         width = 10, height = 50, filename = paste0(figureDir, 'heatmap_DEgenes_matureSample_qv.0.1_microarray.pdf')) 
 
 # plot only TFs and SPs
 ggs = rownames(yy)
 ggs = sapply(ggs, function(x) unlist(strsplit(as.character(x), '_'))[1])
 
-mm = match(ggs, unique(c(tfs[, 3], toupper(sps$gene))))
+mm = match(ggs, unique(c(tfs, toupper(sps), eps, rbp)))
 yy1 = yy[!is.na(mm), ]
 
 pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
          scale = 'row',
          cluster_cols=FALSE, annotation_col=df, fontsize_row = 8, 
          width = 10, height = 20,
-         filename = paste0(shareDir, '/heatmap_DE.tfs.sps_mature_qv.0.1_microarray.pdf')) 
+         filename = paste0(figureDir, 'heatmap_DE.tfs.sps.eps.rbp_mature_qv.0.1_microarray.pdf')) 
+
+
+library(ggrepel)
+library(dplyr)
+library(tibble)
+res$gene = sapply(rownames(res), function(x) unlist(strsplit(as.character(x), '_'))[1])
+
+examples.sel = unique(res$gene[which(res$fdr.max > 3 & abs(res$logFC.max) > 1)])
+ggplot(data=res, aes(x=logFC.max, y=fdr.max, label = gene)) +
+  geom_point(size = 1) + 
+  theme(axis.text.x = element_text(size = 12), 
+        axis.text.y = element_text(size = 12)) +
+  #geom_text_repel(data=subset(res, log2FoldChange > 2), size = 4) +
+  geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel),
+                   size = 2) + 
+  #scale_color_manual(values=c("blue", "black", "red")) +
+  geom_vline(xintercept=c(0), col="red") +
+  geom_hline(yintercept=5, col="red") +
+  ggsave(paste0(figureDir, "VolcanoPlot_logFC.max_pval.max_matureSamples.pdf"), width=12, height = 8)
+  
+  
 
 if(saveTables){
   write.csv(res[select, ],
               file = paste0(shareDir, '/position_dependent_genes_from_matureSamples_microarray_qv.0.1.csv'), 
               quote = FALSE, col.names = TRUE, row.names = TRUE)
+  
   
 }
 
