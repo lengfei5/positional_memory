@@ -396,6 +396,7 @@ if(Improve.hs.symbol.annotation.with.synteny.analysis){
   hs = hs[with(hs, order(chr, start, end)), ] ## 19920 genes in chr1-22, X,Y
   
   hs$gene.name = as.character(hs$gene.name)
+  
   ##########################################
   # prepare axolotl genes 
   ##########################################
@@ -654,6 +655,18 @@ if(Improve.hs.symbol.annotation.with.synteny.analysis){
               file = paste0(resDir, 'annot_AmexT_v47_geneAnnot_extraEvidence_synteny.shared.geneSymbol.hs.nr.txt'),
               sep = '\t', col.names = TRUE, row.names = FALSE, quote = FALSE)
     
+}
+
+
+Test.annotation.v1 = FALSE
+if(Test.annotation.v1){
+  annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                         'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
+  xx = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                      'geneAnnotation_geneSymbols.synteny.evidence.hs.nr.same.evidence.rds'))
+  mm = match(annot$geneID, xx$geneID)
+  
+  
 }
 
 
