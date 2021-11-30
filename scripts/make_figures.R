@@ -17,8 +17,11 @@ library(VennDiagram)
 library(Vennerable)
 require(GenomicFeatures)
 require(ChIPpeakAnno)
+source('functions_chipSeq.R')
+source('Functions_atac.R')
 
 annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
+gtf.file =  paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf')
 
 ########################################################
 ########################################################
@@ -254,7 +257,8 @@ if(Make.Heatmap.positional.peaks){
     keep = as.matrix(keep)
     
     jj = grep('102655|74938', colnames(keep))
-    keep = keep[, -jj]
+    if(length(jj) > 0)  keep = keep[, -jj]
+    
     df <- data.frame(cc[-jj])
     rownames(df) = colnames(keep)
     colnames(df) = 'segments'
@@ -263,7 +267,7 @@ if(Make.Heatmap.positional.peaks){
     
     pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
              cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps, 
-             filename = paste0(figureDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head_rm.oldUA.pdf'), 
+             filename = paste0(figureDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head_rm.oldUA_v2.pdf'), 
              width = 8, height = 12)
     
   }

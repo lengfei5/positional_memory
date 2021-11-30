@@ -138,11 +138,12 @@ if(Normalization.BatchCorrect){
   
   save(counts, design, 
        file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical_v1.Rdata'))
+  
   ##########################################
   # filter peaks below certain thrshold of read counts
   # And also consider those filtered peaks as background
   ##########################################
-  #load(file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical_v1.Rdata'))
+  load(file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical_v1.Rdata'))
   select.peaks.with.readThreshold = TRUE
   select.background.for.peaks = TRUE
   
@@ -220,18 +221,22 @@ if(Normalization.BatchCorrect){
   if(edgeR.normalization.batch.correction){
     source('Functions_atac.R')
     library(edgeR)
+    require("sva")
     
     d <- DGEList(counts=counts(dds), group=design$conds)
     tmm <- calcNormFactors(d, method='TMM')
-    fpm = cpm(tmm, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 1)
-    rm(tmm)
+    tmm = cpm(tmm, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 1)
+    #rm(tmm)
     rm(d)
     #fpm = log2(tmm + 1)
     
-    require("sva")
+    table(design$batch, design$condition)
+    
     bc = as.factor(design$batch)
     mod = model.matrix(~ as.factor(conds), data = design)
-    fpm.bc = ComBat(dat=fpm, batch=bc, mod=mod, par.prior=TRUE, ref.batch = '2021S') # 2021S as reference is better for some reasons    
+    fpm.bc = ComBat(dat=tmm, batch=bc, mod=mod, par.prior=TRUE, ref.batch = '2020') # 2021S as reference is better for some reasons    
+    
+    
     fpm = fpm.bc
     
     # fpm.bc = readRDS(file = paste0(RdataDir, '/fpm_TMM_combat.rds'))
