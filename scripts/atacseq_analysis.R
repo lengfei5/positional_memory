@@ -177,6 +177,7 @@ if(Normalization.BatchCorrect){
   }
   
   dds <- estimateSizeFactors(dds)
+  
   plot(sizeFactors(dds), colSums(counts(dds))/median(colSums(counts(dds))), log = 'xy')
   
   plot(sizeFactors(dds), design$usable, log = 'xy')
@@ -230,11 +231,14 @@ if(Normalization.BatchCorrect){
     rm(d)
     #fpm = log2(tmm + 1)
     
-    table(design$batch, design$condition)
+    table(design$condition, design$batch)
     
     bc = as.factor(design$batch)
     mod = model.matrix(~ as.factor(conds), data = design)
-    fpm.bc = ComBat(dat=tmm, batch=bc, mod=mod, par.prior=TRUE, ref.batch = '2020') # 2021S as reference is better for some reasons    
+    fpm.bc = ComBat(dat=tmm, batch=bc, mod=mod, par.prior=TRUE, ref.batch = '2021S') # 2021S as reference is better for some reasons    
+    
+    xx = tmm[, grep('Mature', colnames(fpm.bc))]
+    yy = fpm.bc[, grep('Mature', colnames(fpm.bc))]
     
     
     fpm = fpm.bc
