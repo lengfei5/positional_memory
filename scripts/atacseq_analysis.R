@@ -248,9 +248,9 @@ if(Normalization.BatchCorrect){
       ddx = dds[, sels]
       ddx$conds = droplevels(ddx$conds)
       ss = rowSums(counts(ddx))
-      
-      ddx = ddx[which(ss>40), ]
-      
+      # remove low count genes, otherwise combat returns error 
+      # 'Error in while (change > conv) { : missing value where TRUE/FALSE needed'
+      ddx = ddx[which(ss>5), ] 
       ddx = estimateSizeFactors(ddx)
       vsd <- varianceStabilizingTransformation(ddx, blind = TRUE)
       tmm = assay(vsd)
@@ -512,7 +512,7 @@ if(grouping.position.dependent.peaks){
   fpm = fpm[grep('bg_', rownames(fpm), invert = TRUE), ]
   rownames(fpm) = gsub('_', '-', rownames(fpm))
   
-  hist(fpm.bg, breaks = 50, main = 'background distribution')
+  hist(fpm.bg, breaks = 100, main = 'background distribution')
   abline(v = 1, col = 'red', lwd = 2.0)
   quantile(fpm.bg, c(0.95, 0.99))
   
@@ -579,15 +579,14 @@ if(grouping.position.dependent.peaks){
     cpm = fpm[, sample.sels]
     
     # select the peaks that are above background with >3 samples
-    quantile(fpm.bg, 0.999)
+    quantile(fpm.bg, 0.99)
     
     hist(fpm.bg)
     
     # stringent here, with signal > 2.5 in >=3 samples 
-    nb.above.threshold = apply(as.matrix(cpm), 1, function(x) length(which(x> 2.5)))
+    nb.above.threshold = apply(as.matrix(cpm), 1, function(x) length(which(x> 4.5)))
     hist(nb.above.threshold, breaks = c(-1:ncol(cpm)))
-    peak.sels = which(nb.above.threshold>=3)
-    
+    peak.sels = which(nb.above.threshold>=2)
     cat(length(peak.sels), 'peaks after filtering for mature samples\n')
     
     cpm = cpm[peak.sels, ]
@@ -600,14 +599,14 @@ if(grouping.position.dependent.peaks){
     xx = data.frame(res, pp.annots[match(rownames(res), rownames(pp.annots)), ], stringsAsFactors = FALSE)
     
     res = xx
-    saveRDS(res, file = paste0(RdataDir, '/res_position_dependant_test_v8.rds'))
+    saveRDS(res, file = paste0(RdataDir, '/res_position_dependant_test_v9.rds'))
     
   }
   
   ##########################################
   # select all positional-dependent loci with below threshold
   ##########################################
-  res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v8.rds'))
+  res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v9.rds'))
   
   # select the positional peaks with 
   fdr.cutoff = 0.01; logfc.cutoff = 0.5
@@ -627,12 +626,12 @@ if(grouping.position.dependent.peaks){
   fpm[which(rownames(fpm) == 'chr2p:873464923-873465440'), ]
   
   # filter the peaks from head control sample
-  Filtering.peaks.in.Head.samples = TRUE
+  Filtering.peaks.in.Head.samples = FALSE
   if(Filtering.peaks.in.Head.samples){
     p0 = pp[match(rownames(xx), names(pp))]
     
     ctl = fpm[, grep('HEAD', colnames(fpm))]
-    ctl = ctl[which(ctl>2.5)]
+    ctl = ctl[which(ctl>4.5)]
     p.ctl = pp[match(names(ctl), names(pp))]
     
     non.overlap = !overlapsAny(p0, p.ctl)
@@ -653,12 +652,12 @@ if(grouping.position.dependent.peaks){
   library(ggplot2)
   df <- data.frame(cc)
   rownames(df) = colnames(keep)
-  
-  ii.gaps = c(5, 8)
+  colnames(df) = 'segments'
+  ii.gaps = c(4, 6)
   pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
            cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps, 
-           filename = paste0(figureDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
-           width = 8, height = 12)
+           filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC0.5_keepPeaks.head.pdf'), 
+           width = 8, height = 10)
   
   if(saveTable){
     yy = data.frame(keep, xx, stringsAsFactors = FALSE)
@@ -668,52 +667,56 @@ if(grouping.position.dependent.peaks){
   }
   
   ##########################################
-  ## select top peaks genome-wide and also promoter peaks
+  ## select top peaks genome-wide
   ##########################################
-  #res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v2.rds'))
-  #jj = which(res$prob.M0.mature < 0.01 & res$log2FC.mature > 3 & res$min.mature <1)
-  #xx = res[jj, ]
-  #xx = xx[order(-xx$log2FC.mature), ]
-  #xx = data.frame(xx, pp.annots[match(rownames(xx), rownames(pp.annots)), ], stringsAsFactors = FALSE)
-  xx = xx[order(-xx$logFC.mean), ]
-  
-  yy = xx
-  yy[grep('HOXA13', yy$geneId), ]
-  
-  # res2 here is residues in the fitting for each condition, UA, LA and Hand
-  #yy = yy[which(yy$max > 3 & yy$min < 1 & yy$res2.max< 0.1), ]
-  yy = yy[which(yy$max > 3 & yy$min < 1), ]
-  
-  yy = yy[order(yy$logFC.mean), ]
-  
-  keep = fpm[!is.na(match(rownames(fpm), rownames(yy))), sample.sels]
-  gg = res$geneId[match(rownames(keep), rownames(res))]
-  grep('HOXA13', gg)
-  rownames(keep) = paste0(rownames(keep), '_', gg)
-  #rownames(keep) = gg
-  keep = as.matrix(keep)
-  
-  gg = rownames(keep)
-  gg = sapply(gg, function(x) unlist(strsplit(as.character(x), '_'))[2])
-  gg = sapply(gg, function(x) unlist(strsplit(as.character(x), '[|]'))[1])
-  #keep = keep[1:50, ]
-  #rownames(keep) = gg
-  #kk = grep('Mature', cc)
-  #df <- data.frame(condition = cc[kk])
-  #keep = keep[,kk]
-  #rownames(df) = colnames(keep)
-  ii.gaps = c(5, 8)
-  
-  pheatmap(keep, cluster_rows=TRUE, show_rownames=TRUE, scale = 'row', show_colnames = FALSE,
-           cluster_cols=FALSE, annotation_col = df, fontsize_row = 8, gaps_col = ii.gaps,
-           filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_top300_genomewide.pdf'), 
-           width = 16, height = 40)
-  
-  if(saveTable){
-    write.csv(data.frame(keep, yy, stringsAsFactors = FALSE), 
-              file = paste0(resDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_top300_genomewide.csv'), 
-              quote = FALSE, row.names = TRUE)
+  Select.top.peaks = FALSE
+  if(Select.top.peaks){
+    #res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v2.rds'))
+    #jj = which(res$prob.M0.mature < 0.01 & res$log2FC.mature > 3 & res$min.mature <1)
+    #xx = res[jj, ]
+    #xx = xx[order(-xx$log2FC.mature), ]
+    #xx = data.frame(xx, pp.annots[match(rownames(xx), rownames(pp.annots)), ], stringsAsFactors = FALSE)
+    xx = xx[order(-xx$logFC.mean), ]
     
+    yy = xx
+    yy[grep('HOXA13', yy$geneId), ]
+    
+    # res2 here is residues in the fitting for each condition, UA, LA and Hand
+    yy = yy[which(yy$max > 5 & yy$min < 4 & yy$res2.max< 0.1), ]
+    #yy = yy[which(yy$max > 3 & yy$min < 1), ]
+    
+    yy = yy[order(yy$logFC.mean), ]
+    
+    keep = fpm[!is.na(match(rownames(fpm), rownames(yy))), sample.sels]
+    gg = res$geneId[match(rownames(keep), rownames(res))]
+    grep('HOXA13', gg)
+    
+    rownames(keep) = paste0(rownames(keep), '_', gg)
+    #rownames(keep) = gg
+    keep = as.matrix(keep)
+    
+    gg = rownames(keep)
+    gg = sapply(gg, function(x) unlist(strsplit(as.character(x), '_'))[2])
+    gg = sapply(gg, function(x) unlist(strsplit(as.character(x), '[|]'))[1])
+    #keep = keep[1:50, ]
+    #rownames(keep) = gg
+    #kk = grep('Mature', cc)
+    #df <- data.frame(condition = cc[kk])
+    #keep = keep[,kk]
+    #rownames(df) = colnames(keep)
+    ii.gaps = c(4, 6)
+    
+    pheatmap(keep, cluster_rows=TRUE, show_rownames=TRUE, scale = 'row', show_colnames = FALSE,
+             cluster_cols=FALSE, annotation_col = df, fontsize_row = 8, gaps_col = ii.gaps,
+             filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_top300_genomewide.pdf'), 
+             width = 16, height = 40)
+    
+    if(saveTable){
+      write.csv(data.frame(keep, yy, stringsAsFactors = FALSE), 
+                file = paste0(resDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_top300_genomewide.csv'), 
+                quote = FALSE, row.names = TRUE)
+      
+    }
   }
   
   ##########################################
@@ -726,7 +729,7 @@ if(grouping.position.dependent.peaks){
   #yy = xx
   #yy = yy[c(1:50), ]
   #yy = yy[which(yy$logFC.mean>1.5), ]
-  yy = yy[which(yy$max > 3 & yy$min < 2 & yy$res2.max< 0.1), ]
+  yy = yy[which(yy$max > 5 & yy$min < 4.5), ] # max residual square < 0.1
   
   keep = fpm[!is.na(match(rownames(fpm), rownames(yy))), sample.sels]
   gg = res$geneId[match(rownames(keep), rownames(res))]
@@ -760,11 +763,11 @@ if(grouping.position.dependent.peaks){
   #df <- data.frame(condition = cc[kk])
   #keep = keep[,kk]
   #rownames(df) = colnames(keep)
-  ii.gaps = c(5, 8)
+  ii.gaps = c(4, 6)
   pheatmap(keep, cluster_rows=TRUE, show_rownames=TRUE, scale = 'row', show_colnames = FALSE,
-           cluster_cols=FALSE, annotation_col = df, fontsize_row = 11, gaps_col = ii.gaps,
-           filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_top50_promoter.pdf'), 
-           width = 16, height = 12)
+           cluster_cols=FALSE, annotation_col = df, fontsize_row = 12, gaps_col = ii.gaps,
+           filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC0.5_top.promoter.pdf'), 
+           width = 14, height = 10)
   
   
   if(saveTable){
@@ -773,7 +776,6 @@ if(grouping.position.dependent.peaks){
               quote = FALSE, row.names = TRUE)
     
   }
-  
   
   ##########################################
   # first motif activity analysis for positional-dependent peaks 
