@@ -341,18 +341,23 @@ if(Normalization.BatchCorrect){
   
 }
 
+
 ########################################################
 ########################################################
-# Section II : grouping atac-seq peak profiles
+# Section II: promoter analysis
+# grouping atac-seq peak profiles
 # 1) first identify static peaks (probably most of them) with model selection 
 # (linear regression with only intercept and nonlinear fitting with spline or GAM)
 # 2) grouping dynamic peaks using DP-GP
-# 
+# ##########################################
+# all-peaks test M0 (static peaks), M1 (dynamic peaks above background), M2 (dyanmic peaks with some condtions below background)
+# we will also loci that are always open across all conditions
 ########################################################
 ########################################################
-Differentially.Binding.analysis = TRUE
-if(Differentially.Binding.analysis){
+make.test.All.Peaks = FALSE
+if(make.test.All.Peaks){
   
+  # to change for all peaks
   fpm = readRDS(file = paste0(RdataDir, '/fpm.bc_TMM_combat_MatureSamples_batch2019.2020.2021.2021S.rds'))
   design = readRDS(file = paste0(RdataDir, '/design_sels_bc_TMM_combat_MatureSamples_batch2019.2020.2021.2021S.rds'))
   
@@ -398,18 +403,6 @@ if(Differentially.Binding.analysis){
     
   }
   
-}
-
-########################################################
-########################################################
-# Section III: promoter analysis
-# ##########################################
-# all-peaks test M0 (static peaks), M1 (dynamic peaks above background), M2 (dyanmic peaks with some condtions below background)
-# we will also loci that are always open across all conditions
-########################################################
-########################################################
-make.test.All.Peaks = FALSE
-if(make.test.All.Peaks){
   
   Run.all.peaks.test = FALSE
   if(Run.all.peaks.test){
@@ -478,7 +471,7 @@ if(make.test.All.Peaks){
 
 ########################################################
 ########################################################
-# Section IV : positional peaks
+# Section III : positional peaks
 # ##########################################
 # Position-dependent test
 # mainly use the mature samples, mUA, mLA and mHand
@@ -488,11 +481,51 @@ if(make.test.All.Peaks){
 ########################################################
 grouping.position.dependent.peaks = FALSE
 if(grouping.position.dependent.peaks){
+  fpm = readRDS(file = paste0(RdataDir, '/fpm.bc_TMM_combat_MatureSamples_batch2019.2020.2021.2021S.rds'))
+  design = readRDS(file = paste0(RdataDir, '/design_sels_bc_TMM_combat_MatureSamples_batch2019.2020.2021.2021S.rds'))
   
-  #conds = as.character(unique(design$conds))
-  # conds = c("Mature_UA", "Mature_LA", "Mature_Hand", 
-  #           "Embryo_Stage44_proximal", "Embryo_Stage44_distal",
-  #           "BL_UA_13days_proximal", "BL_UA_13days_distal")
+  # prepare the background distribution
+  fpm.bg = fpm[grep('bg_', rownames(fpm), invert = FALSE), ]
+  fpm = fpm[grep('bg_', rownames(fpm), invert = TRUE), ]
+  rownames(fpm) = gsub('_', '-', rownames(fpm))
+  
+  hist(fpm.bg, breaks = 100, main = 'background distribution')
+  abline(v = 1, col = 'red', lwd = 2.0)
+  quantile(fpm.bg, c(0.95, 0.99))
+  
+  ##########################################
+  ## make Granges and annotate peaks
+  ##########################################
+  Make.Granges.and.peakAnnotation = TRUE
+  if(Make.Granges.and.peakAnnotation){
+    require(ChIPpeakAnno)
+    require(ChIPseeker)
+    
+    pp = data.frame(t(sapply(rownames(fpm), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+    pp$strand = '*'
+    
+    save.peak.bed = FALSE
+    if(save.peak.bed){
+      bed = data.frame(pp[, c(1:3)], rownames(pp), 0, pp[, 4], stringsAsFactors = FALSE)
+      write.table(bed, file = paste0(resDir, '/peakset_', version.analysis, '.bed'), col.names = FALSE, row.names = FALSE,
+                  sep = '\t', quote = FALSE)
+    }
+    
+    pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                  start.field="X2", end.field="X3", strand.field="strand")
+    
+    # annotation from ucsc browser ambMex60DD_genes_putative
+    amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
+    pp.annots = annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+    #plotAnnoBar(pp.annots)
+    
+    pp.annots = as.data.frame(pp.annots)
+    rownames(pp.annots) = rownames(fpm)
+    
+    promoters = select.promoters.regions(upstream = 2000, downstream = 2000, ORF.type.gtf = 'Putative', promoter.select = 'all')
+    
+  }
+  
   
   conds = c("Mature_UA", "Mature_LA", "Mature_Hand")
   
@@ -721,7 +754,7 @@ if(grouping.position.dependent.peaks){
 
 ########################################################
 ########################################################
-# Section : regeneration peaks
+# Section IV : regeneration peaks
 # or temporal-peaks test
 ########################################################
 ########################################################
