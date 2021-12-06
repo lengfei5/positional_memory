@@ -125,8 +125,6 @@ if(Normalization.BatchCorrect){
   
   dds <- DESeqDataSetFromMatrix(as.matrix(counts[, sels]), DataFrame(design[sels, ]), design = ~ conds)
   
-  #rm(counts)
-  
   # check the peak length
   peakNames = rownames(dds)
   pp = data.frame(t(sapply(peakNames, function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
@@ -223,32 +221,121 @@ if(Normalization.BatchCorrect){
     source('Functions_atac.R')
     library(edgeR)
     require("sva")
+    #require(limma)
     
-    d <- DGEList(counts=counts(dds), group=design$conds)
-    tmm <- calcNormFactors(d, method='TMM')
-    tmm = cpm(tmm, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 1)
-    #rm(tmm)
-    rm(d)
-    #fpm = log2(tmm + 1)
-    
+    ##########################################
+    # batch correct samples separately for mature samples and regeneration samples  
+    ##########################################
     table(design$condition, design$batch)
     
-    bc = as.factor(design$batch)
-    mod = model.matrix(~ as.factor(conds), data = design)
-    fpm.bc = ComBat(dat=tmm, batch=bc, mod=mod, par.prior=TRUE, ref.batch = '2021S') # 2021S as reference is better for some reasons    
-    
-    xx = tmm[, grep('Mature', colnames(fpm.bc))]
-    yy = fpm.bc[, grep('Mature', colnames(fpm.bc))]
-    
-    
-    fpm = fpm.bc
-    
-    # fpm.bc = readRDS(file = paste0(RdataDir, '/fpm_TMM_combat.rds'))
-    make.pca.plots(fpm.bc, ntop = 3000, conds.plot = 'all')
-    #make.pca.plots(fpm.bc, ntop = 3000, conds.plot = 'Dev.Mature')
-    
-    rm(fpm.bc)
-    saveRDS(fpm, file = paste0(RdataDir, '/fpm_TMM_combat.rds'))
+    Split.Mature.Regeneration.samples = TRUE
+    if(!Split.Mature.Regeneration.samples){
+      
+      # start with mature samples
+      sels = grep('Mature|HEAD', design$conds)
+      #sels = setdiff(sels, which(design$SampleID == '74938'| design$SampleID == '74939'))
+      design.sels = design[sels, ]
+      
+      design.sels$conds = droplevels(design.sels$conds)
+      
+      #design.sels$batch[which(design.sels$batch == '2021')] = '2021S'
+      
+      design.sels$batch[grep('749', design.sels$SampleID)] = '2019'
+      
+      #design.sels$batch = droplevels(design.sels$batch)
+      table(design.sels$conds, design.sels$batch)
+      
+      d <- DGEList(counts=counts(dds[, sels]), group=design.sels$conds)
+      
+      tmm <- calcNormFactors(d, method='TMM')
+      tmm = cpm(tmm, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 1)
+      
+      bc = as.factor(design.sels$batch)
+      mod = model.matrix(~ as.factor(conds), data = design.sels)
+      
+      # if specify ref.batch, the parameters will be estimated from the ref, inapprioate here, 
+      # because there is no better batche other others 
+      #ref.batch = '2021S'# 2021S as reference is better for some reasons (NOT USED here)    
+      fpm.bc = ComBat(dat=tmm, batch=bc, mod=mod, par.prior=TRUE, ref.batch = NULL) 
+      
+      #design.tokeep<-model.matrix(~ 0 + conds,  data = design.sels)
+      #cpm.bc = limma::removeBatchEffect(tmm, batch = bc, design = design.tokeep)
+      # plot(fpm.bc[,1], tmm[, 1]);abline(0, 1, lwd = 2.0, col = 'red')
+      
+      make.pca.plots(tmm, ntop = 1000, conds.plot = 'Mature')
+      
+      make.pca.plots(fpm.bc, ntop = 1000, conds.plot = 'Mature')
+      
+      fpm = fpm.bc
+      
+      rm(fpm.bc)
+      
+      saveRDS(fpm, file = paste0(RdataDir, '/fpm.bc_TMM_combat_MatureSamples_batch2019.2020.2021.2021S.rds'))
+      saveRDS(design.sels, file = paste0(RdataDir, '/design_sels_bc_TMM_combat_MatureSamples_batch2019.2020.2021.2021S.rds'))
+      
+      # regeneration time points and embryo stages
+      sels = unique(c(grep('BL_UA', design$conds), which(design$condition == 'Mature_UA' & design$batch == '2021')))
+      sels = sels[which(design$batch[sels] != '2020')]
+      design.sels = design[sels, ]
+      design.sels$conds = droplevels(design.sels$conds)
+      
+      table(design.sels$conds, design.sels$batch)
+      design.sels$batch[which(design.sels$batch == '2021S')] = '2021'
+      #design.sels$batch = droplevels(design.sels$batch)
+      
+      d <- DGEList(counts=counts(dds[, sels]), group=design.sels$conds)
+      
+      tmm <- calcNormFactors(d, method='TMM')
+      tmm = cpm(tmm, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 1)
+      
+      
+      bc = as.factor(design.sels$batch)
+      mod = model.matrix(~ as.factor(conds), data = design.sels)
+      
+      fpm.bc = ComBat(dat=tmm, batch=bc, mod=mod, par.prior=TRUE, ref.batch = '2021') # 2021S as reference is better for some reasons    
+      
+      #design.tokeep<-model.matrix(~ 0 + conds,  data = design.sels)
+      #cpm.bc = limma::removeBatchEffect(tmm, batch = bc, design = design.tokeep)
+      # plot(fpm.bc[,1], tmm[, 1]);abline(0, 1, lwd = 2.0, col = 'red')
+      
+      make.pca.plots(tmm, ntop = 1000, conds.plot = 'all')
+      
+      make.pca.plots(fpm.bc, ntop = 1000, conds.plot = 'all')
+      
+      fpm = fpm.bc
+      
+      rm(fpm.bc)
+      
+      saveRDS(fpm, file = paste0(RdataDir, '/fpm_noBC_TMM_regeneration.rds'))
+      
+      
+    }else{
+      d <- DGEList(counts=counts(dds), group=design$conds)
+      tmm <- calcNormFactors(d, method='TMM')
+      tmm = cpm(tmm, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 1)
+      #rm(tmm)
+      rm(d)
+      #fpm = log2(tmm + 1)
+      
+      table(design$condition, design$batch)
+      
+      bc = as.factor(design$batch)
+      mod = model.matrix(~ as.factor(conds), data = design)
+      fpm.bc = ComBat(dat=tmm, batch=bc, mod=mod, par.prior=TRUE, ref.batch = '2021S') # 2021S as reference is better for some reasons    
+      
+      xx = tmm[, grep('Mature', colnames(fpm.bc))]
+      yy = fpm.bc[, grep('Mature', colnames(fpm.bc))]
+      
+      
+      fpm = fpm.bc
+      
+      # fpm.bc = readRDS(file = paste0(RdataDir, '/fpm_TMM_combat.rds'))
+      make.pca.plots(fpm.bc, ntop = 3000, conds.plot = 'all')
+      #make.pca.plots(fpm.bc, ntop = 3000, conds.plot = 'Dev.Mature')
+      
+      rm(fpm.bc)
+      saveRDS(fpm, file = paste0(RdataDir, '/fpm_TMM_combat.rds')) 
+    }
     
   }
   
@@ -265,8 +352,9 @@ if(Normalization.BatchCorrect){
 ########################################################
 Differentially.Binding.analysis = TRUE
 if(Differentially.Binding.analysis){
-  load(file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical_v1.Rdata'))
-  fpm = readRDS(file = paste0(RdataDir, '/fpm_TMM_combat.rds'))
+  
+  fpm = readRDS(file = paste0(RdataDir, '/fpm.bc_TMM_combat_MatureSamples_batch2019.2020.2021.2021S.rds'))
+  design = readRDS(file = paste0(RdataDir, '/design_sels_bc_TMM_combat_MatureSamples_batch2019.2020.2021.2021S.rds'))
   
   # prepare the background distribution
   fpm.bg = fpm[grep('bg_', rownames(fpm), invert = FALSE), ]
