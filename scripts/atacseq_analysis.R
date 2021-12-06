@@ -25,6 +25,10 @@ RdataDir = paste0(resDir, '/Rdata')
 if(!dir.exists(resDir)) dir.create(resDir)
 if(!dir.exists(RdataDir)) dir.create(RdataDir)
 
+figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
+tableDir = paste0(figureDir, 'tables4plots/')
+
+
 annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
 gtf.file =  paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf')
 
@@ -134,14 +138,10 @@ if(Normalization.BatchCorrect){
                                 start.field="X2", end.field="X3", strand.field="strand")
   ll = width(pp)
   
-  save(counts, design, 
-       file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical_v1.Rdata'))
-  
   ##########################################
   # filter peaks below certain thrshold of read counts
   # And also consider those filtered peaks as background
   ##########################################
-  load(file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical_v1.Rdata'))
   select.peaks.with.readThreshold = TRUE
   select.background.for.peaks = TRUE
   
@@ -221,7 +221,7 @@ if(Normalization.BatchCorrect){
     source('Functions_atac.R')
     library(edgeR)
     require("sva")
-    #require(limma)
+    require(limma)
     
     ##########################################
     # batch correct samples separately for mature samples and regeneration samples  
@@ -233,22 +233,34 @@ if(Normalization.BatchCorrect){
       
       # start with mature samples
       sels = grep('Mature|HEAD', design$conds)
-      #sels = setdiff(sels, which(design$SampleID == '74938'| design$SampleID == '74939'))
+      sels = setdiff(sels, which(design$SampleID == '74938'| design$SampleID == '74939'|design$SampleID == '74940'))
       design.sels = design[sels, ]
       
       design.sels$conds = droplevels(design.sels$conds)
       
       #design.sels$batch[which(design.sels$batch == '2021')] = '2021S'
       
-      design.sels$batch[grep('749', design.sels$SampleID)] = '2019'
+      #design.sels$batch[grep('749', design.sels$SampleID)] = '2019'
       
       #design.sels$batch = droplevels(design.sels$batch)
       table(design.sels$conds, design.sels$batch)
       
-      d <- DGEList(counts=counts(dds[, sels]), group=design.sels$conds)
+      ddx = dds[, sels]
+      ddx$conds = droplevels(ddx$conds)
+      ss = rowSums(counts(ddx))
       
-      tmm <- calcNormFactors(d, method='TMM')
-      tmm = cpm(tmm, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 1)
+      ddx = ddx[which(ss>40), ]
+      
+      ddx = estimateSizeFactors(ddx)
+      vsd <- varianceStabilizingTransformation(ddx, blind = TRUE)
+      tmm = assay(vsd)
+      
+      #d <- DGEList(counts=counts(ddx), group=design.sels$conds)
+      #tmm <- calcNormFactors(d, method='TMM')
+      #tmm = cpm(tmm, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 1)
+      
+      tmm.vars = apply(as.matrix(tmm), 1, var) # row with var = 0 pose problem for ComBat
+      tmm = tmm[which(tmm.vars>0 & !is.na(tmm.vars)), ]
       
       bc = as.factor(design.sels$batch)
       mod = model.matrix(~ as.factor(conds), data = design.sels)
@@ -256,22 +268,22 @@ if(Normalization.BatchCorrect){
       # if specify ref.batch, the parameters will be estimated from the ref, inapprioate here, 
       # because there is no better batche other others 
       #ref.batch = '2021S'# 2021S as reference is better for some reasons (NOT USED here)    
-      fpm.bc = ComBat(dat=tmm, batch=bc, mod=mod, par.prior=TRUE, ref.batch = NULL) 
+      fpm.bc = ComBat(dat=as.matrix(tmm), batch=bc, mod=mod, par.prior=TRUE, ref.batch = NULL) 
       
       #design.tokeep<-model.matrix(~ 0 + conds,  data = design.sels)
       #cpm.bc = limma::removeBatchEffect(tmm, batch = bc, design = design.tokeep)
       # plot(fpm.bc[,1], tmm[, 1]);abline(0, 1, lwd = 2.0, col = 'red')
+      make.pca.plots(fpm.bc, ntop = 1000, conds.plot = 'Mature')
       
       make.pca.plots(tmm, ntop = 1000, conds.plot = 'Mature')
       
-      make.pca.plots(fpm.bc, ntop = 1000, conds.plot = 'Mature')
-      
+    
       fpm = fpm.bc
       
       rm(fpm.bc)
       
-      saveRDS(fpm, file = paste0(RdataDir, '/fpm.bc_TMM_combat_MatureSamples_batch2019.2020.2021.2021S.rds'))
-      saveRDS(design.sels, file = paste0(RdataDir, '/design_sels_bc_TMM_combat_MatureSamples_batch2019.2020.2021.2021S.rds'))
+      saveRDS(fpm, file = paste0(RdataDir, '/fpm.bc_TMM_combat_MatureSamples_batch2020.2021.2021S_rmOldBatch.rds'))
+      saveRDS(design.sels, file = paste0(RdataDir, '/design_sels_bc_TMM_combat_MatureSamples_batch2020.2021.2021S_rmOldBatch.rds'))
       
       # regeneration time points and embryo stages
       sels = unique(c(grep('BL_UA', design$conds), which(design$condition == 'Mature_UA' & design$batch == '2021')))
@@ -302,6 +314,8 @@ if(Normalization.BatchCorrect){
       
       make.pca.plots(fpm.bc, ntop = 1000, conds.plot = 'all')
       
+      make.pca.plots(fpm.bc, ntop = 1000, conds.plot = 'Mature')
+      
       fpm = fpm.bc
       
       rm(fpm.bc)
@@ -316,22 +330,27 @@ if(Normalization.BatchCorrect){
       #rm(tmm)
       rm(d)
       #fpm = log2(tmm + 1)
+      make.pca.plots(tmm[,which(design$batch == '2020')], ntop = 1000, conds.plot = 'all')
+      
+      design$batch[grep('749', design$SampleID)] = '2019'
       
       table(design$condition, design$batch)
       
       bc = as.factor(design$batch)
       mod = model.matrix(~ as.factor(conds), data = design)
-      fpm.bc = ComBat(dat=tmm, batch=bc, mod=mod, par.prior=TRUE, ref.batch = '2021S') # 2021S as reference is better for some reasons    
+      
+      fpm.bc = ComBat(dat=tmm, batch=bc, mod=mod, par.prior=FALSE, ref.batch = NULL) # No reference is better for some reasons    
+      
       
       xx = tmm[, grep('Mature', colnames(fpm.bc))]
       yy = fpm.bc[, grep('Mature', colnames(fpm.bc))]
       
-      
-      fpm = fpm.bc
-      
       # fpm.bc = readRDS(file = paste0(RdataDir, '/fpm_TMM_combat.rds'))
       make.pca.plots(fpm.bc, ntop = 3000, conds.plot = 'all')
-      #make.pca.plots(fpm.bc, ntop = 3000, conds.plot = 'Dev.Mature')
+      make.pca.plots(fpm.bc, ntop = 3000, conds.plot = 'Dev.Mature')
+      make.pca.plots(fpm.bc, ntop = 1000, conds.plot = 'Mature')
+      
+      fpm = fpm.bc
       
       rm(fpm.bc)
       saveRDS(fpm, file = paste0(RdataDir, '/fpm_TMM_combat.rds')) 
@@ -481,15 +500,19 @@ if(make.test.All.Peaks){
 ########################################################
 grouping.position.dependent.peaks = FALSE
 if(grouping.position.dependent.peaks){
-  fpm = readRDS(file = paste0(RdataDir, '/fpm.bc_TMM_combat_MatureSamples_batch2019.2020.2021.2021S.rds'))
-  design = readRDS(file = paste0(RdataDir, '/design_sels_bc_TMM_combat_MatureSamples_batch2019.2020.2021.2021S.rds'))
+  
+  ##########################################
+  # import batch corrected gene expression and design 
+  ##########################################
+  fpm = readRDS(file = paste0(RdataDir, '/fpm.bc_TMM_combat_MatureSamples_batch2020.2021.2021S_rmOldBatch.rds'))
+  design = readRDS(file = paste0(RdataDir, '/design_sels_bc_TMM_combat_MatureSamples_batch2020.2021.2021S_rmOldBatch.rds'))
   
   # prepare the background distribution
   fpm.bg = fpm[grep('bg_', rownames(fpm), invert = FALSE), ]
   fpm = fpm[grep('bg_', rownames(fpm), invert = TRUE), ]
   rownames(fpm) = gsub('_', '-', rownames(fpm))
   
-  hist(fpm.bg, breaks = 100, main = 'background distribution')
+  hist(fpm.bg, breaks = 50, main = 'background distribution')
   abline(v = 1, col = 'red', lwd = 2.0)
   quantile(fpm.bg, c(0.95, 0.99))
   
@@ -526,7 +549,9 @@ if(grouping.position.dependent.peaks){
     
   }
   
-  
+  ##########################################
+  # run spatial test for mature samples
+  ##########################################
   conds = c("Mature_UA", "Mature_LA", "Mature_Hand")
   
   sample.sels = c();  cc = c()
@@ -562,38 +587,44 @@ if(grouping.position.dependent.peaks){
     nb.above.threshold = apply(as.matrix(cpm), 1, function(x) length(which(x> 2.5)))
     hist(nb.above.threshold, breaks = c(-1:ncol(cpm)))
     peak.sels = which(nb.above.threshold>=3)
+    
+    cat(length(peak.sels), 'peaks after filtering for mature samples\n')
+    
     cpm = cpm[peak.sels, ]
     
     tic() 
     res = spatial.peaks.test(cpm = cpm, c = cc, test.Dev.Reg = FALSE)
-    res = data.frame(res, pp.annots[ii.test, ], stringsAsFactors = FALSE)
+    #res = data.frame(res, pp.annots[ii.test, ], stringsAsFactors = FALSE)
     toc()
     
     xx = data.frame(res, pp.annots[match(rownames(res), rownames(pp.annots)), ], stringsAsFactors = FALSE)
     
     res = xx
-    saveRDS(res, file = paste0(RdataDir, '/res_position_dependant_test_v6.rds'))
+    saveRDS(res, file = paste0(RdataDir, '/res_position_dependant_test_v8.rds'))
     
   }
   
   ##########################################
   # select all positional-dependent loci with below threshold
   ##########################################
-  res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v6.rds'))
+  res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v8.rds'))
   
   # select the positional peaks with 
-  fdr.cutoff = 0.01; logfc.cutoff = 1
+  fdr.cutoff = 0.01; logfc.cutoff = 0.5
   jj = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & res$logFC.mLA.vs.mUA > logfc.cutoff) |
                (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & res$logFC.mHand.vs.mUA > logfc.cutoff)|
                (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & res$logFC.mHand.vs.mLA > logfc.cutoff)
   )
-  
+  cat(length(jj), '\n')
   jj1 = which(res$prob.M0<0.01 & res$log2FC>1)
+  cat(length(jj1), '\n')
   jj2 = which(res$pval.lrt < 0.001 & res$log2FC > 1)
+  cat(length(jj2), '\n')
   
   xx = res[c(jj), ]
   #xx = xx[order(-xx$log2FC.mature), ]
   xx[grep('HOXA13', xx$transcriptId), ]
+  fpm[which(rownames(fpm) == 'chr2p:873464923-873465440'), ]
   
   # filter the peaks from head control sample
   Filtering.peaks.in.Head.samples = TRUE
@@ -611,7 +642,7 @@ if(grouping.position.dependent.peaks){
   }
   
   xx[grep('HOXA13', xx$transcriptId), ]
-  
+  cat(nrow(xx), ' peaks left\n')
   # sort positional peaks with logFC
   #xx = xx[order(-xx$logFC.mean), ]
   xx = xx[order(-xx$log2FC), ]
@@ -626,7 +657,7 @@ if(grouping.position.dependent.peaks){
   ii.gaps = c(5, 8)
   pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
            cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps, 
-           filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
+           filename = paste0(figureDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
            width = 8, height = 12)
   
   if(saveTable){
@@ -647,7 +678,11 @@ if(grouping.position.dependent.peaks){
   xx = xx[order(-xx$logFC.mean), ]
   
   yy = xx
-  yy = yy[which(yy$max > 3 & yy$min < 1 & yy$res2.max< 0.1), ]
+  yy[grep('HOXA13', yy$geneId), ]
+  
+  # res2 here is residues in the fitting for each condition, UA, LA and Hand
+  #yy = yy[which(yy$max > 3 & yy$min < 1 & yy$res2.max< 0.1), ]
+  yy = yy[which(yy$max > 3 & yy$min < 1), ]
   
   yy = yy[order(yy$logFC.mean), ]
   
