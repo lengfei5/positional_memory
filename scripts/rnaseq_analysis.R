@@ -316,8 +316,7 @@ ss = rowSums(counts(dds))
 length(which(ss > quantile(ss, probs = 0.6)))
 
 #ss = rowMeans(counts(dds))
-
-dd0 = dds[ss > quantile(ss, probs = 0.6) , ]
+dd0 = dds[ss > quantile(ss, probs = 0.6), ]
 dd0 = estimateSizeFactors(dd0)
 
 sizefactors.UQ = sizeFactors(dds)
@@ -403,8 +402,8 @@ if(Run.batch.correction){
                repel = FALSE     # Avoid text overlapping
   )
   
+  
 }
-
 
 Test.glmpca.mds = FALSE
 if(Test.glmpca.mds){
@@ -456,7 +455,6 @@ eps = readRDS(file = paste0('../data/human_chromatin_remodelers_Epifactors.datab
 rbp = readRDS(file = paste0('../data/human_RBPs_rbpdb.rds'))
 tfs = unique(tfs$`HGNC symbol`)
 sps = toupper(unique(sps$gene))
-
 
 #dds0 = dds
 #fpm0 = fpm(dds)
@@ -621,54 +619,66 @@ print(intersect(ggs, sps))
 print(intersect(ggs, eps))
 print(intersect(ggs, rbp))
 
-
 yy = res[select, c(1:9)]
 df <- data.frame(condition = rep(c('mUA', 'mLA', 'mHand'), each = 3))
 rownames(df) = colnames(yy)
-
+colnames(df) = 'segments'
 #ss = apply(as.matrix(yy), 1, mean)
 #yy = yy[which(ss>-2), ]
 
-pheatmap(yy, cluster_rows=TRUE, show_rownames=TRUE, fontsize_row = 5,
+pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
          show_colnames = FALSE,
          scale = 'row',
          cluster_cols=FALSE, annotation_col=df,
-         width = 10, height = 50, filename = paste0(figureDir, 'heatmap_DEgenes_matureSample_qv.0.1_microarray.pdf')) 
+         width = 8, height = 12, filename = paste0(figureDir, 'heatmap_DEgenes_matureSample_qv.0.1_microarray.pdf')) 
 
 # plot only TFs and SPs
 ggs = rownames(yy)
 ggs = sapply(ggs, function(x) unlist(strsplit(as.character(x), '_'))[1])
 
-mm = match(ggs, unique(c(tfs, toupper(sps), eps, rbp)))
-yy1 = yy[!is.na(mm), ]
+##########################################
+# highlight TFs and EPs in positional genes 
+##########################################
+mm = match(ggs, unique(c(tfs, eps)))
+yy1 = yy[unique(c(which(!is.na(mm)))), ]
 
 pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
          scale = 'row',
          cluster_cols=FALSE, annotation_col=df, fontsize_row = 8, 
-         width = 10, height = 20,
-         filename = paste0(figureDir, 'heatmap_DE.tfs.sps.eps.rbp_mature_qv.0.1_microarray.pdf')) 
+         width = 8, height = 12,
+         filename = paste0(figureDir, 'heatmap_DE.tfs_eps_mature_qv.0.1_microarray.pdf')) 
+
+
+mm = match(ggs, unique(c(toupper(sps))))
+yy1 = yy[unique(c(which(!is.na(mm)), grep('CYP2', rownames(yy)))), ]
+
+pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
+         scale = 'row',
+         cluster_cols=FALSE, annotation_col=df, fontsize_row = 8, 
+         width = 8, height = 12,
+         filename = paste0(figureDir, 'heatmap_DE_sps_mature_qv.0.1_microarray.pdf')) 
 
 
 library(ggrepel)
 library(dplyr)
 library(tibble)
 res$gene = sapply(rownames(res), function(x) unlist(strsplit(as.character(x), '_'))[1])
+res$fdr = -log10(res$adj.P.Val_mHand.vs.mUA)
+res$logfc = res$logFC_mHand.vs.mUA
+examples.sel = unique(res$gene[which(res$adj.P.Val_mHand.vs.mUA <0.001 & abs(res$logFC_mHand.vs.mUA) > 2)])
 
-examples.sel = unique(res$gene[which(res$fdr.max > 3 & abs(res$logFC.max) > 1)])
-ggplot(data=res, aes(x=logFC.max, y=fdr.max, label = gene)) +
+ggplot(data=res, aes(x=logfc, y=fdr, label = gene)) +
   geom_point(size = 1) + 
   theme(axis.text.x = element_text(size = 12), 
         axis.text.y = element_text(size = 12)) +
-  #geom_text_repel(data=subset(res, log2FoldChange > 2), size = 4) +
-  geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel),
-                   size = 2) + 
+  geom_text_repel(data= res[abs(res$logfc)>2 & res$fdr >3, ], size = 2.5, label.padding = 0.15) +
+  #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
   #scale_color_manual(values=c("blue", "black", "red")) +
-  geom_vline(xintercept=c(0), col="red") +
-  geom_hline(yintercept=5, col="red") +
-  ggsave(paste0(figureDir, "VolcanoPlot_logFC.max_pval.max_matureSamples_microarray.pdf"), width=12, height = 8)
+  geom_vline(xintercept=c(-3, 3), col="red") +
+  geom_hline(yintercept=3, col="red") +
+  ggsave(paste0(figureDir, "VolcanoPlot_log2FC_fdr_Hand.vs.UA.microarray.pdf"), width=12, height = 8)
   
     
-
 if(saveTables){
   write.csv(res[select, ],
               file = paste0(shareDir, '/position_dependent_genes_from_matureSamples_microarray_qv.0.1.csv'), 

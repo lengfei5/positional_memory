@@ -577,8 +577,12 @@ run.MARA.atac.spatial = function(keep, cc)
   # prepare Y response matrix
   Prepare.Response.Matrix = FALSE
   if(Prepare.Response.Matrix){
-    load(file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical_v1.Rdata'))
-    fpm = readRDS(file = paste0(RdataDir, '/fpm_TMM_combat.rds'))
+    #load(file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical_v1.Rdata'))
+    #fpm = readRDS(file = paste0(RdataDir, '/fpm_TMM_combat.rds'))
+    fpm = readRDS(file = paste0(RdataDir, '/fpm.bc_TMM_combat_MatureSamples_batch2020.2021.2021S_rmOldBatch.rds'))
+    design = readRDS(file = paste0(RdataDir, '/design_sels_bc_TMM_combat_MatureSamples_batch2020.2021.2021S_rmOldBatch.rds'))
+    
+    
     
     # prepare the background distribution
     fpm.bg = fpm[grep('bg_', rownames(fpm), invert = FALSE), ]
