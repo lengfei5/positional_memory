@@ -608,12 +608,14 @@ if(grouping.position.dependent.peaks){
   ##########################################
   res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v9.rds'))
   
-  # select the positional peaks with 
+  # select the positional peaks with pairwise comparisions 
+  # limma logFC is in log2 scale
   fdr.cutoff = 0.01; logfc.cutoff = 0.5
-  jj = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & res$logFC.mLA.vs.mUA > logfc.cutoff) |
-               (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & res$logFC.mHand.vs.mUA > logfc.cutoff)|
-               (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & res$logFC.mHand.vs.mLA > logfc.cutoff)
+  jj = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & abs(res$logFC.mLA.vs.mUA) > logfc.cutoff) |
+               (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & abs(res$logFC.mHand.vs.mUA) > logfc.cutoff)|
+               (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & abs(res$logFC.mHand.vs.mLA) > logfc.cutoff)
   )
+  
   cat(length(jj), '\n')
   jj1 = which(res$prob.M0<0.01 & res$log2FC>1)
   cat(length(jj1), '\n')
@@ -654,6 +656,18 @@ if(grouping.position.dependent.peaks){
   rownames(df) = colnames(keep)
   colnames(df) = 'segments'
   ii.gaps = c(4, 6)
+  
+  annot_colors = c('springgreen3', 'red', 'black')
+  names(annot_colors) = c('Mature_UA', 'Mature_LA', 'Mature_Hand')
+  annot_colors = list(segments = annot_colors)
+  
+  pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
+           cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps, 
+           annotation_colors = ann_colors)
+           
+  
+  
+  
   pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
            cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps, 
            filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC0.5_keepPeaks.head.pdf'), 

@@ -614,6 +614,8 @@ ggs = sapply(rownames(res), function(x){unlist(strsplit(as.character(x), '_'))[1
 select = which(res$fdr.max> -log10(0.05) & abs(res$logFC.max)> 0)
 ggs = ggs[select]
 
+cat(ggs[grep('MEIS', ggs)], '\n')
+
 print(intersect(ggs, tfs))
 print(intersect(ggs, sps))
 print(intersect(ggs, eps))
@@ -632,13 +634,13 @@ pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
          cluster_cols=FALSE, annotation_col=df,
          width = 8, height = 12, filename = paste0(figureDir, 'heatmap_DEgenes_matureSample_qv.0.1_microarray.pdf')) 
 
+##########################################
+# highlight TFs and EPs in positional genes 
+##########################################
 # plot only TFs and SPs
 ggs = rownames(yy)
 ggs = sapply(ggs, function(x) unlist(strsplit(as.character(x), '_'))[1])
 
-##########################################
-# highlight TFs and EPs in positional genes 
-##########################################
 mm = match(ggs, unique(c(tfs, eps)))
 yy1 = yy[unique(c(which(!is.na(mm)))), ]
 
@@ -646,7 +648,7 @@ pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
          scale = 'row',
          cluster_cols=FALSE, annotation_col=df, fontsize_row = 8, 
          width = 8, height = 12,
-         filename = paste0(figureDir, 'heatmap_DE.tfs_eps_mature_qv.0.1_microarray.pdf')) 
+         filename = paste0(resDir, 'heatmap_DE.tfs_eps_mature_qv.0.1_microarray.pdf')) 
 
 
 mm = match(ggs, unique(c(toupper(sps))))

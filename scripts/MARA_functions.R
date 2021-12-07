@@ -579,22 +579,20 @@ run.MARA.atac.spatial = function(keep, cc)
   if(Prepare.Response.Matrix){
     #load(file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical_v1.Rdata'))
     #fpm = readRDS(file = paste0(RdataDir, '/fpm_TMM_combat.rds'))
+    #res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v6.rds'))
     fpm = readRDS(file = paste0(RdataDir, '/fpm.bc_TMM_combat_MatureSamples_batch2020.2021.2021S_rmOldBatch.rds'))
     design = readRDS(file = paste0(RdataDir, '/design_sels_bc_TMM_combat_MatureSamples_batch2020.2021.2021S_rmOldBatch.rds'))
-    
-    
+    res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v9.rds'))
     
     # prepare the background distribution
     fpm.bg = fpm[grep('bg_', rownames(fpm), invert = FALSE), ]
     fpm = fpm[grep('bg_', rownames(fpm), invert = TRUE), ]
     rownames(fpm) = gsub('_', '-', rownames(fpm))
     
-    res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v6.rds'))
-    
-    conds = c("Mature_UA", "Mature_LA", "Mature_Hand")
+    conds = c("Mature_UA", "Mature_LA", "Mature_Hand", 'HEAD')
     sample.sels = c();  cc = c()
     for(n in 1:length(conds)) {
-      kk = which(design$conds == conds[n] & design$SampleID != '74938' & design$SampleID != '102655')
+      kk = which(design$conds == conds[n])
       #kk = which(design$conds == conds[n]) 
       sample.sels = c(sample.sels, kk)
       cc = c(cc, rep(conds[n], length(kk)))
@@ -611,14 +609,8 @@ run.MARA.atac.spatial = function(keep, cc)
     jj1 = which(res$prob.M0<0.01 & res$log2FC>1)
     jj2 = which(res$pval.lrt < 0.001 & res$log2FC > 1)
     
-    jj = which(res$prob.M0 <  0.01 & res$log2FC > 2.5)
+    #jj = which(res$prob.M0 <  0.01 & res$log2FC > 2.5)
     cat(length(jj), ' peaks selected \n')
-    
-    #jj = which(res$prob.M0 <  0.01 & res$log2FC > 1.5)
-    #cat(length(jj), ' peaks selected \n')
-    
-    #jj = which(res$fdr.mean> 2 & res$logFC.mean > 1.2)
-    #cat(length(jj), ' peaks selected \n')
     
     xx = res[c(jj), ]
     xx = xx[order(-xx$log2FC), ]
@@ -700,26 +692,30 @@ run.MARA.atac.spatial = function(keep, cc)
     
     saveRDS(r, file = paste0(resDir, '/MARA_Bayesian_ridge.rds'))
     zz = r$Zscore
-    zz = apply(as.matrix(zz), 1, function(x){x.abs = abs(x); return(x[which(x.abs == max(x.abs))][1]); })
+    zz = apply(as.matrix(zz[, c(1:3)]), 1, function(x){x.abs = abs(x); return(x[which(x.abs == max(x.abs))][1]); })
     r$max.Zscore = zz
     
     # = sort(r$combined.Zscore, decreasing=TRUE)[1:50]
     sort(r$combined.Zscore, decreasing=TRUE)[1:20]
     
     sort(r$max.Zscore, decreasing=TRUE)[1:20]
-    sort(r$max.Zscore, decreasing=TRUE)[1:50]
+    sort(r$max.Zscore, decreasing=TRUE)[1:30]
     
     r$max.Zscore[grep('MEIS|RAR|RXR|SOX9', names(r$max.Zscore))]
     
     top20 = sort(r$max.Zscore, decreasing = TRUE)[1:30]
     motif.names = rownames(r$Zscore)
     bb = r$Zscore[match(names(top20), motif.names), ]
-    pheatmap(bb, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = FALSE, 
-             scale = 'none', cluster_cols=FALSE, main = paste0("Inferred z-scores (motif activity) by MARA"), 
-             na_col = "white", fontsize_row = 12, 
-             filename = paste0(resDir, '/positional_peaks_MARA_ridge.pdf'), 
-             width = 8, height = 10) 
     
+    df <- data.frame(colnames(bb))
+    rownames(df) = colnames(bb)
+    colnames(df) = 'segments'
+    
+    pheatmap(bb, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = FALSE, 
+             scale = 'none', cluster_cols=FALSE, main = paste0(" Motif activity (Z-scores) by MARA"), 
+             na_col = "white", fontsize_row = 12, annotation_col = df,
+             filename = paste0(resDir, '/MARA_bayesian_ridge_positional_peaks.pdf'), 
+             width = 8, height = 8)
     
   }
   
@@ -759,26 +755,35 @@ run.MARA.atac.spatial = function(keep, cc)
     varImpPlot(rf, n.var = 20)
     imps = importance(rf, type = 1)
     
-    zz1 = apply(aa, 1, max)
+    zz1 = apply(aa[,c(1:3)], 1, max)
     aa = aa[order(-zz1), ]
     zz1 = zz1[order(-zz1)]
     
-    zz2 = apply(bb, 1, max)
+    zz2 = apply(bb[, c(1:3)], 1, max)
     bb = bb[order(-zz2), ]
     zz2 = zz2[order(-zz2)]
-    xx = bb[c(1:50), ]
     
-    tops = 30
-    plot(zz2[1:tops], c(tops:1) )
+    tops = 20
+    plot(zz2[1:tops], c(tops:1))
     
-    yy = data.frame(names = rownames(aa)[1:tops], scores = zz1[1:tops], rank = c(tops:1))
-   
+    
+    xx = data.frame(names = rownames(aa)[1:tops], scores = zz1[1:tops], rank = c(tops:1))
+    yy = data.frame(names = rownames(bb)[1:tops], scores = zz2[1:tops], rank = c(tops:1))
+    
     gp = ggplot(data = yy, aes(x = scores, y = rank, label = names)) +   
       geom_point(size = 3.0, color = 'blue') +
       theme(axis.text.x = element_text(size = 12), 
           axis.text.y = element_text(size = 12)) + 
       #geom_text_repel(data=subset(yy, pvalue_pos > 2), size = 4)
       geom_label_repel(size = 4)
+    
+    
+    gp = ggplot(data = yy, aes(x = scores, y = rank, label = names)) +   
+      geom_point(size = 2.0, color = 'blue') +
+      theme(axis.text.x = element_text(size = 12), 
+            axis.text.y = element_text(size = 12)) + 
+      geom_text_repel(size = 4) + ggtitle('Importance score from Random Forest MARA')
+      #geom_label_repel(size = 4)
       #theme(axis.text.x = element_text(angle = 90, size = 8)) + 
       #geom_hline(yintercept = c(20, 50, 100)) + ylab("unique.rmdup (M)")
     
@@ -797,11 +802,11 @@ run.MARA.atac.spatial = function(keep, cc)
   if(Run.glmnet){
     ### specify glment parameters
     alpha = 0.1
-    standardize = TRUE;
+    standardize = FALSE;
     use.lambda.min = FALSE;
     binarize.x = FALSE
     standardize.response=FALSE
-    intercept=FALSE
+    intercept=TRUE
     family = 'mgaussian'
     
    
@@ -810,7 +815,7 @@ run.MARA.atac.spatial = function(keep, cc)
     
     #x = t(scale(t(X), center = TRUE, scale = TRUE));
     x = X
-    y = scale(Y, center = TRUE, scale = FALSE)
+    y = scale(Y[, c(1:3)], center = TRUE, scale = FALSE)
     if(binarize.x) x = x > 0
     #sels = c(1:5000)
     #x = x[sels, ]
@@ -819,7 +824,7 @@ run.MARA.atac.spatial = function(keep, cc)
     library(tictoc)
     tic()
     cv.fit=cv.glmnet(x, y, family= family, grouped=FALSE, 
-                     alpha=alpha, nlambda=100, standardize=standardize, 
+                     alpha=alpha, nlambda=200, standardize=standardize, 
                      standardize.response=standardize.response, parallel = TRUE)
     
     plot(cv.fit)
