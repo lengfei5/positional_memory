@@ -600,11 +600,12 @@ run.MARA.atac.spatial = function(keep, cc)
     
     
     # select the positional peaks with 
-    fdr.cutoff = 0.01; logfc.cutoff = 1
-    jj = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & res$logFC.mLA.vs.mUA > logfc.cutoff) |
-                 (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & res$logFC.mHand.vs.mUA > logfc.cutoff)|
-                 (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & res$logFC.mHand.vs.mLA > logfc.cutoff)
+    fdr.cutoff = 0.01; logfc.cutoff = 0.5
+    jj = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & abs(res$logFC.mLA.vs.mUA) > logfc.cutoff) |
+                 (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & abs(res$logFC.mHand.vs.mUA) > logfc.cutoff)|
+                 (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & abs(res$logFC.mHand.vs.mLA) > logfc.cutoff)
     )
+    cat(length(jj), '\n')
     
     jj1 = which(res$prob.M0<0.01 & res$log2FC>1)
     jj2 = which(res$pval.lrt < 0.001 & res$log2FC > 1)
@@ -691,34 +692,38 @@ run.MARA.atac.spatial = function(keep, cc)
     r = ridge.regression(N, E, opt$lambda.opt)
     
     saveRDS(r, file = paste0(resDir, '/MARA_Bayesian_ridge.rds'))
+    
     zz = r$Zscore
     zz = apply(as.matrix(zz[, c(1:3)]), 1, function(x){x.abs = abs(x); return(x[which(x.abs == max(x.abs))][1]); })
-    r$max.Zscore = zz
+    r$max.Zscore = abs(zz)
     
     # = sort(r$combined.Zscore, decreasing=TRUE)[1:50]
     sort(r$combined.Zscore, decreasing=TRUE)[1:20]
-    
     sort(r$max.Zscore, decreasing=TRUE)[1:20]
+    
     sort(r$max.Zscore, decreasing=TRUE)[1:30]
     
     r$max.Zscore[grep('MEIS|RAR|RXR|SOX9', names(r$max.Zscore))]
     
-    top20 = sort(r$max.Zscore, decreasing = TRUE)[1:30]
+    top20 = sort(r$max.Zscore, decreasing = TRUE)[1:20]
     motif.names = rownames(r$Zscore)
     bb = r$Zscore[match(names(top20), motif.names), ]
     
     df <- data.frame(colnames(bb))
     rownames(df) = colnames(bb)
     colnames(df) = 'segments'
+    annot_colors = c('springgreen4', 'steelblue2', 'gold2', 'darkgray')
+    names(annot_colors) = c('Mature_UA', 'Mature_LA', 'Mature_Hand', 'HEAD')
+    annot_colors = list(segments = annot_colors)
     
     pheatmap(bb, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = FALSE, 
              scale = 'none', cluster_cols=FALSE, main = paste0(" Motif activity (Z-scores) by MARA"), 
-             na_col = "white", fontsize_row = 12, annotation_col = df,
+             na_col = "white", fontsize_row = 12, annotation_col = df, 
+             annotation_colors = annot_colors,
              filename = paste0(resDir, '/MARA_bayesian_ridge_positional_peaks.pdf'), 
-             width = 8, height = 8)
+             width = 8, height = 6)
     
   }
-  
   
   Run.RF = FALSE
   if(Run.RF){
@@ -770,7 +775,7 @@ run.MARA.atac.spatial = function(keep, cc)
     xx = data.frame(names = rownames(aa)[1:tops], scores = zz1[1:tops], rank = c(tops:1))
     yy = data.frame(names = rownames(bb)[1:tops], scores = zz2[1:tops], rank = c(tops:1))
     
-    gp = ggplot(data = yy, aes(x = scores, y = rank, label = names)) +   
+    gp = ggplot(data = xx, aes(x = scores, y = rank, label = names)) +   
       geom_point(size = 3.0, color = 'blue') +
       theme(axis.text.x = element_text(size = 12), 
           axis.text.y = element_text(size = 12)) + 

@@ -615,20 +615,20 @@ if(grouping.position.dependent.peaks){
                (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & abs(res$logFC.mHand.vs.mUA) > logfc.cutoff)|
                (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & abs(res$logFC.mHand.vs.mLA) > logfc.cutoff)
   )
-  
   cat(length(jj), '\n')
-  jj1 = which(res$prob.M0<0.01 & res$log2FC>1)
+  
+  jj1 = which(res$prob.M0<0.01 & res$log2FC>logfc.cutoff)
   cat(length(jj1), '\n')
-  jj2 = which(res$pval.lrt < 0.001 & res$log2FC > 1)
+  jj2 = which(res$pval.lrt < 0.001 & res$log2FC > logfc.cutoff)
   cat(length(jj2), '\n')
   
   xx = res[c(jj), ]
   #xx = xx[order(-xx$log2FC.mature), ]
-  xx[grep('HOXA13', xx$transcriptId), ]
+  xx[grep('HOXA13|SHOX', xx$transcriptId), ]
   fpm[which(rownames(fpm) == 'chr2p:873464923-873465440'), ]
   
   # filter the peaks from head control sample
-  Filtering.peaks.in.Head.samples = FALSE
+  Filtering.peaks.in.Head.samples = TRUE
   if(Filtering.peaks.in.Head.samples){
     p0 = pp[match(rownames(xx), names(pp))]
     
@@ -639,10 +639,12 @@ if(grouping.position.dependent.peaks){
     non.overlap = !overlapsAny(p0, p.ctl)
     
     xx = xx[non.overlap, ]
-    
   }
   
-  xx[grep('HOXA13', xx$transcriptId), ]
+  dim(xx)
+  
+  xx[grep('HOXA13|SHOX|MEIS', xx$transcriptId), ]
+  
   cat(nrow(xx), ' peaks left\n')
   # sort positional peaks with logFC
   #xx = xx[order(-xx$logFC.mean), ]
@@ -657,20 +659,14 @@ if(grouping.position.dependent.peaks){
   colnames(df) = 'segments'
   ii.gaps = c(4, 6)
   
-  annot_colors = c('springgreen3', 'red', 'black')
+  annot_colors = c('springgreen4', 'steelblue2', 'gold2')
   names(annot_colors) = c('Mature_UA', 'Mature_LA', 'Mature_Hand')
   annot_colors = list(segments = annot_colors)
   
   pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
            cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps, 
-           annotation_colors = ann_colors)
-           
-  
-  
-  
-  pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
-           cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps, 
-           filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC0.5_keepPeaks.head.pdf'), 
+           annotation_colors = annot_colors, 
+           filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC0.5_rmPeaks.head.pdf'), 
            width = 8, height = 10)
   
   if(saveTable){
@@ -739,11 +735,11 @@ if(grouping.position.dependent.peaks){
   yy = xx
   
   yy = yy[grep('Promoter', yy$annotation), ] # peak close to promoters
-  yy[grep('HOXA13', yy$transcriptId),]
+  yy[grep('HOXA13|MEIS|SHOX|HOXC', yy$transcriptId),]
   #yy = xx
   #yy = yy[c(1:50), ]
   #yy = yy[which(yy$logFC.mean>1.5), ]
-  yy = yy[which(yy$max > 5 & yy$min < 4.5), ] # max residual square < 0.1
+  yy = yy[which(yy$max > 5), ] # max residual square < 0.1
   
   keep = fpm[!is.na(match(rownames(fpm), rownames(yy))), sample.sels]
   gg = res$geneId[match(rownames(keep), rownames(res))]
@@ -764,10 +760,6 @@ if(grouping.position.dependent.peaks){
   # # make sure max above the threshold
   # nb.above.threshold = apply(keep, 1, function(x) length(which(x>3)))
   # keep = keep[which(nb.above.threshold >=3), ] 
-  # 
-  # nb.below.bg = apply(keep, 1, function(x) length(which(x<2)))
-  # keep = keep[which(nb.below.bg >=3), ] 
-  
   gg = rownames(keep)
   gg = sapply(gg, function(x) unlist(strsplit(as.character(x), '_'))[2])
   gg = sapply(gg, function(x) unlist(strsplit(as.character(x), '[|]'))[1])
@@ -779,9 +771,10 @@ if(grouping.position.dependent.peaks){
   #rownames(df) = colnames(keep)
   ii.gaps = c(4, 6)
   pheatmap(keep, cluster_rows=TRUE, show_rownames=TRUE, scale = 'row', show_colnames = FALSE,
-           cluster_cols=FALSE, annotation_col = df, fontsize_row = 12, gaps_col = ii.gaps,
-           filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC0.5_top.promoter.pdf'), 
-           width = 14, height = 10)
+           cluster_cols=FALSE, annotation_col = df, fontsize_row = 14, gaps_col = ii.gaps,
+           annotation_colors = annot_colors,
+           filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC0.5_top.promoters.pdf'), 
+           width = 18, height = 10)
   
   
   if(saveTable){
