@@ -830,8 +830,53 @@ if(grouping.position.dependent.peaks){
 grouping.temporal.peaks = FALSE
 if(grouping.temporal.peaks){
   
-  conds = c("Embryo_Stage40", "Embryo_Stage44_proximal", "Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal")
+  fpm = readRDS(file = paste0(RdataDir, '/fpm.bc_TMM_combat_mUA_regeneration_embryoStages.rds'))
+  design = readRDS(file = paste0(RdataDir, '/design_sels_bc_TMM_combat_mUA_regeneration_embryoStages.rds'))
   
+  # prepare the background distribution
+  fpm.bg = fpm[grep('bg_', rownames(fpm), invert = FALSE), ]
+  fpm = fpm[grep('bg_', rownames(fpm), invert = TRUE), ]
+  rownames(fpm) = gsub('_', '-', rownames(fpm))
+  
+  hist(fpm.bg, breaks = 100, main = 'background distribution')
+  abline(v = 1, col = 'red', lwd = 2.0)
+  quantile(fpm.bg, c(0.95, 0.99))
+  
+  ##########################################
+  ## make Granges and annotate peaks
+  ##########################################
+  Make.Granges.and.peakAnnotation = TRUE
+  if(Make.Granges.and.peakAnnotation){
+    require(ChIPpeakAnno)
+    require(ChIPseeker)
+    
+    pp = data.frame(t(sapply(rownames(fpm), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+    pp$strand = '*'
+    
+    save.peak.bed = FALSE
+    if(save.peak.bed){
+      bed = data.frame(pp[, c(1:3)], rownames(pp), 0, pp[, 4], stringsAsFactors = FALSE)
+      write.table(bed, file = paste0(resDir, '/peakset_', version.analysis, '.bed'), col.names = FALSE, row.names = FALSE,
+                  sep = '\t', quote = FALSE)
+    }
+    
+    pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                  start.field="X2", end.field="X3", strand.field="strand")
+    
+    # annotation from ucsc browser ambMex60DD_genes_putative
+    amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
+    pp.annots = annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+    #plotAnnoBar(pp.annots)
+    
+    pp.annots = as.data.frame(pp.annots)
+    rownames(pp.annots) = rownames(fpm)
+    
+    promoters = select.promoters.regions(upstream = 2000, downstream = 2000, ORF.type.gtf = 'Putative', promoter.select = 'all')
+    
+  }
+  
+  
+  conds = c("Embryo_Stage40", "Embryo_Stage44_proximal", "Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal")
   # examples to test
   test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
   #test.examples = c('Hoxa13')
@@ -855,13 +900,12 @@ if(grouping.temporal.peaks){
     source('Functions_atac.R')
     cpm = fpm[, sample.sels]
     
-    quantile(fpm.bg, 0.99)
-    nb.above.threshold = apply(as.matrix(cpm), 1, function(x) length(which(x> 2)))
-    
+    # stringent here, with signal > 2.5 in >=3 samples 
+    nb.above.threshold = apply(as.matrix(cpm), 1, function(x) length(which(x> 4.5)))
     hist(nb.above.threshold, breaks = c(-1:ncol(cpm)))
-    length(which(nb.above.threshold>6))
+    peak.sels = which(nb.above.threshold>=2)
+    cat(length(peak.sels), 'peaks after filtering for mature samples\n')
     
-    peak.sels = which(nb.above.threshold>=3)
     cpm = cpm[peak.sels, ]
     
     tic()
@@ -874,12 +918,12 @@ if(grouping.temporal.peaks){
     
     res = xx
     
-    saveRDS(res, file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v4.rds'))
+    saveRDS(res, file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v5.rds'))
     
   }
   
   
-  res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v4.rds'))
+  res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v5.rds'))
   
   # select the temporal dynamic peaks
   length(which(res$prob.M0<0.05))
@@ -892,11 +936,12 @@ if(grouping.temporal.peaks){
   
   #jj = which(res$prob.M0 < 0.05 & res$log2FC >1 )
   
-  jj = which(res$prob.M0 < 0.01 & res$log2FC > 2 )
+  jj = which(res$prob.M0 < 0.05 & res$log2FC > 1 )
   
   xx = res[c(jj), ]
   xx = xx[order(-xx$log2FC), ]
-  xx = xx[which(xx$min < 1), ]
+  
+  #xx = xx[which(xx$min < 4), ]
   
   source('Functions_atac.R')
   keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
@@ -944,5 +989,4 @@ if(grouping.temporal.peaks){
   xx = run.MARA.atac.temporal(keep, cc)
   
 }
-
 
