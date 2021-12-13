@@ -667,27 +667,36 @@ pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
 library(ggrepel)
 library(dplyr)
 library(tibble)
+
 res$gene = sapply(rownames(res), function(x) unlist(strsplit(as.character(x), '_'))[1])
-res$fdr = -log10(res$adj.P.Val_mHand.vs.mUA)
-res$logfc = res$logFC_mHand.vs.mUA
 
-examples.sel = which(res$adj.P.Val_mHand.vs.mUA <0.001 & abs(res$logFC_mHand.vs.mUA) > 2)
-examples.sel = unique(c(examples.sel, grep('HOXA11|HOXA9|HOXD13|HOXD11|HOXD9', res$gene)))
+#res$fdr = -log10(res$adj.P.Val_mHand.vs.mUA)
+#res$logfc = res$logFC_mHand.vs.mUA
 
-ggplot(data=res, aes(x=logfc, y=fdr, label = gene)) +
-  geom_point(size = 1) + 
-  theme(axis.text.x = element_text(size = 12), 
-        axis.text.y = element_text(size = 12)) +
-  geom_text_repel(data= res[examples.sel, ], size = 3.0, label.padding = 0.15, color = 'blue') +
-  #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
-  #scale_color_manual(values=c("blue", "black", "red")) +
-  geom_vline(xintercept=c(0), col='darkgray') +
-  geom_hline(yintercept=3, col="darkgray") 
-
-ggsave(paste0(figureDir, "VolcanoPlot_log2FC_fdr_Hand.vs.UA.microarray.pdf"), width=12, height = 8)
-
-
+for(comp in c('mHand.vs.mUA', 'mHand.vs.mLA', 'mLA.vs.mUA'))
+{
+  # comp = 'mLA.vs.mUA' 
+  res$fdr = eval(parse(text = paste0('-log10(res$adj.P.Val_', comp, ')')))
+  res$pval = eval(parse(text = paste0('-log10(res$P.Value_', comp, ')')))
+  res$logfc = eval(parse(text = paste0('res$logFC_', comp)))
   
+  
+  examples.sel = which(res$pval > 4 & abs(res$logfc) > 2)
+  examples.sel = unique(c(examples.sel, grep('HOXA11|HOXA9|HOXD13|HOXD11|HOXD9', res$gene)))
+  
+  ggplot(data=res, aes(x=logfc, y=pval, label = gene)) +
+    geom_point(size = 1) + 
+    theme(axis.text.x = element_text(size = 12), 
+          axis.text.y = element_text(size = 12)) +
+    geom_text_repel(data= res[examples.sel, ], size = 3.0, label.padding = 0.15, color = 'blue') +
+    #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
+    #scale_color_manual(values=c("blue", "black", "red")) +
+    geom_vline(xintercept=c(0), col='darkgray') +
+    geom_hline(yintercept=3, col="darkgray") 
+  
+  ggsave(paste0(figureDir, "VolcanoPlot_log2FC_pval_microarray_", comp, ".pdf"), width=12, height = 8)
+  
+}
     
 if(saveTables){
   write.csv(res[select, ],
