@@ -661,24 +661,32 @@ pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
          filename = paste0(figureDir, 'heatmap_DE_sps_mature_qv.0.1_microarray.pdf')) 
 
 
+##########################################
+# volcano plot with highlighting genes
+##########################################
 library(ggrepel)
 library(dplyr)
 library(tibble)
 res$gene = sapply(rownames(res), function(x) unlist(strsplit(as.character(x), '_'))[1])
 res$fdr = -log10(res$adj.P.Val_mHand.vs.mUA)
 res$logfc = res$logFC_mHand.vs.mUA
-examples.sel = unique(res$gene[which(res$adj.P.Val_mHand.vs.mUA <0.001 & abs(res$logFC_mHand.vs.mUA) > 2)])
+
+examples.sel = which(res$adj.P.Val_mHand.vs.mUA <0.001 & abs(res$logFC_mHand.vs.mUA) > 2)
+examples.sel = unique(c(examples.sel, grep('HOXA11|HOXA9|HOXD13|HOXD11|HOXD9', res$gene)))
 
 ggplot(data=res, aes(x=logfc, y=fdr, label = gene)) +
   geom_point(size = 1) + 
   theme(axis.text.x = element_text(size = 12), 
         axis.text.y = element_text(size = 12)) +
-  geom_text_repel(data= res[abs(res$logfc)>2 & res$fdr >3, ], size = 2.5, label.padding = 0.15) +
+  geom_text_repel(data= res[examples.sel, ], size = 3.0, label.padding = 0.15, color = 'blue') +
   #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
   #scale_color_manual(values=c("blue", "black", "red")) +
-  geom_vline(xintercept=c(-3, 3), col="red") +
-  geom_hline(yintercept=3, col="red") +
-  ggsave(paste0(figureDir, "VolcanoPlot_log2FC_fdr_Hand.vs.UA.microarray.pdf"), width=12, height = 8)
+  geom_vline(xintercept=c(0), col='darkgray') +
+  geom_hline(yintercept=3, col="darkgray") 
+
+ggsave(paste0(figureDir, "VolcanoPlot_log2FC_fdr_Hand.vs.UA.microarray.pdf"), width=12, height = 8)
+
+
   
     
 if(saveTables){
