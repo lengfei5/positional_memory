@@ -938,15 +938,19 @@ run.MARA.atac.temporal = function(keep, cc)
   # prepare Y response matrix
   Prepare.Response.Matrix = FALSE
   if(Prepare.Response.Matrix){
-    load(file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical_v1.Rdata'))
-    fpm = readRDS(file = paste0(RdataDir, '/fpm_TMM_combat.rds'))
+    fpm = readRDS(file = paste0(RdataDir, '/fpm.bc_TMM_combat_mUA_regeneration_embryoStages.rds'))
+    design = readRDS(file = paste0(RdataDir, '/design_sels_bc_TMM_combat_mUA_regeneration_embryoStages.rds'))
     
     # prepare the background distribution
     fpm.bg = fpm[grep('bg_', rownames(fpm), invert = FALSE), ]
     fpm = fpm[grep('bg_', rownames(fpm), invert = TRUE), ]
     rownames(fpm) = gsub('_', '-', rownames(fpm))
     
-    res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v4.rds'))
+    hist(fpm.bg, breaks = 100, main = 'background distribution')
+    abline(v = 1, col = 'red', lwd = 2.0)
+    quantile(fpm.bg, c(0.95, 0.99))
+    
+    res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v5.rds'))
     
     # select the temporal dynamic peaks
     length(which(res$prob.M0<0.05))
@@ -955,7 +959,7 @@ run.MARA.atac.temporal = function(keep, cc)
     length(which(res$prob.M0<0.01 & res$log2FC > 1.5))
     length(which(res$prob.M0<0.01 & res$log2FC > 2))
     
-    jj = which(res$prob.M0 < 0.01 & res$log2FC > 2 )
+    jj = which(res$prob.M0 < 0.01 & res$log2FC > 1 )
     
     conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal")
     
@@ -1025,8 +1029,12 @@ run.MARA.atac.temporal = function(keep, cc)
     saveRDS(r, file = paste0(RdataDir, '/MARA_Bayesian_ridge_regenerationPeaks.rds'))
     
     zz = r$Zscore
-    zz = apply(as.matrix(zz), 1, max)
-    r$max.Zscore = zz
+    zz = apply(as.matrix(zz[, c(1:3)]), 1, function(x){x.abs = abs(x); return(x[which(x.abs == max(x.abs))][1]); })
+    r$max.Zscore = abs(zz)
+    
+    #zz = r$Zscore
+    #zz = apply(as.matrix(zz), 1, max)
+    #r$max.Zscore = zz
     
     # = sort(r$combined.Zscore, decreasing=TRUE)[1:50]
     sort(r$combined.Zscore, decreasing=TRUE)[1:20]
@@ -1039,11 +1047,13 @@ run.MARA.atac.temporal = function(keep, cc)
     topMotifs = sort(r$max.Zscore, decreasing = TRUE)[1:30]
     motif.names = rownames(r$Zscore)
     bb = r$Zscore[match(names(topMotifs), motif.names), ]
-    pheatmap(bb, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = FALSE, 
+    pheatmap(bb, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE, 
              scale = 'none', cluster_cols=FALSE, main = paste0("Inferred z-scores (motif activity) by MARA"), 
              na_col = "white", fontsize_row = 12, 
-             filename = paste0(resDir, '/positional_peaks_MARA_ridge.pdf'), 
+             filename = paste0(resDir, '/MARA_bayesianRidge_temporalpeaks.pdf'), 
              width = 8, height = 10) 
+    
+    
     
     
   }

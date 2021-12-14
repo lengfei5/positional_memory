@@ -924,6 +924,7 @@ if(grouping.temporal.peaks){
   
   
   res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v5.rds'))
+  res = res[order(-res$log2FC), ]
   
   # select the temporal dynamic peaks
   length(which(res$prob.M0<0.05))
@@ -941,26 +942,39 @@ if(grouping.temporal.peaks){
   xx = res[c(jj), ]
   xx = xx[order(-xx$log2FC), ]
   
-  #xx = xx[which(xx$min < 4), ]
+  xx = xx[which(xx$min < 4.5), ]
   
   source('Functions_atac.R')
-  keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
+  
+  ##########################################
+  # heatmap for all regeneration dynamic peaks
+  ##########################################
+  keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), ]
   keep = as.matrix(keep)
   
-  kk = c(grep('Embryo_Stage40', colnames(keep)), 
-         grep('Embryo_Stage44', colnames(keep)))
-  kk = c(setdiff(c(1:ncol(keep)), kk), kk)
+  conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal", 'BL_UA_13days_distal',
+            "Embryo_Stage40", "Embryo_Stage44_proximal", 'Embryo_Stage44_distal')
+    
+  sample.sels = c(); cc = c()
+  for(n in 1:length(conds)) {
+    kk = which(design$conds == conds[n])
+    if(length(unique(design$batch[kk])) > 1) kk = kk[which(design$batch[kk] == '2021')]
+    sample.sels = c(sample.sels, kk)
+    cc = c(cc, as.character(design$conds[kk]))
+  }
+  kk = sample.sels
   
   keep = keep[, kk]
-  df <- data.frame(cc[kk])
+  df <- data.frame(cc)
   rownames(df) = colnames(keep)
+  colnames(df) = 'regeneration time'
   
-  ii.gaps = c(4, 8, 10, 12, 16)+1
+  ii.gaps = seq(2, nrow(df), by = 2)
   
   pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
            cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps,
-           filename = paste0(resDir, '/heatmap_regenerationPeaks_fdr0.01_log2FC.1.pdf'), 
-           width = 12, height = 12)
+           filename = paste0(resDir, '/heatmap_regenerationPeaks_M0prob0.05_log2FC.1.pdf'), 
+           width = 10, height = 14)
   
   ##########################################
   # highligh potential regeneration peaks, not found in mUA and embryo stages only in regeneration process 
@@ -972,11 +986,11 @@ if(grouping.temporal.peaks){
   mean2 = apply(keep[, jj2], 1, mean)
   mean3 = apply(keep[, jj3], 1, mean)
   
-  kk = which(mean1< 1. & mean2 < 1. & mean3 < 1.)
+  kk = which(mean1< 4.2 & mean2 < 4.2 & mean3 < 4.2)
   
   pheatmap(keep[kk, ], cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
            cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps,
-           filename = paste0(resDir, '/heatmap_regenerationPeaks_fdr0.01_log2FC.1_regeneartion.specific.pdf'), 
+           filename = paste0(resDir, '/heatmap_regenerationPeaks_M0prob0.05_log2FC.1_regeneartion.specific.pdf'), 
            width = 8, height = 10)
   
   yy = keep[kk,]
