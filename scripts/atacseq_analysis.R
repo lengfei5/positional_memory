@@ -54,7 +54,6 @@ if(Import.HoxCluster.annotation){
   HoxD2 = makeGRangesFromDataFrame(HoxD2, seqnames.field = 'chr', start.field = 'start', end.field = 'end', strand.field = 'strand')
   
   Hoxs = c(HoxA, HoxD1, HoxD2)
-  
 }
 
 ##########################################
