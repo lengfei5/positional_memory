@@ -692,7 +692,8 @@ for(comp in c('mHand.vs.mUA', 'mHand.vs.mLA', 'mLA.vs.mUA'))
     #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
     #scale_color_manual(values=c("blue", "black", "red")) +
     geom_vline(xintercept=c(0), col='darkgray') +
-    geom_hline(yintercept=3, col="darkgray") 
+    geom_hline(yintercept=3, col="darkgray") +
+    labs(x = "New x label")
   
   ggsave(paste0(figureDir, "VolcanoPlot_log2FC_pval_microarray_", comp, ".pdf"), width=12, height = 8)
   
