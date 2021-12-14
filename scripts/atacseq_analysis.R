@@ -922,7 +922,6 @@ if(grouping.temporal.peaks){
     
   }
   
-  
   res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v5.rds'))
   res = res[order(-res$log2FC), ]
   
