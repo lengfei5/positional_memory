@@ -37,6 +37,11 @@ require(DESeq2)
 require(GenomicRanges)
 require(pheatmap)
 library(tictoc)
+library(ggrepel)
+library(dplyr)
+library(tibble)
+library(reshape2)
+library(tidyverse)
 
 ########################################################
 ########################################################
@@ -150,10 +155,6 @@ saveRDS(fpm, file = paste0(RdataDir,  '/histoneMarkers_normSignals_axolotlAllTSS
 fpm = readRDS(file = paste0(RdataDir,  '/histoneMarkers_normSignals_axolotlAllTSS.2kb.rds'))
 res = data.frame(log2(fpm + 1), stringsAsFactors = FALSE)
 
-library(ggrepel)
-library(dplyr)
-library(tibble)
-
 res$gene = sapply(rownames(res), function(x){unlist(strsplit(as.character(x), '_'))[2]})
 
 
@@ -196,6 +197,104 @@ ggplot(data=res, aes(x=x1, y=x2, label = gene)) +
   labs(x = "Hand_H3K27me3", y= 'UA_H3K27me3')
 
 ggsave(paste0(figureDir, "histMarker_H3K27me3_scatterplot_Hand.vs.Hand.pdf"), width=12, height = 8)
+
+########################################################
+########################################################
+# Section : Consider the grouping: 
+# inactive promoters, active promoter, house-keeping genes, mature-specific genes,
+# regeneration genes, positional genes
+########################################################
+########################################################
+fpm = readRDS(file = paste0(RdataDir,  '/histoneMarkers_normSignals_axolotlAllTSS.2kb.rds'))
+res = data.frame(log2(fpm + 1), stringsAsFactors = FALSE)
+res$gene = sapply(rownames(res), function(x){unlist(strsplit(as.character(x), '_'))[2]})
+res$geneID  = sapply(rownames(res), function(x){unlist(strsplit(as.character(x), '_'))[1]})
+
+##########################################
+# clean TSS, for each gene, only keep the TSS with sigals if there are mulitple ones
+##########################################
+res$used = NA
+
+Clean.TSS = FALSE
+if(Clean.TSS){
+  ggs = unique(res$geneID)
+  
+  for(n in 1:length(ggs))
+  {
+    # n = 1
+    jj = which(res$geneID == ggs[n])  
+    if(length(jj)>0){
+      hist.max = apply()
+    } 
+    
+  }
+}
+
+##########################################
+# first try to define groups 
+##########################################
+res$x1 = res$UA_K4me3
+res$x2 = res$UA_K27me3
+#rr = res$x1 - res$x2
+
+#examples.sel = which(abs(rr)>2 & (res$x1>5|res$x2>5))
+examples.sel = c()
+examples.sel = unique(c(examples.sel, grep('HOXA13|HOXA11|HOXA9|HOXD13|HOXD11|HOXD9|MEIS', res$gene)))
+
+ggplot(data=res, aes(x=x1, y=x2, label = gene)) +
+  geom_point(size = 0.25) + 
+  theme(axis.text.x = element_text(size = 12), 
+        axis.text.y = element_text(size = 12)) +
+  geom_text_repel(data= res[examples.sel, ], size = 3.0, color = 'blue') +
+  #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
+  #scale_color_manual(values=c("blue", "black", "red")) +
+  geom_vline(xintercept=4, col='darkgray') +
+  geom_hline(yintercept=4, col="darkgray") +
+  labs(x = "UA_H3K4me3", y= 'UA_H3K27me3')
+
+
+load(file =  paste0(annotDir, 'axolotl_housekeepingGenes_controls.other.tissues.liver.islet.testis_expressedIn21tissues.Rdata'))
+hkgs = controls.tissue$geneIDs[which(controls.tissue$tissues == 'housekeeping')]
+nonexp = controls.tissue$geneIDs[which(controls.tissue$tissues != 'housekeeping')]
+
+res$groups = 'limb'
+res$groups[!is.na(match(res$geneID, hkgs))] = 'house.keep'
+res$groups[!is.na(match(res$geneID, nonexp))] = 'other.tissues'
+
+##########################################
+# redefine different groups with RNA-seq data 
+##########################################
+Redefine.gene.groups.with.RNAseq = TRUE
+if(Redefine.gene.groups.with.RNAseq){
+  load(file = paste0('~/workspace/imp/positional_memory/results/rnaseq_Rxxxx.old_R10724_R161513_mergedTechRep/Rdata/RNAseq_design_dds.object.Rdata'))
+  annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                         'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
+  dds = dds[,which(dds$condition != 'Mature_HEAD')]
+  dds$condition = droplevels(dds$condition)
+  
+  
+}
+
+
+ggplot(data=res, aes(x=x1, y=x2, label = gene, color = groups)) +
+  geom_point(size = 0.4) + 
+  theme(axis.text.x = element_text(size = 12), 
+        axis.text.y = element_text(size = 12)) +
+  geom_text_repel(data= res[examples.sel, ], size = 3.0, color = 'blue') +
+  #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
+  #scale_color_manual(values=c("blue", "black", "red")) +
+  geom_vline(xintercept=4, col='darkgray') +
+  geom_hline(yintercept=4, col="darkgray") +
+  labs(x = "UA_H3K4me3", y= 'UA_H3K27me3')
+
+
+#xx = melt(res[], id.vars = c('UA_K4me3', 'UA_K27me3'), variable_name = 'markers')
+res[,c(1, 4, 7:12)] %>% 
+  pivot_longer(cols = c('UA_K4me3', 'UA_K27me3'), names_to = 'markers') %>%
+ggplot(aes(x = groups, y=value, fill=markers)) + 
+  geom_boxplot(outlier.shape = NA) + 
+  #geom_jitter(width = 0.1)+
+  theme(axis.text.x = element_text(angle = 0, size = 12))
 
 
 

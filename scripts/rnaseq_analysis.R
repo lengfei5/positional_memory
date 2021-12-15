@@ -511,7 +511,6 @@ print(intersect(ggs, sps))
 print(intersect(ggs, eps))
 print(intersect(ggs, rbp))
 
-
 #select = which(res$pvalue_Hand.vs.LA < pval.cutoff | res$pvalue_Hand.vs.UA < pval.cutoff | res$pvalue_LA.vs.UA < pval.cutoff)
 #cat(length(select), ' positional genes found \n')
 
@@ -675,27 +674,26 @@ res$gene = sapply(rownames(res), function(x) unlist(strsplit(as.character(x), '_
 
 for(comp in c('mHand.vs.mUA', 'mHand.vs.mLA', 'mLA.vs.mUA'))
 {
-  # comp = 'mLA.vs.mUA' 
+  # 'mHand.vs.mLA'
   res$fdr = eval(parse(text = paste0('-log10(res$adj.P.Val_', comp, ')')))
   res$pval = eval(parse(text = paste0('-log10(res$P.Value_', comp, ')')))
   res$logfc = eval(parse(text = paste0('res$logFC_', comp)))
   
-  
   examples.sel = which(res$pval > 4 & abs(res$logfc) > 2)
-  examples.sel = unique(c(examples.sel, grep('HOXA11|HOXA9|HOXD13|HOXD11|HOXD9', res$gene)))
+  examples.sel = unique(c(examples.sel, grep('HOXA|HOXD', res$gene)))
   
   ggplot(data=res, aes(x=logfc, y=pval, label = gene)) +
-    geom_point(size = 1) + 
+    geom_point(size = 0.5) + 
     theme(axis.text.x = element_text(size = 12), 
-          axis.text.y = element_text(size = 12)) +
-    geom_text_repel(data= res[examples.sel, ], size = 3.0, label.padding = 0.15, color = 'blue') +
+          axis.text.y = element_text(size = 12)) + 
+    #geom_text_repel(data= res[examples.sel, ], size = 3.0, label.padding = 0.15, color = 'blue') +
     #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
     #scale_color_manual(values=c("blue", "black", "red")) +
     geom_vline(xintercept=c(0), col='darkgray') +
     geom_hline(yintercept=3, col="darkgray") +
-    labs(x = "New x label")
+    labs(x = "log2FC")
   
-  ggsave(paste0(figureDir, "VolcanoPlot_log2FC_pval_microarray_", comp, ".pdf"), width=12, height = 8)
+  ggsave(paste0(figureDir, "VolcanoPlot_log2FC_pval_microarray_noLabels_", comp, ".pdf"), width=12, height = 8)
   
 }
     
@@ -822,7 +820,7 @@ if(Compare_stage44.proximal.distal_BL.UA.day13.promximal.distal){
                      size = 3) + 
     #scale_color_manual(values=c("blue", "black", "red")) +
     geom_vline(xintercept=c(0), col="red") +
-    geom_hline(yintercept=5, col="red") +
+    geom_hline(yintercept=5, col="red") + 
     ggsave(paste0(figureDir, "VolcanoPlot_logFC_padj_EmbryoStage.proximal.vs.distal.pdf"), width=12, height = 8)
   
   # # narrow down to TFs and SPs
@@ -852,56 +850,144 @@ if(Compare_stage44.proximal.distal_BL.UA.day13.promximal.distal){
 ########################################################
 ########################################################
 load(file = paste0(RdataDir, 'RNAseq_design_dds.object.Rdata'))
-dds0 = dds
-fpm0 = fpm(dds)
+#dds0 = dds
+#fpm0 = fpm(dds)
+annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                       'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
+
+tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
+sps = readRDS(file = '~/workspace/imp/organoid_patterning/results/Rdata/curated_signaling.pathways_gene.list_v2.rds')
+eps = readRDS(file = paste0('../data/human_chromatin_remodelers_Epifactors.database.rds'))
+rbp = readRDS(file = paste0('../data/human_RBPs_rbpdb.rds'))
+tfs = unique(tfs$`HGNC symbol`)
+sps = toupper(unique(sps$gene))
 
 # select mature samples
-sels = unique(c(which(design.matrix$batch == 3 & design.matrix$condition != 'BL_UA_13days_distal'), 
-             which(design.matrix$condition == 'Embryo_Stage46_proximal')))
+sels = unique(c(which(design.matrix$batch == 3 | design.matrix$condition == 'BL_UA_9days')))
 dds = dds[, sels]
-cpm = log2(fpm0[, sels] + 2^-6)
-
 dds$condition = droplevels(dds$condition)
-dds <- estimateDispersions(dds)
+dds$batch = droplevels(dds$batch)
 
-plotDispEsts(dds, ymin = 10^-3)
+vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
 
-dds = nbinomWaldTest(dds, betaPrior = TRUE)
-resultsNames(dds)
+pca=plotPCA(vsd, intgroup = c('condition', 'batch'), returnData = FALSE)
+print(pca)
 
-res.ii = results(dds, contrast=c("condition", 'BL_UA_13days_proximal', 'Mature_UA'))
-colnames(res.ii) = paste0(colnames(res.ii), "_BL.D13.vs.UA")
-res = data.frame(res.ii[, c(2, 5, 6)])
+pca2save = as.data.frame(plotPCA(vsd, intgroup = c('condition', 'batch'), returnData = TRUE))
+ggp = ggplot(data=pca2save, aes(PC1, PC2, label = name, color= condition, shape = batch))  + 
+  geom_point(size=3) + 
+  geom_text(hjust = 0.7, nudge_y = 1, size=2.5)
 
-res.ii = results(dds, contrast=c("condition", 'BL_UA_5days', 'Mature_UA'))
-colnames(res.ii) = paste0(colnames(res.ii), "_BL.D5.vs.LA")
-res = data.frame(res, res.ii[, c(2, 5, 6)])
+plot(ggp)
 
-res.ii = results(dds, contrast=c("condition", 'BL_UA_9days', 'Mature_UA'))
-colnames(res.ii) = paste0(colnames(res.ii), "_BL.D9.vs.UA")
-res = data.frame(res, res.ii[, c(2, 5, 6)])
+#cpm = log2(fpm0[, sels] + 2^-6)
+dds$condition = droplevels(dds$condition)
 
+dds <- DESeq(dds, test="LRT", reduced=~1, fitType = c("parametric"))
+res <- results(dds, alpha = 0.05)
+
+#plotDispEsts(dds, ymin = 10^-3)
+#dds = nbinomWaldTest(dds, betaPrior = TRUE)
+#resultsNames(dds)
+
+#cpm = cpm[which(res$padj<0.1), ]
+
+# res.ii = results(dds, contrast=c("condition", 'BL_UA_13days_proximal', 'Mature_UA'))
+# colnames(res.ii) = paste0(colnames(res.ii), "_BL.D13.vs.UA")
+# res = data.frame(res.ii[, c(2, 5, 6)])
+# 
+# res.ii = results(dds, contrast=c("condition", 'BL_UA_5days', 'Mature_UA'))
+# colnames(res.ii) = paste0(colnames(res.ii), "_BL.D5.vs.LA")
+# res = data.frame(res, res.ii[, c(2, 5, 6)])
+# 
+# res.ii = results(dds, contrast=c("condition", 'BL_UA_9days', 'Mature_UA'))
+# colnames(res.ii) = paste0(colnames(res.ii), "_BL.D9.vs.UA")
+# res = data.frame(res, res.ii[, c(2, 5, 6)])
 
 #dds <- nbinomLRT(dds, reduced = ~1 )
 #res0 <- results(dds)
 
+source('Functions_atac.R')
+
+cpm = log2(fpm(dds) + 2^-6)
+o1 = c(grep('Mature_UA', dds$condition), grep('BL_UA_5days', dds$condition), grep('BL_UA_9days', dds$condition), 
+       grep('BL_UA_13days_proximal', dds$condition), grep('BL_UA_13days_distal', dds$condition))
+
+library(tictoc)
+tic()
+## define the dynamic enhancers with mature UA and BL.UA and check them if embryo samples
+xx = t(apply(cpm[, o1], 1, temporal.peaks.test, c = dds$condition[o1]))
+toc()
+
+xx$log2FC.mUA.vs.others = apply(cpm[, o1], 1, 
+                                function(x){})
+
+res = data.frame(res, xx, stringsAsFactors = FALSE)
+
 library("pheatmap")
-pval.cutoff = 0.01
-select = which(res$pvalue_BL.D13.vs.UA < pval.cutoff | res$pvalue_BL.D5.vs.LA < pval.cutoff | res$pvalue_BL.D9.vs.UA < pval.cutoff)
+fdr.cutoff = 0.01
+length(which(res$padj<fdr.cutoff))
+length(which(res$prob.M0<0.01))
+length(which(res$padj<fdr.cutoff & res$log2FC>1))
+length(which(res$prob.M0<0.01 & res$log2FC>1))
 
-df <- as.data.frame(colData(dds)[,c("condition", 'batch')])
+#select = which(res$pvalue_BL.D13.vs.UA < pval.cutoff | res$pvalue_BL.D5.vs.LA < pval.cutoff | res$pvalue_BL.D9.vs.UA < pval.cutoff)
+select = which(res$padj < fdr.cutoff & res$log2FC >1)
+
+
+df <- as.data.frame(colData(dds)[,c("condition")])
+colnames(df) = 'condition'
 o1 = c(grep('Mature_UA', df$condition), grep('BL_UA_5days', df$condition), grep('BL_UA_9days', df$condition), 
-       grep('BL_UA_13days_proximal', df$condition), grep('Embryo_Stage40', df$condition), 
-       grep('Embryo_Stage46_proximal', df$condition))
-
+       grep('BL_UA_13days_proximal', df$condition), grep('BL_UA_13days_distal', df$condition))
 yy = cpm[select, o1]
-ss = apply(as.matrix(yy), 1, mean)
-yy = yy[which(ss>-2), ]
+
+df <- as.data.frame(df[o1, ])
+colnames(df) = 'condition'
+rownames(df) = colnames(yy)
 
 pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, show_colnames = FALSE,
          scale = 'row',
-         cluster_cols=FALSE, annotation_col=df[o1, ])
+         cluster_cols=FALSE, annotation_col=df, 
+         width = 10, height = 12,
+         filename = paste0(resDir, '/heatmap_DE_regeneration_timepoints_qv.0.05_log2FC.1_RNAseq.pdf')) 
 
+out = pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, show_colnames = FALSE,
+              scale = 'row', clustering_distance_rows="euclidean", cex=1,
+              clustering_method="complete",
+              cluster_cols=FALSE, annotation_col=df)
+
+head(sort(cutree(out$tree_row, k=4)))
+
+##########################################
+# highlight TF, eps and other 
+##########################################
+ggs = rownames(yy)
+ggs = sapply(ggs, function(x) unlist(strsplit(as.character(x), '_'))[1])
+
+print(intersect(ggs, tfs))
+print(intersect(ggs, sps))
+print(intersect(ggs, eps))
+print(intersect(ggs, rbp))
+
+
+mm = match(ggs, unique(c(tfs, eps)))
+yy1 = yy[unique(c(which(!is.na(mm)))), ]
+
+pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
+         scale = 'row',
+         cluster_cols=FALSE, annotation_col=df, fontsize_row = 8, 
+         width = 8, height = 12,
+         filename = paste0(resDir, 'heatmap_DE.tfs_eps_mature_qv.0.1_microarray.pdf')) 
+
+
+mm = match(ggs, unique(c(toupper(sps))))
+yy1 = yy[unique(c(which(!is.na(mm)), grep('CYP2', rownames(yy)))), ]
+
+pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
+         scale = 'row',
+         cluster_cols=FALSE, annotation_col=df, fontsize_row = 8, 
+         width = 8, height = 12,
+         filename = paste0(figureDir, 'heatmap_DE_sps_mature_qv.0.1_microarray.pdf')) 
 
 #xx = res[select, ]
 #xx = xx[order(xx$pvalue), ]
@@ -921,6 +1007,7 @@ ss = apply(yy[, c(1:7)], 1, mean)
 yy = yy[which(vars>=1.5), ]
 #ss = apply(as.matrix(yy), 1, mean)
 #yy = yy[which(ss>-2), ]
+
 
 pheatmap(yy, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
          scale = 'row',
