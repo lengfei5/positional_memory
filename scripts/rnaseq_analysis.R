@@ -674,29 +674,31 @@ res$gene = sapply(rownames(res), function(x) unlist(strsplit(as.character(x), '_
 
 for(comp in c('mHand.vs.mUA', 'mHand.vs.mLA', 'mLA.vs.mUA'))
 {
-  # 'mHand.vs.mLA'
+  # comp =  'mHand.vs.mUA'
   res$fdr = eval(parse(text = paste0('-log10(res$adj.P.Val_', comp, ')')))
   res$pval = eval(parse(text = paste0('-log10(res$P.Value_', comp, ')')))
   res$logfc = eval(parse(text = paste0('res$logFC_', comp)))
   
-  examples.sel = which(res$pval > 4 & abs(res$logfc) > 2)
-  examples.sel = unique(c(examples.sel, grep('HOXA|HOXD', res$gene)))
+  #examples.sel = which(res$pval > 4 & abs(res$logfc) > 2)
+  examples.sel = c()
+  examples.sel = unique(c(examples.sel, grep('HOXA13|HOXD13', res$gene)))
   
   ggplot(data=res, aes(x=logfc, y=pval, label = gene)) +
     geom_point(size = 0.5) + 
+    geom_point(data=res[examples.sel, ], aes(x=logfc, y=pval), colour="blue", size=2) +
     theme(axis.text.x = element_text(size = 12), 
           axis.text.y = element_text(size = 12)) + 
-    #geom_text_repel(data= res[examples.sel, ], size = 3.0, label.padding = 0.15, color = 'blue') +
+    geom_text_repel(data= res[examples.sel, ], size = 3.0, color = 'blue') +
     #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
     #scale_color_manual(values=c("blue", "black", "red")) +
     geom_vline(xintercept=c(0), col='darkgray') +
     geom_hline(yintercept=3, col="darkgray") +
     labs(x = "log2FC")
   
-  ggsave(paste0(figureDir, "VolcanoPlot_log2FC_pval_microarray_noLabels_", comp, ".pdf"), width=12, height = 8)
+  ggsave(paste0(figureDir, "VolcanoPlot_log2FC_pval_microarray_labels.HOXA13.HOXD13_", comp, ".pdf"), width=12, height = 8)
   
 }
-    
+  
 if(saveTables){
   write.csv(res[select, ],
               file = paste0(shareDir, '/position_dependent_genes_from_matureSamples_microarray_qv.0.1.csv'), 
