@@ -230,9 +230,13 @@ if(Clean.TSS){
 
 res = res[sels, ]
 
+saveRDS(res, file = paste0(RdataDir,  '/histoneMarkers_normSignals_axolotlAllTSS.2kb_TSSfiltered.rds'))
+
 ##########################################
 # first try to define groups 
 ##########################################
+res = readRDS(file = paste0(RdataDir,  '/histoneMarkers_normSignals_axolotlAllTSS.2kb_TSSfiltered.rds'))
+
 aa = readRDS(file =  "../results/rnaseq_Rxxxx.old_R10724_R161513_mergedTechRep/Rdata/TestStat_regeneration_RNAseq.rds") 
 
 aa$gene = sapply(rownames(aa), function(x) unlist(strsplit(as.character(x), '_'))[1])
@@ -244,8 +248,8 @@ aa$expr.mUA = apply(aa[, grep('Mature_UA', colnames(aa))], 1, mean)
 aa$expr.BLday5 = apply(aa[, grep('BL_UA_5days', colnames(aa))], 1, mean)
 aa$expr.BLday9 = apply(aa[, grep('BL_UA_9days', colnames(aa))], 1, mean)
 aa$expr.BLday13 = apply(aa[, grep('BL_UA_13days_proximal', colnames(aa))], 1, mean)
-
-aa = aa[, c(5:11, 23:28)]
+aa$expr.BLday13.distal = apply(aa[, grep('BL_UA_13days_distal', colnames(aa))], 1, mean)
+aa = aa[, c(5:11, 23:29)]
 aa = aa[match(res$geneID, aa$geneID), ]
 res = data.frame(res, aa, stringsAsFactors = FALSE)
 
@@ -324,12 +328,12 @@ if(Redefine.gene.groups.with.RNAseq){
   ss = apply(res[kk, grep('expr', colnames(res))], 1, max)
   
   select = kk[which(ss< -1 | is.na(ss))]
-  res$groups[select] = 'non.expressed.in.limb'
+  res$groups[select] = 'lowlyExpr_limb'
   table(res$groups)
   
   res[,c(1, 4, 7:ncol(res))] %>% 
     pivot_longer(cols = c('UA_K4me3', 'UA_K27me3'), names_to = 'markers') %>%
-    ggplot(aes(x = factor(groups, levels = c('other_tissues', 'non.expressed.in.limb',
+    ggplot(aes(x = factor(groups, levels = c('other_tissues', 'lowlyExpr_limb',
                                              'house_keep', 'limb')), y=value, fill=markers)) + 
     geom_boxplot(outlier.alpha = 0.1) + 
     #geom_jitter(width = 0.1)+
@@ -338,10 +342,74 @@ if(Redefine.gene.groups.with.RNAseq){
     theme(axis.text.x = element_text(angle = 0, size = 14)) +
     labs(x = "", y= 'normalized data (log2)')
   
-  jj = which(res$x1>4 & res$x2 >4)
-  xx = res[jj, ]
+  #jj = which(res$x1>4 & res$x2 >4)
+  #xx = res[jj, ]
     
   kk = which(res$groups == 'limb')
+  
+  diffs = res$expr.BLday5[kk] - res$expr.mUA[kk]
+  select = kk[which(res$expr.mUA[kk] < 0 & diffs >2)]
+  
+  res$groups[select] = 'upregulated.d5'
+  table(res$groups)
+  
+  select = kk[which(res$expr.mUA[kk] > 0 & (res$expr.mUA[kk] - res$expr.BLday5[kk]) >2)]
+  res$groups[select] = 'downregulated.d5'
+  
+  res[,c(1, 4, 7:ncol(res))] %>% 
+    pivot_longer(cols = c('UA_K4me3', 'UA_K27me3'), names_to = 'markers') %>%
+    ggplot(aes(x = factor(groups, levels = c('other_tissues', 'lowlyExpr_limb',
+                                             'house_keep', 'upregulated.d5', 'downregulated.d5', 'limb')), y=value, fill=markers)) + 
+    geom_boxplot(outlier.alpha = 0.1) + 
+    #geom_jitter(width = 0.1)+
+    #geom_violin(width = 1.2) +
+    theme_classic() +
+    theme(axis.text.x = element_text(angle = 0, size = 14)) +
+    labs(x = "", y= 'normalized data (log2)')
+  
+  
+  kk = which(res$groups == 'limb')
+  
+  select = kk[which(res$expr.mUA[kk] < 0 & (res$expr.BLday5[kk] - res$expr.mUA[kk]) < 2 &  (res$expr.BLday9[kk] - res$expr.mUA[kk]) > 2)]
+  res$groups[select] = 'upregulated.d9'
+  
+  select = kk[which(res$expr.mUA[kk] > 0 & (res$expr.mUA[kk] - res$expr.BLday5[kk]) < 2 & (res$expr.mUA[kk] - res$expr.BLday9[kk]) >2)]
+  res$groups[select] = 'downregulated.d9'
+  
+  
+  kk = which(res$groups == 'limb')
+  
+  select = kk[which(res$expr.mUA[kk] < 0 & (res$expr.BLday5[kk] - res$expr.mUA[kk]) < 2 &  (res$expr.BLday9[kk] - res$expr.mUA[kk]) < 2 &
+                    (res$expr.BLday13[kk] - res$expr.mUA[kk]) >2)]
+  res$groups[select] = 'upregulated.d13'
+  
+  select = kk[which(res$expr.mUA[kk] > 0 & (res$expr.mUA[kk] - res$expr.BLday5[kk]) < 2 & (res$expr.mUA[kk] - res$expr.BLday9[kk]) < 2 &
+                (res$expr.mUA[kk] - res$expr.BLday9[kk]) > 2) ]
+  res$groups[select] = 'downregulated.d13'
+  
+  
+  
+  
+  table(res$groups)
+  
+  res[,c(1, 4, 7:ncol(res))] %>% 
+    pivot_longer(cols = c('UA_K4me3', 'UA_K27me3'), names_to = 'markers') %>%
+    ggplot(aes(x = factor(groups, levels = c('other_tissues', 'lowlyExpr_limb',
+                                             'house_keep', 
+                                             'upregulated.d5', 'upregulated.d9','upregulated.d13', 
+                                             'downregulated.d5',  'downregulated.d9',
+                                             'downregulated.d13',
+                                             'limb')), y=value, fill=markers)) + 
+    geom_boxplot(outlier.alpha = 0.1) + 
+    #geom_jitter(width = 0.1)+
+    #geom_violin(width = 1.2) +
+    theme_classic() +
+    theme(axis.text.x = element_text(angle = 90, size = 14)) +
+    labs(x = "", y= 'normalized data (log2)')
+  
+  
+  ggsave(paste0(figureDir, "histMarker_H3K27me3_H3K4me3_up.downregulatedGenes.UA.BL.days.pdf"), width=12, height = 8)
+  
   fdr.cutoff = 0.05
   select = which(aa$padj < fdr.cutoff & aa$log2FC >1 & aa$log2FC.mUA.vs.others >0)
   res$groups[!is.na(match(res$geneID, aa$geneID[select]))] = 'mature_highlyExp'
