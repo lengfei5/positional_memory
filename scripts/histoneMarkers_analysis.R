@@ -7,7 +7,6 @@
 # Date of creation: Tue Dec 14 10:04:12 2021
 ##########################################################################
 ##########################################################################
-
 rm(list=ls())
 
 RNA.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functions/RNAseq_functions.R'
@@ -50,7 +49,6 @@ library(tidyverse)
 ########################################################
 ########################################################
 promoters = select.promoters.regions(upstream = 2000, downstream = 2000, ORF.type.gtf = 'Putative', promoter.select = 'all')
-
 
 # clean peaks
 peaks = promoters
@@ -206,40 +204,58 @@ ggsave(paste0(figureDir, "histMarker_H3K27me3_scatterplot_Hand.vs.Hand.pdf"), wi
 ########################################################
 ########################################################
 fpm = readRDS(file = paste0(RdataDir,  '/histoneMarkers_normSignals_axolotlAllTSS.2kb.rds'))
-res = data.frame(log2(fpm + 1), stringsAsFactors = FALSE)
+res = data.frame(log2(fpm + 2^0), stringsAsFactors = FALSE)
 res$gene = sapply(rownames(res), function(x){unlist(strsplit(as.character(x), '_'))[2]})
 res$geneID  = sapply(rownames(res), function(x){unlist(strsplit(as.character(x), '_'))[1]})
 
 ##########################################
 # clean TSS, for each gene, only keep the TSS with sigals if there are mulitple ones
 ##########################################
-res$used = NA
+Clean.TSS = TRUE
 
-Clean.TSS = FALSE
 if(Clean.TSS){
   ggs = unique(res$geneID)
-  
+  sels = c()
   for(n in 1:length(ggs))
   {
     # n = 1
     jj = which(res$geneID == ggs[n])  
     if(length(jj)>0){
-      hist.max = apply()
+      ss = apply(as.matrix(res[jj, c(1:6)]), 1, sum)
+      sels = c(sels, jj[which.max(ss)])
     } 
     
   }
 }
 
+res = res[sels, ]
+
 ##########################################
 # first try to define groups 
 ##########################################
+aa = readRDS(file =  "../results/rnaseq_Rxxxx.old_R10724_R161513_mergedTechRep/Rdata/TestStat_regeneration_RNAseq.rds") 
+
+aa$gene = sapply(rownames(aa), function(x) unlist(strsplit(as.character(x), '_'))[1])
+aa$geneID = sapply(rownames(aa), function(x) {test = unlist(strsplit(as.character(x), '_')); return(test[length(test)])})
+
+aa[grep('DBP|SALL', rownames(aa)), grep('Mature_UA', colnames(aa))]
+
+aa$expr.mUA = apply(aa[, grep('Mature_UA', colnames(aa))], 1, mean)
+aa$expr.BLday5 = apply(aa[, grep('BL_UA_5days', colnames(aa))], 1, mean)
+aa$expr.BLday9 = apply(aa[, grep('BL_UA_9days', colnames(aa))], 1, mean)
+aa$expr.BLday13 = apply(aa[, grep('BL_UA_13days_proximal', colnames(aa))], 1, mean)
+
+aa = aa[, c(5:11, 23:28)]
+aa = aa[match(res$geneID, aa$geneID), ]
+res = data.frame(res, aa, stringsAsFactors = FALSE)
+
 res$x1 = res$UA_K4me3
 res$x2 = res$UA_K27me3
-#rr = res$x1 - res$x2
+res$ratio = res$x1 - res$x2
 
-#examples.sel = which(abs(rr)>2 & (res$x1>5|res$x2>5))
 examples.sel = c()
-examples.sel = unique(c(examples.sel, grep('HOXA13|HOXA11|HOXA9|HOXD13|HOXD11|HOXD9|MEIS', res$gene)))
+examples.sel = unique(c(examples.sel, grep('HOXA13|HOXA11|HOXA9|HOXD13|HOXD11|HOXD9|MEIS|SALL|DBP', res$gene)))
+
 
 ggplot(data=res, aes(x=x1, y=x2, label = gene)) +
   geom_point(size = 0.25) + 
@@ -253,26 +269,92 @@ ggplot(data=res, aes(x=x1, y=x2, label = gene)) +
   labs(x = "UA_H3K4me3", y= 'UA_H3K27me3')
 
 
+ggplot(data=res, aes(x=ratio, y=expr, label = gene)) +
+  geom_point(size = 0.25) + 
+  theme(axis.text.x = element_text(size = 12), 
+        axis.text.y = element_text(size = 12)) +
+  geom_text_repel(data= res[examples.sel, ], size = 3.0, color = 'blue') +
+  #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
+  #scale_color_manual(values=c("blue", "black", "red")) +
+  geom_vline(xintercept=4, col='darkgray') +
+  geom_hline(yintercept=4, col="darkgray") +
+  labs(x = "UA_H3K4me3/UA_H3K27me3", y= 'Expr')
+
 load(file =  paste0(annotDir, 'axolotl_housekeepingGenes_controls.other.tissues.liver.islet.testis_expressedIn21tissues.Rdata'))
 hkgs = controls.tissue$geneIDs[which(controls.tissue$tissues == 'housekeeping')]
 nonexp = controls.tissue$geneIDs[which(controls.tissue$tissues != 'housekeeping')]
 
 res$groups = 'limb'
-res$groups[!is.na(match(res$geneID, hkgs))] = 'house.keep'
-res$groups[!is.na(match(res$geneID, nonexp))] = 'other.tissues'
+res$groups[!is.na(match(res$geneID, hkgs))] = 'house_keep'
+res$groups[!is.na(match(res$geneID, nonexp))] = 'other_tissues'
+
+xx = res[order(-res$expr), ]
+head(xx[which(xx$groups != 'house_keep'), ])
+
+ggplot(data=res, aes(x=expr.mUA, y=ratio, label = gene, color = groups)) +
+  geom_point(size = 0.25) + 
+  theme(axis.text.x = element_text(size = 12), 
+        axis.text.y = element_text(size = 12)) +
+  geom_text_repel(data= res[examples.sel, ], size = 3.0, color = 'blue') +
+  #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
+  #scale_color_manual(values=c("blue", "black", "red")) +
+  geom_vline(xintercept=4, col='darkgray') +
+  geom_hline(yintercept=4, col="darkgray") +
+  labs(y = "UA_H3K4me3/UA_H3K27me3", x= 'Expr')
+
+res[,c(1, 4, 7:ncol(res))] %>% 
+  pivot_longer(cols = c('UA_K4me3', 'UA_K27me3'), names_to = 'markers') %>%
+  ggplot(aes(x = factor(groups, levels = c('other_tissues', 'house_keep', 'limb')), y=value, fill=markers)) + 
+  geom_boxplot(outlier.alpha = 0.1) + 
+  #geom_jitter(width = 0.1)+
+  #geom_violin(width = 1.2) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 0, size = 14)) +
+  labs(x = "", y= 'normalized data (log2)')
 
 ##########################################
 # redefine different groups with RNA-seq data 
 ##########################################
 Redefine.gene.groups.with.RNAseq = TRUE
 if(Redefine.gene.groups.with.RNAseq){
-  load(file = paste0('~/workspace/imp/positional_memory/results/rnaseq_Rxxxx.old_R10724_R161513_mergedTechRep/Rdata/RNAseq_design_dds.object.Rdata'))
-  annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
-                         'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
-  dds = dds[,which(dds$condition != 'Mature_HEAD')]
-  dds$condition = droplevels(dds$condition)
   
+  table(res$groups)
+  kk = which(res$groups == 'limb')
   
+  ss = apply(res[kk, grep('expr', colnames(res))], 1, max)
+  
+  select = kk[which(ss< -1 | is.na(ss))]
+  res$groups[select] = 'non.expressed.in.limb'
+  table(res$groups)
+  
+  res[,c(1, 4, 7:ncol(res))] %>% 
+    pivot_longer(cols = c('UA_K4me3', 'UA_K27me3'), names_to = 'markers') %>%
+    ggplot(aes(x = factor(groups, levels = c('other_tissues', 'non.expressed.in.limb',
+                                             'house_keep', 'limb')), y=value, fill=markers)) + 
+    geom_boxplot(outlier.alpha = 0.1) + 
+    #geom_jitter(width = 0.1)+
+    #geom_violin(width = 1.2) +
+    theme_classic() +
+    theme(axis.text.x = element_text(angle = 0, size = 14)) +
+    labs(x = "", y= 'normalized data (log2)')
+  
+  jj = which(res$x1>4 & res$x2 >4)
+  xx = res[jj, ]
+    
+  kk = which(res$groups == 'limb')
+  fdr.cutoff = 0.05
+  select = which(aa$padj < fdr.cutoff & aa$log2FC >1 & aa$log2FC.mUA.vs.others >0)
+  res$groups[!is.na(match(res$geneID, aa$geneID[select]))] = 'mature_highlyExp'
+  table(res$groups)
+  
+  select = which(aa$padj < fdr.cutoff & aa$log2FC >1 & aa$log2FC.mUA.vs.others < 0)
+  res$groups[!is.na(match(res$geneID, aa$geneID[select]))] = 'regeneration'
+  table(res$groups)
+  
+  select = which((aa$padj >= fdr.cutoff | aa$log2FC <=1) & log2(aa$baseMean) <4) 
+  res$groups[!is.na(match(res$geneID, aa$geneID[select])) & res$groups == 'limb_static'] = 'limb_lowlyExp'
+  
+    
 }
 
 
@@ -289,12 +371,19 @@ ggplot(data=res, aes(x=x1, y=x2, label = gene, color = groups)) +
 
 
 #xx = melt(res[], id.vars = c('UA_K4me3', 'UA_K27me3'), variable_name = 'markers')
-res[,c(1, 4, 7:12)] %>% 
+res[,c(1, 4, 7:13)] %>% 
   pivot_longer(cols = c('UA_K4me3', 'UA_K27me3'), names_to = 'markers') %>%
-ggplot(aes(x = groups, y=value, fill=markers)) + 
-  geom_boxplot(outlier.shape = NA) + 
+ggplot(aes(x = factor(groups, levels = c('other_tissues', 'house_keep', 'limb_lowlyExp',
+                                          'mature_highlyExp', 'regeneration', 'limb_static')), y=value, fill=markers)) + 
+  geom_boxplot(outlier.alpha = 0.1) + 
   #geom_jitter(width = 0.1)+
-  theme(axis.text.x = element_text(angle = 0, size = 12))
+  #geom_violin(width = 1.2) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 0, size = 14)) +
+  labs(x = "", y= 'normalized data (log2)')
+
+  
+
 
 
 

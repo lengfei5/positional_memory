@@ -919,11 +919,20 @@ tic()
 xx = t(apply(cpm[, o1], 1, temporal.peaks.test, c = dds$condition[o1]))
 toc()
 
-xx$log2FC.mUA.vs.others = apply(cpm[, o1], 1, 
-                                function(x){})
+test = apply(cpm[, o1], 1, function(x){return(mean(x[c(1:2)]) - max(c(mean(x[c(3:4)]), mean(x[c(5:7)]), 
+                                                                           mean(x[c(8:9)]), mean(x[c(10:11)]))))})
 
-res = data.frame(res, xx, stringsAsFactors = FALSE)
+res = data.frame(res, xx, log2FC.mUA.vs.others = test, stringsAsFactors = FALSE)
 
+saveRDS(res, file = paste0(RdataDir, 'TestStat_regeneration_RNAseq.rds'))
+
+#res = readRDS(file = paste0(RdataDir, 'TestStat_regeneration_RNAseq.rds'))
+#res = data.frame(res, cpm[, o1], stringsAsFactors = FALSE)
+
+
+##########################################
+# visualize the restuls
+##########################################
 library("pheatmap")
 fdr.cutoff = 0.01
 length(which(res$padj<fdr.cutoff))
@@ -970,50 +979,22 @@ print(intersect(ggs, eps))
 print(intersect(ggs, rbp))
 
 
-mm = match(ggs, unique(c(tfs, eps)))
-yy1 = yy[unique(c(which(!is.na(mm)))), ]
-
-pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
-         scale = 'row',
-         cluster_cols=FALSE, annotation_col=df, fontsize_row = 8, 
-         width = 8, height = 12,
-         filename = paste0(resDir, 'heatmap_DE.tfs_eps_mature_qv.0.1_microarray.pdf')) 
-
-
-mm = match(ggs, unique(c(toupper(sps))))
-yy1 = yy[unique(c(which(!is.na(mm)), grep('CYP2', rownames(yy)))), ]
-
-pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
-         scale = 'row',
-         cluster_cols=FALSE, annotation_col=df, fontsize_row = 8, 
-         width = 8, height = 12,
-         filename = paste0(figureDir, 'heatmap_DE_sps_mature_qv.0.1_microarray.pdf')) 
-
-#xx = res[select, ]
-#xx = xx[order(xx$pvalue), ]
-#xx = cpm
-ggs = rownames(yy)
-ggs = sapply(ggs, function(x) unlist(strsplit(as.character(x), '_'))[1])
-
-mm = match(tfs[, 3], ggs)
-xx = yy[mm[!is.na(mm)], ]
-
-tf.sels = match(rownames(xx), rownames(res))
-df <- as.data.frame(colData(dds)[,c("condition", 'batch')])
-
-yy = cpm[tf.sels, o1]
-vars = apply(yy[, c(1:7)],1, var)
-ss = apply(yy[, c(1:7)], 1, mean)
-yy = yy[which(vars>=1.5), ]
-#ss = apply(as.matrix(yy), 1, mean)
-#yy = yy[which(ss>-2), ]
-
-
-pheatmap(yy, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
-         scale = 'row',
-         cluster_cols=FALSE, annotation_col=df[o1, ], fontsize_row = 8, 
-         filename = paste0(resDir, '/heatmap_DE_TFs_mUA_regeneration.pdf'),
-         width = 12, height = 20)
-
-write.table(yy, file = paste0(resDir, '/DEtfs_mUA_regeneration_dev.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
-
+for(subg in c('tfs', 'eps', 'sps', 'rbp'))
+{
+  
+  # subg = 'rbp'
+  
+  mm = eval(parse(text = paste0('match(ggs, unique(', subg, '))')))
+  
+  yy1 = yy[unique(c(which(!is.na(mm)))), ]
+  
+  pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
+           scale = 'row',
+           cluster_cols=FALSE, annotation_col=df, fontsize_row = 9, 
+           width = 10, height = 28,
+           filename = paste0(resDir, '/heatmap_regeneration_DE_', subg, '_qv.0.05_FDR.1.pdf')) 
+  
+  
+  write.table(yy, file = paste0(resDir, '/DEtfs_mUA_regeneration_dev.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
+  
+}
