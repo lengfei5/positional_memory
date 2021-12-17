@@ -891,8 +891,6 @@ if(grouping.temporal.peaks){
   }
   
   
-  # ii.test = c(1:nrow(fpm)) # takes about 2 mins for 40k peaks
-  
   Run.temporal.peak.test = FALSE
   if(Run.temporal.peak.test)
   {
@@ -974,6 +972,14 @@ if(grouping.temporal.peaks){
            filename = paste0(resDir, '/heatmap_regenerationPeaks_M0prob0.05_log2FC.1.pdf'), 
            width = 10, height = 14)
   
+  if(saveTable){
+    write.csv(data.frame(xx, keep, stringsAsFactors = FALSE), 
+              file = paste0(resDir, '/regeneration_peaks_all.csv'), 
+              quote = FALSE, row.names = TRUE)
+    
+  }
+  
+  
   ##########################################
   # highligh potential regeneration peaks, not found in mUA and embryo stages only in regeneration process 
   ##########################################
@@ -993,6 +999,13 @@ if(grouping.temporal.peaks){
   
   yy = keep[kk,]
   
+  
+  if(saveTable){
+    write.csv(data.frame(xx[kk, ], keep[kk, ], stringsAsFactors = FALSE), 
+              file = paste0(resDir, '/regeneration_peaks_regeneration.specific.csv'), 
+              quote = FALSE, row.names = TRUE)
+    
+  }
   
   ##########################################
   # first motif activity analysis for temporally dynamic peaks 

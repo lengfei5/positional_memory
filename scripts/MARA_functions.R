@@ -961,7 +961,7 @@ run.MARA.atac.temporal = function(keep, cc)
     
     jj = which(res$prob.M0 < 0.01 & res$log2FC > 1 )
     
-    conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal")
+    conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal", "BL_UA_13days_distal")
     
     sample.sels = c(); cc = c()
     for(n in 1:length(conds)) {
@@ -1044,16 +1044,20 @@ run.MARA.atac.temporal = function(keep, cc)
     sort(r$max.Zscore, decreasing=TRUE)[1:40]
     sort(r$max.Zscore, decreasing=TRUE)[1:50]
     
-    topMotifs = sort(r$max.Zscore, decreasing = TRUE)[1:30]
+    topMotifs = sort(r$max.Zscore, decreasing = TRUE)[1:40]
     motif.names = rownames(r$Zscore)
     bb = r$Zscore[match(names(topMotifs), motif.names), ]
+    
+    df <- data.frame(colnames(bb))
+    rownames(df) = colnames(bb)
+    colnames(df) = 'regeneration time'
+    
     pheatmap(bb, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE, 
              scale = 'none', cluster_cols=FALSE, main = paste0("Inferred z-scores (motif activity) by MARA"), 
              na_col = "white", fontsize_row = 12, 
+             annotation_col = df, 
              filename = paste0(resDir, '/MARA_bayesianRidge_temporalpeaks.pdf'), 
-             width = 8, height = 10) 
-    
-    
+             width = 10, height = 12) 
     
   }
   

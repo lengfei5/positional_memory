@@ -704,7 +704,6 @@ if(saveTables){
               file = paste0(shareDir, '/position_dependent_genes_from_matureSamples_microarray_qv.0.1.csv'), 
               quote = FALSE, col.names = TRUE, row.names = TRUE)
   
-  
 }
 
 ########################################################
