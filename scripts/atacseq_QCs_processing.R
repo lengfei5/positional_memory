@@ -9,7 +9,7 @@
 ##########################################################################
 rm(list=ls())
 
-version.analysis = 'R10723_Rxxxx_R11637_atacseq_R11876_CutTag'
+version.analysis = 'Rxxxx_R10723_R11637_R12810_atac'
 #peakDir = "Peaks/macs2_broad"
 
 resDir = paste0("../results/", version.analysis)
@@ -23,6 +23,7 @@ dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memo
 source('Functions_atac.R')
 require(ggplot2)
 require(GenomicFeatures)
+
 ########################################################
 ########################################################
 # Section : sequencing quality controls
@@ -30,8 +31,8 @@ require(GenomicFeatures)
 # sequence saturation analysis
 ########################################################
 ########################################################
-
 design_file = paste0(dataDir, 'design_sampleInfo_all.txt')
+
 
 Collect.design.stat.nf.out = TRUE
 
