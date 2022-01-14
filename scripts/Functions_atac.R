@@ -2747,7 +2747,6 @@ check.atacseq.sample.ratios = function()
  
   aa$read.pred = aa$pct.total* 3.7*10^9/10^6
   
-  
 }
 
 extract.stat.for.samples.manual = function()

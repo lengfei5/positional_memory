@@ -37,9 +37,19 @@ design_file = paste0(dataDir, 'design_sampleInfo_all.txt')
 Collect.design.stat.nf.out = TRUE
 
 if(Collect.design.stat.nf.out){
-  design = read.table(paste0(dataDir, 'sampleInfo_parsed.txt'), sep = '\t', header = TRUE)
   
-  stats = read.table(paste0(dataDir, 'nf_out/result/countStatTable.txt'), sep = '\t', header = TRUE)
+  #design = read.table(paste0(dataDir, 'sampleInfo_parsed.txt'), sep = '\t', header = TRUE)
+  design = read.delim(design_file, sep = '\t', header = TRUE)
+  
+  # Rxxxx, R10723 and R11637 technical replicates merged 
+  stats = read.table(paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/R11637_atac/', 
+                            'nf_out/result/countStatTable.txt'), sep = '\t', header = TRUE)
+  
+  # 2022 new data R12810
+  xx = read.table(paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/R12810_atac/', 
+                         'nf_out/result/countStatTable.txt'), sep = '\t', header = TRUE)
+  
+  stats = rbind(stats, xx)
   colnames(stats)[c(1, 3)] = c('fileName', 'trimmed')
   
   index = c()
@@ -62,17 +72,18 @@ if(Collect.design.stat.nf.out){
   colnames(stats) = c('sampleID', 'samples', 'fileName', 'total',  'adapter.trimmed', 'mapped', 'chrM.rm', 'unique', 'unique.rmdup')
   
   stats$trimming.pct = as.numeric(stats$adapter.trimmed)/as.numeric(stats$total)
-  stats$mapped.pct = as.numeric(stats$mapped)/as.numeric(stats$adapter.trimmed)
-  stats$mito.pct = as.numeric(stats$chrM.rm)/as.numeric(stats$adapter.trimmed)
+  stats$mapped.pct =  as.numeric(stats$mapped)/as.numeric(stats$adapter.trimmed)
+  stats$mito.pct = 1.0 - as.numeric(stats$chrM.rm)/as.numeric(stats$adapter.trimmed)
   stats$multimapper.pct = 1- as.numeric(stats$unique) / as.numeric(stats$mapped)
   stats$dup.rate = 1.0 - as.numeric(stats$unique.rmdup)/as.numeric(stats$unique)
   stats$pct.usable = stats$unique.rmdup / stats$total
   
-  write.csv(stats, file = paste0(resDir, '/R11876_CutTag_QCs_stats.csv'), row.names = FALSE)
-  
   stats$usable = stats$unique.rmdup/10^6
   colnames(stats)[c(2,3)] = c('condition', 'samples')
   stats$samples = paste0(stats$condition, '_', stats$sampleID)
+  
+  stats = stats[!is.na(stats$total), ]
+  write.csv(stats, file = paste0(resDir, '/R11637_R12810_atac_QCs_stats.csv'), row.names = FALSE)
   
   plot(stats$usable, stats$mapped); text(stats$usable, stats$mapped, stats$samples)
   
@@ -84,7 +95,6 @@ if(Collect.design.stat.nf.out){
   extract.stat.for.samples.manual(design_file, dataDir)
   
 }
-
 
 ########################################################
 ########################################################
@@ -99,10 +109,12 @@ source('functions_chipSeq.R')
 peakDir = paste0(dataDir,  'calledPeaks/macs2')
 peak.files = list.files(path = peakDir,
                         pattern = '*_peaks.xls', full.names = TRUE)
-design = readRDS(file = paste0(RdataDir, '/design_merged_technicalReplicates.rds'))
+design = readRDS(file = paste0('../results/R10723_Rxxxx_R11637_atacseq_R11876_CutTag/Rdata', '/design_merged_technicalReplicates.rds'))
 
-mm = match(design$sampleID, as.character(c(161523:161526)))
-design = design[is.na(mm), ]
+#mm = match(design$sampleID, as.character(c(161523:161526)))
+#design = design[is.na(mm), ]
+
+saveRDS(design, file = paste0(RdataDir, '/design_merged_technicalReplicates_Rxxxx_R10723_R11637.rds'))
 
 index  = c()
 for(n in 1:nrow(design))
