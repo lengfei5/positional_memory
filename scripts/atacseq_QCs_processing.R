@@ -109,12 +109,24 @@ source('functions_chipSeq.R')
 peakDir = paste0(dataDir,  'calledPeaks/macs2')
 peak.files = list.files(path = peakDir,
                         pattern = '*_peaks.xls', full.names = TRUE)
-design = readRDS(file = paste0('../results/R10723_Rxxxx_R11637_atacseq_R11876_CutTag/Rdata', '/design_merged_technicalReplicates.rds'))
 
+design = readRDS(file = paste0(RdataDir, '/design_merged_technicalReplicates_Rxxxx_R10723_R11637.rds'))
 #mm = match(design$sampleID, as.character(c(161523:161526)))
 #design = design[is.na(mm), ]
+#saveRDS(design, file = paste0(RdataDir, '/design_merged_technicalReplicates_Rxxxx_R10723_R11637.rds'))
 
-saveRDS(design, file = paste0(RdataDir, '/design_merged_technicalReplicates_Rxxxx_R10723_R11637.rds'))
+load(file = paste0(RdataDir, '/R11637_atacseq_samples_design_stats.Rdata'))
+stats = stats[is.na(match(stats$sampleID, design$sampleID)), ]
+stats = stats[, c(1, 2, 3, 8, 9)]
+colnames(stats) = colnames(design)
+
+stats$unique = stats$unique/10^6
+stats$usable = stats$usable/10^6
+
+design = rbind(design, stats)
+design = data.frame(design, stringsAsFactors = FALSE)
+saveRDS(design, file = paste0(RdataDir, '/design_merged_technicalReplicates_Rxxxx_R10723_R11637_R12810.rds'))
+
 
 index  = c()
 for(n in 1:nrow(design))
@@ -128,13 +140,14 @@ for(n in 1:nrow(design))
 }
 peak.files = peak.files[index]
 
-# union of all peaks from all replicates
-#peak.merged = merge.peaks.macs2(peak.files, pcutoff = 6)
 
 ##########################################
 # Manually identify consensus peaks across replicates taking into account of different batches and sequencing depth
 ##########################################
 Manually.identify.peak.consensus = FALSE
+
+# union of all peaks from all replicates
+peak.merged = merge.peaks.macs2(peak.files, pcutoff = 6)
 
 if(Manually.identify.peak.consensus){
   peaks = c()
@@ -159,11 +172,13 @@ if(Manually.identify.peak.consensus){
   }
   
   names(peaks) = design$fileName
-  saveRDS(peaks, file = paste0(RdataDir, '/macs2_peaks_mergedTechnialReps_30samples_pval.', pval.cutoff, '.rds'))
+  
+  saveRDS(peaks, file = paste0(RdataDir, '/macs2_peaks_mergedTechnialReps_34samples_pval.', pval.cutoff, '.rds'))
+  
+  peaks = readRDS(file = paste0(RdataDir, '/macs2_peaks_mergedTechnialReps_30samples_pval.', pval.cutoff, '.rds'))
   
   #xx = readRDS(file = paste0(RdataDir, '/macs2_peaks_mergedTechnialReps_30samples.rds'))
   #peaks = readRDS(file = paste0(RdataDir, '/macs2_peaks_mergedTechnialReps_30samples_pval0.001.rds'))
-  peaks = readRDS(file = paste0(RdataDir, '/macs2_peaks_mergedTechnialReps_30samples_pval.', pval.cutoff, '.rds'))
   #peaks = readRDS(file = paste0(RdataDir, '/macs2_peaks_mergedTechnialReps_30samples_pval0.001.rds'))
   
   ##########################################
@@ -348,7 +363,10 @@ if(Manually.identify.peak.consensus){
   ua = union(union(ua1, ua2), ua3)
   ua = reduce(ua)
   
+  # LA
   kk = which(design$condition == 'Mature_LA')
+  
+  kk = c(23, 24, 25)
   ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll")
   v <- venn_cnt2venn(ol.peaks$vennCounts)
   try(plot(v))
@@ -356,6 +374,16 @@ if(Manually.identify.peak.consensus){
   if(length(dev.list())!=0) dev.off()
   pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_Mature_LA.pdf'),  height = 10, width = 10)
   try(plot(v)); dev.off()
+  
+  kk = c(25, 32, 34)
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll")
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  if(length(dev.list())!=0) dev.off()
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_Mature_LA_R12810_3.pdf'),  height = 10, width = 10)
+  try(plot(v)); dev.off()
+  
   
   # for the moment, mLA peak consensus are peaks covered by > 2 out of three replicates
   la1 = intersect(peaks[[23]], peaks[[24]])
@@ -384,6 +412,14 @@ if(Manually.identify.peak.consensus){
   
   # for the moment head control only one sample
   kk = which(design$condition == 'HEAD')
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll")
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  if(length(dev.list())!=0) dev.off()
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_Mature_Head.pdf'),  height = 10, width = 10)
+  try(plot(v)); dev.off()
+  
   hc = peaks[[kk]]
   
   ## here  es40, es44.d, es44.p, bld5, bld9, bld13.p, bld13.d data are complete
@@ -473,7 +509,6 @@ peaks = peaks[which(peaks$chr != 'chrM'), ]
 dim(peaks)
 
 
-
 # preapre SAF input for featureCounts
 require(Rsubread)
 
@@ -535,12 +570,14 @@ source(RNA.QC.functions)
 
 #load(file = paste0(RdataDir, '/R11637_atacseq_samples_design_stats.Rdata'))
 #design = stats
-design = readRDS(file = paste0(RdataDir, '/design_merged_technicalReplicates.rds'))
+design = readRDS(file = paste0(RdataDir, '/design_merged_technicalReplicates_Rxxxx_R10723_R11637_R12810.rds'))
 mm = match(design$sampleID, as.character(c(161523:161526)))
 design = design[is.na(mm), ]
 
+design = rbind(design, c('177595.177597', 'HEAD', 'HEAD_177595.177597', NA, NA))
+design = rbind(design, c('177596.177598', 'Mature_LA', 'Mature_LA_177596.177598', NA, NA))
 
-xlist<-list.files(path=paste0(dataDir, '/featurecounts_peaks.Q30'),
+xlist<-list.files(path=paste0(dataDir, 'featurecounts_peaks.Q30'),
                   pattern = "*_featureCounts.txt$", full.names = TRUE) ## list of data set to merge
 
 all = cat.countTable(xlist, countsfrom = 'featureCounts')
@@ -560,7 +597,10 @@ counts = process.countTable(all=all, design = design[, c(1,2)])
 # 
 # design = data.frame(design, stats, stringsAsFactors = FALSE)
 
-save(design, counts, file = paste0(RdataDir, '/samplesDesign_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical.Rdata'))
+save(design, counts, file = paste0(RdataDir, 
+                                   '/samplesDesign_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical_', 
+                                   version.analysis, '.Rdata'))
+
 
 Compare.with.Old.mature.resequencing = FALSE
 if(Compare.with.Old.mature.resequencing){
@@ -596,10 +636,16 @@ if(Compare.with.Old.mature.resequencing){
 ##########################################
 #  peak signal normalization
 ##########################################
-load(file = paste0(RdataDir, '/samplesDesign_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical.Rdata'))
+load(file = paste0(RdataDir, 
+                   '/samplesDesign_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical_', 
+                   version.analysis, '.Rdata'))
+design$sampleID = design$SampleID
 
-#design$batch = 1
-#design = design[, c(1, 2, 6, 3:5)]
+design$batch = 'old'
+design$batch[grep('1775', design$sampleID)] = '2022'
+sels = grep('HEAD|Mature', design$condition)
+design = design[sels, ]
+counts = counts[, c(1, sels + 1)]
 
 ss = apply(as.matrix(counts[, -1]), 1, mean)
 
@@ -661,13 +707,6 @@ dds <- estimateDispersions(dds, fitType = 'parametric')
 # resultsNames(dds)  
 # 
 # res1 = results(dds, contrast=c("condition", 'BL_UA_5days', 'Mature_UA'), alpha = 0.1)
-# res2 = results(dds, contrast=c("condition", 'BL_UA_9days', 'BL_UA_5days'), alpha = 0.1)
-# res2 = results(dds, contrast=c("condition", 'BL_UA_9days', 'Mature_UA'), alpha = 0.1)
-# res2 = results(dds, contrast=c("condition", 'BL_UA_13days_proximal', 'Mature_UA'), alpha = 0.1)
-# 
-# res2 = results(dds, contrast=c("condition", 'BL_UA_13days_proximal', 'BL_UA_9days'), alpha = 0.1)
-# 
-# res2 = results(dds, contrast=c("condition", 'BL_UA_13days_distal', 'BL_UA_9days'), alpha = 0.1)
 
 vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
 
@@ -675,7 +714,7 @@ pca=plotPCA(vsd, intgroup = colnames(design)[2], ntop = 3000, returnData = FALSE
 print(pca)
 
 
-pca2save = as.data.frame(plotPCA(vsd, intgroup = colnames(design)[c(2, 3)], returnData = TRUE, ntop = 3000))
+pca2save = as.data.frame(plotPCA(vsd, intgroup = colnames(design)[c(2, 7)], returnData = TRUE, ntop = 3000))
 pca2save$name = paste0(design$condition, '_', design$SampleID, '_', design$batch)
 #pca2save$batch = 'old'
 #pca2save$batch[grep('1361|1373', pca2save$name)] = 'new'
@@ -685,7 +724,8 @@ ggp = ggplot(data=pca2save, aes(PC1, PC2, label = name, color=condition, shape =
   geom_point(size=3) + 
   geom_text(hjust = 0.2, nudge_y = 0.5, size=3)
 
-plot(ggp) + ggsave(paste0(resDir, "/PCA_allatacseq_new.old.merged_ntop3000.pdf"), width = 16, height = 10)
+plot(ggp) 
+ggsave(paste0(resDir, "/PCA_allatacseq_new.old.merged_ntop3000_mature.pdf"), width = 16, height = 10)
 
 plot(sizeFactors(dds), design$mapped, log = '')
 plot(sizeFactors(dds), design$usable, log = 'xy')
@@ -698,11 +738,18 @@ text(sizeFactors(dds), design$usable, labels = design$fileName, cex = 0.7)
 
 save.scalingFactors.for.deeptools = FALSE
 if(save.scalingFactors.for.deeptools){
-  xx = data.frame(sampleID = design$SampleID,  
-                  scalingFactor = design$usable/(sizeFactors(dds)*median(design$usable)),
-                  stringsAsFactors = FALSE)
+  design$usable[which(design$sampleID == '177595.177597')] = 
+    sum(as.numeric(as.character(design$usable[which(design$SampleID == '177595'| design$SampleID == '177597')])))
   
+  design$usable[which(design$sampleID == '177596.177598')] = 
+    sum(as.numeric(as.character(design$usable[which(design$SampleID == '177596'| design$SampleID == '177598')])))
+  
+  xx = data.frame(sampleID = design$sampleID,  
+                  scalingFactor = as.numeric(design$usable)/(sizeFactors(dds)*median(as.numeric(design$usable))),
+                  stringsAsFactors = FALSE)
+  xx = xx[c(17:18), ]
   write.table(xx, file = paste0(dataDir, '/DESeq2_scalingFactor_forDeeptools.txt'), sep = '\t',
               col.names = FALSE, row.names = FALSE, quote = FALSE)
+  
   
 }
