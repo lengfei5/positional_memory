@@ -76,4 +76,13 @@ write.csv(stats, file = paste0(resDir, '/', version.analysis,  '_QCs_stats.csv')
 
 
 
+##########################################
+# saturation analysis 
+##########################################
+source('Functions_utility.R')
+Sequence.Saturation.Analysis(design)
+
+
+
+
 

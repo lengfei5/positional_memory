@@ -56,20 +56,22 @@ Make.fragsize.distribution = function()
 # 
 ########################################################
 ########################################################
-Sequence.Saturation.Analysis = function()
+Sequence.Saturation.Analysis = function(design)
 {
   library("ChIPseeker");
   library("rtracklayer")
-  load(file = paste0(RdataDir, '/samples_design_stats.Rdata'))
+  
+  #load(file = paste0(RdataDir, '/samples_design_stats.Rdata'))
   
   sampleUsed = 'mergedRep_downsample.Picard'
-  Dir.downsampledBam = '../Data/R10723_atac/saturation/bams_downsampled_picard'
-  Dir.called.peaks = '../Data/R10723_atac/saturation/calledPeaks_downsampledPicard/macs2'
+  
+  Dir.downsampledBam = paste0(dataDir, 'R12810_cuttag/bam_downsampling/QCs/BamStat')
+  Dir.called.peaks = paste0(dataDir, 'R12810_cuttag/bam_downsampling/calledPeaks/macs2_broad')
   
   peak.files = list.files(path = Dir.called.peaks, 
-                          pattern = '*macs2_peaks.xls', full.names = TRUE)
-  total.files = list.files(path = Dir.downsampledBam , 
-                           pattern = '*bam.counts.txt', full.names = TRUE)
+                          pattern = '*peaks.xls', full.names = TRUE)
+  total.files = list.files(path = Dir.downsampledBam, 
+                           pattern = '*_stat.txt', full.names = TRUE)
   
   macs.peaks.stats = function(f)
   {
@@ -90,9 +92,10 @@ Sequence.Saturation.Analysis = function()
   }
   
   colnames(test) = c('peaks.nb', 'peaks.width', 'peaks.nb.p10', 'peaks.width.p10')
+  
   save(test, file = paste0(RdataDir, '/saturation_data_peak.nbs_widths_', sampleUsed, '.Rdata'))
   
-  sat = data.frame(gsub('_macs2_peaks.xls', '', basename(peak.files)), test,  stringsAsFactors = FALSE)
+  sat = data.frame(gsub('_macs2_broad_fdr_0.05_peaks.xls', '', basename(peak.files)), test,  stringsAsFactors = FALSE)
   colnames(sat)[1] = c('samples')
   
   sat$peaks.nb = sat$peaks.nb/10^3
@@ -103,31 +106,38 @@ Sequence.Saturation.Analysis = function()
   #pct.downsample = gsub('uniq_rmdup_downsampled.', '', sat$samples)
   
   sat$ss = NA
-  sat$pcts = NA
-  sat$reads = NA
+  sat$downsample = NA
+  sat$total = NA
+  sat$usable = NA
+  sat$dup = NA
   
   for(n in 1:nrow(sat))
   {
-    # n = 20
+    # n = 1
     cat(n, '\n')
     sample.pcts = gsub('downsampled.', '', sat$samples[n])
     sample.pcts = unlist(strsplit(as.character(sample.pcts), '_'))
     
-    sat$pcts[n] = as.numeric(sample.pcts[length(sample.pcts)])
+    sat$downsample[n] = as.numeric(sample.pcts[length(sample.pcts)])
     sat$ss[n] = paste0(sample.pcts[-length(sample.pcts)], collapse = "_")
-    sat$reads[n] = as.numeric(read.table(total.files[grep(paste0(sat$samples[n], '.bam.counts'), total.files)])[1, 1])/10^6
+    ss = read.table(total.files[grep(sat$samples[n], total.files)], sep = '\t', header = TRUE)
+    sat$total[n] = as.numeric(ss$total)/10^6
+    sat$usable[n] = as.numeric(ss$rmdup_uniq)/10^6
+    sat$dup[n] = 1 - as.numeric(ss$rmdup_uniq)/as.numeric(ss$uniq)
     
   }
   
   save(sat, file = paste0(RdataDir, '/saturation_data_peak.nbs_widths_downsample.ptc_', sampleUsed, '.Rdata'))
+  
+  write.csv(sat, file = paste0(resDir, '/downsampling_states.csv'))
   
   load(file = paste0(RdataDir, '/saturation_data_peak.nbs_widths_downsample.ptc_', sampleUsed, '.Rdata'))
   
   sample.uniq = unique(sat$ss)
   
   pdfname = paste0(resDir, '/saturation_curve_sequencing_depth_mergedReplicates_', sampleUsed, '.pdf')
-  pdf(pdfname, width = 20, height = 16)
-  par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+  pdf(pdfname, width = 12, height = 10)
+  #par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
   
   par(mfrow=c(2,2))
   
@@ -141,45 +151,55 @@ Sequence.Saturation.Analysis = function()
     # saturation curve with nb of peaks 
     # usable.reads = stats$unique.rmdup[which(stats$samples == sample.uniq[n])][[1]]
     kk = which(sat$ss == sample.uniq[n])
-    xlims = c(0, max(105, max(sat$reads[kk])))
+    xlims = c(0, max(105, max(sat$total[kk])))
     
-    plot(sat$reads[kk], sat$peaks.nb[kk], type= 'p', col = 'blue', lwd = 2.0,  main = sample.uniq[n], log = '', 
-         xlab = 'nb of usable reads (Million)', ylab = 'nb of peaks (K)', xlim = xlims)
-    sat1 = data.frame(nb.reads = sat$reads[kk], nb.peaks = sat$peaks.nb[kk])
+    plot(sat$total[kk], sat$peaks.nb[kk], type= 'p', col = 'blue', lwd = 2.0,  main = sample.uniq[n], log = '', 
+         xlab = 'nb of total reads (Million)', ylab = 'nb of peaks (K)', xlim = xlims, cex = 1.2)
+    sat1 = data.frame(nb.reads = sat$total[kk], nb.peaks = sat$peaks.nb[kk])
     loessMod <- loess(nb.peaks ~ nb.reads, data=sat1, span=span)
     smoothed <- predict(loessMod)
     lines(smoothed, x=sat1$nb.reads, col="red", lwd = 2.0)
     #points(sat$pcts[kk] * usable.reads/10^6, sat$nb.peaks[kk]/10^3, type = 'p', col = 'darkblue', pch =1, cex = 1.5)
     abline(v = 100, col = 'blue', lwd = 2.0)
     
-    sat2 = data.frame(nb.reads = sat$reads[kk], peak.width = sat$peaks.width[kk])
-    loessMod2 <- loess(peak.width ~ nb.reads, data=sat2, span=span)
-    smoothed2 <- predict(loessMod2) 
+    plot(sat$total[kk], sat$dup[kk], type= 'p', col = 'blue', lwd = 2.0,  main = sample.uniq[n], log = '',  cex = 1.2, 
+         xlab = 'nb of total reads (Million)', ylab = 'dupliocation rates')
     
-    plot(sat2$nb.reads, sat2$peak.width, type= 'p', col = 'blue', lwd = 2.0,  main = sample.uniq[n], log = '', 
-         xlab = 'nb of usable reads (Million)', ylab = 'total peak width (M)', xlim = xlims)
-    lines(smoothed2, x=sat2$nb.reads, col="red", lwd = 2.0)
-    abline(v = 100, col = 'blue', lwd = 2.0)
+    plot(sat$usable[kk], sat$peaks.nb[kk], type= 'p', col = 'blue', lwd = 2.0,  main = sample.uniq[n], log = '', cex = 1.2,
+         xlab = 'nb of usable reads (Million)', ylab = 'nb of peaks (K)')
     
     
-    plot(sat$reads[kk], sat$peaks.nb.p10[kk], type= 'p', col = 'blue', lwd = 2.0,  main = sample.uniq[n], log = '', 
-         xlab = 'nb of usable reads (Million)', ylab = 'nb of peaks.p10 (K)', xlim = xlims)
-    sat1 = data.frame(nb.reads = sat$reads[kk], nb.peaks = sat$peaks.nb.p10[kk])
-    loessMod <- loess(nb.peaks ~ nb.reads, data=sat1, span=span)
-    smoothed <- predict(loessMod)
-    lines(smoothed, x=sat1$nb.reads, col="red", lwd = 2.0)
-    #points(sat$pcts[kk] * usable.reads/10^6, sat$nb.peaks[kk]/10^3, type = 'p', col = 'darkblue', pch =1, cex = 1.5)
-    abline(v = 100, col = 'blue', lwd = 2.0)
+    plot(sat$total[kk], sat$dup[kk], type= 'n', col = 'blue', lwd = 2.0,  main = sample.uniq[n], log = '',
+         xlab = 'nb of total reads (Million)', ylab = 'dupliocation rates', cex = 1.2)
     
-    sat2 = data.frame(nb.reads = sat$reads[kk], peak.width = sat$peaks.width.p10[kk])
-    loessMod2 <- loess(peak.width ~ nb.reads, data=sat2, span=span)
-    smoothed2 <- predict(loessMod2) 
+    # sat2 = data.frame(nb.reads = sat$reads[kk], peak.width = sat$peaks.width[kk])
+    # loessMod2 <- loess(peak.width ~ nb.reads, data=sat2, span=span)
+    # smoothed2 <- predict(loessMod2) 
+    # 
+    # plot(sat2$nb.reads, sat2$peak.width, type= 'p', col = 'blue', lwd = 2.0,  main = sample.uniq[n], log = '', 
+    #      xlab = 'nb of usable reads (Million)', ylab = 'total peak width (M)', xlim = xlims)
+    # lines(smoothed2, x=sat2$nb.reads, col="red", lwd = 2.0)
+    # abline(v = 100, col = 'blue', lwd = 2.0)
     
-    plot(sat2$nb.reads, sat2$peak.width, type= 'p', col = 'blue', lwd = 2.0,  main = sample.uniq[n], log = '', 
-         xlab = 'nb of usable reads (Million)', ylab = 'total peak.p10 width (M)', xlim = xlims)
-    lines(smoothed2, x=sat2$nb.reads, col="red", lwd = 2.0)
-    abline(v = 100, col = 'blue', lwd = 2.0)
-    
+    # 
+    # plot(sat$reads[kk], sat$peaks.nb.p10[kk], type= 'p', col = 'blue', lwd = 2.0,  main = sample.uniq[n], log = '', 
+    #      xlab = 'nb of usable reads (Million)', ylab = 'nb of peaks.p10 (K)', xlim = xlims)
+    # sat1 = data.frame(nb.reads = sat$reads[kk], nb.peaks = sat$peaks.nb.p10[kk])
+    # loessMod <- loess(nb.peaks ~ nb.reads, data=sat1, span=span)
+    # smoothed <- predict(loessMod)
+    # lines(smoothed, x=sat1$nb.reads, col="red", lwd = 2.0)
+    # #points(sat$pcts[kk] * usable.reads/10^6, sat$nb.peaks[kk]/10^3, type = 'p', col = 'darkblue', pch =1, cex = 1.5)
+    # abline(v = 100, col = 'blue', lwd = 2.0)
+    # 
+    # sat2 = data.frame(nb.reads = sat$reads[kk], peak.width = sat$peaks.width.p10[kk])
+    # loessMod2 <- loess(peak.width ~ nb.reads, data=sat2, span=span)
+    # smoothed2 <- predict(loessMod2) 
+    # 
+    # plot(sat2$nb.reads, sat2$peak.width, type= 'p', col = 'blue', lwd = 2.0,  main = sample.uniq[n], log = '', 
+    #      xlab = 'nb of usable reads (Million)', ylab = 'total peak.p10 width (M)', xlim = xlims)
+    # lines(smoothed2, x=sat2$nb.reads, col="red", lwd = 2.0)
+    # abline(v = 100, col = 'blue', lwd = 2.0)
+    # 
     
   }
   
