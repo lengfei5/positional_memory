@@ -161,7 +161,7 @@ Manually.identify.peak.consensus = FALSE
 
 if(Manually.identify.peak.consensus){
   peaks = c()
-  pval.cutoff = 6
+  pval.cutoff = 6 # the 10^-6 seems to be better when checking peak overlapping in replicates
   
   for(n in 1:length(peak.files)) 
   {
@@ -196,8 +196,10 @@ if(Manually.identify.peak.consensus){
   source('functions_chipSeq.R')
   ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main='BL_UA_day13_proximal')
   v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
   
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_BL.UA.D13.proximal.pdf'),  height = 10, width = 10)
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_BL.UA.D13.proximal_pval.', pval.cutoff, '.pdf'), 
+      height = 10, width = 10)
   try(plot(v))
   dev.off()
   
@@ -209,12 +211,14 @@ if(Manually.identify.peak.consensus){
   v <- venn_cnt2venn(ol.peaks$vennCounts)
   try(plot(v))
   
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_BL_UA_13days_distal.pdf'),  height = 10, width = 10)
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_BL_UA_13days_distal_pval.', pval.cutoff, '.pdf'),
+    height = 10, width = 10)
   try(plot(v))
   dev.off()
   
   #bld13.d = peaks[[1]][overlapsAny(peaks[[1]], peaks[[2]])]
   bld13.d = GenomicRanges::intersect(peaks[[1]], peaks[[2]])
+  
   
   kk = which(design$condition == 'BL_UA_9days')
   
@@ -223,7 +227,8 @@ if(Manually.identify.peak.consensus){
   try(plot(v))
   
   if (length(dev.list())!=0) {dev.off()}
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_BL_UA_9days.pdf'),  height = 10, width = 10)
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_BL_UA_9days_pval', pval.cutoff, '.pdf'),  
+      height = 10, width = 10)
   try(plot(v)); dev.off()
   
   #bld9 = peaks[[10]][overlapsAny(peaks[[10]], peaks[[9]])]
@@ -250,7 +255,8 @@ if(Manually.identify.peak.consensus){
   try(plot(v))
   
   if (length(dev.list())!=0) {dev.off()}
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_BL_UA_5days_new.pdf'),  height = 10, width = 10)
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_BL_UA_5days_new_pval', pval.cutoff, '.pdf'),  
+      height = 10, width = 10)
   try(plot(v)); dev.off()
   
   bld52 = GenomicRanges::intersect(peaks[[5]], peaks[[6]])
@@ -261,15 +267,18 @@ if(Manually.identify.peak.consensus){
   try(plot(v))
   
   if (length(dev.list())!=0) {dev.off()}
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_BL_UA_5days_new_vs_old.pdf'),  height = 10, width = 10)
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_BL_UA_5days_new_vs_old_pval', pval.cutoff, '.pdf'),  
+      height = 10, width = 10)
   try(plot(v)); dev.off()
   
+  # use the new samples for peaks not old one
   #length(bld5[overlapsAny(bld5, bld52)])
   bld5.old = bld5
   bld5 = bld52
   
-  save(bld5, bld5.old, bld9, bld13.p, bld13.d, 
-       file = paste0(RdataDir, '/consensus_peaks_intersectReplicates_pval', pval.cutoff, 'version_', version.analysis, 'regeneration.Rdata'))
+  save(bld5, bld9, bld13.p, bld13.d, 
+       file = paste0(RdataDir, '/consensus_peaks_intersectReplicates_pval', pval.cutoff, 'version_', version.analysis, 
+                     '_regeneration.Timepoints.Rdata'))
   
   ##########################################
   # manual define the overlapping peaks for embryo stages
@@ -292,7 +301,8 @@ if(Manually.identify.peak.consensus){
   try(plot(v))
   
   if(length(dev.list())!=0) dev.off()
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_Embryo_Stage40_old.pdf'),  height = 10, width = 10)
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_Embryo_Stage40_old_pval', pval.cutoff, '.pdf'),  
+      height = 10, width = 10)
   try(plot(v)); dev.off()
   
   es40.old = GenomicRanges::intersect(peaks[[13]], peaks[[14]])
@@ -302,13 +312,14 @@ if(Manually.identify.peak.consensus){
   try(plot(v))
   
   if(length(dev.list())!=0) dev.off()
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_Embryo_Stage40_new_vs_old.pdf'),  height = 10, width = 10)
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_Embryo_Stage40_new_vs_old_pval', pval.cutoff, '.pdf'),  
+      height = 10, width = 10)
   try(plot(v)); dev.off()
-  
   
   # here for Embryo.stage40, new batche and old merged
   es40 = union(es40.new, es40.old)
   #es40 = es40.new
+  
   
   kk = which(design$condition == 'Embryo_Stage44_proximal')
   ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main='BL_UA_day13_proximal')
@@ -316,23 +327,26 @@ if(Manually.identify.peak.consensus){
   try(plot(v))
   
   if(length(dev.list())!=0) dev.off()
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_Embryo_Stage44_proximal.pdf'),  height = 10, width = 10)
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_Embryo_Stage44_proximal_pval', pval.cutoff, '.pdf'), 
+      height = 10, width = 10)
   try(plot(v)); dev.off()
   
   es44.p = intersect(peaks[[17]], peaks[[18]])
   
   kk = which(design$condition == 'Embryo_Stage44_distal')
+  
   ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll")
   v <- venn_cnt2venn(ol.peaks$vennCounts)
   try(plot(v))
   
   if(length(dev.list())!=0) dev.off()
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_Embryo_Stage44_distal.pdf'),  height = 10, width = 10)
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_Embryo_Stage44_distal_pval', pval.cutoff, '.pdf'),  
+      height = 10, width = 10)
   try(plot(v)); dev.off()
     
   es44.d = intersect(peaks[[15]], peaks[[16]])
   
-  save(es40, es44.d, es44.p, es40.old, es40.new, 
+  save(es40, es44.d, es44.p,  
        file = paste0(RdataDir, '/consensus_peaks_intersectReplicates_pval', pval.cutoff, 'version_', version.analysis, 
                      'embryoStage.Rdata'))
   
