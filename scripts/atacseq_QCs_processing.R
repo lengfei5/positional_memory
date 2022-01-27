@@ -360,7 +360,7 @@ if(Manually.identify.peak.consensus){
   try(plot(v))
   
   if(length(dev.list())!=0) dev.off()
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_Mature_UA.old.pdf'),  height = 10, width = 10)
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_Mature_UA.old_', pval.cutoff, '.pdf'),  height = 10, width = 10)
   try(plot(v)); dev.off()
   
   ua0 = GenomicRanges::intersect(peaks[[30]], peaks[[27]])
@@ -371,9 +371,8 @@ if(Manually.identify.peak.consensus){
   try(plot(v))
   
   if(length(dev.list())!=0) dev.off()
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_Mature_UA.new.pdf'),  height = 10, width = 10)
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_Mature_UA.new_pval', pval.cutoff, '.pdf'),  height = 10, width = 10)
   try(plot(v)); dev.off()
-  
   
   # for the moment, ua peaks overlapped by two replicates will be saved here 
   #ua = peaks[[29]][overlapsAny(peaks[[29]], peaks[[26]])|overlapsAny(peaks[[29]], peaks[[28]])]
@@ -387,32 +386,56 @@ if(Manually.identify.peak.consensus){
   # LA
   kk = which(design$condition == 'Mature_LA')
   
-  kk = c(23, 24, 25)
+  kk = c(24, 25)
   ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll")
   v <- venn_cnt2venn(ol.peaks$vennCounts)
   try(plot(v))
   
   if(length(dev.list())!=0) dev.off()
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_Mature_LA.pdf'),  height = 10, width = 10)
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_Mature_LA.2020_pval', pval.cutoff, '.pdf'),  height = 10, width = 10)
   try(plot(v)); dev.off()
   
-  kk = c(25, 32, 34)
+  kk = c(23, 32)
   ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll")
   v <- venn_cnt2venn(ol.peaks$vennCounts)
   try(plot(v))
   
   if(length(dev.list())!=0) dev.off()
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_Mature_LA_R12810_3.pdf'),  height = 10, width = 10)
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_Mature_LA_2022.2021_pval', pval.cutoff,'.pdf'),  height = 10, width = 10)
+  try(plot(v)); dev.off()
+  
+  
+  kk = c(24, 25, 23)
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll")
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  if(length(dev.list())!=0) dev.off()
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_Mature_LA.2020.2021_pval', pval.cutoff, '.pdf'),  
+      height = 10, width = 10)
+  try(plot(v)); dev.off()
+  
+  
+  kk = c(24, 25, 32)
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll")
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  if(length(dev.list())!=0) dev.off()
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_Mature_LA.2020.2022_pval', pval.cutoff, '.pdf'),  
+      height = 10, width = 10)
   try(plot(v)); dev.off()
   
   
   # for the moment, mLA peak consensus are peaks covered by > 2 out of three replicates
-  la1 = intersect(peaks[[23]], peaks[[24]])
+  kk = which(design$condition == 'Mature_LA')
+  la1 = intersect(peaks[[32]], peaks[[24]])
   la2 = intersect(peaks[[25]], peaks[[24]])
-  la3 = intersect(peaks[[23]], peaks[[25]])
+  la3 = intersect(peaks[[32]], peaks[[25]])
   
   la = union(union(la1, la2), la3)
-  la = reduce(la)
+  lax = intersect(la, peaks[[23]])
+  la = reduce(lax)
   
   # for the moment, mHand peak consensus are peaks covered by > 2 out of three replicates
   kk = which(design$condition == 'Mature_Hand')
@@ -421,7 +444,7 @@ if(Manually.identify.peak.consensus){
   try(plot(v))
   
   if(length(dev.list())!=0) dev.off()
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_Mature_Hand.pdf'),  height = 10, width = 10)
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_Mature_Hand_pval',  pval.cutoff, '.pdf'),  height = 10, width = 10)
   try(plot(v)); dev.off()
   
   hd1 = intersect(peaks[[20]], peaks[[21]])
@@ -433,15 +456,16 @@ if(Manually.identify.peak.consensus){
   
   # for the moment head control only one sample
   kk = which(design$condition == 'HEAD')
+  
   ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll")
   v <- venn_cnt2venn(ol.peaks$vennCounts)
   try(plot(v))
   
   if(length(dev.list())!=0) dev.off()
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_Mature_Head.pdf'),  height = 10, width = 10)
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_Mature_Head_pval', pval.cutoff, '.pdf'),  height = 10, width = 10)
   try(plot(v)); dev.off()
   
-  hc = peaks[[kk]]
+  hc = intersect(peaks[[19]], peaks[[31]])
   
   ## here  es40, es44.d, es44.p, bld5, bld9, bld13.p, bld13.d data are complete
   ## in contrast, ua (not sure), la, hd, ua, hc and hand regeneration time points will have new data
@@ -454,6 +478,13 @@ if(Manually.identify.peak.consensus){
   ##########################################
   # define the peak union across conditions
   ##########################################
+  load(file = paste0(RdataDir, '/consensus_peaks_intersectReplicates_pval', pval.cutoff, 'version_', version.analysis, 
+                      '_regeneration.Timepoints.Rdata'))
+  load(file = paste0(RdataDir, '/consensus_peaks_intersectReplicates_pval', pval.cutoff, 'version_', version.analysis, 
+                       'embryoStage.Rdata'))
+  load( file = paste0(RdataDir, '/consensus_peaks_intersectReplicates_pval', pval.cutoff, 'version_', version.analysis, 
+                      'Mature.Rdata'))
+  
   peak.merged = union(bld5, bld9)
   peak.merged = union(peak.merged, bld13.p)
   peak.merged = union(peak.merged, bld13.d)
@@ -463,6 +494,7 @@ if(Manually.identify.peak.consensus){
   peak.merged = union(peak.merged, ua)
   peak.merged = union(peak.merged, la)
   peak.merged = union(peak.merged, hd)
+  peak.merged = union(peak.merged, hc)
   
   #peak.merged = union(peak.merged, hc) # probalby the peak from the negative controls heads are not included
   peak.merged = dropSeqlevels(peak.merged, 'chrM', pruning.mode=c("coarse"))
@@ -511,8 +543,7 @@ if(Manually.identify.peak.consensus){
  
 }
   
-# clean peaks
-
+## clean peaks
 peaks = peak.merged
 peaks = data.frame(peaks)
 colnames(peaks)[c(1:3)] = c("chr", "start", "end")
@@ -591,12 +622,12 @@ source(RNA.QC.functions)
 
 #load(file = paste0(RdataDir, '/R11637_atacseq_samples_design_stats.Rdata'))
 #design = stats
-design = readRDS(file = paste0(RdataDir, '/design_merged_technicalReplicates_Rxxxx_R10723_R11637_R12810.rds'))
-mm = match(design$sampleID, as.character(c(161523:161526)))
-design = design[is.na(mm), ]
+#design = readRDS(file = paste0(RdataDir, '/design_merged_technicalReplicates_Rxxxx_R10723_R11637_R12810.rds'))
 
-design = rbind(design, c('177595.177597', 'HEAD', 'HEAD_177595.177597', NA, NA))
-design = rbind(design, c('177596.177598', 'Mature_LA', 'Mature_LA_177596.177598', NA, NA))
+#mm = match(design$SampleID, as.character(c(161523:161526)))
+#design = design[is.na(mm), ]
+#design = rbind(design, c('177595.177597', 'HEAD', 'HEAD_177595.177597', NA, NA))
+#design = rbind(design, c('177596.177598', 'Mature_LA', 'Mature_LA_177596.177598', NA, NA))
 
 xlist<-list.files(path=paste0(dataDir, 'featurecounts_peaks.Q30'),
                   pattern = "*_featureCounts.txt$", full.names = TRUE) ## list of data set to merge
@@ -619,7 +650,7 @@ counts = process.countTable(all=all, design = design[, c(1,2)])
 # design = data.frame(design, stats, stringsAsFactors = FALSE)
 
 save(design, counts, file = paste0(RdataDir, 
-                                   '/samplesDesign_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical_', 
+                                   '/samplesDesign_readCounts.within_manualConsensusPeaks.pval6_mergedTechnical_', 
                                    version.analysis, '.Rdata'))
 
 
@@ -658,15 +689,15 @@ if(Compare.with.Old.mature.resequencing){
 #  peak signal normalization
 ##########################################
 load(file = paste0(RdataDir, 
-                   '/samplesDesign_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical_', 
+                   '/samplesDesign_readCounts.within_manualConsensusPeaks.pval6_mergedTechnical_', 
                    version.analysis, '.Rdata'))
 design$sampleID = design$SampleID
 
-design$batch = 'old'
-design$batch[grep('1775', design$sampleID)] = '2022'
-sels = grep('HEAD|Mature', design$condition)
-design = design[sels, ]
-counts = counts[, c(1, sels + 1)]
+#design$batch = 'old'
+#design$batch[grep('1775', design$sampleID)] = '2022'
+#sels = grep('HEAD|Mature', design$condition)
+#design = design[sels, ]
+#counts = counts[, c(1, sels + 1)]
 
 ss = apply(as.matrix(counts[, -1]), 1, mean)
 
@@ -689,7 +720,7 @@ hist(design$pct.reads.in.peaks, main = 'distribution of pct of usable reads with
 
 ss = apply(as.matrix(counts[, -1]), 1, max)
 
-cutoff = 50
+cutoff = 30
 hist(log10(ss), breaks = 200)
 abline(v = log10(cutoff), col = 'red')
 kk = which(ss>cutoff)
@@ -705,12 +736,6 @@ require(DESeq2)
 rownames(counts) = counts$gene
 dds <- DESeqDataSetFromMatrix(as.matrix(counts[kk, -1]), DataFrame(design), design = ~ condition)
 
-#dds = dds[, grep('1361', design$SampleID)]
-#dds$condition = droplevels(dds$condition)
-
-#ss0 = rowMaxs(counts(dds))
-#dds = dds[ss0 > 50, ]
-#dds = dds[ss > cutoff, ]
 ss = rowSums(counts(dds))
 length(which(ss > quantile(ss, probs = 0.6)))
 
@@ -735,7 +760,7 @@ pca=plotPCA(vsd, intgroup = colnames(design)[2], ntop = 3000, returnData = FALSE
 print(pca)
 
 
-pca2save = as.data.frame(plotPCA(vsd, intgroup = colnames(design)[c(2, 7)], returnData = TRUE, ntop = 3000))
+pca2save = as.data.frame(plotPCA(vsd, intgroup = colnames(design)[c(2, 6)], returnData = TRUE, ntop = 3000))
 pca2save$name = paste0(design$condition, '_', design$SampleID, '_', design$batch)
 #pca2save$batch = 'old'
 #pca2save$batch[grep('1361|1373', pca2save$name)] = 'new'
@@ -745,31 +770,30 @@ ggp = ggplot(data=pca2save, aes(PC1, PC2, label = name, color=condition, shape =
   geom_point(size=3) + 
   geom_text(hjust = 0.2, nudge_y = 0.5, size=3)
 
-plot(ggp) 
-ggsave(paste0(resDir, "/PCA_allatacseq_new.old.merged_ntop3000_mature.pdf"), width = 16, height = 10)
+plot(ggp)
+ggsave(paste0(resDir, "/PCA_allatacseq_new.old.merged_ntop3000_allSamples",  version.analysis, ".pdf"), width = 16, height = 10)
 
-plot(sizeFactors(dds), design$mapped, log = '')
+design$usable = as.numeric(design$usable)
+design$usable[c(31:32)] = design$usable[c(31:32)]/10^6
+
 plot(sizeFactors(dds), design$usable, log = 'xy')
 text(sizeFactors(dds), design$usable, labels = design$fileName, cex = 0.7)
 
-#plot(sizeFactors(dds), design$mapped, log = 'xy')
-#text(sizeFactors(dds), design$mapped, labels = design$samples, cex = 0.7)
-
-#dev.off()
 
 save.scalingFactors.for.deeptools = FALSE
 if(save.scalingFactors.for.deeptools){
-  design$usable[which(design$sampleID == '177595.177597')] = 
-    sum(as.numeric(as.character(design$usable[which(design$SampleID == '177595'| design$SampleID == '177597')])))
+  #design$usable[which(design$sampleID == '177595.177597')] = 
+  #  sum(as.numeric(as.character(design$usable[which(design$SampleID == '177595'| design$SampleID == '177597')])))
   
-  design$usable[which(design$sampleID == '177596.177598')] = 
-    sum(as.numeric(as.character(design$usable[which(design$SampleID == '177596'| design$SampleID == '177598')])))
+  #design$usable[which(design$sampleID == '177596.177598')] = 
+  #  sum(as.numeric(as.character(design$usable[which(design$SampleID == '177596'| design$SampleID == '177598')])))
   
   xx = data.frame(sampleID = design$sampleID,  
                   scalingFactor = as.numeric(design$usable)/(sizeFactors(dds)*median(as.numeric(design$usable))),
                   stringsAsFactors = FALSE)
-  xx = xx[c(17:18), ]
-  write.table(xx, file = paste0(dataDir, '/DESeq2_scalingFactor_forDeeptools.txt'), sep = '\t',
+  # xx = xx[c(17:18), ]
+  
+  write.table(xx, file = paste0(dataDir, 'DESeq2_scalingFactor_forDeeptools.txt'), sep = '\t',
               col.names = FALSE, row.names = FALSE, quote = FALSE)
   
   
