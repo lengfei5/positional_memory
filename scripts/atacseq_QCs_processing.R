@@ -161,7 +161,7 @@ Manually.identify.peak.consensus = FALSE
 
 if(Manually.identify.peak.consensus){
   peaks = c()
-  pval.cutoff = 4
+  pval.cutoff = 6
   
   for(n in 1:length(peak.files)) 
   {
@@ -187,10 +187,7 @@ if(Manually.identify.peak.consensus){
   
   peaks = readRDS(file = paste0(RdataDir, '/macs2_peaks_mergedTechnialReps_30samples_pval.', pval.cutoff, '.rds'))
   
-  #xx = readRDS(file = paste0(RdataDir, '/macs2_peaks_mergedTechnialReps_30samples.rds'))
-  #peaks = readRDS(file = paste0(RdataDir, '/macs2_peaks_mergedTechnialReps_30samples_pval0.001.rds'))
-  #peaks = readRDS(file = paste0(RdataDir, '/macs2_peaks_mergedTechnialReps_30samples_pval0.001.rds'))
-  
+    
   ##########################################
   #  # try to merge BL time series
   ##########################################
