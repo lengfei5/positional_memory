@@ -31,34 +31,37 @@ require(GenomicFeatures)
 # sequence saturation analysis
 ########################################################
 ########################################################
-design_file = paste0(dataDir, 'design_sampleInfo_all.txt')
+# design_file = paste0(dataDir, 'design_sampleInfo_all.txt')
+design = readRDS(file = '../data/design_sampleInfos_30atacSamplesUsed.rds')
 
-
-Collect.design.stat.nf.out = TRUE
-
+Collect.design.stat.nf.out = FALSE
 if(Collect.design.stat.nf.out){
   
   #design = read.table(paste0(dataDir, 'sampleInfo_parsed.txt'), sep = '\t', header = TRUE)
-  design = read.delim(design_file, sep = '\t', header = TRUE)
+  #design = read.table(design_file, sep = '\t', header = TRUE, as.is = c(1, 2), colClasses = 'character')
+  design = rbind(design, 
+                 c('177595.177597', 'HEAD', rep(NA, 4)), 
+                 c('177596.177598', 'Mature_LA', rep(NA, 4)))
   
   # Rxxxx, R10723 and R11637 technical replicates merged 
-  stats = read.table(paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/R11637_atac/', 
-                            'nf_out/result/countStatTable.txt'), sep = '\t', header = TRUE)
-  
   # 2022 new data R12810
-  xx = read.table(paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/R12810_atac/', 
-                         'nf_out/result/countStatTable.txt'), sep = '\t', header = TRUE)
+  #xx = read.table(paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/R12810_atac/', 
+  #                       'nf_out/result/countStatTable.txt'), sep = '\t', header = TRUE)
+  # 2022 merged bams 
+  stats = read.table(paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/R12810_atac/bam_merged/QCs/BamStat', 
+                            '/countStatTable.txt'), sep = '\t', header = TRUE)
   
-  stats = rbind(stats, xx)
+  
+  #stats = rbind(stats, xx)
   colnames(stats)[c(1, 3)] = c('fileName', 'trimmed')
   
   index = c()
-  for(n in 1:nrow(design))
+  for(n in 31:nrow(design))
   {
     # n = 1;
     cat(n, '\n')
     #cc.files = cnts[grep(design$sampleID[n], cnts)]
-    ii = grep(design$sampleID[n], stats$fileName)
+    ii = grep(design$SampleID[n], stats$fileName)
     if(length(ii) == 1){
       index = c(index, ii)
     }else{
@@ -68,8 +71,12 @@ if(Collect.design.stat.nf.out){
     
   }
   
-  stats = data.frame(design, stats[index, ], stringsAsFactors = FALSE)
-  colnames(stats) = c('sampleID', 'samples', 'fileName', 'total',  'adapter.trimmed', 'mapped', 'chrM.rm', 'unique', 'unique.rmdup')
+  design$fileName[31:32] = as.character(stats$fileName)
+  design$unique[31:32] = stats$uniq
+  design$usable[31:32] = stats$rmdup_uniq
+  design$batch[31:32] = '2022'
+  #stats = data.frame(design, stats[index, ], stringsAsFactors = FALSE)
+  #colnames(stats) = c('sampleID', 'samples', 'fileName', 'total',  'adapter.trimmed', 'mapped', 'chrM.rm', 'unique', 'unique.rmdup')
   
   stats$trimming.pct = as.numeric(stats$adapter.trimmed)/as.numeric(stats$total)
   stats$mapped.pct =  as.numeric(stats$mapped)/as.numeric(stats$adapter.trimmed)

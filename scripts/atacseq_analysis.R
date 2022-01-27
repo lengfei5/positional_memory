@@ -118,6 +118,10 @@ if(Binary.peaks.QCs.analysis){
 ########################################################
 load(file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical.Rdata'))
 
+saveRDS(design, file = paste0('../data/design_sampleInfos_30atacSamplesUsed.rds'))
+
+
+
 Normalization.BatchCorrect = FALSE
 if(Normalization.BatchCorrect){
   design$conds = design$condition
