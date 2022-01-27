@@ -32,7 +32,8 @@ require(GenomicFeatures)
 ########################################################
 ########################################################
 # design_file = paste0(dataDir, 'design_sampleInfo_all.txt')
-design = readRDS(file = '../data/design_sampleInfos_30atacSamplesUsed.rds')
+# design = readRDS(file = '../data/design_sampleInfos_30atacSamplesUsed.rds')
+design = readRDS(file = paste0(resDir, '/design_sampleInfos_', version.analysis, '.rds'))
 
 Collect.design.stat.nf.out = FALSE
 if(Collect.design.stat.nf.out){
@@ -75,6 +76,9 @@ if(Collect.design.stat.nf.out){
   design$unique[31:32] = stats$uniq
   design$usable[31:32] = stats$rmdup_uniq
   design$batch[31:32] = '2022'
+  
+  saveRDS(design, file = paste0(resDir, '/design_sampleInfos_', version.analysis, '.rds'))
+  
   #stats = data.frame(design, stats[index, ], stringsAsFactors = FALSE)
   #colnames(stats) = c('sampleID', 'samples', 'fileName', 'total',  'adapter.trimmed', 'mapped', 'chrM.rm', 'unique', 'unique.rmdup')
   
@@ -117,36 +121,35 @@ peakDir = paste0(dataDir,  'calledPeaks/macs2')
 peak.files = list.files(path = peakDir,
                         pattern = '*_peaks.xls', full.names = TRUE)
 
-design = readRDS(file = paste0(RdataDir, '/design_merged_technicalReplicates_Rxxxx_R10723_R11637.rds'))
+#design = readRDS(file = paste0(RdataDir, '/design_merged_technicalReplicates_Rxxxx_R10723_R11637.rds'))
 #mm = match(design$sampleID, as.character(c(161523:161526)))
 #design = design[is.na(mm), ]
 #saveRDS(design, file = paste0(RdataDir, '/design_merged_technicalReplicates_Rxxxx_R10723_R11637.rds'))
 
-load(file = paste0(RdataDir, '/R11637_atacseq_samples_design_stats.Rdata'))
-stats = stats[is.na(match(stats$sampleID, design$sampleID)), ]
-stats = stats[, c(1, 2, 3, 8, 9)]
-colnames(stats) = colnames(design)
+# load(file = paste0(RdataDir, '/R11637_atacseq_samples_design_stats.Rdata'))
+# stats = stats[is.na(match(stats$sampleID, design$sampleID)), ]
+# stats = stats[, c(1, 2, 3, 8, 9)]
+# colnames(stats) = colnames(design)
 
-stats$unique = stats$unique/10^6
-stats$usable = stats$usable/10^6
+#stats$unique = stats$unique/10^6
+#stats$usable = stats$usable/10^6
 
-design = rbind(design, stats)
-design = data.frame(design, stringsAsFactors = FALSE)
-saveRDS(design, file = paste0(RdataDir, '/design_merged_technicalReplicates_Rxxxx_R10723_R11637_R12810.rds'))
-
+# design = rbind(design, stats)
+# design = data.frame(design, stringsAsFactors = FALSE)
+# saveRDS(design, file = paste0(RdataDir, '/design_merged_technicalReplicates_Rxxxx_R10723_R11637_R12810.rds'))
 
 index  = c()
 for(n in 1:nrow(design))
 {
-  test = grep(design$sampleID[n], peak.files)
+  test = grep(design$SampleID[n], peak.files)
   if(length(test) != 1) {
     cat(length(test), 'peak files Found \n')
   }else{
     index = c(index, test)
   }
 }
-peak.files = peak.files[index]
 
+peak.files = peak.files[index]
 
 ##########################################
 # Manually identify consensus peaks across replicates taking into account of different batches and sequencing depth
@@ -154,7 +157,7 @@ peak.files = peak.files[index]
 Manually.identify.peak.consensus = FALSE
 
 # union of all peaks from all replicates
-peak.merged = merge.peaks.macs2(peak.files, pcutoff = 6)
+#peak.merged = merge.peaks.macs2(peak.files, pcutoff = 6)
 
 if(Manually.identify.peak.consensus){
   peaks = c()
