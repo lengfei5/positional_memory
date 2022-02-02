@@ -126,152 +126,234 @@ if(Binary.peaks.QCs.analysis){
 #load(file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical.Rdata'))
 load(file = paste0(RdataDir, '/samplesDesign_readCounts.within_manualConsensusPeaks.pval6_mergedTechnical_', 
                    version.analysis, '.Rdata'))
+design$sampleID = design$SampleID
+design$usable = as.numeric(design$usable)
+design$usable[c(31:32)] = design$usable[c(31:32)]/10^6
 
 saveRDS(design, file = paste0('../data/design_sampleInfos_32atacSamplesUsed.rds'))
 
-source('Functions_atac.R')
-# Global.Normalization.BatchCorrect(design, counts)
+##########################################
+# Select peak consensus across mature, regeneration and embryo 
+# and choose the background 
+##########################################
+Peaks.Background.selection = TRUE
 
-if(Normalization.BatchCorrect){
+if(Peaks.Background.selection){
   
- 
+  design$conds = design$condition
+  design$unique.rmdup = design$usable
+  colnames(design)[which(colnames(design) == 'fileName')] = 'samples'
+  #sels = grep('Mature|Embryo|BL_UA', design$conds)
+  sels = c(1:nrow(design))
+  rownames(counts) = counts$gene
+  counts = as.matrix(counts[, -1])
+  
+  dds <- DESeqDataSetFromMatrix(counts, DataFrame(design[sels, ]), design = ~ conds)
+  colnames(dds) = colnames(counts)
+  
+  # check the peak length
+  peakNames = rownames(dds)
+  pp = data.frame(t(sapply(peakNames, function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
+  
+  pp$strand = '*'
+  pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
+  ll = width(pp)
   
   ##########################################
-  # test normalization and batch correction of ATAC-seq data
-  # TMM and combat were selected for normalization and batch correction
+  # filter peaks below certain thrshold of read counts
+  # And also consider those filtered peaks as background
   ##########################################
-  edgeR.normalization.batch.correction = FALSE
-  if(edgeR.normalization.batch.correction){
-    source('Functions_atac.R')
-    library(edgeR)
-    require("sva")
-    require(limma)
+  select.peaks.with.readThreshold = TRUE
+  select.background.for.peaks = TRUE
+  
+  if(select.peaks.with.readThreshold){
+    #ss = rowMax(counts(dds)[, grep('Embryo_', dds$conds)])
+    ss = rowMaxs(counts(dds))/ll*500
+    hist(log10(ss), breaks = 200, main = 'log2(max of read counts within peaks) ')
+    cutoff.peak = 50 # 30 as peak cutoff looks good
+    cutoff.bg = 20
+    cat(length(which(ss >= cutoff.peak)), 'peaks selected with minimum read of the highest peak -- ', cutoff.peak,  '\n')
+    cat(length(which(ss < cutoff.bg)), 'peaks selected with minimum read of the highest peak -- ', cutoff.bg,  '\n')
+    abline(v= log10(cutoff.peak), col = 'red', lwd = 2.0)
+    abline(v= log10(cutoff.bg), col = 'blue', lwd = 2.0)
     
-    ##########################################
-    # batch correct samples separately for mature samples and regeneration samples  
-    ##########################################
-    table(design$condition, design$batch)
+    nb.above.threshold = apply(counts(dds), 1, function(x) length(which(x>cutoff.peak)))
+    ii = which(ss >= cutoff.peak)
+    #ii = which(nb.above.threshold>=2)
     
-    Split.Mature.Regeneration.samples = TRUE
-    if(Split.Mature.Regeneration.samples){
+    if(select.background.for.peaks){
+      ii.bg = which(ss < cutoff.bg)
+      ii.bg = sample(ii.bg, size = 1000, replace = FALSE)
+      rownames(dds)[ii.bg] = paste0('bg_', rownames(dds)[ii.bg])
+      dds = dds[c(ii, ii.bg), ]
+      ll.sels = ll[c(ii, ii.bg)]
       
-      # start with mature samples
-      Batch.Correct.matureSamples = FALSE
-      if(Batch.Correct.matureSamples){
-        sels = grep('Mature|HEAD', design$conds)
-        sels = setdiff(sels, which(design$SampleID == '74938'| design$SampleID == '74939'|design$SampleID == '74940'))
-        design.sels = design[sels, ]
-        
-        design.sels$conds = droplevels(design.sels$conds)
-        
-        #design.sels$batch[which(design.sels$batch == '2021')] = '2021S'
-        
-        #design.sels$batch[grep('749', design.sels$SampleID)] = '2019'
-        
-        #design.sels$batch = droplevels(design.sels$batch)
-        table(design.sels$conds, design.sels$batch)
-        
-        ddx = dds[, sels]
-        ddx$conds = droplevels(ddx$conds)
-        ss = rowSums(counts(ddx))
-        # remove low count genes, otherwise combat returns error 
-        # 'Error in while (change > conv) { : missing value where TRUE/FALSE needed'
-        ddx = ddx[which(ss>5), ] 
-        ddx = estimateSizeFactors(ddx)
-        vsd <- varianceStabilizingTransformation(ddx, blind = TRUE)
-        tmm = assay(vsd)
-        
-        #d <- DGEList(counts=counts(ddx), group=design.sels$conds)
-        #tmm <- calcNormFactors(d, method='TMM')
-        #tmm = cpm(tmm, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 1)
-        
-        tmm.vars = apply(as.matrix(tmm), 1, var) # row with var = 0 pose problem for ComBat
-        tmm = tmm[which(tmm.vars>0 & !is.na(tmm.vars)), ]
-        
-        bc = as.factor(design.sels$batch)
-        mod = model.matrix(~ as.factor(conds), data = design.sels)
-        
-        # if specify ref.batch, the parameters will be estimated from the ref, inapprioate here, 
-        # because there is no better batche other others 
-        #ref.batch = '2021S'# 2021S as reference is better for some reasons (NOT USED here)    
-        fpm.bc = ComBat(dat=as.matrix(tmm), batch=bc, mod=mod, par.prior=TRUE, ref.batch = NULL) 
-        
-        #design.tokeep<-model.matrix(~ 0 + conds,  data = design.sels)
-        #cpm.bc = limma::removeBatchEffect(tmm, batch = bc, design = design.tokeep)
-        # plot(fpm.bc[,1], tmm[, 1]);abline(0, 1, lwd = 2.0, col = 'red')
-        make.pca.plots(fpm.bc, ntop = 1000, conds.plot = 'Mature')
-        
-        make.pca.plots(tmm, ntop = 1000, conds.plot = 'Mature')
-        
-        
-        fpm = fpm.bc
-        
-        rm(fpm.bc)
-        
-        saveRDS(fpm, file = paste0(RdataDir, '/fpm.bc_TMM_combat_MatureSamples_batch2020.2021.2021S_rmOldBatch.rds'))
-        saveRDS(design.sels, file = paste0(RdataDir, '/design_sels_bc_TMM_combat_MatureSamples_batch2020.2021.2021S_rmOldBatch.rds'))
-        
-      }
-      # regeneration time points and embryo stages
-      Batch.Correct.regeneration.embryoStage = FALSE
-      if(Batch.Correct.regeneration.embryoStage){
-        
-        sels = unique(c(setdiff(which(design$batch == '2020'), grep('Mature', design$condition)), 
-                        which(design$batch == '2021'), which(design$condition == 'BL_UA_9days')))
-        #sels = sels[which(design$batch[sels] != '2020')]
-        design.sels = design[sels, ]
-        design.sels$conds = droplevels(design.sels$conds)
-        
-        table(design.sels$conds, design.sels$batch)
-        
-        design.sels$batch[which(design.sels$batch == '2021S')] = '2021'
-        #design.sels$batch = droplevels(design.sels$batch)
-        table(design.sels$conds, design.sels$batch)
-        
-        ddx = dds[, sels]
-        ddx$conds = droplevels(ddx$conds)
-        ss = rowSums(counts(ddx))
-        # remove low count genes, otherwise combat returns error 
-        # 'Error in while (change > conv) { : missing value where TRUE/FALSE needed'
-        ddx = ddx[which(ss>5), ] 
-        ddx = estimateSizeFactors(ddx)
-        vsd <- varianceStabilizingTransformation(ddx, blind = TRUE)
-        tmm = assay(vsd)
-        
-        #d <- DGEList(counts=counts(ddx), group=design.sels$conds)
-        #tmm <- calcNormFactors(d, method='TMM')
-        #tmm = cpm(tmm, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 1)
-        
-        tmm.vars = apply(as.matrix(tmm), 1, var) # row with var = 0 pose problem for ComBat
-        tmm = tmm[which(tmm.vars>0 & !is.na(tmm.vars)), ]
-        
-        bc = as.factor(design.sels$batch)
-        mod = model.matrix(~ as.factor(conds), data = design.sels)
-        
-        # if specify ref.batch, the parameters will be estimated from the ref, inapprioate here, 
-        # because there is no better batche other others 
-        #ref.batch = '2021S'# 2021S as reference is better for some reasons (NOT USED here)    
-        fpm.bc = ComBat(dat=as.matrix(tmm), batch=bc, mod=mod, par.prior=TRUE, ref.batch = NULL) 
-        
-        #design.tokeep<-model.matrix(~ 0 + conds,  data = design.sels)
-        #cpm.bc = limma::removeBatchEffect(tmm, batch = bc, design = design.tokeep)
-        # plot(fpm.bc[,1], tmm[, 1]);abline(0, 1, lwd = 2.0, col = 'red')
-        make.pca.plots(fpm.bc, ntop = 1000, conds.plot = 'all')
-        
-        make.pca.plots(tmm, ntop = 1000, conds.plot = 'all')
-        
-        
-        fpm = fpm.bc
-        
-        rm(fpm.bc)
-        
-        saveRDS(fpm, file = paste0(RdataDir, '/fpm.bc_TMM_combat_mUA_regeneration_embryoStages.rds'))
-        saveRDS(design.sels, file = paste0(RdataDir, '/design_sels_bc_TMM_combat_mUA_regeneration_embryoStages.rds'))
-          
-      }
-      
-      
+    }else{
+      dds <- dds[ii, ]
+      ll.sels = ll[ss >= cutoff.peak]
     }
+    
+  }
+  
+  dds <- estimateSizeFactors(dds)
+  
+  plot(sizeFactors(dds), colSums(counts(dds))/median(colSums(counts(dds))), log = 'xy')
+  
+  plot(sizeFactors(dds), design$usable, log = 'xy')
+  text(sizeFactors(dds), design$usable, labels = design$samples, cex = 0.7)
+  
+  save.scalingFactors.for.deeptools = FALSE
+  if(save.scalingFactors.for.deeptools){
+    xx = data.frame(sampleID = design$SampleID,  
+                    scalingFactor = design$unique.rmdup/(sizeFactors(dds)*median(design$unique.rmdup)),
+                    stringsAsFactors = FALSE)
+    
+    write.table(xx, file = paste0(resDir, '/DESeq2_scalingFactor_forDeeptools.txt'), sep = '\t',
+                col.names = FALSE, row.names = FALSE, quote = FALSE)
+    
+    sfs = data.frame(sample = colnames(dds), sf = sizeFactors(dds)*median(colSums(counts(dds))), stringsAsFactors = FALSE)
+    
+    saveRDS(sfs, file = paste0(RdataDir, '/DESeq2_peaks.based_scalingFactors_forGenomicRanger.rds'))
+    
+  }
+}
+
+##########################################
+# test normalization and batch correction of ATAC-seq data
+# TMM and combat were selected for normalization and batch correction
+##########################################
+
+source('Functions_atac.R')
+library(edgeR)
+require("sva")
+require(limma)
+
+# Global.Normalization.BatchCorrect(design, dds)
+
+Split.Mature.Regeneration.samples = TRUE
+if(Split.Mature.Regeneration.samples){
+  ##########################################
+  # batch correct samples separately for mature samples and regeneration samples  
+  ##########################################
+  table(design$condition, design$batch)
+  
+  # start with mature samples
+  Batch.Correct.matureSamples = FALSE
+  if(Batch.Correct.matureSamples){
+    
+    sels = grep('Mature|HEAD', design$conds)
+    
+    #sels = setdiff(sels, which(design$SampleID == '74938'| design$SampleID == '74939'|design$SampleID == '74940'))
+    design.sels = design[sels, ]
+    
+    design.sels$conds = droplevels(design.sels$conds)
+    
+    design.sels$batch[grep('749', design.sels$SampleID)] = '2019'
+    
+    #design.sels$batch = droplevels(design.sels$batch)
+    table(design.sels$conds, design.sels$batch)
+    
+    ddx = dds[, sels]
+    ddx$conds = droplevels(ddx$conds)
+    ss = rowSums(counts(ddx))
+    # remove low count genes, otherwise combat returns error 
+    # 'Error in while (change > conv) { : missing value where TRUE/FALSE needed'
+    #ddx = ddx[which(ss>5), ] 
+    #ddx = estimateSizeFactors(ddx)
+    
+    #vsd <- varianceStabilizingTransformation(ddx, blind = TRUE)
+    
+    #tmm = assay(vsd)
+    
+    #tmm = log2(fpm(ddx) + )
+    tmm.vars = apply(as.matrix(tmm), 1, var) # row with var = 0 pose problem for ComBat
+    tmm = tmm[which(tmm.vars>0 & !is.na(tmm.vars)), ]
+    
+    
+    d <- DGEList(counts=counts(ddx), group=design.sels$conds)
+    tmm <- calcNormFactors(d, method='TMM')
+    tmm = cpm(tmm, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 1)
+    
+    bc = as.factor(design.sels$batch)
+    mod = model.matrix(~ as.factor(conds), data = design.sels)
+    
+    # if specify ref.batch, the parameters will be estimated from the ref, inapprioate here, 
+    # because there is no better batche other others 
+    #ref.batch = '2021S'# 2021S as reference is better for some reasons (NOT USED here)    
+    fpm.bc = ComBat(dat=as.matrix(tmm), batch=bc, mod=mod, par.prior=TRUE, ref.batch = NULL) 
+    
+    #design.tokeep<-model.matrix(~ 0 + conds,  data = design.sels)
+    #cpm.bc = limma::removeBatchEffect(tmm, batch = bc, design = design.tokeep)
+    # plot(fpm.bc[,1], tmm[, 1]);abline(0, 1, lwd = 2.0, col = 'red')
+    make.pca.plots(fpm.bc, ntop = 1000, conds.plot = 'Mature')
+    
+    make.pca.plots(tmm, ntop = 1000, conds.plot = 'Mature')
+    
+    fpm = fpm.bc
+    
+    rm(fpm.bc)
+    
+    saveRDS(fpm, file = paste0(RdataDir, '/fpm.bc_TMM_combat_MatureSamples_batch2020.2021.2021S_rmOldBatch.rds'))
+    saveRDS(design.sels, file = paste0(RdataDir, '/design_sels_bc_TMM_combat_MatureSamples_batch2020.2021.2021S_rmOldBatch.rds'))
+    
+  }
+  
+  # regeneration time points and embryo stages
+  Batch.Correct.regeneration.embryoStage = FALSE
+  if(Batch.Correct.regeneration.embryoStage){
+    
+    sels = unique(c(setdiff(which(design$batch == '2020'), grep('Mature', design$condition)), 
+                    which(design$batch == '2021'), which(design$condition == 'BL_UA_9days')))
+    #sels = sels[which(design$batch[sels] != '2020')]
+    design.sels = design[sels, ]
+    design.sels$conds = droplevels(design.sels$conds)
+    
+    table(design.sels$conds, design.sels$batch)
+    
+    design.sels$batch[which(design.sels$batch == '2021S')] = '2021'
+    #design.sels$batch = droplevels(design.sels$batch)
+    table(design.sels$conds, design.sels$batch)
+    
+    ddx = dds[, sels]
+    ddx$conds = droplevels(ddx$conds)
+    ss = rowSums(counts(ddx))
+    # remove low count genes, otherwise combat returns error 
+    # 'Error in while (change > conv) { : missing value where TRUE/FALSE needed'
+    ddx = ddx[which(ss>5), ] 
+    ddx = estimateSizeFactors(ddx)
+    vsd <- varianceStabilizingTransformation(ddx, blind = TRUE)
+    tmm = assay(vsd)
+    
+    #d <- DGEList(counts=counts(ddx), group=design.sels$conds)
+    #tmm <- calcNormFactors(d, method='TMM')
+    #tmm = cpm(tmm, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 1)
+    
+    tmm.vars = apply(as.matrix(tmm), 1, var) # row with var = 0 pose problem for ComBat
+    tmm = tmm[which(tmm.vars>0 & !is.na(tmm.vars)), ]
+    
+    bc = as.factor(design.sels$batch)
+    mod = model.matrix(~ as.factor(conds), data = design.sels)
+    
+    # if specify ref.batch, the parameters will be estimated from the ref, inapprioate here, 
+    # because there is no better batche other others 
+    #ref.batch = '2021S'# 2021S as reference is better for some reasons (NOT USED here)    
+    fpm.bc = ComBat(dat=as.matrix(tmm), batch=bc, mod=mod, par.prior=TRUE, ref.batch = NULL) 
+    
+    #design.tokeep<-model.matrix(~ 0 + conds,  data = design.sels)
+    #cpm.bc = limma::removeBatchEffect(tmm, batch = bc, design = design.tokeep)
+    # plot(fpm.bc[,1], tmm[, 1]);abline(0, 1, lwd = 2.0, col = 'red')
+    make.pca.plots(fpm.bc, ntop = 1000, conds.plot = 'all')
+    
+    make.pca.plots(tmm, ntop = 1000, conds.plot = 'all')
+    
+    
+    fpm = fpm.bc
+    
+    rm(fpm.bc)
+    
+    saveRDS(fpm, file = paste0(RdataDir, '/fpm.bc_TMM_combat_mUA_regeneration_embryoStages.rds'))
+    saveRDS(design.sels, file = paste0(RdataDir, '/design_sels_bc_TMM_combat_mUA_regeneration_embryoStages.rds'))
     
   }
   
