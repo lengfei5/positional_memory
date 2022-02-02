@@ -16,21 +16,24 @@ source(RNA.QC.functions)
 source('functions_chipSeq.R')
 source('Functions_atac.R')
 
-version.analysis = 'atac_rna_chipseq_analysis_20211007'
+
+version.analysis = 'Rxxxx_R10723_R11637_R12810_atac'
 #peakDir = "Peaks/macs2_broad"
-saveTable = TRUE
 
 resDir = paste0("../results/", version.analysis)
+
 RdataDir = paste0(resDir, '/Rdata')
 if(!dir.exists(resDir)) dir.create(resDir)
 if(!dir.exists(RdataDir)) dir.create(RdataDir)
 
+dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/'
+annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
+gtf.file =  paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf')
+
+
 figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
 tableDir = paste0(figureDir, 'tables4plots/')
 
-
-annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
-gtf.file =  paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf')
 
 require(ggplot2)
 require(DESeq2)
@@ -41,7 +44,7 @@ library(tictoc)
 ##########################################
 # some annotations for all analysis 
 ##########################################
-Import.HoxCluster.annotation = TRUE
+Import.HoxCluster.annotation = FALSE
 
 if(Import.HoxCluster.annotation){
   HoxA = data.frame(chr = 'chr2p', start = 873085043, end = 884416919, strand = '*', stringsAsFactors = FALSE)
@@ -60,11 +63,18 @@ if(Import.HoxCluster.annotation){
 # Here import design matrix and read counts of pooled peaks across conditions (pval < 10^-6)
 # in the future the IDR will be used to select the peaks across replicates and and then pool peaks
 ##########################################
-load(file = paste0("../results/R10723_Rxxxx_R11637_atacseq_R11876_CutTag/Rdata",
-                   '/samplesDesign_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical.Rdata'))
+#load(file = paste0("../results/R10723_Rxxxx_R11637_atacseq_R11876_CutTag/Rdata",
+#                   '/samplesDesign_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical.Rdata'))
+
+load(file = paste0(RdataDir, 
+                   '/samplesDesign_readCounts.within_manualConsensusPeaks.pval6_mergedTechnical_', 
+                   version.analysis, '.Rdata'))
+design$sampleID = design$SampleID
+design$usable = as.numeric(design$usable)
+design$usable[c(31:32)] = design$usable[c(31:32)]/10^6
 
 ##########################################
-# Quick check the sample infos and manually add batch information
+# Quick check the sample infos and manually add batch information if necessary
 ##########################################
 Manual.change.sample.infos = FALSE
 if(Manual.change.sample.infos){
@@ -86,16 +96,13 @@ if(Manual.change.sample.infos){
   
 }
 
-#hist(design$unique.rmdup/design$total, breaks = 16, main = 'pct of usable reads/total ')
-
-xx = design
-xx$unique.rmdup = as.numeric(xx$usable)
-
-#xx$unique.rmdup = xx$unique.rmdup
-ggplot(data = xx, aes(x = fileName, y = unique.rmdup, color= condition)) +   
+ggplot(data = design, aes(x = fileName, y = usable, color= condition)) +   
   geom_bar(aes(fill = batch), position = "dodge", stat="identity") +
-  theme(axis.text.x = element_text(angle = 90, size = 8)) + 
-  geom_hline(yintercept = c(20, 50, 100)) + ylab("unique.rmdup (M)")
+  theme(axis.text.x = element_text(angle = 90, size = 12)) + 
+  geom_hline(yintercept = c(20, 50, 100)) + ylab("usable reads (M)") + 
+  coord_flip()
+
+ggsave(paste0(resDir, "/Overview_all32samples_sequencedDepth_batches_",  version.analysis, ".pdf"), width = 10, height = 14)
 
 
 ########################################################
@@ -106,7 +113,7 @@ ggplot(data = xx, aes(x = fileName, y = unique.rmdup, color= condition)) +
 ########################################################
 Binary.peaks.QCs.analysis = FALSE
 if(Binary.peaks.QCs.analysis){
-  source('Functions.R')
+  source('Functions_atac.R')
   ATACseq.peaks.binary.analysis()
 
 }

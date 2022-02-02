@@ -692,6 +692,8 @@ load(file = paste0(RdataDir,
                    '/samplesDesign_readCounts.within_manualConsensusPeaks.pval6_mergedTechnical_', 
                    version.analysis, '.Rdata'))
 design$sampleID = design$SampleID
+design$usable = as.numeric(design$usable)
+design$usable[c(31:32)] = design$usable[c(31:32)]/10^6
 
 #design$batch = 'old'
 #design$batch[grep('1775', design$sampleID)] = '2022'
@@ -720,7 +722,7 @@ hist(design$pct.reads.in.peaks, main = 'distribution of pct of usable reads with
 
 ss = apply(as.matrix(counts[, -1]), 1, max)
 
-cutoff = 30
+cutoff = 50
 hist(log10(ss), breaks = 200)
 abline(v = log10(cutoff), col = 'red')
 kk = which(ss>cutoff)
@@ -737,9 +739,9 @@ rownames(counts) = counts$gene
 dds <- DESeqDataSetFromMatrix(as.matrix(counts[kk, -1]), DataFrame(design), design = ~ condition)
 
 ss = rowSums(counts(dds))
-length(which(ss > quantile(ss, probs = 0.6)))
+length(which(ss > quantile(ss, probs = 0.25)))
 
-dd0 = dds[ss > quantile(ss, probs = 0.6) , ]
+dd0 = dds[ss > quantile(ss, probs = 0.25) , ]
 dd0 = estimateSizeFactors(dd0)
 sizefactors.UQ = sizeFactors(dd0)
 
@@ -773,8 +775,6 @@ ggp = ggplot(data=pca2save, aes(PC1, PC2, label = name, color=condition, shape =
 plot(ggp)
 ggsave(paste0(resDir, "/PCA_allatacseq_new.old.merged_ntop3000_allSamples",  version.analysis, ".pdf"), width = 16, height = 10)
 
-design$usable = as.numeric(design$usable)
-design$usable[c(31:32)] = design$usable[c(31:32)]/10^6
 
 plot(sizeFactors(dds), design$usable, log = 'xy')
 text(sizeFactors(dds), design$usable, labels = design$fileName, cex = 0.7)
@@ -791,6 +791,7 @@ if(save.scalingFactors.for.deeptools){
   xx = data.frame(sampleID = design$sampleID,  
                   scalingFactor = as.numeric(design$usable)/(sizeFactors(dds)*median(as.numeric(design$usable))),
                   stringsAsFactors = FALSE)
+  
   # xx = xx[c(17:18), ]
   
   write.table(xx, file = paste0(dataDir, 'DESeq2_scalingFactor_forDeeptools.txt'), sep = '\t',
