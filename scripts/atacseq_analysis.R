@@ -493,8 +493,8 @@ if(make.test.All.Peaks){
     #DoubleCheck.promoter.peaks.enrichment(fpm) # double check those open promoters are not due to sample contamination
     
   }
-  
 }
+
 
 ########################################################
 ########################################################
