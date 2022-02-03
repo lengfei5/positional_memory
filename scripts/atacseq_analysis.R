@@ -620,16 +620,18 @@ if(grouping.position.dependent.peaks){
     res = xx
     saveRDS(res, file = paste0(RdataDir, '/res_position_dependant_test_', version.analysis, '_v10.rds'))
     
+    rm(xx)
+    
   }
   
   ##########################################
   # select all positional-dependent loci with below threshold
   ##########################################
-  res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v9.rds'))
+  res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_', version.analysis, '_v10.rds'))
   
   # select the positional peaks with pairwise comparisions 
   # limma logFC is in log2 scale
-  fdr.cutoff = 0.01; logfc.cutoff = 0.5
+  fdr.cutoff = 0.01; logfc.cutoff = 1
   jj = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & abs(res$logFC.mLA.vs.mUA) > logfc.cutoff) |
                (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & abs(res$logFC.mHand.vs.mUA) > logfc.cutoff)|
                (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & abs(res$logFC.mHand.vs.mLA) > logfc.cutoff)
@@ -643,21 +645,25 @@ if(grouping.position.dependent.peaks){
   
   xx = res[c(jj), ]
   #xx = xx[order(-xx$log2FC.mature), ]
-  xx[grep('HOXA13|SHOX', xx$transcriptId), ]
+  xx[grep('HOXA13|SHOX', xx$transcriptId), c(1:8)]
   fpm[which(rownames(fpm) == 'chr2p:873464923-873465440'), ]
   
-  # filter the peaks from head control sample
+  ### filter the peaks from head control sample
   Filtering.peaks.in.Head.samples = TRUE
   if(Filtering.peaks.in.Head.samples){
+    
     p0 = pp[match(rownames(xx), names(pp))]
     
     ctl = fpm[, grep('HEAD', colnames(fpm))]
-    ctl = ctl[which(ctl>4.5)]
-    p.ctl = pp[match(names(ctl), names(pp))]
+    ctl.mean = apply(ctl, 1, mean)
+    ctl.sels = ctl.mean[which(ctl.mean>3.0)]
+    
+    p.ctl = pp[match(names(ctl.sels), names(pp))]
     
     non.overlap = !overlapsAny(p0, p.ctl)
     
     xx = xx[non.overlap, ]
+    
   }
   
   dim(xx)
@@ -668,6 +674,9 @@ if(grouping.position.dependent.peaks){
   # sort positional peaks with logFC
   #xx = xx[order(-xx$logFC.mean), ]
   xx = xx[order(-xx$log2FC), ]
+  
+  saveRDS(xx, file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.rds'))
+  
   
   keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
   keep = as.matrix(keep)
@@ -694,6 +703,7 @@ if(grouping.position.dependent.peaks){
               quote = FALSE, row.names = TRUE)
     
   }
+  
   
   ##########################################
   ## select top peaks genome-wide

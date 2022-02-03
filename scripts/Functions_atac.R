@@ -1915,7 +1915,7 @@ spatial.peaks.test = function(cpm, c = c("Mature_UA", "Mature_UA", "Mature_LA", 
       for(n in 1:nrow(cpm))
       {
         # n = 1
-        if(n%%500 == 0) cat(n, '\n')
+        if(n%%1000 == 0) cat(n, '\n')
         y0 = as.numeric(cpm[n, c(ii1, ii2, ii3)])
         tt = c(rep(1, length(ii1)), rep(2, length(ii2)), rep(3, length(ii3)))
         fit0 = lm (y0 ~ poly(tt, degree = 2, raw = FALSE))
