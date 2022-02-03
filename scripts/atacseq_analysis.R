@@ -512,8 +512,11 @@ if(grouping.position.dependent.peaks){
   ##########################################
   # import batch corrected gene expression and design 
   ##########################################
-  fpm = readRDS(file = paste0(RdataDir, '/fpm.bc_TMM_combat_MatureSamples_batch2020.2021.2021S_rmOldBatch.rds'))
-  design = readRDS(file = paste0(RdataDir, '/design_sels_bc_TMM_combat_MatureSamples_batch2020.2021.2021S_rmOldBatch.rds'))
+  #fpm = readRDS(file = paste0(RdataDir, '/fpm.bc_TMM_combat_MatureSamples_batch2020.2021.2021S_rmOldBatch.rds'))
+  #design = readRDS(file = paste0(RdataDir, '/design_sels_bc_TMM_combat_MatureSamples_batch2020.2021.2021S_rmOldBatch.rds'))
+  fpm = readRDS(file = paste0(RdataDir, '/fpm.bc_TMM_combat_MatureSamples_batch2019.2020.2021.2021S.2022.rds'))
+  design = readRDS(file = paste0(RdataDir, '/design_sels_bc_TMM_combat_MatureSamples_batch2019.2020.2021.2021S.2022.rds'))
+  
   
   # prepare the background distribution
   fpm.bg = fpm[grep('bg_', rownames(fpm), invert = FALSE), ]
@@ -521,7 +524,7 @@ if(grouping.position.dependent.peaks){
   rownames(fpm) = gsub('_', '-', rownames(fpm))
   
   hist(fpm.bg, breaks = 100, main = 'background distribution')
-  abline(v = 1, col = 'red', lwd = 2.0)
+  abline(v = 3, col = 'red', lwd = 2.0)
   quantile(fpm.bg, c(0.95, 0.99))
   
   ##########################################
@@ -529,6 +532,7 @@ if(grouping.position.dependent.peaks){
   ##########################################
   Make.Granges.and.peakAnnotation = TRUE
   if(Make.Granges.and.peakAnnotation){
+    
     require(ChIPpeakAnno)
     require(ChIPseeker)
     
@@ -557,6 +561,7 @@ if(grouping.position.dependent.peaks){
     
   }
   
+  
   ##########################################
   # run spatial test for mature samples
   ##########################################
@@ -568,6 +573,7 @@ if(grouping.position.dependent.peaks){
     kk = which(design$conds == conds[n]) 
     sample.sels = c(sample.sels, kk)
     cc = c(cc, rep(conds[n], length(kk)))
+    
   }
   
   Run.test.spatial.peaks = FALSE
@@ -591,13 +597,18 @@ if(grouping.position.dependent.peaks){
     
     hist(fpm.bg)
     
-    # stringent here, with signal > 2.5 in >=3 samples 
-    nb.above.threshold = apply(as.matrix(cpm), 1, function(x) length(which(x> 4.5)))
-    hist(nb.above.threshold, breaks = c(-1:ncol(cpm)))
-    peak.sels = which(nb.above.threshold>=2)
-    cat(length(peak.sels), 'peaks after filtering for mature samples\n')
-    
-    cpm = cpm[peak.sels, ]
+    further.peak.signal.filtering = FALSE
+    if(further.peak.signal.filtering){
+      signal.threshold = 3.0
+      # stringent here, with signal > 2.5 in >=3 samples 
+      nb.above.threshold = apply(as.matrix(cpm), 1, function(x) length(which(x>signal.threshold )))
+      hist(nb.above.threshold, breaks = c(-1:ncol(cpm)))
+      peak.sels = which(nb.above.threshold>=2)
+      cat(length(peak.sels), 'peaks after filtering for mature samples\n')
+      
+      cpm = cpm[peak.sels, ]
+      
+    }
     
     tic() 
     res = spatial.peaks.test(cpm = cpm, c = cc, test.Dev.Reg = FALSE)
@@ -607,7 +618,7 @@ if(grouping.position.dependent.peaks){
     xx = data.frame(res, pp.annots[match(rownames(res), rownames(pp.annots)), ], stringsAsFactors = FALSE)
     
     res = xx
-    saveRDS(res, file = paste0(RdataDir, '/res_position_dependant_test_v9.rds'))
+    saveRDS(res, file = paste0(RdataDir, '/res_position_dependant_test_', version.analysis, '_v10.rds'))
     
   }
   
