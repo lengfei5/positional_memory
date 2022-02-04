@@ -132,6 +132,17 @@ design$usable[c(31:32)] = design$usable[c(31:32)]/10^6
 
 saveRDS(design, file = paste0('../data/design_sampleInfos_32atacSamplesUsed.rds'))
 
+
+require(ChIPpeakAnno)
+require(ChIPseeker)
+
+pp = data.frame(t(sapply(counts$gene, function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
+pp$strand = '*'
+
+pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                              start.field="X2", end.field="X3", strand.field="strand")
+
+
 ##########################################
 # Select peak consensus across mature, regeneration and embryo 
 # and choose the background 

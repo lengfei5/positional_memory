@@ -183,9 +183,9 @@ if(Manually.identify.peak.consensus){
   
   names(peaks) = design$fileName
   
-  saveRDS(peaks, file = paste0(RdataDir, '/macs2_peaks_mergedTechnialReps_34samples_pval.', pval.cutoff, '.rds'))
+  saveRDS(peaks, file = paste0(RdataDir, '/macs2_peaks_mergedTechnialReps_32samples_pval.', pval.cutoff, '.rds'))
   
-  peaks = readRDS(file = paste0(RdataDir, '/macs2_peaks_mergedTechnialReps_30samples_pval.', pval.cutoff, '.rds'))
+  peaks = readRDS(file = paste0(RdataDir, '/macs2_peaks_mergedTechnialReps_32samples_pval.', pval.cutoff, '.rds'))
   
     
   ##########################################
@@ -415,7 +415,6 @@ if(Manually.identify.peak.consensus){
       height = 10, width = 10)
   try(plot(v)); dev.off()
   
-  
   kk = c(24, 25, 32)
   ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll")
   v <- venn_cnt2venn(ol.peaks$vennCounts)
@@ -429,12 +428,14 @@ if(Manually.identify.peak.consensus){
   
   # for the moment, mLA peak consensus are peaks covered by > 2 out of three replicates
   kk = which(design$condition == 'Mature_LA')
+  
   la1 = intersect(peaks[[32]], peaks[[24]])
   la2 = intersect(peaks[[25]], peaks[[24]])
   la3 = intersect(peaks[[32]], peaks[[25]])
+  lax =  union(intersect(peaks[[23]], peaks[[24]]),  intersect(peaks[[23]], peaks[[25]]))
+  lax = union(lax,  intersect(peaks[[23]], peaks[[32]]))
+  la = union(union(union(la1, la2), la3), lax)
   
-  la = union(union(la1, la2), la3)
-  lax = intersect(la, peaks[[23]])
   la = reduce(lax)
   
   # for the moment, mHand peak consensus are peaks covered by > 2 out of three replicates
@@ -448,11 +449,11 @@ if(Manually.identify.peak.consensus){
   try(plot(v)); dev.off()
   
   hd1 = intersect(peaks[[20]], peaks[[21]])
-  hd2 = intersect(peaks[[22]], peaks[[21]])
-  hd3 = intersect(peaks[[20]], peaks[[22]])
+  hd2 = intersect(peaks[[22]], hd1)
+  #hd3 = intersect(peaks[[20]], peaks[[22]])
   
-  hd = union(union(hd1, hd2), hd3)
-  hd = reduce(hd)
+  #hd = union(union(hd1, hd2), hd3)
+  hd = reduce(hd2)
   
   # for the moment head control only one sample
   kk = which(design$condition == 'HEAD')
