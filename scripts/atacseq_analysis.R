@@ -648,26 +648,6 @@ if(grouping.position.dependent.peaks){
   xx[grep('HOXA13|SHOX', xx$transcriptId), c(1:8)]
   fpm[which(rownames(fpm) == 'chr2p:873464923-873465440'), ]
   
-  ### filter the peaks from head control sample
-  Filtering.peaks.in.Head.samples = TRUE
-  if(Filtering.peaks.in.Head.samples){
-    
-    p0 = pp[match(rownames(xx), names(pp))]
-    
-    ctl = fpm[, grep('HEAD', colnames(fpm))]
-    ctl.mean = apply(ctl, 1, mean)
-    ctl.sels = ctl.mean[which(ctl.mean>3.0)]
-    
-    p.ctl = pp[match(names(ctl.sels), names(pp))]
-    
-    non.overlap = !overlapsAny(p0, p.ctl)
-    
-    xx = xx[non.overlap, ]
-    
-  }
-  
-  dim(xx)
-  
   xx[grep('HOXA13|SHOX|MEIS', xx$transcriptId), ]
   
   cat(nrow(xx), ' peaks left\n')
@@ -675,92 +655,84 @@ if(grouping.position.dependent.peaks){
   #xx = xx[order(-xx$logFC.mean), ]
   xx = xx[order(-xx$log2FC), ]
   
-  saveRDS(xx, file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.rds'))
+  ########
+  ## asscociate the signifiant postional peaks with expression matrix
+  ########
+  conds = c("Mature_UA", "Mature_LA", "Mature_Hand", 'HEAD')
   
+  sample.sels = c();  cc = c()
+  for(n in 1:length(conds)) {
+    kk = which(design$conds == conds[n]) 
+    sample.sels = c(sample.sels, kk)
+    cc = c(cc, rep(conds[n], length(kk)))
+  }
   
-  keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
+  keep = fpm[(match(rownames(xx), rownames(fpm))), sample.sels]
   keep = as.matrix(keep)
   
+  ### filter the peaks from head control sample
+  ## either filter soly based on the head signals or based on the logFC between max(mature samples/control) or both
+  Filtering.peaks.in.Head.samples = TRUE
+  if(Filtering.peaks.in.Head.samples){
+    maxs = apply(keep[, grep('Mature_', colnames(keep))], 1, function(x) return(max(c(mean(x[1:5]), mean(x[6:9]), mean(x[10:12])))))
+    
+    ctl.mean = apply(keep[, grep('HEAD', colnames(keep))], 1, mean)
+    
+    rr = maxs - ctl.mean
+    #p.ctl = pp[match(names(ctl.sels), names(pp))]
+    #non.overlap = !overlapsAny(p0, p.ctl)
+    plot(maxs, ctl.mean, cex = 0.2);
+    abline(0, 1, lwd = 2.0, col = 'red')
+    abline(v = 3, lwd = 2.0, col = 'red')
+    abline(h = 3, lwd = 2.0, col = 'red')
+    
+    #xx = xx[non.overlap, ]
+    plot(rr, ctl.mean, cex = 0.2);
+    abline(h = 3, col = 'red', lwd = 2.0)
+    abline(v = c(0.5, 1), col = 'red', lwd = 2.0)
+    
+    sels = which(rr>1 & ctl.mean<3 & maxs > 3)
+    cat(length(sels), 'peaks selected \n')
+    
+    xx = xx[sels, ]
+    keep = keep[sels, ]
+    
+  }
+  
+  dim(xx)
+  
+  save(xx, keep, file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata'))
+  
+  ##########################################
+  # heatmap displaying the postional peaks 
+  #########################################
   library(ggplot2)
   df <- data.frame(cc)
   rownames(df) = colnames(keep)
   colnames(df) = 'segments'
-  ii.gaps = c(4, 6)
+  ii.gaps = c(5, 9, 12)
   
-  annot_colors = c('springgreen4', 'steelblue2', 'gold2')
-  names(annot_colors) = c('Mature_UA', 'Mature_LA', 'Mature_Hand')
+  annot_colors = c('springgreen4', 'steelblue2', 'gold2', 'darkgray')
+  names(annot_colors) = c('Mature_UA', 'Mature_LA', 'Mature_Hand', 'HEAD')
   annot_colors = list(segments = annot_colors)
   
   pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
            cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps, 
            annotation_colors = annot_colors, 
-           filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC0.5_rmPeaks.head.pdf'), 
-           width = 8, height = 10)
+           filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
+           width = 6, height = 8)
   
   if(saveTable){
     yy = data.frame(keep, xx, stringsAsFactors = FALSE)
-    write.csv(yy, file = paste0(resDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head.csv'), 
+    write.csv(yy, file = paste0(tableDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head.csv'), 
               quote = FALSE, row.names = TRUE)
     
   }
   
-  
   ##########################################
-  ## select top peaks genome-wide
+  # select top peaks or top promoter peaks
   ##########################################
-  Select.top.peaks = FALSE
-  if(Select.top.peaks){
-    #res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v2.rds'))
-    #jj = which(res$prob.M0.mature < 0.01 & res$log2FC.mature > 3 & res$min.mature <1)
-    #xx = res[jj, ]
-    #xx = xx[order(-xx$log2FC.mature), ]
-    #xx = data.frame(xx, pp.annots[match(rownames(xx), rownames(pp.annots)), ], stringsAsFactors = FALSE)
-    xx = xx[order(-xx$logFC.mean), ]
-    
-    yy = xx
-    yy[grep('HOXA13', yy$geneId), ]
-    
-    # res2 here is residues in the fitting for each condition, UA, LA and Hand
-    yy = yy[which(yy$max > 5 & yy$min < 4 & yy$res2.max< 0.1), ]
-    #yy = yy[which(yy$max > 3 & yy$min < 1), ]
-    
-    yy = yy[order(yy$logFC.mean), ]
-    
-    keep = fpm[!is.na(match(rownames(fpm), rownames(yy))), sample.sels]
-    gg = res$geneId[match(rownames(keep), rownames(res))]
-    grep('HOXA13', gg)
-    
-    rownames(keep) = paste0(rownames(keep), '_', gg)
-    #rownames(keep) = gg
-    keep = as.matrix(keep)
-    
-    gg = rownames(keep)
-    gg = sapply(gg, function(x) unlist(strsplit(as.character(x), '_'))[2])
-    gg = sapply(gg, function(x) unlist(strsplit(as.character(x), '[|]'))[1])
-    #keep = keep[1:50, ]
-    #rownames(keep) = gg
-    #kk = grep('Mature', cc)
-    #df <- data.frame(condition = cc[kk])
-    #keep = keep[,kk]
-    #rownames(df) = colnames(keep)
-    ii.gaps = c(4, 6)
-    
-    pheatmap(keep, cluster_rows=TRUE, show_rownames=TRUE, scale = 'row', show_colnames = FALSE,
-             cluster_cols=FALSE, annotation_col = df, fontsize_row = 8, gaps_col = ii.gaps,
-             filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_top300_genomewide.pdf'), 
-             width = 16, height = 40)
-    
-    if(saveTable){
-      write.csv(data.frame(keep, yy, stringsAsFactors = FALSE), 
-                file = paste0(resDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_top300_genomewide.csv'), 
-                quote = FALSE, row.names = TRUE)
-      
-    }
-  }
-  
-  ##########################################
-  # select top promoter peaks
-  ##########################################
+  load(file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata'))
   yy = xx
   
   yy = yy[grep('Promoter', yy$annotation), ] # peak close to promoters
@@ -768,10 +740,11 @@ if(grouping.position.dependent.peaks){
   #yy = xx
   #yy = yy[c(1:50), ]
   #yy = yy[which(yy$logFC.mean>1.5), ]
-  yy = yy[which(yy$max > 5), ] # max residual square < 0.1
-  
-  keep = fpm[!is.na(match(rownames(fpm), rownames(yy))), sample.sels]
-  gg = res$geneId[match(rownames(keep), rownames(res))]
+  # yy = yy[which(yy$max > 4 ), ] # max residual square < 0.1
+  keep = keep[match(rownames(yy), rownames(keep)), ]
+    
+  #keep = fpm[!is.na(match(rownames(fpm), rownames(yy))), sample.sels]
+  gg = yy$geneId
   grep('HOXA13', gg)
   rownames(keep) = paste0(rownames(keep), '_', gg)
   #rownames(keep) = gg
@@ -793,18 +766,17 @@ if(grouping.position.dependent.peaks){
   gg = sapply(gg, function(x) unlist(strsplit(as.character(x), '_'))[2])
   gg = sapply(gg, function(x) unlist(strsplit(as.character(x), '[|]'))[1])
   #keep = keep[1:50, ]
-  #rownames(keep) = gg
+  rownames(keep) = gg
   #kk = grep('Mature', cc)
   #df <- data.frame(condition = cc[kk])
   #keep = keep[,kk]
   #rownames(df) = colnames(keep)
-  ii.gaps = c(4, 6)
+  #ii.gaps = c(4, 6)
   pheatmap(keep, cluster_rows=TRUE, show_rownames=TRUE, scale = 'row', show_colnames = FALSE,
-           cluster_cols=FALSE, annotation_col = df, fontsize_row = 14, gaps_col = ii.gaps,
-           annotation_colors = annot_colors,
-           filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC0.5_top.promoters.pdf'), 
-           width = 18, height = 10)
-  
+           cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps, 
+           annotation_colors = annot_colors, 
+           filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_top.promoters.pdf'), 
+           width = 8, height = 6)
   
   if(saveTable){
     write.csv(data.frame(keep, yy, stringsAsFactors = FALSE), 

@@ -577,69 +577,88 @@ run.MARA.atac.spatial = function(keep, cc)
   # prepare Y response matrix
   Prepare.Response.Matrix = FALSE
   if(Prepare.Response.Matrix){
-    #load(file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical_v1.Rdata'))
-    #fpm = readRDS(file = paste0(RdataDir, '/fpm_TMM_combat.rds'))
-    #res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v6.rds'))
-    fpm = readRDS(file = paste0(RdataDir, '/fpm.bc_TMM_combat_MatureSamples_batch2020.2021.2021S_rmOldBatch.rds'))
-    design = readRDS(file = paste0(RdataDir, '/design_sels_bc_TMM_combat_MatureSamples_batch2020.2021.2021S_rmOldBatch.rds'))
-    res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_v9.rds'))
+    res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_', version.analysis, '_v10.rds'))
     
-    # prepare the background distribution
-    fpm.bg = fpm[grep('bg_', rownames(fpm), invert = FALSE), ]
-    fpm = fpm[grep('bg_', rownames(fpm), invert = TRUE), ]
-    rownames(fpm) = gsub('_', '-', rownames(fpm))
-    
-    conds = c("Mature_UA", "Mature_LA", "Mature_Hand", 'HEAD')
-    sample.sels = c();  cc = c()
-    for(n in 1:length(conds)) {
-      kk = which(design$conds == conds[n])
-      #kk = which(design$conds == conds[n]) 
-      sample.sels = c(sample.sels, kk)
-      cc = c(cc, rep(conds[n], length(kk)))
-    }
-    
-    
-    # select the positional peaks with 
-    fdr.cutoff = 0.01; logfc.cutoff = 0.5
+    # select the positional peaks with pairwise comparisions 
+    # limma logFC is in log2 scale
+    fdr.cutoff = 0.01; logfc.cutoff = 1
     jj = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & abs(res$logFC.mLA.vs.mUA) > logfc.cutoff) |
                  (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & abs(res$logFC.mHand.vs.mUA) > logfc.cutoff)|
                  (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & abs(res$logFC.mHand.vs.mLA) > logfc.cutoff)
     )
     cat(length(jj), '\n')
     
-    jj1 = which(res$prob.M0<0.01 & res$log2FC>1)
-    jj2 = which(res$pval.lrt < 0.001 & res$log2FC > 1)
-    
-    #jj = which(res$prob.M0 <  0.01 & res$log2FC > 2.5)
-    cat(length(jj), ' peaks selected \n')
+    jj1 = which(res$prob.M0<0.01 & res$log2FC>logfc.cutoff)
+    cat(length(jj1), '\n')
+    jj2 = which(res$pval.lrt < 0.001 & res$log2FC > logfc.cutoff)
+    cat(length(jj2), '\n')
     
     xx = res[c(jj), ]
-    xx = xx[order(-xx$log2FC), ]
+    #xx = xx[order(-xx$log2FC.mature), ]
+    xx[grep('HOXA13|SHOX', xx$transcriptId), c(1:8)]
+    fpm[which(rownames(fpm) == 'chr2p:873464923-873465440'), ]
     
-    xx[grep('HOXA13', xx$transcriptId), ]
+    xx[grep('HOXA13|SHOX|MEIS', xx$transcriptId), ]
     
-    # filter the peaks from head control sample
-    Filtering.peaks.in.Head.samples = FALSE
-    if(Filtering.peaks.in.Head.samples){
-      p0 = pp[match(rownames(xx), names(pp))]
-      
-      ctl = fpm[, grep('HEAD', colnames(fpm))]
-      ctl = ctl[which(ctl>2.5)]
-      p.ctl = pp[match(names(ctl), names(pp))]
-      
-      non.overlap = !overlapsAny(p0, p.ctl)
-      
-      xx = xx[non.overlap, ]
-      
-      xx[grep('HOXA13', xx$transcriptId), ]
-    }
-    
+    cat(nrow(xx), ' peaks left\n')
     # sort positional peaks with logFC
     #xx = xx[order(-xx$logFC.mean), ]
     xx = xx[order(-xx$log2FC), ]
     
-    keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
+    ########
+    ## asscociate the signifiant postional peaks with expression matrix
+    ########
+    conds = c("Mature_UA", "Mature_LA", "Mature_Hand", 'HEAD')
+    
+    sample.sels = c();  cc = c()
+    for(n in 1:length(conds)) {
+      kk = which(design$conds == conds[n]) 
+      sample.sels = c(sample.sels, kk)
+      cc = c(cc, rep(conds[n], length(kk)))
+    }
+    
+    keep = fpm[(match(rownames(xx), rownames(fpm))), sample.sels]
     keep = as.matrix(keep)
+    
+    ### filter the peaks from head control sample
+    ## either filter soly based on the head signals or based on the logFC between max(mature samples/control) or both
+    Filtering.peaks.in.Head.samples = FALSE
+    if(Filtering.peaks.in.Head.samples){
+      maxs = apply(keep[, grep('Mature_', colnames(keep))], 1, function(x) return(max(c(mean(x[1:5]), mean(x[6:9]), mean(x[10:12])))))
+      
+      ctl.mean = apply(keep[, grep('HEAD', colnames(keep))], 1, mean)
+      
+      rr = maxs - ctl.mean
+      #p.ctl = pp[match(names(ctl.sels), names(pp))]
+      #non.overlap = !overlapsAny(p0, p.ctl)
+      plot(maxs, ctl.mean, cex = 0.2);
+      abline(0, 1, lwd = 2.0, col = 'red')
+      abline(v = 3, lwd = 2.0, col = 'red')
+      abline(h = 3, lwd = 2.0, col = 'red')
+      
+      #xx = xx[non.overlap, ]
+      plot(rr, ctl.mean, cex = 0.2);
+      abline(h = 3, col = 'red', lwd = 2.0)
+      abline(v = c(0.5, 1), col = 'red', lwd = 2.0)
+      
+      sels = which(rr>1 & ctl.mean<3 & maxs > 3)
+      cat(length(sels), 'peaks selected \n')
+      
+      xx = xx[sels, ]
+      keep = keep[sels, ]
+      
+    }
+    
+    #load(file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata'))
+    #conds = c("Mature_UA", "Mature_LA", "Mature_Hand", 'HEAD')
+    
+    sample.sels = c();  cc = c()
+    for(n in 1:length(conds)) {
+      kk = which(design$conds == conds[n]) 
+      sample.sels = c(sample.sels, kk)
+      cc = c(cc, rep(conds[n], length(kk)))
+    }
+    
     
     cc.uniq = unique(cc)
     Y = matrix(NA, ncol = length(cc.uniq), nrow = nrow(keep))
@@ -701,7 +720,7 @@ run.MARA.atac.spatial = function(keep, cc)
     sort(r$combined.Zscore, decreasing=TRUE)[1:20]
     sort(r$max.Zscore, decreasing=TRUE)[1:20]
     
-    sort(r$max.Zscore, decreasing=TRUE)[1:30]
+    sort(r$max.Zscore, decreasing=TRUE)[1:50]
     
     r$max.Zscore[grep('MEIS|RAR|RXR|SOX9', names(r$max.Zscore))]
     
@@ -806,9 +825,9 @@ run.MARA.atac.spatial = function(keep, cc)
   Run.glmnet = FALSE
   if(Run.glmnet){
     ### specify glment parameters
-    alpha = 0.1
-    standardize = FALSE;
-    use.lambda.min = FALSE;
+    alpha = 1
+    standardize = TRUE;
+    use.lambda.min  = FALSE
     binarize.x = FALSE
     standardize.response=FALSE
     intercept=TRUE
@@ -820,7 +839,7 @@ run.MARA.atac.spatial = function(keep, cc)
     
     #x = t(scale(t(X), center = TRUE, scale = TRUE));
     x = X
-    y = scale(Y[, c(1:3)], center = TRUE, scale = FALSE)
+    y = scale(Y[, c(1:4)], center = TRUE, scale = FALSE)
     if(binarize.x) x = x > 0
     #sels = c(1:5000)
     #x = x[sels, ]
@@ -841,7 +860,7 @@ run.MARA.atac.spatial = function(keep, cc)
       s.optimal = cv.fit$lambda.1se
     }
     
-    fit=glmnet(x,y,alpha=alpha, lambda=s.optimal, family=family, 
+    fit=glmnet(x,y,alpha=alpha, lambda=cv.fit$lambda, family=family, 
                standardize=standardize, standardize.response=standardize.response, intercept=intercept, 
                relax = FALSE)
     

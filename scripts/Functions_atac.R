@@ -2784,6 +2784,7 @@ Identify.LA.Hand.specific.genes.from.atacseq = function(xx)
 
 
 
+
 ########################################################
 ########################################################
 # Section : some handy utility functions
@@ -2906,4 +2907,52 @@ extract.stat.for.samples.manual = function()
   save(stats, file = paste0(RdataDir, '/R11637_atacseq_samples_design_stats.Rdata'))
   
 }
+
+select.plot.top.positional.peaks = function()
+{
+  ##########################################
+  ## select top peaks genome-wide
+  ##########################################
+  Select.top.peaks = FALSE
+  if(Select.top.peaks){
+    load(file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata'))
+    xx = xx[order(-xx$logFC.mean), ]
+    
+    yy = xx
+    yy[grep('HOXA13', yy$geneId), ]
+    
+    # res2 here is residues in the fitting for each condition, UA, LA and Hand
+    yy = yy[which(yy$max > 4 & yy$min < 3 & yy$res2.max< 1.0), ]
+    
+    #yy = yy[which(yy$max > 3 & yy$min < 1), ]
+    
+    yy = yy[order(yy$logFC.mean), ]
+    
+    keep = fpm[!is.na(match(rownames(fpm), rownames(yy))), sample.sels]
+    gg = res$geneId[match(rownames(keep), rownames(res))]
+    grep('HOXA13', gg)
+    
+    rownames(keep) = paste0(rownames(keep), '_', gg)
+    #rownames(keep) = gg
+    keep = as.matrix(keep)
+    
+    gg = rownames(keep)
+    gg = sapply(gg, function(x) unlist(strsplit(as.character(x), '_'))[2])
+    gg = sapply(gg, function(x) unlist(strsplit(as.character(x), '[|]'))[1])
+    
+    pheatmap(keep, cluster_rows=TRUE, show_rownames=TRUE, scale = 'row', show_colnames = FALSE,
+             cluster_cols=FALSE, annotation_col = df, fontsize_row = 8, gaps_col = ii.gaps,
+             filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_top300_genomewide.pdf'), 
+             width = 16, height = 40)
+    
+    if(saveTable){
+      write.csv(data.frame(keep, yy, stringsAsFactors = FALSE), 
+                file = paste0(resDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_top300_genomewide.csv'), 
+                quote = FALSE, row.names = TRUE)
+      
+    }
+  }
+  
+}
+
 
