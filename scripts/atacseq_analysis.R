@@ -362,7 +362,7 @@ if(Split.Mature.Regeneration.samples){
     #design.tokeep<-model.matrix(~ 0 + conds,  data = design.sels)
     #cpm.bc = limma::removeBatchEffect(tmm, batch = bc, design = design.tokeep)
     # plot(fpm.bc[,1], tmm[, 1]);abline(0, 1, lwd = 2.0, col = 'red')
-   
+    
     make.pca.plots(tmm, ntop = 1000, conds.plot = 'all')
     ggsave(paste0(resDir, "/regeneration_embryo_Samples_batchCorrect_before_",  version.analysis, ".pdf"), width = 16, height = 14)
     
@@ -376,6 +376,7 @@ if(Split.Mature.Regeneration.samples){
     saveRDS(fpm, file = paste0(RdataDir, '/fpm.bc_TMM_combat_mUA_regeneration_embryoStages', version.analysis, '.rds'))
     saveRDS(design.sels, file = paste0(RdataDir, '/design_sels_bc_TMM_combat_mUA_regeneration_embryoStages', version.analysis, 
                                        '.rds'))
+    
   }
   
 }
@@ -577,19 +578,19 @@ if(grouping.position.dependent.peaks){
   ##########################################
   # run spatial test for mature samples
   ##########################################
-  conds = c("Mature_UA", "Mature_LA", "Mature_Hand")
-  
-  sample.sels = c();  cc = c()
-  for(n in 1:length(conds)) {
-    #kk = which(design$conds == conds[n] & design$SampleID != '136159')
-    kk = which(design$conds == conds[n]) 
-    sample.sels = c(sample.sels, kk)
-    cc = c(cc, rep(conds[n], length(kk)))
-    
-  }
-  
   Run.test.spatial.peaks = FALSE
   if(Run.test.spatial.peaks){
+    conds = c("Mature_UA", "Mature_LA", "Mature_Hand")
+    
+    sample.sels = c();  cc = c()
+    for(n in 1:length(conds)) {
+      #kk = which(design$conds == conds[n] & design$SampleID != '136159')
+      kk = which(design$conds == conds[n]) 
+      sample.sels = c(sample.sels, kk)
+      cc = c(cc, rep(conds[n], length(kk)))
+      
+    }
+    
     # examples to test
     #test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
     #test.examples = c('Hoxa13')
@@ -630,7 +631,7 @@ if(grouping.position.dependent.peaks){
     xx = data.frame(res, pp.annots[match(rownames(res), rownames(pp.annots)), ], stringsAsFactors = FALSE)
     
     res = xx
-    saveRDS(res, file = paste0(RdataDir, '/res_position_dependant_test_', version.analysis, '_v10.rds'))
+    saveRDS(res, file = paste0(RdataDir, '/res_position_dependant_test_', version.analysis, '_v11.rds'))
     
     rm(xx)
     
@@ -639,7 +640,7 @@ if(grouping.position.dependent.peaks){
   ##########################################
   # select all positional-dependent loci with below threshold
   ##########################################
-  res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_', version.analysis, '_v10.rds'))
+  res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_', version.analysis, '_v11.rds'))
   
   # select the positional peaks with pairwise comparisions 
   # limma logFC is in log2 scale
@@ -666,6 +667,7 @@ if(grouping.position.dependent.peaks){
   # sort positional peaks with logFC
   #xx = xx[order(-xx$logFC.mean), ]
   xx = xx[order(-xx$log2FC), ]
+  
   
   ########
   ## asscociate the signifiant postional peaks with expression matrix
@@ -706,6 +708,11 @@ if(grouping.position.dependent.peaks){
     sels = which(rr>1 & ctl.mean<3 & maxs > 3)
     cat(length(sels), 'peaks selected \n')
     
+    sels = which(rr >1 & maxs > 3.)
+    cat(length(sels), 'peaks selected \n')
+    
+    #nonsels = which(rr<=1 | maxs <=2)
+    
     xx = xx[sels, ]
     keep = keep[sels, ]
     
@@ -714,6 +721,34 @@ if(grouping.position.dependent.peaks){
   dim(xx)
   
   save(xx, keep, file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata'))
+  
+  ##########################################
+  # quick clustering of postional peaks 
+  ##########################################
+  yy = data.frame(apply(as.matrix(keep[,grep(conds[1], colnames(keep))]), 1, mean), 
+                  apply(as.matrix(keep[,grep(conds[2], colnames(keep))]), 1, mean),
+                  apply(as.matrix(keep[,grep(conds[3], colnames(keep))]), 1, mean)
+                  )
+  colnames(yy) = conds[c(1:3)]  
+  
+  yy = t(scale(t(yy)))
+  colnames(yy) = conds[c(1:3)]  
+  
+  d <- dist(yy, method = "euclidean") # distance matrix
+  fit <- hclust(d, method="complete")
+  plot(fit) # display dendogram
+  groups <- cutree(fit, k=5) # cut tree into 5 clusters
+  # draw dendogram with red borders around the 5 clusters
+  rect.hclust(fit, k=4, border="red") 
+  
+  #hc <- out$tree_row
+  #lbl <- cutree(hc, 3)
+  
+  pheatmap(yy, cluster_rows=TRUE, kmeans_k = NA, cutree_rows = 5, 
+           show_rownames=FALSE, scale = 'none', show_colnames = FALSE,
+           clustering_method = 'ward.D2',
+           cluster_cols=FALSE)
+           
   
   ##########################################
   # heatmap displaying the postional peaks 
@@ -733,6 +768,7 @@ if(grouping.position.dependent.peaks){
            annotation_colors = annot_colors, 
            filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
            width = 6, height = 8)
+  
   
   if(saveTable){
     yy = data.frame(keep, xx, stringsAsFactors = FALSE)

@@ -174,7 +174,6 @@ annot_colors = c('springgreen4', 'steelblue2', 'gold2', 'darkgray')
 names(annot_colors) = c('Mature_UA', 'Mature_LA', 'Mature_Hand', 'HEAD')
 annot_colors = list(segments = annot_colors)
 
-
 out = pheatmap(keep, cluster_rows=TRUE, kmeans_k = NA, cutree_rows = 3,
                show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
          cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps, 
