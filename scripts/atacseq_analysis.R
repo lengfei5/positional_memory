@@ -726,6 +726,9 @@ if(grouping.position.dependent.peaks){
   ##########################################
   # quick clustering of postional peaks 
   ##########################################
+  library(dendextend)
+  library(ggplot2)
+  
   load(file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata'))
   yy = data.frame(apply(as.matrix(keep[,grep(conds[1], colnames(keep))]), 1, mean), 
                   apply(as.matrix(keep[,grep(conds[2], colnames(keep))]), 1, mean),
@@ -733,24 +736,42 @@ if(grouping.position.dependent.peaks){
                   )
   colnames(yy) = conds[c(1:3)]  
   
-  yy = t(scale(t(yy)))
-  colnames(yy) = conds[c(1:3)]  
+  cal_z_score <- function(x){
+    (x - mean(x)) / sd(x)
+  }
   
-  d <- dist(yy, method = "euclidean") # distance matrix
-  fit <- hclust(d, method="complete")
-  plot(fit) # display dendogram
-  groups <- cutree(fit, k=5) # cut tree into 5 clusters
-  # draw dendogram with red borders around the 5 clusters
-  rect.hclust(fit, k=4, border="red") 
+  yy <- t(apply(yy, 1, cal_z_score))
+  
+  my_hclust_gene <- hclust(dist(yy), method = "complete")
+ 
+  my_gene_col <- cutree(tree = as.dendrogram(my_hclust_gene), k = 4)
+  my_gene_col <- data.frame(cluster = my_gene_col)
+  
+  df <- data.frame(conds)
+  rownames(df) = conds
+  colnames(df) = 'segments'
+  
+  yy1 = data.frame(apply(as.matrix(keep[,grep(conds[1], colnames(keep))]), 1, mean), 
+                       apply(as.matrix(keep[,grep(conds[2], colnames(keep))]), 1, mean),
+                       apply(as.matrix(keep[,grep(conds[3], colnames(keep))]), 1, mean),
+                   apply(as.matrix(keep[,grep(conds[4], colnames(keep))]), 1, mean)
+  )
+  colnames(yy1) = conds
+  yy1 <- t(apply(yy1, 1, cal_z_score))
+  
+  annot_colors = c('springgreen4', 'steelblue2', 'gold2')
+  names(annot_colors) = c('Mature_UA', 'Mature_LA', 'Mature_Hand')
+  annot_colors = list(segments = annot_colors)
+  
+  pheatmap(yy, annotation_row = my_gene_col, annotation_col = df, show_rownames = FALSE, scale = 'none', 
+           show_colnames = FALSE,
+           cluster_rows = TRUE, cluster_cols = FALSE,  clustering_method = 'complete',
+           annotation_colors = annot_colors, cutree_rows = 4, 
+           filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
+           width = 8, height = 10)
   
   #hc <- out$tree_row
   #lbl <- cutree(hc, 3)
-  
-  pheatmap(yy, cluster_rows=TRUE, kmeans_k = NA, cutree_rows = 4, 
-           color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(20),
-           show_rownames=FALSE, scale = 'row', show_colnames = FALSE, gaps_row = 'green',
-           clustering_method = 'complete',
-           cluster_cols=FALSE)
   
            
   ##########################################

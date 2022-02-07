@@ -151,39 +151,48 @@ dev.off()
 ##########################################
 # Fig 1D: heatmap of positional peaks 
 ##########################################
+library(dendextend)
 library(ggplot2)
 
 load(file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata'))
-design = readRDS(file = paste0(RdataDir, '/design_sels_bc_TMM_combat_MatureSamples_batch2019.2020.2021.2021S.2022.rds'))
+yy = data.frame(apply(as.matrix(keep[,grep(conds[1], colnames(keep))]), 1, mean), 
+                apply(as.matrix(keep[,grep(conds[2], colnames(keep))]), 1, mean),
+                apply(as.matrix(keep[,grep(conds[3], colnames(keep))]), 1, mean)
+)
+colnames(yy) = conds[c(1:3)]  
 
-conds = c("Mature_UA", "Mature_LA", "Mature_Hand", 'HEAD')
-
-sample.sels = c();  cc = c()
-for(n in 1:length(conds)) {
-  kk = which(design$conds == conds[n]) 
-  sample.sels = c(sample.sels, kk)
-  cc = c(cc, rep(conds[n], length(kk)))
+cal_z_score <- function(x){
+  (x - mean(x)) / sd(x)
 }
 
-df <- data.frame(cc)
-rownames(df) = colnames(keep)
-colnames(df) = 'segments'
-ii.gaps = c(5, 9, 12)
+yy <- t(apply(yy, 1, cal_z_score))
 
-annot_colors = c('springgreen4', 'steelblue2', 'gold2', 'darkgray')
-names(annot_colors) = c('Mature_UA', 'Mature_LA', 'Mature_Hand', 'HEAD')
+my_hclust_gene <- hclust(dist(yy), method = "complete")
+
+my_gene_col <- cutree(tree = as.dendrogram(my_hclust_gene), k = 4)
+my_gene_col <- data.frame(cluster = my_gene_col)
+
+xx = data.frame(xx, my_gene_col, stringsAsFactors = FALSE)
+
+save(xx, keep, file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl_clustered.4groups_', 
+                             version.analysis, '.Rdata'))
+
+conds = c("Mature_UA", "Mature_LA", "Mature_Hand")
+
+df <- data.frame(conds)
+rownames(df) = conds
+colnames(df) = 'segments'
+
+annot_colors = c('springgreen4', 'steelblue2', 'gold2')
+names(annot_colors) = c('Mature_UA', 'Mature_LA', 'Mature_Hand')
 annot_colors = list(segments = annot_colors)
 
-out = pheatmap(keep, cluster_rows=TRUE, kmeans_k = NA, cutree_rows = 3,
-               show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
-         cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps, 
-         annotation_colors = annot_colors, 
-         filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
-         width = 6, height = 8)
-
-hc <- out$tree_row
-
-lbl <- cutree(hc, 3) # you'll need to change '5' to the number of gene-groups you're interested in
+pheatmap(yy, annotation_row = my_gene_col, annotation_col = df, show_rownames = FALSE, scale = 'none', 
+         show_colnames = FALSE,
+         cluster_rows = TRUE, cluster_cols = FALSE,  clustering_method = 'complete',
+         annotation_colors = annot_colors, cutree_rows = 4, 
+         filename = paste0(figureDir, '/Fig1D_heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head_1000peaks.pdf'), 
+         width = 8, height = 10)
 
 
 if(saveTable){
@@ -194,35 +203,86 @@ if(saveTable){
 }
 
 ##########################################
+# feature distribution of groups of positional peaks 
+##########################################
+amex = makeTxDbFromGFF(file = paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf'))
+
+pp = data.frame(t(sapply(rownames(xx), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+pp$strand = '*'
+
+pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                              start.field="X2", end.field="X3", strand.field="strand")
+
+pp.annots = annotatePeak(pp[which(xx$cluster == 2)], TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+
+pdfname = paste0(figureDir, "Fig1E_positional_peak_feature_distribution_group2.pdf")
+pdf(pdfname, width = 8, height = 6)
+par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+
+plotAnnoPie(pp.annots)
+
+dev.off()
+
+pp.annots = annotatePeak(pp[which(xx$cluster == 3)], TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+
+pdfname = paste0(figureDir, "Fig1E_positional_peak_feature_distribution_group3.pdf")
+pdf(pdfname, width = 8, height = 6)
+par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+
+plotAnnoPie(pp.annots)
+
+dev.off()
+
+
+pp.annots = annotatePeak(pp[which(xx$cluster == 1| xx$cluster == 4)], TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+
+pdfname = paste0(figureDir, "Fig1E_positional_peak_feature_distribution_group1_4.pdf")
+pdf(pdfname, width = 8, height = 6)
+par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+
+plotAnnoPie(pp.annots)
+
+dev.off()
+
+##########################################
 # select top peaks or top promoter peaks
 ##########################################
-load(file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata'))
+load(file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl_clustered.4groups_', 
+                   version.analysis, '.Rdata'))
+conds = c("Mature_UA", "Mature_LA", "Mature_Hand")
+
 yy = xx
 
 yy = yy[grep('Promoter', yy$annotation), ] # peak close to promoters
 yy[grep('HOXA13|MEIS|SHOX|HOXC', yy$transcriptId),]
-#yy = xx
-#yy = yy[c(1:50), ]
-#yy = yy[which(yy$logFC.mean>1.5), ]
-# yy = yy[which(yy$max > 4 ), ] # max residual square < 0.1
+
 keep = keep[match(rownames(yy), rownames(keep)), ]
 
-#keep = fpm[!is.na(match(rownames(fpm), rownames(yy))), sample.sels]
+
+keep = data.frame(apply(as.matrix(keep[,grep(conds[1], colnames(keep))]), 1, mean), 
+                apply(as.matrix(keep[,grep(conds[2], colnames(keep))]), 1, mean),
+                apply(as.matrix(keep[,grep(conds[3], colnames(keep))]), 1, mean)
+)
+colnames(keep) = conds
+
 gg = yy$geneId
 grep('HOXA13', gg)
 rownames(keep) = paste0(rownames(keep), '_', gg)
 #rownames(keep) = gg
 keep = as.matrix(keep)
+keep = keep[c(1:20),]
+xx = xx[c(1:20), ]
 
-# jj1 = grep('Embryo_Stage40', colnames(keep))
-# jj2 = grep('Embryo_Stage44', colnames(keep))
-# jj3 = grep('Mature_UA', colnames(keep))
-# mean1 = apply(keep[, jj1], 1, mean)
-# mean2 = apply(keep[, jj2], 1, mean)
-# mean3 = apply(keep[, jj3], 1, mean)
-# 
-# kk = which(mean1< 1. & mean2 < 1. & mean3 < 1.)
-# 
+cal_z_score <- function(x){
+  (x - mean(x)) / sd(x)
+}
+
+keep <- t(apply(keep, 1, cal_z_score))
+
+
+#keep = fpm[!is.na(match(rownames(fpm), rownames(yy))), sample.sels]
+
+
 # # make sure max above the threshold
 # nb.above.threshold = apply(keep, 1, function(x) length(which(x>3)))
 # keep = keep[which(nb.above.threshold >=3), ] 
@@ -236,15 +296,15 @@ rownames(keep) = gg
 #keep = keep[,kk]
 #rownames(df) = colnames(keep)
 #ii.gaps = c(4, 6)
-pheatmap(keep, cluster_rows=TRUE, show_rownames=TRUE, scale = 'row', show_colnames = FALSE,
-         cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps, 
-         annotation_colors = annot_colors, 
-         filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_top.promoters.pdf'), 
+pheatmap(keep, cluster_rows=TRUE, show_rownames=TRUE, scale = 'none', show_colnames = FALSE,
+         cluster_cols=FALSE, annotation_col = df, 
+         annotation_colors = annot_colors,
+         filename = paste0(figureDir, '/Figure1F_heatmap_positionalPeaks_fdr0.01_log2FC.1_top.promoters.pdf'), 
          width = 8, height = 6)
 
 if(saveTable){
-  write.csv(data.frame(keep, yy, stringsAsFactors = FALSE), 
-            file = paste0(resDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_top50_promoterPeaks.csv'), 
+  write.csv(data.frame(keep,  stringsAsFactors = FALSE), 
+            file = paste0(tableDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_top20_promoterPeaks.csv'), 
             quote = FALSE, row.names = TRUE)
   
 }
