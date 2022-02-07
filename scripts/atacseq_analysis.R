@@ -322,7 +322,8 @@ if(Split.Mature.Regeneration.samples){
     sels = unique(c(setdiff(which(design$batch == '2020'), grep('Mature', design$condition)), 
                     which(design$batch == '2021'), which(design$condition == 'BL_UA_9days')))
     
-    #sels = sels[which(design$batch[sels] != '2020')]
+    sels = sels[which(design$SampleID[sels] != '89542' & design$SampleID[sels] != '89543')]
+    
     design.sels = design[sels, ]
     design.sels$conds = droplevels(design.sels$conds)
     

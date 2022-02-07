@@ -492,6 +492,7 @@ if(Manually.identify.peak.consensus){
   peak.merged = union(peak.merged, es40)
   peak.merged = union(peak.merged, es44.d)
   peak.merged = union(peak.merged, es44.p)
+  
   peak.merged = union(peak.merged, ua)
   peak.merged = union(peak.merged, la)
   peak.merged = union(peak.merged, hd)
@@ -740,9 +741,9 @@ rownames(counts) = counts$gene
 dds <- DESeqDataSetFromMatrix(as.matrix(counts[kk, -1]), DataFrame(design), design = ~ condition)
 
 ss = rowSums(counts(dds))
-length(which(ss > quantile(ss, probs = 0.25)))
+length(which(ss > quantile(ss, probs = 0.6)))
 
-dd0 = dds[ss > quantile(ss, probs = 0.25) , ]
+dd0 = dds[ss > quantile(ss, probs = 0.6) , ]
 dd0 = estimateSizeFactors(dd0)
 sizefactors.UQ = sizeFactors(dd0)
 
