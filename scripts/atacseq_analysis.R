@@ -689,6 +689,7 @@ if(grouping.position.dependent.peaks){
   Filtering.peaks.in.Head.samples = TRUE
   if(Filtering.peaks.in.Head.samples){
     maxs = apply(keep[, grep('Mature_', colnames(keep))], 1, function(x) return(max(c(mean(x[1:5]), mean(x[6:9]), mean(x[10:12])))))
+    mins = apply(keep[, grep('Mature_', colnames(keep))], 1, function(x) return(min(c(mean(x[1:5]), mean(x[6:9]), mean(x[10:12])))))
     
     ctl.mean = apply(keep[, grep('HEAD', colnames(keep))], 1, mean)
     
@@ -705,11 +706,11 @@ if(grouping.position.dependent.peaks){
     abline(h = 3, col = 'red', lwd = 2.0)
     abline(v = c(0.5, 1), col = 'red', lwd = 2.0)
     
-    sels = which(rr>1 & ctl.mean<3 & maxs > 3)
+    sels = which(rr>1 & ctl.mean<3 & maxs > 3 & mins <3)
     cat(length(sels), 'peaks selected \n')
     
-    sels = which(rr >1 & maxs > 3.)
-    cat(length(sels), 'peaks selected \n')
+    #sels = which(rr >1 & maxs > 3.)
+    #cat(length(sels), 'peaks selected \n')
     
     #nonsels = which(rr<=1 | maxs <=2)
     
@@ -725,6 +726,7 @@ if(grouping.position.dependent.peaks){
   ##########################################
   # quick clustering of postional peaks 
   ##########################################
+  load(file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata'))
   yy = data.frame(apply(as.matrix(keep[,grep(conds[1], colnames(keep))]), 1, mean), 
                   apply(as.matrix(keep[,grep(conds[2], colnames(keep))]), 1, mean),
                   apply(as.matrix(keep[,grep(conds[3], colnames(keep))]), 1, mean)
@@ -744,12 +746,13 @@ if(grouping.position.dependent.peaks){
   #hc <- out$tree_row
   #lbl <- cutree(hc, 3)
   
-  pheatmap(yy, cluster_rows=TRUE, kmeans_k = NA, cutree_rows = 5, 
-           show_rownames=FALSE, scale = 'none', show_colnames = FALSE,
-           clustering_method = 'ward.D2',
+  pheatmap(yy, cluster_rows=TRUE, kmeans_k = NA, cutree_rows = 4, 
+           color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(20),
+           show_rownames=FALSE, scale = 'row', show_colnames = FALSE, gaps_row = 'green',
+           clustering_method = 'complete',
            cluster_cols=FALSE)
-           
   
+           
   ##########################################
   # heatmap displaying the postional peaks 
   #########################################
