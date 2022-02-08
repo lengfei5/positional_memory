@@ -444,6 +444,178 @@ if(Test.glmpca.mds){
 # 
 ########################################################
 ########################################################
+
+##########################################
+# position-dependent genes from microarray 
+##########################################
+require(limma)
+
+Rdata.microarray = "../results/microarray/Rdata/"
+load(file = paste0(Rdata.microarray, 'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary.Rdata'))
+annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                       'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
+
+mm = match(rownames(res), annot$geneID)
+ggs = paste0(annot$gene.symbol.toUse[mm], '_',  annot$geneID[mm])
+rownames(res)[!is.na(mm)] = ggs[!is.na(mm)]
+
+f <- factor(rep(c('mUA', 'mLA', 'mHand'), each = 3), levels=c("mUA","mLA","mHand")) 
+design <- model.matrix(~0+f)
+colnames(design) <- c("mUA","mLA","mHand")
+
+#To make all pair-wise comparisons between the three groups one could proceed
+fit <- lmFit(res, design)
+contrast.matrix <- makeContrasts(mLA-mUA, mHand-mUA, mHand-mLA, levels=design)
+fit2 <- contrasts.fit(fit, contrast.matrix)
+fit2 <- eBayes(fit2)
+
+#A list of top genes for RNA2 versus RNA1 can be obtained from
+topTable(fit2, coef=1, adjust="BH")
+
+#The outcome of each hypothesis test can be assigned using
+results <- decideTests(fit2)
+
+xx = data.frame(fit2$p.value)
+colnames(xx) = c('mLA.vs.mUA', 'mHand.vs.mUA', 'mHand.vs.mLA')
+xx$pval.max = apply(as.matrix(-log10(xx)), 1, max)
+
+res = data.frame(res, xx)
+res = res[order(-res$pval.max), ]
+
+save(res, raw, fit2, file = paste0(RdataDir, 
+                                   'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_DEpval.Rdata'))
+
+# load microarray analysis results: log2 signal (res), comparison (fit2), and raw data (raw)
+load(file = paste0("../results/microarray/Rdata/", 
+                   'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_DEpval.Rdata'))
+
+res = res[, c(1:9)] # drop the pval kept previously
+
+tops = topTable(fit2, coef=1, adjust="BH", number = nrow(res), genelist = rownames(res))[, c(2, 5,6)]
+colnames(tops) = paste0(colnames(tops), '_mLA.vs.mUA')
+res = data.frame(res, tops[match(rownames(res), rownames(tops)), ])
+
+tops = topTable(fit2, coef=2, adjust="BH", number = nrow(res), genelist = rownames(res))[, c(2, 5,6)]
+colnames(tops) = paste0(colnames(tops), '_mHand.vs.mUA')
+res = data.frame(res, tops[match(rownames(res), rownames(tops)), ])
+
+tops = topTable(fit2, coef=3, adjust="BH", number = nrow(res), genelist = rownames(res))[, c(2, 5,6)]
+colnames(tops) = paste0(colnames(tops), '_mHand.vs.mLA')
+res = data.frame(res, tops[match(rownames(res), rownames(tops)), ])
+
+# plot all position-dependent genes
+library("pheatmap")
+#qv.cutoff = 0.1
+# select = which(res$adj.P.Val_mHand.vs.mLA < qv.cutoff |
+#                  res$adj.P.Val_mLA.vs.mUA < qv.cutoff | 
+#                  res$adj.P.Val_mHand.vs.mLA < qv.cutoff)
+# cat(length(select), ' positional genes found \n')
+
+res$fdr.max = apply(-log10(res[, grep('adj.P.Val_', colnames(res))]), 1, max)
+res$logFC.max = apply((res[, grep('logFC_', colnames(res))]), 1, function(x) return(x[which(abs(x)==max(abs(x)))][1]))
+
+o1 = order(-res$fdr.max)
+res = res[o1, ]
+
+ggs = sapply(rownames(res), function(x){unlist(strsplit(as.character(x), '_'))[1]})
+select = which(res$fdr.max> -log10(0.05) & abs(res$logFC.max)> 0)
+ggs = ggs[select]
+
+cat(ggs[grep('MEIS', ggs)], '\n')
+
+print(intersect(ggs, tfs))
+print(intersect(ggs, sps))
+print(intersect(ggs, eps))
+print(intersect(ggs, rbp))
+
+yy = res[select, c(1:9)]
+df <- data.frame(condition = rep(c('mUA', 'mLA', 'mHand'), each = 3))
+rownames(df) = colnames(yy)
+colnames(df) = 'segments'
+#ss = apply(as.matrix(yy), 1, mean)
+#yy = yy[which(ss>-2), ]
+
+pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+         show_colnames = FALSE,
+         scale = 'row',
+         cluster_cols=FALSE, annotation_col=df,
+         width = 8, height = 12, filename = paste0(figureDir, 'heatmap_DEgenes_matureSample_qv.0.1_microarray.pdf')) 
+
+##########################################
+# highlight TFs and EPs in positional genes 
+##########################################
+# plot only TFs and SPs
+ggs = rownames(yy)
+ggs = sapply(ggs, function(x) unlist(strsplit(as.character(x), '_'))[1])
+
+mm = match(ggs, unique(c(tfs, eps)))
+yy1 = yy[unique(c(which(!is.na(mm)))), ]
+
+pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
+         scale = 'row',
+         cluster_cols=FALSE, annotation_col=df, fontsize_row = 8, 
+         width = 8, height = 12,
+         filename = paste0(resDir, 'heatmap_DE.tfs_eps_mature_qv.0.1_microarray.pdf')) 
+
+
+mm = match(ggs, unique(c(toupper(sps))))
+yy1 = yy[unique(c(which(!is.na(mm)), grep('CYP2', rownames(yy)))), ]
+
+pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
+         scale = 'row',
+         cluster_cols=FALSE, annotation_col=df, fontsize_row = 8, 
+         width = 8, height = 12,
+         filename = paste0(figureDir, 'heatmap_DE_sps_mature_qv.0.1_microarray.pdf')) 
+
+
+##########################################
+# volcano plot with highlighting genes
+##########################################
+library(ggrepel)
+library(dplyr)
+library(tibble)
+
+res$gene = sapply(rownames(res), function(x) unlist(strsplit(as.character(x), '_'))[1])
+
+#res$fdr = -log10(res$adj.P.Val_mHand.vs.mUA)
+#res$logfc = res$logFC_mHand.vs.mUA
+
+for(comp in c('mHand.vs.mUA', 'mHand.vs.mLA', 'mLA.vs.mUA'))
+{
+  # comp =  'mHand.vs.mUA'
+  res$fdr = eval(parse(text = paste0('-log10(res$adj.P.Val_', comp, ')')))
+  res$pval = eval(parse(text = paste0('-log10(res$P.Value_', comp, ')')))
+  res$logfc = eval(parse(text = paste0('res$logFC_', comp)))
+  
+  #examples.sel = which(res$pval > 4 & abs(res$logfc) > 2)
+  examples.sel = c()
+  examples.sel = unique(c(examples.sel, grep('HOXA13|HOXD13', res$gene)))
+  
+  ggplot(data=res, aes(x=logfc, y=pval, label = gene)) +
+    geom_point(size = 0.5) + 
+    geom_point(data=res[examples.sel, ], aes(x=logfc, y=pval), colour="blue", size=2) +
+    theme(axis.text.x = element_text(size = 12), 
+          axis.text.y = element_text(size = 12)) + 
+    geom_text_repel(data= res[examples.sel, ], size = 3.0, color = 'blue') +
+    #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
+    #scale_color_manual(values=c("blue", "black", "red")) +
+    geom_vline(xintercept=c(0), col='darkgray') +
+    geom_hline(yintercept=3, col="darkgray") +
+    labs(x = "log2FC")
+  
+  ggsave(paste0(figureDir, "VolcanoPlot_log2FC_pval_microarray_labels.HOXA13.HOXD13_", comp, ".pdf"), width=12, height = 8)
+  
+}
+
+if(saveTables){
+  write.csv(res[select, ],
+            file = paste0(shareDir, '/position_dependent_genes_from_matureSamples_microarray_qv.0.1.csv'), 
+            quote = FALSE, col.names = TRUE, row.names = TRUE)
+  
+}
+
+
+
 # load dds normalized object and annotations
 load(file = paste0(RdataDir, 'RNAseq_design_dds.object.Rdata'))
 annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
@@ -573,138 +745,6 @@ if(saveTables){
   
 }
 
-##########################################
-# position-dependent genes from microarray 
-##########################################
-require(limma)
-# load microarray analysis results: log2 signal (res), comparison (fit2), and raw data (raw)
-load(file = paste0("../results/microarray/Rdata/", 
-                   'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_DEpval.Rdata'))
-
-res = res[, c(1:9)] # drop the pval kept previously
-
-tops = topTable(fit2, coef=1, adjust="BH", number = nrow(res), genelist = rownames(res))[, c(2, 5,6)]
-colnames(tops) = paste0(colnames(tops), '_mLA.vs.mUA')
-res = data.frame(res, tops[match(rownames(res), rownames(tops)), ])
-
-tops = topTable(fit2, coef=2, adjust="BH", number = nrow(res), genelist = rownames(res))[, c(2, 5,6)]
-colnames(tops) = paste0(colnames(tops), '_mHand.vs.mUA')
-res = data.frame(res, tops[match(rownames(res), rownames(tops)), ])
-
-tops = topTable(fit2, coef=3, adjust="BH", number = nrow(res), genelist = rownames(res))[, c(2, 5,6)]
-colnames(tops) = paste0(colnames(tops), '_mHand.vs.mLA')
-res = data.frame(res, tops[match(rownames(res), rownames(tops)), ])
-
-# plot all position-dependent genes
-library("pheatmap")
-#qv.cutoff = 0.1
-# select = which(res$adj.P.Val_mHand.vs.mLA < qv.cutoff |
-#                  res$adj.P.Val_mLA.vs.mUA < qv.cutoff | 
-#                  res$adj.P.Val_mHand.vs.mLA < qv.cutoff)
-# cat(length(select), ' positional genes found \n')
-
-res$fdr.max = apply(-log10(res[, grep('adj.P.Val_', colnames(res))]), 1, max)
-res$logFC.max = apply((res[, grep('logFC_', colnames(res))]), 1, function(x) return(x[which(abs(x)==max(abs(x)))][1]))
-
-o1 = order(-res$fdr.max)
-res = res[o1, ]
-
-ggs = sapply(rownames(res), function(x){unlist(strsplit(as.character(x), '_'))[1]})
-select = which(res$fdr.max> -log10(0.05) & abs(res$logFC.max)> 0)
-ggs = ggs[select]
-
-cat(ggs[grep('MEIS', ggs)], '\n')
-
-print(intersect(ggs, tfs))
-print(intersect(ggs, sps))
-print(intersect(ggs, eps))
-print(intersect(ggs, rbp))
-
-yy = res[select, c(1:9)]
-df <- data.frame(condition = rep(c('mUA', 'mLA', 'mHand'), each = 3))
-rownames(df) = colnames(yy)
-colnames(df) = 'segments'
-#ss = apply(as.matrix(yy), 1, mean)
-#yy = yy[which(ss>-2), ]
-
-pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
-         show_colnames = FALSE,
-         scale = 'row',
-         cluster_cols=FALSE, annotation_col=df,
-         width = 8, height = 12, filename = paste0(figureDir, 'heatmap_DEgenes_matureSample_qv.0.1_microarray.pdf')) 
-
-##########################################
-# highlight TFs and EPs in positional genes 
-##########################################
-# plot only TFs and SPs
-ggs = rownames(yy)
-ggs = sapply(ggs, function(x) unlist(strsplit(as.character(x), '_'))[1])
-
-mm = match(ggs, unique(c(tfs, eps)))
-yy1 = yy[unique(c(which(!is.na(mm)))), ]
-
-pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
-         scale = 'row',
-         cluster_cols=FALSE, annotation_col=df, fontsize_row = 8, 
-         width = 8, height = 12,
-         filename = paste0(resDir, 'heatmap_DE.tfs_eps_mature_qv.0.1_microarray.pdf')) 
-
-
-mm = match(ggs, unique(c(toupper(sps))))
-yy1 = yy[unique(c(which(!is.na(mm)), grep('CYP2', rownames(yy)))), ]
-
-pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
-         scale = 'row',
-         cluster_cols=FALSE, annotation_col=df, fontsize_row = 8, 
-         width = 8, height = 12,
-         filename = paste0(figureDir, 'heatmap_DE_sps_mature_qv.0.1_microarray.pdf')) 
-
-
-##########################################
-# volcano plot with highlighting genes
-##########################################
-library(ggrepel)
-library(dplyr)
-library(tibble)
-
-res$gene = sapply(rownames(res), function(x) unlist(strsplit(as.character(x), '_'))[1])
-
-#res$fdr = -log10(res$adj.P.Val_mHand.vs.mUA)
-#res$logfc = res$logFC_mHand.vs.mUA
-
-for(comp in c('mHand.vs.mUA', 'mHand.vs.mLA', 'mLA.vs.mUA'))
-{
-  # comp =  'mHand.vs.mUA'
-  res$fdr = eval(parse(text = paste0('-log10(res$adj.P.Val_', comp, ')')))
-  res$pval = eval(parse(text = paste0('-log10(res$P.Value_', comp, ')')))
-  res$logfc = eval(parse(text = paste0('res$logFC_', comp)))
-  
-  #examples.sel = which(res$pval > 4 & abs(res$logfc) > 2)
-  examples.sel = c()
-  examples.sel = unique(c(examples.sel, grep('HOXA13|HOXD13', res$gene)))
-  
-  ggplot(data=res, aes(x=logfc, y=pval, label = gene)) +
-    geom_point(size = 0.5) + 
-    geom_point(data=res[examples.sel, ], aes(x=logfc, y=pval), colour="blue", size=2) +
-    theme(axis.text.x = element_text(size = 12), 
-          axis.text.y = element_text(size = 12)) + 
-    geom_text_repel(data= res[examples.sel, ], size = 3.0, color = 'blue') +
-    #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
-    #scale_color_manual(values=c("blue", "black", "red")) +
-    geom_vline(xintercept=c(0), col='darkgray') +
-    geom_hline(yintercept=3, col="darkgray") +
-    labs(x = "log2FC")
-  
-  ggsave(paste0(figureDir, "VolcanoPlot_log2FC_pval_microarray_labels.HOXA13.HOXD13_", comp, ".pdf"), width=12, height = 8)
-  
-}
-  
-if(saveTables){
-  write.csv(res[select, ],
-              file = paste0(shareDir, '/position_dependent_genes_from_matureSamples_microarray_qv.0.1.csv'), 
-              quote = FALSE, col.names = TRUE, row.names = TRUE)
-  
-}
 
 ########################################################
 ########################################################
