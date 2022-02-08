@@ -28,11 +28,12 @@ dataDir = "/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memo
 design.file = paste0(dataDir, 'sampleInfos_parsed.txt')
 
 resDir = paste0("../results/", version.Data)
-tabDir =  paste0(resDir, "/tables/")
+#tabDir =  paste0(resDir, "/tables/")
 tfDir = '~/workspace/imp/positional_memory/results/motif_analysis'
 RdataDir = paste0(resDir, "/Rdata/")
 shareDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/AkaneToJingkuiShareFiles/results_rnaseq/positional_genes'
 figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
+tableDir = paste0(figureDir, 'tables4plots/')
 
 if(!dir.exists(resDir)){dir.create(resDir)}
 if(!dir.exists(tabDir)){dir.create(tabDir)}
@@ -495,7 +496,6 @@ if(Run.limma.test){
   
 }
 
-
 # load microarray analysis results: log2 signal (res), comparison (fit2), and raw data (raw)
 load(file = paste0("../results/microarray/Rdata/", 
                    'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_DEpval.Rdata'))
@@ -651,22 +651,66 @@ head(ego)
 # 
 # head(ego)
 
-barplot(ego, showCategory=30) + ggtitle("Go term enrichment for promoter peaks in Akane's ATAC-seq data")
+#barplot(ego, showCategory=30) + ggtitle("Go term enrichment for promoter peaks in Akane's ATAC-seq data")
 
-edox <- setReadable(ego, 'org.Mm.eg.db', 'ENSEMBL')
-library(DOSE)
+#edox <- setReadable(ego, 'org.Mm.eg.db', 'ENSEMBL')
+pdfname = paste0(figureDir, 'Fig2B_GOterm_postionalGenes.pdf')
+pdf(pdfname, width = 12, height = 8)
+par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
 
-edox2 <- pairwise_termsim(edox)
-p1 <- treeplot(edox2)
-p2 <- treeplot(edox2, hclust_method = "average")
-aplot::plot_list(p1, p2, tag_levels='A')
+dotplot(ego, showCategory=30) + ggtitle("positional genes")
 
+dev.off()
 
-write.csv(ego, file = paste0(resDir, "GO_term_enrichmenet_for_upregulated_genes_pval_0.05.csv"), 
+write.csv(ego, file = paste0(tableDir, "GO_term_enrichmenet_for_positional_genes_Microarray.csv"), 
           row.names = TRUE)
 
+##########################################
+# volcano plot with highlighting genes
+##########################################
+library(ggrepel)
+library(dplyr)
+library(tibble)
+
+res$gene = sapply(rownames(res), function(x) unlist(strsplit(as.character(x), '_'))[1])
+
+for(comp in c('mHand.vs.mUA', 'mHand.vs.mLA', 'mLA.vs.mUA'))
+{
+  # comp =  'mHand.vs.mUA'
+  
+  res$fdr = eval(parse(text = paste0('-log10(res$adj.P.Val_', comp, ')')))
+  res$pval = eval(parse(text = paste0('-log10(res$P.Value_', comp, ')')))
+  res$logfc = eval(parse(text = paste0('res$logFC_', comp)))
+  
+  #examples.sel = which(res$pval > 4 & abs(res$logfc) > 2)
+  examples.sel = c()
+  examples.sel = unique(c(examples.sel, grep('HOXA13|HOXD13', res$gene)))
+  
+  ggplot(data=res, aes(x=logfc, y=pval, label = gene)) +
+    geom_point(size = 0.5) + 
+    geom_point(data=res[which(res$logfc > 1 & res$pval > -log10(0.001)), ], aes(x=logfc, y=pval), colour="red", size=1) +
+    geom_point(data=res[which(res$logfc < -1 & res$pval > -log10(0.001)), ], aes(x=logfc, y=pval), colour="blue", size=1) +
+    theme_classic() + 
+    theme(axis.text.x = element_text(size = 12), 
+          axis.text.y = element_text(size = 12)) + 
+    #geom_text_repel(data= res[examples.sel, ], size = 3.0, color = 'blue') +
+    #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
+    #scale_color_manual(values=c("blue", "black", "red")) +
+    geom_vline(xintercept=c(-1, 1), col='gray') +
+    geom_hline(yintercept=-log10(0.001), col="gray") +
+    labs(x = "log2FC")
+  
+  ggsave(paste0(figureDir, "Fig2C_VolcanoPlot_log2FC_pval_microarray_noLabels_", comp, ".pdf"), width=12, height = 8)
+  
+}
 
 
+if(saveTables){
+  write.csv(res[select, ],
+            file = paste0(tableDir, '/position_dependent_genes_from_matureSamples_microarray_qv.0.05_log2FC.1.csv'), 
+            quote = FALSE, row.names = TRUE)
+  
+}
 
 ##########################################
 # highlight TFs and EPs in positional genes 
@@ -679,67 +723,22 @@ mm = match(ggs, unique(c(tfs, eps)))
 yy1 = yy[unique(c(which(!is.na(mm)))), ]
 
 pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
-         scale = 'row',
+         color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(16), 
+         scale = 'none',
          cluster_cols=FALSE, annotation_col=df, fontsize_row = 8, 
          width = 8, height = 12,
-         filename = paste0(resDir, 'heatmap_DE.tfs_eps_mature_qv.0.1_microarray.pdf')) 
-
+         filename = paste0(figureDir, 'FigS2A_heatmap_DE.tfs_eps_mature_qv.0.05_log2fc.1_microarray.pdf')) 
 
 mm = match(ggs, unique(c(toupper(sps))))
 yy1 = yy[unique(c(which(!is.na(mm)), grep('CYP2', rownames(yy)))), ]
 
 pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
-         scale = 'row',
+         scale = 'none',
+         color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(16), 
          cluster_cols=FALSE, annotation_col=df, fontsize_row = 8, 
          width = 8, height = 12,
-         filename = paste0(figureDir, 'heatmap_DE_sps_mature_qv.0.1_microarray.pdf')) 
+         filename = paste0(figureDir, 'FigS2A_heatmap_DE_sps_mature_qv.0.05_log2FC.1_microarray.pdf')) 
 
-
-##########################################
-# volcano plot with highlighting genes
-##########################################
-library(ggrepel)
-library(dplyr)
-library(tibble)
-
-res$gene = sapply(rownames(res), function(x) unlist(strsplit(as.character(x), '_'))[1])
-
-#res$fdr = -log10(res$adj.P.Val_mHand.vs.mUA)
-#res$logfc = res$logFC_mHand.vs.mUA
-
-for(comp in c('mHand.vs.mUA', 'mHand.vs.mLA', 'mLA.vs.mUA'))
-{
-  # comp =  'mHand.vs.mUA'
-  res$fdr = eval(parse(text = paste0('-log10(res$adj.P.Val_', comp, ')')))
-  res$pval = eval(parse(text = paste0('-log10(res$P.Value_', comp, ')')))
-  res$logfc = eval(parse(text = paste0('res$logFC_', comp)))
-  
-  #examples.sel = which(res$pval > 4 & abs(res$logfc) > 2)
-  examples.sel = c()
-  examples.sel = unique(c(examples.sel, grep('HOXA13|HOXD13', res$gene)))
-  
-  ggplot(data=res, aes(x=logfc, y=pval, label = gene)) +
-    geom_point(size = 0.5) + 
-    geom_point(data=res[examples.sel, ], aes(x=logfc, y=pval), colour="blue", size=2) +
-    theme(axis.text.x = element_text(size = 12), 
-          axis.text.y = element_text(size = 12)) + 
-    geom_text_repel(data= res[examples.sel, ], size = 3.0, color = 'blue') +
-    #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
-    #scale_color_manual(values=c("blue", "black", "red")) +
-    geom_vline(xintercept=c(0), col='darkgray') +
-    geom_hline(yintercept=3, col="darkgray") +
-    labs(x = "log2FC")
-  
-  ggsave(paste0(figureDir, "VolcanoPlot_log2FC_pval_microarray_labels.HOXA13.HOXD13_", comp, ".pdf"), width=12, height = 8)
-  
-}
-
-if(saveTables){
-  write.csv(res[select, ],
-            file = paste0(shareDir, '/position_dependent_genes_from_matureSamples_microarray_qv.0.1.csv'), 
-            quote = FALSE, col.names = TRUE, row.names = TRUE)
-  
-}
 
 
 
@@ -865,16 +864,6 @@ if(saveTables){
             quote = FALSE, col.names = TRUE, row.names = FALSE)
   
 }
-
-
-########################################################
-########################################################
-# Section III: check the differential expressed genes, 
-# mainly TFs that are changed in mature UA, LA and Hand (head as a control)
-# TFs that are changes in regeneration mature UA, BL.day5, BL.day9, BL.day13.proximal (Development as control)
-# 
-########################################################
-########################################################
 
 ########################################################
 ########################################################
