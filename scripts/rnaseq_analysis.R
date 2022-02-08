@@ -443,47 +443,58 @@ if(Test.glmpca.mds){
 # 
 ########################################################
 ########################################################
-
-##########################################
-# position-dependent genes from microarray 
-##########################################
-require(limma)
-
-
-Rdata.microarray = "../results/microarray/Rdata/"
-load(file = paste0(Rdata.microarray, 'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary.Rdata'))
 annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
                        'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
 
-mm = match(rownames(res), annot$geneID)
-ggs = paste0(annot$gene.symbol.toUse[mm], '_',  annot$geneID[mm])
-rownames(res)[!is.na(mm)] = ggs[!is.na(mm)]
+tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
+sps = readRDS(file = '~/workspace/imp/organoid_patterning/results/Rdata/curated_signaling.pathways_gene.list_v2.rds')
+eps = readRDS(file = paste0('../data/human_chromatin_remodelers_Epifactors.database.rds'))
+rbp = readRDS(file = paste0('../data/human_RBPs_rbpdb.rds'))
+tfs = unique(tfs$`HGNC symbol`)
+sps = toupper(unique(sps$gene))
 
-f <- factor(rep(c('mUA', 'mLA', 'mHand'), each = 3), levels=c("mUA","mLA","mHand")) 
-design <- model.matrix(~0+f)
-colnames(design) <- c("mUA","mLA","mHand")
+##########################################
+# microarray data 
+##########################################
+require(limma)
 
-#To make all pair-wise comparisons between the three groups one could proceed
-fit <- lmFit(res, design)
-contrast.matrix <- makeContrasts(mLA-mUA, mHand-mUA, mHand-mLA, levels=design)
-fit2 <- contrasts.fit(fit, contrast.matrix)
-fit2 <- eBayes(fit2)
+Run.limma.test = FALSE
+if(Run.limma.test){
+  Rdata.microarray = "../results/microarray/Rdata/"
+  load(file = paste0(Rdata.microarray, 'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary.Rdata'))
+  
+  mm = match(rownames(res), annot$geneID)
+  ggs = paste0(annot$gene.symbol.toUse[mm], '_',  annot$geneID[mm])
+  rownames(res)[!is.na(mm)] = ggs[!is.na(mm)]
+  
+  f <- factor(rep(c('mUA', 'mLA', 'mHand'), each = 3), levels=c("mUA","mLA","mHand")) 
+  design <- model.matrix(~0+f)
+  colnames(design) <- c("mUA","mLA","mHand")
+  
+  #To make all pair-wise comparisons between the three groups one could proceed
+  fit <- lmFit(res, design)
+  contrast.matrix <- makeContrasts(mLA-mUA, mHand-mUA, mHand-mLA, levels=design)
+  fit2 <- contrasts.fit(fit, contrast.matrix)
+  fit2 <- eBayes(fit2)
+  
+  #A list of top genes for RNA2 versus RNA1 can be obtained from
+  topTable(fit2, coef=1, adjust="BH")
+  
+  #The outcome of each hypothesis test can be assigned using
+  results <- decideTests(fit2)
+  
+  xx = data.frame(fit2$p.value)
+  colnames(xx) = c('mLA.vs.mUA', 'mHand.vs.mUA', 'mHand.vs.mLA')
+  xx$pval.max = apply(as.matrix(-log10(xx)), 1, max)
+  
+  res = data.frame(res, xx)
+  res = res[order(-res$pval.max), ]
+  
+  save(res, raw, fit2, file = paste0(RdataDir, 
+                                     'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_DEpval.Rdata'))
+  
+}
 
-#A list of top genes for RNA2 versus RNA1 can be obtained from
-topTable(fit2, coef=1, adjust="BH")
-
-#The outcome of each hypothesis test can be assigned using
-results <- decideTests(fit2)
-
-xx = data.frame(fit2$p.value)
-colnames(xx) = c('mLA.vs.mUA', 'mHand.vs.mUA', 'mHand.vs.mLA')
-xx$pval.max = apply(as.matrix(-log10(xx)), 1, max)
-
-res = data.frame(res, xx)
-res = res[order(-res$pval.max), ]
-
-save(res, raw, fit2, file = paste0(RdataDir, 
-                                   'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_DEpval.Rdata'))
 
 # load microarray analysis results: log2 signal (res), comparison (fit2), and raw data (raw)
 load(file = paste0("../results/microarray/Rdata/", 
@@ -505,11 +516,6 @@ res = data.frame(res, tops[match(rownames(res), rownames(tops)), ])
 
 # plot all position-dependent genes
 library("pheatmap")
-#qv.cutoff = 0.1
-# select = which(res$adj.P.Val_mHand.vs.mLA < qv.cutoff |
-#                  res$adj.P.Val_mLA.vs.mUA < qv.cutoff | 
-#                  res$adj.P.Val_mHand.vs.mLA < qv.cutoff)
-# cat(length(select), ' positional genes found \n')
 
 res$fdr.max = apply(-log10(res[, grep('adj.P.Val_', colnames(res))]), 1, max)
 res$logFC.max = apply((res[, grep('logFC_', colnames(res))]), 1, function(x) return(x[which(abs(x)==max(abs(x)))][1]))
@@ -518,7 +524,17 @@ o1 = order(-res$fdr.max)
 res = res[o1, ]
 
 ggs = sapply(rownames(res), function(x){unlist(strsplit(as.character(x), '_'))[1]})
-select = which(res$fdr.max> -log10(0.05) & abs(res$logFC.max)> 0)
+
+qv.cutoff = 0.05
+logfc.cutoff = 1
+select = which(res$fdr.max> -log10(qv.cutoff) & abs(res$logFC.max)> 0)
+
+select = which(res$adj.P.Val_mHand.vs.mLA < qv.cutoff & abs(res$logFC_mHand.vs.mLA) > logfc.cutoff|
+                 res$adj.P.Val_mHand.vs.mUA < qv.cutoff & abs(res$logFC_mHand.vs.mUA) > logfc.cutoff |
+                 res$adj.P.Val_mHand.vs.mLA < qv.cutoff & abs(res$logFC_mHand.vs.mLA) > logfc.cutoff )
+# cat(length(select), ' positional genes found \n')
+cat(length(select), ' DE genes selected \n')
+
 ggs = ggs[select]
 
 cat(ggs[grep('MEIS', ggs)], '\n')
@@ -532,14 +548,125 @@ yy = res[select, c(1:9)]
 df <- data.frame(condition = rep(c('mUA', 'mLA', 'mHand'), each = 3))
 rownames(df) = colnames(yy)
 colnames(df) = 'segments'
-#ss = apply(as.matrix(yy), 1, mean)
-#yy = yy[which(ss>-2), ]
+
+annot_colors = c('springgreen4', 'steelblue2', 'gold2')
+names(annot_colors) = c('mUA', 'mLA', 'mHand')
+annot_colors = list(segments = annot_colors)
 
 pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+         color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(16), 
          show_colnames = FALSE,
          scale = 'row',
          cluster_cols=FALSE, annotation_col=df,
-         width = 8, height = 12, filename = paste0(figureDir, 'heatmap_DEgenes_matureSample_qv.0.1_microarray.pdf')) 
+         annotation_colors = annot_colors,
+         width = 8, height = 12, filename = paste0(figureDir, '/Fig2A_heatmap_DEgenes_matureSample_fdr.0.05_log2fc.1_microarray.pdf')) 
+
+
+##########################################
+# GO term analysis of DE genes 
+##########################################
+library(enrichplot)
+library(clusterProfiler)
+library(openxlsx)
+library(ggplot2)
+library(stringr)
+library(org.Hs.eg.db)
+library(org.Mm.eg.db)
+
+firstup <- function(x) {
+  substr(x, 1, 1) <- toupper(substr(x, 1, 1))
+  x
+}
+
+
+# background
+gg.expressed = unique(unlist(lapply(rownames(res), function(x) { x = unlist(strsplit(as.character(x), '_'));  return(x[length(x)])})))
+gg.expressed = unique(annot$gene.symbol.toUse[match(gg.expressed, annot$geneID)])
+gg.expressed = gg.expressed[which(gg.expressed != '' & gg.expressed != 'N/A' & !is.na(gg.expressed))]
+
+bgs0 = gg.expressed
+bgs0 = unique(bgs0)
+
+xx0 = unique(annot$gene.symbol.toUse)
+xx0 = xx0[which(xx0 != '' & xx0 != 'N/A' & !is.na(xx0))]
+bgs = unique(xx0)
+
+gg.expressed = unique(unlist(lapply(rownames(yy), function(x) { x = unlist(strsplit(as.character(x), '_'));  return(x[length(x)])})))
+gg.expressed = unique(annot$gene.symbol.toUse[match(gg.expressed, annot$geneID)])
+gg.expressed = gg.expressed[which(gg.expressed != '' & gg.expressed != 'N/A' & !is.na(gg.expressed))]
+
+gg.expressed = firstup(tolower(gg.expressed))
+bgs = firstup(tolower(bgs))
+bgs0 = firstup(tolower(bgs0))
+
+gene.df <- bitr(gg.expressed, fromType = "SYMBOL",
+                toType = c("ENSEMBL", "ENTREZID"),
+                OrgDb = org.Mm.eg.db)
+head(gene.df)
+
+bgs.df <- bitr(bgs, fromType = "SYMBOL",
+               toType = c("ENSEMBL", "ENTREZID"),
+               OrgDb = org.Mm.eg.db)
+
+head(bgs.df)
+
+bgs0.df <- bitr(bgs0, fromType = "SYMBOL",
+                toType = c("ENSEMBL", "ENTREZID"),
+                OrgDb = org.Mm.eg.db)
+
+#pval.cutoff = 0.05
+
+#pdfname = paste0(resDir, "/GO.Terms_enrichment_mir1.mutant_upregulated_downregulated_genes.pdf")
+#pdf(pdfname, width = 12, height = 10)
+#par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+
+#kk.up = which(res$pvalue_mir1.mutant.vs.wt < pval.cutoff & res$log2FoldChange_mir1.mutant.vs.wt > 0)
+#kk.down = which(res$pvalue_mir1.mutant.vs.wt < pval.cutoff & res$log2FoldChange_mir1.mutant.vs.wt < 0)
+#cat('nb of upregulated genes : ', length(kk.up), '\n')
+#cat('nb of downregulated genes : ', length(kk.down), '\n')
+ego <-  enrichGO(gene         = gene.df$ENSEMBL,
+                 universe     = bgs0.df$ENSEMBL,
+                 #OrgDb         = org.Hs.eg.db,
+                 OrgDb         = org.Mm.eg.db,
+                 keyType       = 'ENSEMBL',
+                 ont           = "BP",
+                 pAdjustMethod = "BH",
+                 pvalueCutoff  = 0.01,
+                 qvalueCutoff  = 0.05)
+
+head(ego)
+
+# barplot(ego, showCategory=30)
+# 
+# 
+# ego <-  enrichGO(gene         = gene.df$ENSEMBL,
+#                  #universe     = bgs0.df$ENSEMBL,
+#                  #OrgDb         = org.Hs.eg.db,
+#                  OrgDb         = org.Mm.eg.db,
+#                  keyType       = 'ENSEMBL',
+#                  ont           = "BP",
+#                  pAdjustMethod = "BH",
+#                  pvalueCutoff  = 0.01,
+#                  qvalueCutoff  = 0.05)
+# 
+# head(ego)
+
+barplot(ego, showCategory=30) + ggtitle("Go term enrichment for promoter peaks in Akane's ATAC-seq data")
+
+edox <- setReadable(ego, 'org.Mm.eg.db', 'ENSEMBL')
+library(DOSE)
+
+edox2 <- pairwise_termsim(edox)
+p1 <- treeplot(edox2)
+p2 <- treeplot(edox2, hclust_method = "average")
+aplot::plot_list(p1, p2, tag_levels='A')
+
+
+write.csv(ego, file = paste0(resDir, "GO_term_enrichmenet_for_upregulated_genes_pval_0.05.csv"), 
+          row.names = TRUE)
+
+
+
 
 ##########################################
 # highlight TFs and EPs in positional genes 
@@ -621,12 +748,6 @@ load(file = paste0(RdataDir, 'RNAseq_design_dds.object.Rdata'))
 annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
                        'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
 
-tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
-sps = readRDS(file = '~/workspace/imp/organoid_patterning/results/Rdata/curated_signaling.pathways_gene.list_v2.rds')
-eps = readRDS(file = paste0('../data/human_chromatin_remodelers_Epifactors.database.rds'))
-rbp = readRDS(file = paste0('../data/human_RBPs_rbpdb.rds'))
-tfs = unique(tfs$`HGNC symbol`)
-sps = toupper(unique(sps$gene))
 
 #dds0 = dds
 #fpm0 = fpm(dds)
