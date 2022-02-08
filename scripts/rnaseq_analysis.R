@@ -438,9 +438,8 @@ if(Test.glmpca.mds){
 
 ########################################################
 ########################################################
-# Section III: check the differential expressed genes, 
+# Section III: positonal genes from both microarray and RNA-seq
 # mainly TFs that are changed in mature UA, LA and Hand (head as a control)
-# TFs that are changes in regeneration mature UA, BL.day5, BL.day9, BL.day13.proximal (Development as control)
 # 
 ########################################################
 ########################################################
@@ -449,6 +448,7 @@ if(Test.glmpca.mds){
 # position-dependent genes from microarray 
 ##########################################
 require(limma)
+
 
 Rdata.microarray = "../results/microarray/Rdata/"
 load(file = paste0(Rdata.microarray, 'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary.Rdata'))
@@ -745,6 +745,15 @@ if(saveTables){
   
 }
 
+
+########################################################
+########################################################
+# Section III: check the differential expressed genes, 
+# mainly TFs that are changed in mature UA, LA and Hand (head as a control)
+# TFs that are changes in regeneration mature UA, BL.day5, BL.day9, BL.day13.proximal (Development as control)
+# 
+########################################################
+########################################################
 
 ########################################################
 ########################################################
