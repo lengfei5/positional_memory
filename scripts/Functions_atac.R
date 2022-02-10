@@ -437,7 +437,7 @@ Test.promoter.openness.enrichment = function(res, pp, bg)
   xx$gene = sapply(xx$gene, function(x) {x = unlist(strsplit(as.character(x), '[|]')); x[length(x)]})
   
   annot = readRDS(paste0(annotDir, 
-                         'AmexT_v47_transcriptID_transcriptCotig_geneSymbol.nr_geneSymbol.hs_geneID_gtf.geneInfo_gtf.transcriptInfo.rds'))
+            'AmexT_v47_transcriptID_transcriptCotig_geneSymbol.nr_geneSymbol.hs_geneID_gtf.geneInfo_gtf.transcriptInfo.rds'))
   
   mm = match(xx$gene, annot$transcriptid_gtf.transcript)
   xx$gene = annot$geneID_gtf.gene[mm]
@@ -1588,6 +1588,7 @@ pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
   library(Seurat)
   library(patchwork)
   
+  colnames(counts) = rownames(metadata)
   aa = CreateSeuratObject(counts = counts, project = "limb_regeneration", assay = 'RNA', meta.data = as.data.frame(metadata),
                           min.cells = 3, min.features = 500)
   
@@ -1595,7 +1596,7 @@ pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
   FeatureScatter(aa, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
   
   aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
-  aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 2000)
+  aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 3000)
   all.genes <- rownames(aa)
   aa <- ScaleData(aa, features = all.genes)
   aa <- RunPCA(aa, features = VariableFeatures(object = aa))
@@ -1603,17 +1604,24 @@ pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
   
   aa <- FindNeighbors(aa, dims = 1:10)
   aa <- FindClusters(aa, resolution = 0.5)
-  aa <- RunUMAP(aa, dims = 1:10)
-  DimPlot(aa, reduction = "umap")
+  
+  aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.2)
+  p1 = DimPlot(aa, reduction = "umap", group.by = 'timepoint')
+  p2 = DimPlot(aa, reduction = "umap", group.by = 'batch')
+  
+  p1 + p2
+  
+  ggsave(paste0(resDir, "/Overview_Gerber2018_Fluidigm.C1_batches.pdf"), width = 12, height = 8)
   
   
   ##########################################
   # pool scRNA-seq data to have pseudo-bulk 
   ##########################################
-  sels = which(metadata$timepoint == '0dpa'| metadata$timepoint == 'Stage40' | metadata$timepoint == 'Stage44')
-  metadata = metadata[sels, ]
+  #sels = which(metadata$timepoint == '0dpa'| metadata$timepoint == 'Stage40' | metadata$timepoint == 'Stage44')
+  #metadata = metadata[sels, ]
   
-  conds = unique(metadata$condition)
+  raw = counts
+  conds = c('0dpa', 'Stage40', 'Stage44')
   pseudo = matrix(NA, ncol = length(conds), nrow = nrow(raw))
   colnames(pseudo) = conds
   rownames(pseudo) = rownames(raw)
@@ -1623,7 +1631,7 @@ pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
     cat(n, ' : ', conds[n], ' -- ')
     jj = which(metadata$condition == conds[n])
     
-    mm = match(metadata$sample[jj], colnames(raw))
+    mm = match(metadata$cell_id[jj], colnames(raw))
     if(length(which(is.na(mm)))>0) {
       cat('some cells lost \n')
     }else{
@@ -1634,7 +1642,53 @@ pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
     }
   }
   
-  saveRDS(pseudo, file = paste0(RdataDir, 'pseudoBulk_scRNAcellPooling_FluidigmC1_stage40.44.mUA.rds'))
+  pseudo[, 2] = pseudo[,2] + pseudo[, 3]
+  pseudo = pseudo[, c(1, 2)]
+  colnames(pseudo) = c('mUA', 'stage40.44')
+  
+  annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                         'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
+  
+  mm = match(rownames(pseudo), annot$geneID)
+  ggs = paste0(annot$gene.symbol.toUse[mm], '_',  annot$geneID[mm])
+  ggs[is.na(mm)] = rownames(pseudo)[is.na(mm)]
+  rownames(pseudo) = ggs
+  
+  require(DESeq2)
+  condition = factor(c('mUA', 'stage40.44'))
+  dds <- DESeqDataSetFromMatrix(pseudo, DataFrame(condition), design = ~ condition)
+  
+  ss = rowSums(counts(dds))
+  hist(log10(ss), breaks = 100)
+  dds = dds[which(ss > 20), ]
+  
+  dds = estimateSizeFactors(dds)
+  
+  ss = rowSums(counts(dds))
+  length(which(ss > quantile(ss, probs = 0.75)))
+  
+  #ss = rowMeans(counts(dds))
+  dd0 = dds[ss > quantile(ss, probs = 0.75), ]
+  dd0 = estimateSizeFactors(dd0)
+  
+  fpm = fpm(dds, robust = TRUE)
+  fpm = log2(fpm)
+  
+  rr = fpm[, 1] - fpm[, 2]
+  
+  par(mfrow = c(1, 2))
+  hist(fpm[, 2], breaks = 100, main = 'log2 expression of stage40.44');abline(v = 2)
+  plot(fpm, cex = 0.2);
+  abline(0, 1, lwd = 2.0, col = 'red');
+  abline(-1, 1, lwd = 2.0, col = 'red'); 
+  abline(1, 1, lwd = 2.0, col = 'red'); 
+  abline(h = 2)
+  
+  gene.sels = rownames(fpm)[which(abs(rr)>1 & fpm[,2] >2) ]
+  save(dds, gene.sels, 
+       file = paste0(RdataDir, '/pseudoBulk_scRNAcellPooling_FluidigmC1_stage40.44.mUA_dev_geneSelection.Rdata'))
+  
+  #saveRDS(pseudo, file = paste0(RdataDir, 'pseudoBulk_scRNAcellPooling_FluidigmC1_stage40.44.mUA.rds'))
   
 }
 
@@ -2598,7 +2652,7 @@ ATACseq.peaks.binary.analysis = function()
     }
     
     xx = read.delim(file = 
-                      '../results/R10723_Rxxxx_atacseq_bowtie2.newParam_mtDNA_picardrmdup_20210208/HoxCluster.peaks_annotation_CNEs.txt',
+      '../results/R10723_Rxxxx_atacseq_bowtie2.newParam_mtDNA_picardrmdup_20210208/HoxCluster.peaks_annotation_CNEs.txt',
                     sep = '\t', header = TRUE)
     
     #xx = xx[which(xx$seqnames == 'chr2p'), ]
@@ -2660,11 +2714,14 @@ Grouping.peaks.for.promoters.enhancers = function()
   ##########################################
   #  select conditions of interest
   ##########################################
-  #conds.sel = c('Embryo_Stage40_93',  'Embryo_Stage40_13', 'Embryo_Stage44_proximal', 'Embryo_Stage44_distal',  'Mature_UA_', 'Mature_LA', 
-  #              'Mature_Hand', 'BL_UA_5days_13', 'BL_UA_5days_89',  'BL_UA_9days_13', 'BL_UA_13days_proximal', 'BL_UA_13days_distal')
+  #conds.sel = c('Embryo_Stage40_93',  'Embryo_Stage40_13', 'Embryo_Stage44_proximal', 'Embryo_Stage44_distal', 
+  # 'Mature_UA_', 'Mature_LA', 
+  #              'Mature_Hand', 'BL_UA_5days_13', 'BL_UA_5days_89',  'BL_UA_9days_13', 'BL_UA_13days_proximal', 
+  # 'BL_UA_13days_distal')
   
   conds.sel = c('Embryo_Stage40_93',  'Embryo_Stage40_13', 'Embryo_Stage44_proximal', 'Embryo_Stage44_distal',
-                'Mature_UA_13',  'Mature_LA', 'Mature_Hand', 'BL_UA_5days_13', 'BL_UA_5days_89',  'BL_UA_9days_13', 'BL_UA_13days_proximal',
+                'Mature_UA_13',  'Mature_LA', 'Mature_Hand', 'BL_UA_5days_13', 'BL_UA_5days_89',  'BL_UA_9days_13', 
+                'BL_UA_13days_proximal',
                 'BL_UA_13days_distal')
   #conds.sel = c('Mature_UA_13', 'Mature_UA_74938|Mature_UA_102655', 'Mature_LA', 'Mature_Hand')
   
@@ -2966,7 +3023,8 @@ extract.stat.for.samples.manual = function()
               col.names = TRUE, row.names = FALSE, quote = FALSE, sep = '\t')
   
   #stats = data.frame(design, stats[index, ], stringsAsFactors = FALSE)
-  #colnames(stats) = c('sampleID', 'samples', 'fileName', 'total',  'adapter.trimmed', 'mapped', 'chrM.rm', 'unique', 'unique.rmdup')
+  #colnames(stats) = c('sampleID', 'samples', 'fileName', 'total',  'adapter.trimmed', 'mapped', 'chrM.rm', 'unique', 
+  # 'unique.rmdup')
   
   #stats$trimming.pct = as.numeric(stats$adapter.trimmed)/as.numeric(stats$total)
   # stats$mapped.pct = as.numeric(stats$mapped)/as.numeric(stats$adapter.trimmed)
