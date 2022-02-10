@@ -1489,13 +1489,20 @@ make.heatmap.atacseq = function(cpm)
 ########################################################
 pseudo.bulk.by.pooling.scRNAseq = function()
 {
-  scRNAseq.counts = read.delim(file = 
-                  '../../limbRegeneration_scRNA/raw_NGS/axolotl/Gerber_2018/Fluidigm_C1/nf_out/featureCounts/merged_gene_counts.txt',
-                               header = TRUE)
+  scRNADir = '/Volumes/groups/tanaka/People/current/jiwang/projects/limbRegeneration_scRNA/raw_NGS/axolotl/Gerber_2018/'
+  scRNAseq.counts = read.delim(file = paste0(scRNADir, 'Fluidigm_C1/nf_out/featureCounts/merged_gene_counts.txt'), header = TRUE)
   
-  metadata = read.delim(file = '../../limbRegeneration_scRNA/raw_NGS/axolotl/Gerber_2018/Metadata.txt')
-  metadata = data.frame(metadata[which(metadata$Technology == 'Fluidigm C1'), ])
-  metadata$Sample = as.character(metadata$Sample)
+  metadata = read.delim(file = paste0(scRNADir, 'Metadata_EBI.ENA_filereport_read_run_PRJNA416091_tsv.txt'), header = TRUE)
+  metadata = data.frame(metadata$run_accession, metadata$sample_title)
+  
+  cellannot = read.csv(file = paste0(scRNADir, 'aaq0681_TableS7.csv'))
+  cellannot = cellannot[, c(1:3)]
+  
+  mm = match(cellannot$cell_id, metadata$metadata.sample_title)
+  metadata = data.frame(cellannot, metadata[mm, ], stringsAsFactors = FALSE)
+  
+  #metadata = data.frame(metadata[which(metadata$Technology == 'Fluidigm C1'), ])
+  #metadata$Sample = as.character(metadata$Sample)
   
   condition = metadata$Sample
   condition = gsub('forelimb upper arm ', '', condition)
@@ -1535,6 +1542,64 @@ pseudo.bulk.by.pooling.scRNAseq = function()
   saveRDS(pseudo, file = paste0(RdataDir, 'pseudoBulk_scRNAcellPooling_FluidigmC1.rds'))
   
 }
+
+
+pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
+{
+  scRNADir = '/Volumes/groups/tanaka/People/current/jiwang/projects/limbRegeneration_scRNA/raw_NGS/axolotl/Gerber_2018/'
+  scRNAseq.counts = read.delim(file = paste0(scRNADir, 'Fluidigm_C1/nf_out/featureCounts/merged_gene_counts.txt'), header = TRUE)
+  
+  metadata = read.delim(file = paste0(scRNADir, 'Metadata_EBI.ENA_filereport_read_run_PRJNA416091_tsv.txt'), header = TRUE)
+  metadata = data.frame(metadata$run_accession, metadata$sample_title)
+  
+  cellannot = read.csv(file = paste0(scRNADir, 'aaq0681_TableS7.csv'))
+  cellannot = cellannot[, c(1:3)]
+  
+  mm = match(cellannot$cell_id, metadata$metadata.sample_title)
+  metadata = data.frame(cellannot, metadata[mm, ], stringsAsFactors = FALSE)
+  
+  #metadata = data.frame(metadata[which(metadata$Technology == 'Fluidigm C1'), ])
+  #metadata$Sample = as.character(metadata$Sample)
+  
+  condition = metadata$Sample
+  condition = gsub('forelimb upper arm ', '', condition)
+  condition = gsub(' forelimb limb bud', '', condition)
+  condition = gsub(' ', '_', condition)
+  #condition = gsub('11_dpa', 'dpa11', condition)
+  
+  metadata$condition = condition
+  
+  raw = as.matrix(scRNAseq.counts[ ,-1])
+  rownames(raw) = scRNAseq.counts$ENSEMBL_ID
+  
+  names = colnames(raw)
+  names = gsub('_1.sorted_gene.featureCounts.txt', '', names)
+  colnames(raw) = names
+  
+  conds = unique(metadata$condition)
+  pseudo = matrix(NA, ncol = length(conds), nrow = nrow(raw))
+  colnames(pseudo) = conds
+  rownames(pseudo) = rownames(raw)
+  
+  for(n in 1:length(conds))
+  {
+    cat(n, ' : ', conds[n], ' -- ')
+    jj = which(metadata$condition == conds[n])
+    mm = match(metadata$Run[jj], colnames(raw))
+    if(length(which(is.na(mm)))>0) {
+      cat('some cells lost \n')
+    }else{
+      cat(length(mm), ' cell found \n')
+      xx = as.matrix(raw[, mm])
+      xx[is.na(xx)] = 0
+      pseudo[,n] = apply(xx, 1, sum)
+    }
+  }
+  
+  saveRDS(pseudo, file = paste0(RdataDir, 'pseudoBulk_scRNAcellPooling_FluidigmC1.rds'))
+  
+}
+
 
 
 compare.Akane.RNAseq.pseudobulk.scRNAseq = function()

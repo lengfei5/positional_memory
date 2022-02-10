@@ -177,6 +177,8 @@ xx = data.frame(xx, my_gene_col, stringsAsFactors = FALSE)
 save(xx, keep, file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl_clustered.4groups_', 
                              version.analysis, '.Rdata'))
 
+
+
 conds = c("Mature_UA", "Mature_LA", "Mature_Hand")
 
 df <- data.frame(conds)
@@ -199,6 +201,23 @@ if(saveTable){
   yy = data.frame(keep, xx, stringsAsFactors = FALSE)
   write.csv(yy, file = paste0(tableDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head.csv'), 
             quote = FALSE, row.names = TRUE)
+  
+  # save bed files of different peak groups
+  load(file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl_clustered.4groups_', 
+                     version.analysis, '.Rdata'))
+  
+  for(c in unique(xx$cluster))
+  {
+    # c = '1'
+    ss = xx[which(xx$cluster == c), ]
+    
+    ss = data.frame(ss$seqnames, ss$start, ss$end, rownames(ss), rep(0, nrow(ss)), rep('*', nrow(ss)))
+    
+    write.table(ss, file = 
+      paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/makeHeatmaps/peak_groups/', 
+             'peak_group_', c, '.bed'), sep = '\t', row.names = FALSE, col.names = FALSE, quote = FALSE)
+    
+  }
   
 }
 
