@@ -1558,23 +1558,60 @@ pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
   mm = match(cellannot$cell_id, metadata$metadata.sample_title)
   metadata = data.frame(cellannot, metadata[mm, ], stringsAsFactors = FALSE)
   
-  #metadata = data.frame(metadata[which(metadata$Technology == 'Fluidigm C1'), ])
-  #metadata$Sample = as.character(metadata$Sample)
+  save(metadata, scRNAseq.counts, file = paste0(RdataDir, '/Gerber_2018_Fluidigm_C1.Rdata'))
   
-  condition = metadata$Sample
-  condition = gsub('forelimb upper arm ', '', condition)
-  condition = gsub(' forelimb limb bud', '', condition)
-  condition = gsub(' ', '_', condition)
-  #condition = gsub('11_dpa', 'dpa11', condition)
+  load(file = paste0(RdataDir, '/Gerber_2018_Fluidigm_C1.Rdata'))
   
-  metadata$condition = condition
+  counts = scRNAseq.counts[, -1]
+  rownames(counts) = scRNAseq.counts$ENSEMBL_ID
   
-  raw = as.matrix(scRNAseq.counts[ ,-1])
-  rownames(raw) = scRNAseq.counts$ENSEMBL_ID
+  accs = sapply(colnames(counts), function(x) unlist(strsplit(as.character(x), '_'))[1])
   
-  names = colnames(raw)
-  names = gsub('_1.sorted_gene.featureCounts.txt', '', names)
-  colnames(raw) = names
+  mm = match(metadata$metadata.run_accession, accs)
+  metadata = metadata[which(!is.na(mm)), ]
+  counts = counts[, mm[which(!is.na(mm))]]
+  colnames(counts) = as.character(metadata$metadata.run_accession)
+  
+  metadata$condition = metadata$timepoint
+  metadata$sample = as.character(metadata$metadata.run_accession)
+  
+  #raw = as.matrix(counts[ ,-1])
+  #rownames(raw) = counts$ENSEMBL_ID
+  
+  metadata$batch = sapply(metadata$cell_id, function(x) unlist(strsplit(as.character(x), '[.]'))[1])
+  rownames(metadata) = metadata$cell_id
+  
+  ##########################################
+  # check scRNA-seq data 
+  ##########################################
+  library(dplyr)
+  library(Seurat)
+  library(patchwork)
+  
+  aa = CreateSeuratObject(counts = counts, project = "limb_regeneration", assay = 'RNA', meta.data = as.data.frame(metadata),
+                          min.cells = 3, min.features = 500)
+  
+  VlnPlot(aa, features = c("nFeature_RNA", "nCount_RNA"), ncol = 2)
+  FeatureScatter(aa, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+  
+  aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
+  aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 2000)
+  all.genes <- rownames(aa)
+  aa <- ScaleData(aa, features = all.genes)
+  aa <- RunPCA(aa, features = VariableFeatures(object = aa))
+  ElbowPlot(aa)
+  
+  aa <- FindNeighbors(aa, dims = 1:10)
+  aa <- FindClusters(aa, resolution = 0.5)
+  aa <- RunUMAP(aa, dims = 1:10)
+  DimPlot(aa, reduction = "umap")
+  
+  
+  ##########################################
+  # pool scRNA-seq data to have pseudo-bulk 
+  ##########################################
+  sels = which(metadata$timepoint == '0dpa'| metadata$timepoint == 'Stage40' | metadata$timepoint == 'Stage44')
+  metadata = metadata[sels, ]
   
   conds = unique(metadata$condition)
   pseudo = matrix(NA, ncol = length(conds), nrow = nrow(raw))
@@ -1585,7 +1622,8 @@ pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
   {
     cat(n, ' : ', conds[n], ' -- ')
     jj = which(metadata$condition == conds[n])
-    mm = match(metadata$Run[jj], colnames(raw))
+    
+    mm = match(metadata$sample[jj], colnames(raw))
     if(length(which(is.na(mm)))>0) {
       cat('some cells lost \n')
     }else{
@@ -1596,10 +1634,9 @@ pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
     }
   }
   
-  saveRDS(pseudo, file = paste0(RdataDir, 'pseudoBulk_scRNAcellPooling_FluidigmC1.rds'))
+  saveRDS(pseudo, file = paste0(RdataDir, 'pseudoBulk_scRNAcellPooling_FluidigmC1_stage40.44.mUA.rds'))
   
 }
-
 
 
 compare.Akane.RNAseq.pseudobulk.scRNAseq = function()
@@ -3019,5 +3056,4 @@ select.plot.top.positional.peaks = function()
   }
   
 }
-
 
