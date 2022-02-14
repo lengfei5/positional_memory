@@ -756,6 +756,7 @@ if(grouping.position.dependent.peaks){
                        apply(as.matrix(keep[,grep(conds[3], colnames(keep))]), 1, mean),
                    apply(as.matrix(keep[,grep(conds[4], colnames(keep))]), 1, mean)
   )
+  
   colnames(yy1) = conds
   yy1 <- t(apply(yy1, 1, cal_z_score))
   

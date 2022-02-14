@@ -1672,9 +1672,9 @@ pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
   dd0 = estimateSizeFactors(dd0)
   
   fpm = fpm(dds, robust = TRUE)
-  fpm = log2(fpm)
+  fpm = log2(fpm + 2^-7)
   
-  rr = fpm[, 1] - fpm[, 2]
+  rr = fpm[, 2] - fpm[, 1]
   
   par(mfrow = c(1, 2))
   hist(fpm[, 2], breaks = 100, main = 'log2 expression of stage40.44');abline(v = 2)
@@ -1684,14 +1684,12 @@ pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
   abline(1, 1, lwd = 2.0, col = 'red'); 
   abline(h = 2)
   
-  gene.sels = rownames(fpm)[which(abs(rr)>1 & fpm[,2] >2) ]
-  save(dds, gene.sels, 
+  gene.sels1 = rownames(fpm)[which((rr)>1 & fpm[,2] >2) ]
+  gene.sels2 = rownames(fpm)[which((rr)>2 & fpm[,2] >2) ]
+  save(dds, gene.sels1, gene.sels2,  
        file = paste0(RdataDir, '/pseudoBulk_scRNAcellPooling_FluidigmC1_stage40.44.mUA_dev_geneSelection.Rdata'))
-  
-  #saveRDS(pseudo, file = paste0(RdataDir, 'pseudoBulk_scRNAcellPooling_FluidigmC1_stage40.44.mUA.rds'))
-  
+    
 }
-
 
 compare.Akane.RNAseq.pseudobulk.scRNAseq = function()
 {
