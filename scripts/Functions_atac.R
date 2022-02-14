@@ -320,7 +320,7 @@ annotatePeak.curateAxolotl = function(peaks)
   
   xx = overlapsAny(pp, promoter, ignore.strand = TRUE)
   
-  peaks$promoters[xx] = 'promters'
+  peaks$promoters[xx] = 'promoters'
   
   ##########################################
   # promoter annotation

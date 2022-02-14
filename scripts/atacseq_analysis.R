@@ -530,7 +530,6 @@ if(grouping.position.dependent.peaks){
   fpm = readRDS(file = paste0(RdataDir, '/fpm.bc_TMM_combat_MatureSamples_batch2019.2020.2021.2021S.2022.rds'))
   design = readRDS(file = paste0(RdataDir, '/design_sels_bc_TMM_combat_MatureSamples_batch2019.2020.2021.2021S.2022.rds'))
   
-  
   # prepare the background distribution
   fpm.bg = fpm[grep('bg_', rownames(fpm), invert = FALSE), ]
   fpm = fpm[grep('bg_', rownames(fpm), invert = TRUE), ]
@@ -571,6 +570,67 @@ if(grouping.position.dependent.peaks){
     rownames(pp.annots) = rownames(fpm)
     
     promoters = select.promoters.regions(upstream = 2000, downstream = 2000, ORF.type.gtf = 'Putative', promoter.select = 'all')
+    
+    ##########################################
+    # UA gene expression vs promoter signals  
+    ##########################################
+    ## UA promoter signals 
+    ua.annot = data.frame(pp.annots, mUA = apply(fpm[, grep('Mature_UA', colnames(fpm))], 1, mean))
+    ua.promoters = ua.annot[grep('Promoter', ua.annot$annotation), ]
+    ua.promoters$mUA = as.numeric(ua.promoters$mUA) - log2(10^3/as.numeric(ua.promoters$width))
+    aa = ua.promoters
+    rm(ua.annot)
+    rm(ua.promoters)
+    aa$transcript = sapply(aa$geneId, function(x) {x = unlist(strsplit(as.character(x), '[|]')); return(x[length(x)])})
+    
+    annot = readRDS(paste0(annotDir, 
+      'AmexT_v47_transcriptID_transcriptCotig_geneSymbol.nr_geneSymbol.hs_geneID_gtf.geneInfo_gtf.transcriptInfo.rds'))
+    aa$Gene = annot$geneID[match(aa$transcript, annot$transcriptID)]
+    
+    load(file = paste0("../results/microarray/Rdata/", 
+                       'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_DEpval.Rdata'))
+    
+    rnas = apply(res[, c(1:3)], 1, mean)
+    ggs = names(rnas)
+    ggs = sapply(ggs, function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
+    
+    ua = data.frame(gene = unique(c(ggs, aa$Gene)) , stringsAsFactors = FALSE)
+    ua$rna = rnas[match(ua$gene, ua$gene)]
+    ua$gene.length = NA
+    ua$promoter.mean = NA
+    ua$promoter.max = NA
+    
+    for(n in 1:nrow(ua))
+    {
+      # n = 1
+      cat(n, '\n')
+      kk = which(annot$geneID == ua$gene[n])
+      ua$gene.length[n] = median(as.numeric(annot$end_transcript[kk]) - as.numeric(annot$start_transcript[kk]))
+      jj = which(aa$Gene == ua$gene[n])
+      if(length(jj)>0) {
+        ua$promoter.max[n] = max(as.numeric(aa$mUA[jj]))
+        ua$promoter.mean[n] = mean(as.numeric(aa$mUA[jj]))
+      }
+    }
+    
+    ua$rpkm = ua$rna - log2(10^3/ua$gene.length)
+    
+    #ua$promoter[which(is.na(ua$promoter))] = -5
+    load(file = paste0(RdataDir, '/pseudoBulk_scRNAcellPooling_FluidigmC1_stage40.44.mUA_dev_geneSelection.Rdata'))
+    gene.sels2 =  sapply(gene.sels2, function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
+    load(file =  paste0(annotDir, 'axolotl_housekeepingGenes_controls.other.tissues.liver.islet.testis_expressedIn21tissues.Rdata'))
+    
+    hs = controls.tissue$geneIDs[which(controls.tissue$tissues == 'housekeeping')]
+    ctl =  controls.tissue$geneIDs[which(controls.tissue$tissues == '!housekeeping')]
+    
+    plot(ua$rpkm, ua$promoter.max, cex = 0.2, ylim = c(-2, 10))
+    kk = match(gene.sels2, ua$gene)
+    points(ua$rpkm[kk], ua$promoter.max[kk], cex = 0.4, col = 'red')
+    kk = match(hs, ua$gene)
+    points(ua$rpkm[kk], ua$promoter.max[kk], cex = 0.1, col = 'orange')
+    kk = match(ctl, ua$gene)
+    points(ua$rpkm[kk], ua$promoter.max[kk], cex = 0.8, col = 'blue')
+
     
   }
   
@@ -867,12 +927,6 @@ if(grouping.position.dependent.peaks){
   
   # prepare step is in the MARA_functions.R
   xx = run.MARA.atac.spatial(keep, cc)
-  
-  
-  ##########################################
-  #  
-  ##########################################
-  
   
 }
 
