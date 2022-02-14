@@ -36,7 +36,7 @@ figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jing
 tableDir = paste0(figureDir, 'tables4plots/')
 
 if(!dir.exists(resDir)){dir.create(resDir)}
-if(!dir.exists(tabDir)){dir.create(tabDir)}
+if(!dir.exists(tableDir)){dir.create(tableDir)}
 if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 
 ########################################################
@@ -741,6 +741,7 @@ pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
 
 
 
+
 ##########################################
 # DEseq2 normalization of RNA-seq data 
 ##########################################
@@ -897,6 +898,7 @@ for(cc in c('mHand', 'mLA', 'mUA'))
 #             quote = FALSE, col.names = TRUE, row.names = FALSE)
 #   
 # }
+
 
 ########################################################
 ########################################################

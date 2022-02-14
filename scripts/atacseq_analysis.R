@@ -868,6 +868,12 @@ if(grouping.position.dependent.peaks){
   # prepare step is in the MARA_functions.R
   xx = run.MARA.atac.spatial(keep, cc)
   
+  
+  ##########################################
+  #  
+  ##########################################
+  
+  
 }
 
 ########################################################
