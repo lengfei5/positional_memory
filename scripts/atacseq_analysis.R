@@ -792,20 +792,43 @@ if(grouping.position.dependent.peaks){
   
   load(file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata'))
   
-  make.pca.plots(keep, ntop = 1246, conds.plot = 'Mature')
+  amex = makeTxDbFromGFF(file = paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf'))
+  pp = data.frame(t(sapply(rownames(xx), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  pp$strand = '*'
   
+  pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
+  
+  # make.pca.plots(keep, ntop = 1246, conds.plot = 'Mature')
   rep.sels = grep('HEAD|102657|102655|74938', colnames(keep), invert = TRUE)
-  yy = keep[, rep.sels]
   
+  yy = keep[, rep.sels]
   cal_z_score <- function(x){
     (x - mean(x)) / sd(x)
   }
   
   yy <- t(apply(yy, 1, cal_z_score))
   
+  nb_clusters = 4
+  
+  saveDir = paste0(figureDir, 'positional_peaks_clusters_', nb_clusters)
+  if(!dir.exists(saveDir)) dir.create(saveDir)
+  
   my_hclust_gene <- hclust(dist(yy), method = "complete")
- 
-  my_gene_col <- cutree(tree = as.dendrogram(my_hclust_gene), k = 4)
+  
+  my_gene_col <- cutree(tree = as.dendrogram(my_hclust_gene), k = nb_clusters)
+  xx$clusters = my_gene_col
+  
+  # ii_order = c();  gaps.row = c()
+  # for(m in 1:nb_clusters) 
+  # {
+  #   cat(m, '\n')
+  #   ii_order = c(ii_order, which(my_gene_col == m)); 
+  #   if(m < nb_clusters) gaps.row = c(gaps.row, length(ii_order))
+  #   #cat(gaps.row)
+  # }
+  # #yy = yy[ii_order, ]
+  # my_gene_col <- data.frame(cluster = my_gene_col[ii_order])
   
   my_gene_col <- data.frame(cluster = my_gene_col)
   
@@ -816,14 +839,40 @@ if(grouping.position.dependent.peaks){
   annot_colors = c('springgreen4', 'steelblue2', 'gold2')
   names(annot_colors) = c('Mature_UA', 'Mature_LA', 'Mature_Hand')
   annot_colors = list(segments = annot_colors)
-  ii.gaps = c(3, 6)
-  pheatmap(yy, annotation_row = my_gene_col, annotation_col = df, show_rownames = FALSE, scale = 'none', 
+  
+  gaps.col = c(3, 6)
+  
+  pheatmap(yy, annotation_row = my_gene_col, 
+           annotation_col = df, show_rownames = FALSE, scale = 'none', 
            show_colnames = FALSE,
-           cluster_rows = TRUE, cluster_cols = FALSE,  clustering_method = 'complete',
-           annotation_colors = annot_colors, cutree_rows = 4, 
-           gaps_col = ii.gaps, 
-           filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
-           width = 8, height = 10)
+           cluster_rows = TRUE, cluster_cols = FALSE,  
+           clustering_method = 'complete', cutree_rows = 4, 
+           annotation_colors = annot_colors, 
+           gaps_col = gaps.col, 
+           #gaps_row =  gaps.row, 
+           filename = paste0(saveDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
+           width = 8, height = 12)
+  
+  for(m in 1:nb_clusters)
+  {
+    # m = 1
+    pp.annots = annotatePeak(pp[which(xx$cluster == m)], TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+    
+    pdfname = paste0(saveDir, "Fig1E_positional_peak_feature_distribution_group2.pdf")
+    pdf(pdfname, width = 8, height = 6)
+    par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+    
+    plotPeakAnnot_piechart(pp.annots)
+    
+    dev.off()
+    
+  }
+  
+  write.csv(xx, file = paste0(saveDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters', 
+                              nb_clusters, '.csv'), quote = FALSE, row.names = TRUE)
+  
+      
+  
   
   
   ##########################################
