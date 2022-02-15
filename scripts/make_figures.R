@@ -24,6 +24,24 @@ annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotat
 gtf.file =  paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf')
 
 
+plotPeakAnnot_piechart = function(peakAnnots, ndigit = 2)
+{
+  # Create Data
+  data <- data.frame(peakAnnots@annoStat, stringsAsFactors = FALSE)
+  data$Feature = as.character(data$Feature)
+  data$Frequency[which(data$Feature == 'Promoter (<=1kb)')] = sum(data$Frequency[grep('Promoter', data$Feature)])
+  data = data[-which(data$Feature == 'Promoter (1-2kb)'), ]
+  data$Feature[which(data$Feature == 'Promoter (<=1kb)')] = 'Promoter (<=2kb)'
+  
+  data$Feature = paste0(data$Feature, ' (', signif(data$Frequency, d =ndigit), "%)")
+  
+  ggplot(data, aes(x="", y=Frequency, fill = factor(Feature, levels = Feature))) +
+    geom_bar(stat="identity", width=1,  color="white") +
+    coord_polar("y", start=0) +
+    theme_void() +
+    scale_fill_brewer(palette="Set1", direction = 1)
+  
+}
 ########################################################
 ########################################################
 # Figure 1: ATAC-seq positional peaks 
@@ -43,30 +61,39 @@ pval.cutoff = 6
 #load(file = paste0(RdataDir, '/consensus_peaks_intersectReplicates_pval', pval.cutoff, 'version_', version.analysis, 'Mature.Rdata'))
 load( file = paste0(RdataDir, '/consensus_peaks_intersectReplicates_pval', pval.cutoff, 'version_', version.analysis, 'Mature.Rdata'))
 
-## exclude head peaks
-ua = ua[!overlapsAny(ua, hc)]
-la = la[!overlapsAny(la, hc)]
-hd = hd[!overlapsAny(hd, hc)]
+##########################################
+# compare ua, la, hd, hc
+##########################################
+#ua = ua[!overlapsAny(ua, hc)]
+#la = la[!overlapsAny(la, hc)]
+#hd = hd[!overlapsAny(hd, hc)]
+
+annot_colors = c('springgreen4', 'steelblue2', 'gold2', 'darkgray')
 
 pmature = union(ua, la)
 pmature = union(pmature, hd)
+pmature = union(pmature, hc)
 
-ol.peaks <- makeVennDiagram(list(ua, la, hd), NameOfPeaks=c('mUA', 'mLA', 'mHand'), connectedPeaks="keepAll", by = 'region', 
-                            plot = TRUE)
-v <- venn_cnt2venn(ol.peaks$vennCounts)
-try(plot(v))
+library(Vennerable)
+#ol.peaks <- makeVennDiagram(list(ua, la, hd, hc), NameOfPeaks=c('mUA', 'mLA', 'mHand', 'Head'), connectedPeaks="merge", by = 'region', 
+#                            plot = TRUE, fill=annot_colors)
+#v <- venn_cnt2venn(ol.peaks$vennCounts)
+#try(plot(v))
 
-pdfname = paste0(figureDir, 'Fig1B_matureSamples_atacseqPeak_comparison_venndiagram.pdf')
+pdfname = paste0(figureDir, 'FigS1B_matureSamples_Head_atacseqPeak_comparison_venndiagram.pdf')
 pdf(pdfname, width = 10, height = 8)
 par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
 
-v <- venn_cnt2venn(ol.peaks$vennCounts)
-try(plot(v))
+#v <- venn_cnt2venn(ol.peaks$vennCounts)
+#try(plot(v))
+ol.peaks <- makeVennDiagram(list(ua, la, hd, hc), NameOfPeaks=c('mUA', 'mLA', 'mHand', 'Head'), connectedPeaks="keepAll", by = 'region', 
+                            plot = TRUE, fill=annot_colors)
 
 dev.off()
 
 #load(file = paste0(RdataDir, '/peaks_set_union_conditions_pval', pval.cutoff, 'version_', version.analysis, '.Rdata'))
-pp = peak.merged
+# pp = peak.merged
+
 
 ##########################################
 # Fig 1C: feature distribution of mature peaks
@@ -75,14 +102,74 @@ amex = makeTxDbFromGFF(file = paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf'))
 
 peakAnnots = annotatePeak(pmature, TxDb=amex, tssRegion = c(-2000, 2000))
 
-pdfname = paste0(figureDir, "Fig1C_matureSample_peak_featureAssignment_distribution.pdf")
-pdf(pdfname, width = 8, height = 6)
+library(ggplot2)
+
+pdfname = paste0(figureDir, "FigS1C_matureSample.Head_peak_featureAssignment_distribution.pdf")
+pdf(pdfname, width = 10, height = 8)
 par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
 
-plotAnnoPie(peakAnnots)
+plotPeakAnnot_piechart(peakAnnots)
 
 dev.off()
 
+# Basic piechart
+# col3 <- c("#a6cee3", "#1f78b4", "#b2df8a",
+#           "#33a02c", "#fb9a99", "#e31a1c",
+#           "#fdbf6f", "#ff7f00", "#cab2d6",
+#           "#6a3d9a", "#ffff99", "#b15928")
+
+# anno.df = data
+# 
+# ndigit = 3
+# cex = 0.5
+# labels=paste(anno.df$Feature, " (",
+#              round(anno.df$Frequency/sum(anno.df$Frequency)*100, ndigit),
+#              "%)", sep="")
+# 
+# par(mai = c(0,0,0,0))
+# layout(matrix(c(1,2), ncol=2), widths=c(0.6,0.4))
+# pie(anno.df$Frequency, labels=NA, cex=cex, col=col3[1:nrow(anno.df)])
+# plot.new()
+# legend("center", legend = labels, fill = col3[1:nrow(anno.df)], bty = "n", cex = cex)
+
+##########################################
+# compare ua, la, hd excluding hc
+##########################################
+## exclude head peaks
+ua = ua[!overlapsAny(ua, hc)]
+la = la[!overlapsAny(la, hc)]
+hd = hd[!overlapsAny(hd, hc)]
+
+pmature = union(ua, la)
+pmature = union(pmature, hd)
+
+
+pdfname = paste0(figureDir, 'FigS1C_matureSamples_atacseqPeak_comparison_venndiagram.pdf')
+pdf(pdfname, width = 10, height = 8)
+par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+
+ol.peaks <- makeVennDiagram(list(ua, la, hd), NameOfPeaks=c('mUA', 'mLA', 'mHand'), connectedPeaks="keepAll", by = 'region', 
+                            plot = TRUE, fill=annot_colors[1:3])
+#v <- venn_cnt2venn(ol.peaks$vennCounts)
+#v <- venn_cnt2venn(ol.peaks$vennCounts)
+#try(plot(v))
+dev.off()
+
+#load(file = paste0(RdataDir, '/peaks_set_union_conditions_pval', pval.cutoff, 'version_', version.analysis, '.Rdata'))
+pp = peak.merged
+
+##########################################
+# Fig 1C: feature distribution of mature peaks
+##########################################
+peakAnnots = annotatePeak(pmature, TxDb=amex, tssRegion = c(-2000, 2000))
+
+pdfname = paste0(figureDir, "Fig1C_matureSample.noHead_peak_featureAssignment_distribution.pdf")
+pdf(pdfname, width = 10, height = 8)
+par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+
+plotPeakAnnot_piechart(peakAnnots = peakAnnots)
+
+dev.off()
 
 ### plot the partitions of Peaks into different genomics features and distance to TSS
 pdfname = paste0(figureDir, "peak_to_TSS_distance_distribution.pdf")

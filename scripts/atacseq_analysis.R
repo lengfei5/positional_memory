@@ -630,7 +630,7 @@ if(grouping.position.dependent.peaks){
     points(ua$rpkm[kk], ua$promoter.max[kk], cex = 0.1, col = 'orange')
     kk = match(ctl, ua$gene)
     points(ua$rpkm[kk], ua$promoter.max[kk], cex = 0.8, col = 'blue')
-
+    
     
   }
   
@@ -704,22 +704,23 @@ if(grouping.position.dependent.peaks){
   
   # select the positional peaks with pairwise comparisions 
   # limma logFC is in log2 scale
-  fdr.cutoff = 0.01; logfc.cutoff = 1
+  fdr.cutoff = 0.05; logfc.cutoff = 1
   jj = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & abs(res$logFC.mLA.vs.mUA) > logfc.cutoff) |
                (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & abs(res$logFC.mHand.vs.mUA) > logfc.cutoff)|
                (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & abs(res$logFC.mHand.vs.mLA) > logfc.cutoff)
   )
   cat(length(jj), '\n')
   
-  jj1 = which(res$prob.M0<0.01 & res$log2FC>logfc.cutoff)
+  jj1 = which(res$prob.M0< fdr.cutoff & res$log2FC>logfc.cutoff)
   cat(length(jj1), '\n')
-  jj2 = which(res$pval.lrt < 0.001 & res$log2FC > logfc.cutoff)
+  jj2 = which(res$pval.lrt < fdr.cutoff & res$log2FC > logfc.cutoff)
   cat(length(jj2), '\n')
+  
   
   xx = res[c(jj), ]
   #xx = xx[order(-xx$log2FC.mature), ]
-  xx[grep('HOXA13|SHOX', xx$transcriptId), c(1:8)]
-  fpm[which(rownames(fpm) == 'chr2p:873464923-873465440'), ]
+  xx[grep('HOXA13|SHOX', xx$transcriptId), ]
+  # fpm[which(rownames(fpm) == 'chr2p:873464923-873465440'), ]
   
   xx[grep('HOXA13|SHOX|MEIS', xx$transcriptId), ]
   
@@ -727,7 +728,6 @@ if(grouping.position.dependent.peaks){
   # sort positional peaks with logFC
   #xx = xx[order(-xx$logFC.mean), ]
   xx = xx[order(-xx$log2FC), ]
-  
   
   ########
   ## asscociate the signifiant postional peaks with expression matrix
@@ -766,6 +766,7 @@ if(grouping.position.dependent.peaks){
     abline(h = 3, col = 'red', lwd = 2.0)
     abline(v = c(0.5, 1), col = 'red', lwd = 2.0)
     
+    
     sels = which(rr>1 & ctl.mean<3 & maxs > 3 & mins <3)
     cat(length(sels), 'peaks selected \n')
     
@@ -784,17 +785,17 @@ if(grouping.position.dependent.peaks){
   save(xx, keep, file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata'))
   
   ##########################################
-  # quick clustering of postional peaks 
+  # quick clustering of postional peaks using three replicates of each segments
   ##########################################
   library(dendextend)
   library(ggplot2)
   
   load(file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata'))
-  yy = data.frame(apply(as.matrix(keep[,grep(conds[1], colnames(keep))]), 1, mean), 
-                  apply(as.matrix(keep[,grep(conds[2], colnames(keep))]), 1, mean),
-                  apply(as.matrix(keep[,grep(conds[3], colnames(keep))]), 1, mean)
-                  )
-  colnames(yy) = conds[c(1:3)]  
+  
+  make.pca.plots(keep, ntop = 1246, conds.plot = 'Mature')
+  
+  rep.sels = grep('HEAD|102657|102655|74938', colnames(keep), invert = TRUE)
+  yy = keep[, rep.sels]
   
   cal_z_score <- function(x){
     (x - mean(x)) / sd(x)
@@ -805,36 +806,26 @@ if(grouping.position.dependent.peaks){
   my_hclust_gene <- hclust(dist(yy), method = "complete")
  
   my_gene_col <- cutree(tree = as.dendrogram(my_hclust_gene), k = 4)
+  
   my_gene_col <- data.frame(cluster = my_gene_col)
   
-  df <- data.frame(conds)
-  rownames(df) = conds
+  df <- data.frame(rep(conds[1:3], each = 3))
+  rownames(df) = colnames(yy)
   colnames(df) = 'segments'
-  
-  yy1 = data.frame(apply(as.matrix(keep[,grep(conds[1], colnames(keep))]), 1, mean), 
-                       apply(as.matrix(keep[,grep(conds[2], colnames(keep))]), 1, mean),
-                       apply(as.matrix(keep[,grep(conds[3], colnames(keep))]), 1, mean),
-                   apply(as.matrix(keep[,grep(conds[4], colnames(keep))]), 1, mean)
-  )
-  
-  colnames(yy1) = conds
-  yy1 <- t(apply(yy1, 1, cal_z_score))
   
   annot_colors = c('springgreen4', 'steelblue2', 'gold2')
   names(annot_colors) = c('Mature_UA', 'Mature_LA', 'Mature_Hand')
   annot_colors = list(segments = annot_colors)
-  
+  ii.gaps = c(3, 6)
   pheatmap(yy, annotation_row = my_gene_col, annotation_col = df, show_rownames = FALSE, scale = 'none', 
            show_colnames = FALSE,
            cluster_rows = TRUE, cluster_cols = FALSE,  clustering_method = 'complete',
            annotation_colors = annot_colors, cutree_rows = 4, 
+           gaps_col = ii.gaps, 
            filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
            width = 8, height = 10)
   
-  #hc <- out$tree_row
-  #lbl <- cutree(hc, 3)
   
-           
   ##########################################
   # heatmap displaying the postional peaks 
   #########################################
