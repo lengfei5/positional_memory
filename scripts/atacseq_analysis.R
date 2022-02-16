@@ -836,72 +836,82 @@ if(grouping.position.dependent.peaks){
   rownames(df) = colnames(yy)
   colnames(df) = 'segments'
   
+  col3 <- c("#a6cee3", "#1f78b4", "#b2df8a",
+            "#33a02c", "#fb9a99", "#e31a1c",
+            "#fdbf6f", "#ff7f00", "#cab2d6",
+            "#6a3d9a", "#ffff99", "#b15928")
+  
   annot_colors = c('springgreen4', 'steelblue2', 'gold2')
   names(annot_colors) = c('Mature_UA', 'Mature_LA', 'Mature_Hand')
-  annot_colors = list(segments = annot_colors)
+  cluster_col = col3[1:nb_clusters]
+  names(cluster_col) = factor(1:nb_clusters)
+  annot_colors = list(
+    segments = annot_colors,
+    cluster = cluster_col)
   
   gaps.col = c(3, 6)
   
   pheatmap(yy, annotation_row = my_gene_col, 
            annotation_col = df, show_rownames = FALSE, scale = 'none', 
+           color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdYlGn")))(8), 
            show_colnames = FALSE,
            cluster_rows = TRUE, cluster_cols = FALSE,  
-           clustering_method = 'complete', cutree_rows = 4, 
+           clustering_method = 'complete', cutree_rows = nb_clusters, 
            annotation_colors = annot_colors, 
            gaps_col = gaps.col, 
            #gaps_row =  gaps.row, 
            filename = paste0(saveDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
-           width = 8, height = 12)
+           width = 6, height = 12)
+  
+  write.csv(xx, file = paste0(saveDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters', 
+                              nb_clusters, '.csv'), quote = FALSE, row.names = TRUE)
+  
+  
+  ## test the distribution of features of different groups
+  
+  
+  source('Functions_atac.R')
+  
+  pdfname = paste0(saveDir, "/Fig1E_positional_peak_feature_distribution_cluster_all.pdf")
+  pdf(pdfname, width = 8, height = 6)
+  par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+  pp.annots = annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+  
+  stats = plotPeakAnnot_piechart(pp.annots)
+  
+  dev.off()
+  
+  colnames(stats)[ncol(stats)] = 'all'
   
   for(m in 1:nb_clusters)
   {
     # m = 1
+    cat('cluster - ',  m, '\n')
     pp.annots = annotatePeak(pp[which(xx$cluster == m)], TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
     
-    pdfname = paste0(saveDir, "Fig1E_positional_peak_feature_distribution_group2.pdf")
+    pdfname = paste0(saveDir, "/Fig1E_positional_peak_feature_distribution_cluster_", m, ".pdf")
     pdf(pdfname, width = 8, height = 6)
     par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
     
-    plotPeakAnnot_piechart(pp.annots)
+    stats = data.frame(stats,  plotPeakAnnot_piechart(pp.annots)[, 2])
+    colnames(stats)[ncol(stats)] = paste0('cluster', m)
     
     dev.off()
     
   }
   
-  write.csv(xx, file = paste0(saveDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters', 
-                              nb_clusters, '.csv'), quote = FALSE, row.names = TRUE)
+  library(tidyr)
+  library(dplyr)
+  require(ggplot2)
   
-      
+  as_tibble(stats) %>%  gather(group, freq,  2:ncol(stats)) %>% 
+    ggplot(aes(fill=group, y=freq, x=Feature)) + 
+    geom_bar(position="dodge", stat="identity") +
+    theme(axis.text.x = element_text(angle = 90)) 
   
+  ggsave(paste0(saveDir, "/Fig1E_positional_peak_feature_distribution_cluster_comparison.pdf"),  width = 12, height = 8)
   
-  
-  ##########################################
-  # heatmap displaying the postional peaks 
-  #########################################
-  library(ggplot2)
-  df <- data.frame(cc)
-  rownames(df) = colnames(keep)
-  colnames(df) = 'segments'
-  ii.gaps = c(5, 9, 12)
-  
-  annot_colors = c('springgreen4', 'steelblue2', 'gold2', 'darkgray')
-  names(annot_colors) = c('Mature_UA', 'Mature_LA', 'Mature_Hand', 'HEAD')
-  annot_colors = list(segments = annot_colors)
-  
-  pheatmap(keep, cluster_rows=TRUE, show_rownames=FALSE, scale = 'row', show_colnames = FALSE,
-           cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps, 
-           annotation_colors = annot_colors, 
-           filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
-           width = 6, height = 8)
-  
-  
-  if(saveTable){
-    yy = data.frame(keep, xx, stringsAsFactors = FALSE)
-    write.csv(yy, file = paste0(tableDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head.csv'), 
-              quote = FALSE, row.names = TRUE)
     
-  }
-  
   ##########################################
   # select top peaks or top promoter peaks
   ##########################################

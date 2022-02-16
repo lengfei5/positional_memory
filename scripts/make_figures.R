@@ -24,24 +24,6 @@ annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotat
 gtf.file =  paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf')
 
 
-plotPeakAnnot_piechart = function(peakAnnots, ndigit = 2)
-{
-  # Create Data
-  data <- data.frame(peakAnnots@annoStat, stringsAsFactors = FALSE)
-  data$Feature = as.character(data$Feature)
-  data$Frequency[which(data$Feature == 'Promoter (<=1kb)')] = sum(data$Frequency[grep('Promoter', data$Feature)])
-  data = data[-which(data$Feature == 'Promoter (1-2kb)'), ]
-  data$Feature[which(data$Feature == 'Promoter (<=1kb)')] = 'Promoter (<=2kb)'
-  
-  data$Feature = paste0(data$Feature, ' (', signif(data$Frequency, d =ndigit), "%)")
-  
-  ggplot(data, aes(x="", y=Frequency, fill = factor(Feature, levels = Feature))) +
-    geom_bar(stat="identity", width=1,  color="white") +
-    coord_polar("y", start=0) +
-    theme_void() +
-    scale_fill_brewer(palette="Set1", direction = 1)
-  
-}
 ########################################################
 ########################################################
 # Figure 1: ATAC-seq positional peaks 

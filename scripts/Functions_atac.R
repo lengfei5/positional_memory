@@ -3113,3 +3113,41 @@ select.plot.top.positional.peaks = function()
   
 }
 
+########################################################
+########################################################
+# Section : plotting functions
+# 
+########################################################
+########################################################
+plotPeakAnnot_piechart = function(peakAnnots, ndigit = 2)
+{
+  features = c("Promoter (<=1kb)", "Promoter (1-2kb)",   
+               "5' UTR","3' UTR", "1st Exon", "Other Exon", 
+               "1st Intron", "Other Intron",
+               "Downstream (<=300)",  "Distal Intergenic") 
+  # Create Data
+  data <- data.frame(peakAnnots@annoStat, stringsAsFactors = FALSE)
+  data$Feature = as.character(data$Feature)
+  data$Frequency = as.numeric(as.character(data$Frequency))
+  data = data[match(features, data$Feature), ]
+  data$Feature = features
+  data$Frequency[which(is.na(data$Frequency))] = 0.0
+  data$Frequency[which(data$Feature == 'Promoter (<=1kb)')] = sum(data$Frequency[grep('Promoter', data$Feature)])
+  data = data[-which(data$Feature == 'Promoter (1-2kb)'), ]
+  data$Feature[which(data$Feature == 'Promoter (<=1kb)')] = 'Promoter (<=2kb)'
+  
+  data$Feature = paste0(data$Feature, ' (', signif(data$Frequency, d =ndigit), "%)")
+  
+  p1 = ggplot(data, aes(x="", y=Frequency, fill = factor(Feature, levels = Feature))) +
+    geom_bar(stat="identity", width=1,  color="white") +
+    coord_polar("y", start=0) +
+    theme_void() +
+    scale_fill_brewer(palette="Set1", direction = 1)
+  
+  plot(p1)
+  
+  return(data)
+  
+}
+
+
