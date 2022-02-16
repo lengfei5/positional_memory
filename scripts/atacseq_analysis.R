@@ -900,7 +900,7 @@ if(grouping.position.dependent.peaks){
   
   
   ##########################################
-  # select top peaks or top promoter peaks
+  # highlight promoter peaks
   ##########################################
   load(file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata'))
   
@@ -930,8 +930,7 @@ if(grouping.position.dependent.peaks){
   rownames(yy) = gg
   sample_colors = c('springgreen4', 'steelblue2', 'gold2')
   names(sample_colors) = c('Mature_UA', 'Mature_LA', 'Mature_Hand')
-  annot_colors = list(
-    segments = sample_colors)
+  annot_colors = list(segments = sample_colors)
   
   pheatmap(yy, 
            annotation_col = df, show_rownames = TRUE, scale = 'row', 
