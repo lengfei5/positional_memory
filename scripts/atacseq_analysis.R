@@ -809,7 +809,7 @@ if(grouping.position.dependent.peaks){
   
   yy <- t(apply(yy, 1, cal_z_score))
   
-  nb_clusters = 6
+  nb_clusters = 8
   
   saveDir = paste0(figureDir, 'positional_peaks_clusters_', nb_clusters)
   if(!dir.exists(saveDir)) dir.create(saveDir)
@@ -819,7 +819,8 @@ if(grouping.position.dependent.peaks){
   my_gene_col <- cutree(tree = as.dendrogram(my_hclust_gene), k = nb_clusters)
   xx$clusters = my_gene_col
   
-  my_gene_col <- data.frame(cluster = my_gene_col)
+  my_gene_col <- data.frame(cluster =  paste0('cluster_', my_gene_col))
+  rownames(my_gene_col) = rownames(yy)
   
   df <- data.frame(rep(conds[1:3], each = 3))
   rownames(df) = colnames(yy)
@@ -830,12 +831,12 @@ if(grouping.position.dependent.peaks){
             "#fdbf6f", "#ff7f00", "#cab2d6",
             "#6a3d9a", "#ffff99", "#b15928")
   
-  annot_colors = c('springgreen4', 'steelblue2', 'gold2')
-  names(annot_colors) = c('Mature_UA', 'Mature_LA', 'Mature_Hand')
+  sample_colors = c('springgreen4', 'steelblue2', 'gold2')
+  names(sample_colors) = c('Mature_UA', 'Mature_LA', 'Mature_Hand')
   cluster_col = col3[1:nb_clusters]
-  names(cluster_col) = factor(1:nb_clusters)
+  names(cluster_col) = paste0('cluster_', c(1:nb_clusters))
   annot_colors = list(
-    segments = annot_colors,
+    segments = sample_colors,
     cluster = cluster_col)
   
   gaps.col = c(3, 6)
@@ -867,7 +868,7 @@ if(grouping.position.dependent.peaks){
   
   dev.off()
   
-  colnames(stats)[ncol(stats)] = 'all'
+  colnames(stats)[ncol(stats)] = paste0('all_', pp.annots@peakNum)
   
   for(m in 1:nb_clusters)
   {
@@ -880,7 +881,7 @@ if(grouping.position.dependent.peaks){
     par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
     
     stats = data.frame(stats,  plotPeakAnnot_piechart(pp.annots)[, 2])
-    colnames(stats)[ncol(stats)] = paste0('cluster', m)
+    colnames(stats)[ncol(stats)] = paste0('cluster', m, '_', pp.annots@peakNum)
     
     dev.off()
     
@@ -893,7 +894,7 @@ if(grouping.position.dependent.peaks){
   as_tibble(stats) %>%  gather(group, freq,  2:ncol(stats)) %>% 
     ggplot(aes(fill=group, y=freq, x=Feature)) + 
     geom_bar(position="dodge", stat="identity") +
-    theme(axis.text.x = element_text(angle = 90)) 
+    theme(axis.text.x = element_text(angle = 90, size = 10)) 
   
   ggsave(paste0(saveDir, "/Fig1E_positional_peak_feature_distribution_cluster_comparison.pdf"),  width = 12, height = 8)
   
