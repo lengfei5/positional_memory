@@ -809,7 +809,7 @@ if(grouping.position.dependent.peaks){
   
   yy <- t(apply(yy, 1, cal_z_score))
   
-  nb_clusters = 4
+  nb_clusters = 6
   
   saveDir = paste0(figureDir, 'positional_peaks_clusters_', nb_clusters)
   if(!dir.exists(saveDir)) dir.create(saveDir)
@@ -818,17 +818,6 @@ if(grouping.position.dependent.peaks){
   
   my_gene_col <- cutree(tree = as.dendrogram(my_hclust_gene), k = nb_clusters)
   xx$clusters = my_gene_col
-  
-  # ii_order = c();  gaps.row = c()
-  # for(m in 1:nb_clusters) 
-  # {
-  #   cat(m, '\n')
-  #   ii_order = c(ii_order, which(my_gene_col == m)); 
-  #   if(m < nb_clusters) gaps.row = c(gaps.row, length(ii_order))
-  #   #cat(gaps.row)
-  # }
-  # #yy = yy[ii_order, ]
-  # my_gene_col <- data.frame(cluster = my_gene_col[ii_order])
   
   my_gene_col <- data.frame(cluster = my_gene_col)
   
@@ -866,10 +855,7 @@ if(grouping.position.dependent.peaks){
   write.csv(xx, file = paste0(saveDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters', 
                               nb_clusters, '.csv'), quote = FALSE, row.names = TRUE)
   
-  
   ## test the distribution of features of different groups
-  
-  
   source('Functions_atac.R')
   
   pdfname = paste0(saveDir, "/Fig1E_positional_peak_feature_distribution_cluster_all.pdf")
@@ -911,55 +897,51 @@ if(grouping.position.dependent.peaks){
   
   ggsave(paste0(saveDir, "/Fig1E_positional_peak_feature_distribution_cluster_comparison.pdf"),  width = 12, height = 8)
   
-    
+  
   ##########################################
   # select top peaks or top promoter peaks
   ##########################################
   load(file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata'))
-  yy = xx
   
-  yy = yy[grep('Promoter', yy$annotation), ] # peak close to promoters
-  yy[grep('HOXA13|MEIS|SHOX|HOXC', yy$transcriptId),]
-  #yy = xx
-  #yy = yy[c(1:50), ]
-  #yy = yy[which(yy$logFC.mean>1.5), ]
-  # yy = yy[which(yy$max > 4 ), ] # max residual square < 0.1
-  keep = keep[match(rownames(yy), rownames(keep)), ]
+  promoter.sels = grep('Promoter', xx$annotation)
+  yy = keep[promoter.sels, rep.sels]
+  xx = xx[promoter.sels, ]
+  
+  xx[grep('HOXA13|MEIS|SHOX|HOXC', xx$transcriptId), ]
     
-  #keep = fpm[!is.na(match(rownames(fpm), rownames(yy))), sample.sels]
-  gg = yy$geneId
+  gg = xx$geneId
   grep('HOXA13', gg)
-  rownames(keep) = paste0(rownames(keep), '_', gg)
+  rownames(yy) = paste0(rownames(yy), '_', gg)
   #rownames(keep) = gg
-  keep = as.matrix(keep)
+  yy = as.matrix(yy)
   
-  # jj1 = grep('Embryo_Stage40', colnames(keep))
-  # jj2 = grep('Embryo_Stage44', colnames(keep))
-  # jj3 = grep('Mature_UA', colnames(keep))
-  # mean1 = apply(keep[, jj1], 1, mean)
-  # mean2 = apply(keep[, jj2], 1, mean)
-  # mean3 = apply(keep[, jj3], 1, mean)
-  # 
-  # kk = which(mean1< 1. & mean2 < 1. & mean3 < 1.)
-  # 
-  # # make sure max above the threshold
-  # nb.above.threshold = apply(keep, 1, function(x) length(which(x>3)))
-  # keep = keep[which(nb.above.threshold >=3), ] 
-  gg = rownames(keep)
-  gg = sapply(gg, function(x) unlist(strsplit(as.character(x), '_'))[2])
-  gg = sapply(gg, function(x) unlist(strsplit(as.character(x), '[|]'))[1])
-  #keep = keep[1:50, ]
-  rownames(keep) = gg
-  #kk = grep('Mature', cc)
-  #df <- data.frame(condition = cc[kk])
-  #keep = keep[,kk]
-  #rownames(df) = colnames(keep)
-  #ii.gaps = c(4, 6)
-  pheatmap(keep, cluster_rows=TRUE, show_rownames=TRUE, scale = 'row', show_colnames = FALSE,
-           cluster_cols=FALSE, annotation_col = df, gaps_col = ii.gaps, 
+  gg = rownames(yy)
+  gg = sapply(gg, function(x) {x = unlist(strsplit(as.character(x), '_')); return(paste0(x[2:length(x)], collapse = '_'))})
+  gg = sapply(gg, function(x) {
+          xx = unlist(strsplit(as.character(x), '[|]')); 
+          if(xx[1] == 'N/A') 
+          {
+            return(x);
+          }else{
+            return(xx[1]);
+          }})
+  
+  rownames(yy) = gg
+  sample_colors = c('springgreen4', 'steelblue2', 'gold2')
+  names(sample_colors) = c('Mature_UA', 'Mature_LA', 'Mature_Hand')
+  annot_colors = list(
+    segments = sample_colors)
+  
+  pheatmap(yy, 
+           annotation_col = df, show_rownames = TRUE, scale = 'row', 
+           color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdYlGn")))(8), 
+           show_colnames = FALSE,
+           cluster_rows = TRUE, cluster_cols = FALSE, 
            annotation_colors = annot_colors, 
-           filename = paste0(resDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_top.promoters.pdf'), 
-           width = 8, height = 6)
+           gaps_col = gaps.col, 
+           #gaps_row =  gaps.row, 
+           filename = paste0(figureDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_top.promoters.pdf'), 
+           width = 10, height = 8)
   
   if(saveTable){
     write.csv(data.frame(keep, yy, stringsAsFactors = FALSE), 
@@ -979,6 +961,8 @@ if(grouping.position.dependent.peaks){
   xx = run.MARA.atac.spatial(keep, cc)
   
 }
+
+
 
 ########################################################
 ########################################################
