@@ -861,7 +861,6 @@ if(grouping.position.dependent.peaks){
   #load(file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata')) 
   #saveRDS(peaks, file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl_signals_peakAnnot_', 
   #                             version.analysis, '.rds')) 
-  
   peaks = readRDS(file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl_signals_peakAnnot_', 
                         version.analysis, '.rds'))
   
@@ -871,6 +870,13 @@ if(grouping.position.dependent.peaks){
   # positional gene 
   rna = readRDS(file = paste0("../results/microarray/Rdata/", 
                   'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_limma.DE.stats.rds'))
+  
+  matures = data.frame(ua = apply(rna[, c(1:3)], 1, mean), 
+                       la = apply(rna[, c(4:6)], 1, mean), 
+                       hd = apply(rna[, c(7:9)], 1, mean))
+  
+  rna$maxs = apply(matures, 1, max)
+  
   qv.cutoff.rna = 0.05
   logfc.cutoff.rna = 1
   
@@ -878,17 +884,104 @@ if(grouping.position.dependent.peaks){
   
   peaks$Gene = annot$geneID[match(peaks$transcript, annot$transcriptID)]
   
+  
   ggs = rownames(rna)
   ggs = sapply(ggs, function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
   
+  select = which((rna$adj.P.Val_mHand.vs.mLA < qv.cutoff.rna & abs(rna$logFC_mHand.vs.mLA) > logfc.cutoff.rna|
+                   rna$adj.P.Val_mHand.vs.mUA < qv.cutoff.rna & abs(rna$logFC_mHand.vs.mUA) > logfc.cutoff.rna |
+                   rna$adj.P.Val_mHand.vs.mLA < qv.cutoff.rna & abs(rna$logFC_mHand.vs.mLA) > logfc.cutoff.rna) )
+  
+  ## VennDiagram showing the overlapp between positional peak targets and positional genes
+  library(VennDiagram)
+  set1 <- unique(peaks$Gene)
+  set2 = unique(ggs[select])
+  
+  # Chart
+  venn.diagram(
+    x = list(set1, set2),
+    category.names = c("targets of positional peak" , "positional mRNA"),
+    filename = paste0(figureDir, '/comparison_postionalPeak.targets_positionalGenes.png'),
+    height = 480 , 
+    width = 480 , 
+    resolution = 300,
+    compression = "lzw",
+    lwd = 2,
+    lty = 'blank',
+    fill = c('darkgreen', 'darkblue'),
+    output=TRUE,
+    cat.cex = 0.4,
+    cat.fontface = "bold",
+    cat.pos = c(-10, 10)
+  )
+  
+  
+  # heatmap showing the comparions of overlapping peaks
   mm = match(peaks$Gene, ggs)
-  mm = unique(mm[!is.na(mm)])
-  mapped = rna[mm, ]
+  ### note: some peak targets are not found in microarray data due to some reason, e.g. probe design or inaccurate peak gene assignment
+  #mm = unique(mm[!is.na(mm)])
+  yy = peaks[!is.na(mm), ]
+  mapped = rna[mm[!is.na(mm)], ]
+  #targets = rownames(rna)[mm]
+  
   select = which(mapped$adj.P.Val_mHand.vs.mLA < qv.cutoff.rna & abs(mapped$logFC_mHand.vs.mLA) > logfc.cutoff.rna|
                    mapped$adj.P.Val_mHand.vs.mUA < qv.cutoff.rna & abs(mapped$logFC_mHand.vs.mUA) > logfc.cutoff.rna |
                    mapped$adj.P.Val_mHand.vs.mLA < qv.cutoff.rna & abs(mapped$logFC_mHand.vs.mLA) > logfc.cutoff.rna )
   
-  as.character(sapply(rownames(mapped)[select], function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[1])}))
+  yy = yy[select,  ]
+  mapped = mapped[select, ]
+  
+  yy = yy[, c(1:14)]
+  mapped = mapped[, c(1:9)]
+  
+  rep.sels = grep('HEAD|102657|102655|74938', colnames(keep), invert = TRUE)
+  yy = yy[, rep.sels]
+  
+  cal_z_score <- function(x){
+    (x - mean(x)) / sd(x)
+  }
+  
+  yy <- t(apply(yy, 1, cal_z_score))
+  mapped = t(apply(mapped, 1, cal_z_score))
+  
+  yy = data.frame(yy, mapped)  
+    
+  df <- data.frame(rep(rep(conds[1:3], each = 3), 2))
+  rownames(df) = colnames(yy)
+  colnames(df) = 'segments'
+  df$modality = rep(c('atac', 'mRNA'), each = 9)
+  
+  col3 <- c("#a6cee3", "#1f78b4", "#b2df8a",
+            "#33a02c", "#fb9a99", "#e31a1c",
+            "#fdbf6f", "#ff7f00", "#cab2d6",
+            "#6a3d9a", "#ffff99", "#b15928")
+  
+  sample_colors = c('springgreen4', 'steelblue2', 'gold2')
+  names(sample_colors) = c('Mature_UA', 'Mature_LA', 'Mature_Hand')
+  data_colors = c('darkgreen', 'darkblue')
+  names(data_colors) = c('atac', 'mRNA')
+  annot_colors = list(
+    segments = sample_colors,
+    modality = data_colors)
+  
+  gaps.col = c(9)
+  
+  names = sapply(rownames(mapped), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[1])})
+  rownames(yy) = paste0(names, '_', rownames(yy))
+  
+  pheatmap(yy, 
+           annotation_col = df, show_rownames = TRUE, scale = 'none', 
+           color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdYlGn")))(8), 
+           show_colnames = FALSE,
+           cluster_rows = TRUE, cluster_cols = FALSE,  
+           clustering_method = 'complete', cutree_rows = 4, 
+           annotation_colors = annot_colors, 
+           gaps_col = gaps.col, 
+           fontsize_row = 8,
+           #gaps_row =  gaps.row, 
+           filename = paste0(figureDir, '/heatmap_positionalPeaks_positionalGenes_overlapped.pdf'), 
+           width = 12, height = 16)
+  
   
   
   ##########################################
@@ -900,8 +993,6 @@ if(grouping.position.dependent.peaks){
   
   # prepare step is in the MARA_functions.R
   xx = run.MARA.atac.spatial(keep, cc)
-  
-  
   
   
 }
@@ -1103,4 +1194,3 @@ if(grouping.temporal.peaks){
   xx = run.MARA.atac.temporal(keep, cc)
   
 }
-
