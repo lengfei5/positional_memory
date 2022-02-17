@@ -234,12 +234,10 @@ if(Peaks.Background.selection){
 # test normalization and batch correction of ATAC-seq data
 # TMM and combat were selected for normalization and batch correction
 ##########################################
-
 source('Functions_atac.R')
 library(edgeR)
 require("sva")
 require(limma)
-
 # Global.Normalization.BatchCorrect(design, dds)
 
 Split.Mature.Regeneration.samples = TRUE
@@ -384,7 +382,7 @@ if(Split.Mature.Regeneration.samples){
 
 ########################################################
 ########################################################
-# Section III : positional peaks
+# Section II : positional peaks
 # ##########################################
 # Position-dependent test
 # mainly use the mature samples, mUA, mLA and mHand
@@ -394,6 +392,9 @@ if(Split.Mature.Regeneration.samples){
 ########################################################
 grouping.position.dependent.peaks = FALSE
 if(grouping.position.dependent.peaks){
+  
+  require(ChIPpeakAnno)
+  require(ChIPseeker)
   
   ##########################################
   # import batch corrected gene expression and design 
@@ -417,10 +418,6 @@ if(grouping.position.dependent.peaks){
   ##########################################
   Make.Granges.and.peakAnnotation = TRUE
   if(Make.Granges.and.peakAnnotation){
-    
-    require(ChIPpeakAnno)
-    require(ChIPseeker)
-    
     pp = data.frame(t(sapply(rownames(fpm), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
     pp$strand = '*'
     
@@ -506,7 +503,6 @@ if(grouping.position.dependent.peaks){
     
     
   }
-  
   
   ##########################################
   # run spatial test for mature samples
@@ -639,15 +635,19 @@ if(grouping.position.dependent.peaks){
     abline(h = 3, col = 'red', lwd = 2.0)
     abline(v = c(0.5, 1), col = 'red', lwd = 2.0)
     
+    jj = which(maxs > 3 & mins <3)
+    
+    #jj =  which( maxs > 3 & mins <3 & ctl.mean > 3)
+    #jj = which(rr>1 & ctl.mean<3 & maxs > 3 & mins <3)
+    
+    # jj = which(rr>1 & maxs > 3 & mins <3)
     
     sels = which(rr>1 & ctl.mean<3 & maxs > 3 & mins <3)
     cat(length(sels), 'peaks selected \n')
     
     #sels = which(rr >1 & maxs > 3.)
     #cat(length(sels), 'peaks selected \n')
-    
     #nonsels = which(rr<=1 | maxs <=2)
-    
     xx = xx[sels, ]
     keep = keep[sels, ]
     
