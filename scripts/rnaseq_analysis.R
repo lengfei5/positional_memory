@@ -523,6 +523,9 @@ res$logFC.max = apply((res[, grep('logFC_', colnames(res))]), 1, function(x) ret
 o1 = order(-res$fdr.max)
 res = res[o1, ]
 
+saveRDS(res, file = paste0("../results/microarray/Rdata/", 
+                     'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_limma.DE.stats.rds'))
+
 ggs = sapply(rownames(res), function(x){unlist(strsplit(as.character(x), '_'))[1]})
 
 qv.cutoff = 0.05

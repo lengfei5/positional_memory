@@ -851,6 +851,47 @@ if(grouping.position.dependent.peaks){
   
   
   ##########################################
+  # compare the ATAC-seq peaks and microarray data
+  # integrative analysis of positional peaks and positional mRNAs
+  # either from positional peak, check the potentially regulated target is position dependent
+  # or from postional mRNA, are there assigned peaks are positional dependent
+  ##########################################
+  ## first check the targeted gene of positional peaks have positio-dependent gene expression
+  # positonal peaks
+  #load(file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata')) 
+  #saveRDS(peaks, file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl_signals_peakAnnot_', 
+  #                             version.analysis, '.rds')) 
+  
+  peaks = readRDS(file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl_signals_peakAnnot_', 
+                        version.analysis, '.rds'))
+  
+  annot = readRDS(paste0(annotDir, 
+                         'AmexT_v47_transcriptID_transcriptCotig_geneSymbol.nr_geneSymbol.hs_geneID_gtf.geneInfo_gtf.transcriptInfo.rds'))
+  
+  # positional gene 
+  rna = readRDS(file = paste0("../results/microarray/Rdata/", 
+                  'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_limma.DE.stats.rds'))
+  qv.cutoff.rna = 0.05
+  logfc.cutoff.rna = 1
+  
+  peaks$transcript = sapply(peaks$transcriptId, function(x) {x = unlist(strsplit(as.character(x), '[|]')); return(x[length(x)])})
+  
+  peaks$Gene = annot$geneID[match(peaks$transcript, annot$transcriptID)]
+  
+  ggs = rownames(rna)
+  ggs = sapply(ggs, function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
+  
+  mm = match(peaks$Gene, ggs)
+  mm = unique(mm[!is.na(mm)])
+  mapped = rna[mm, ]
+  select = which(mapped$adj.P.Val_mHand.vs.mLA < qv.cutoff.rna & abs(mapped$logFC_mHand.vs.mLA) > logfc.cutoff.rna|
+                   mapped$adj.P.Val_mHand.vs.mUA < qv.cutoff.rna & abs(mapped$logFC_mHand.vs.mUA) > logfc.cutoff.rna |
+                   mapped$adj.P.Val_mHand.vs.mLA < qv.cutoff.rna & abs(mapped$logFC_mHand.vs.mLA) > logfc.cutoff.rna )
+  
+  as.character(sapply(rownames(mapped)[select], function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[1])}))
+  
+  
+  ##########################################
   # first motif activity analysis for positional-dependent peaks 
   ##########################################
   source('MARA_functions.R')
@@ -860,8 +901,10 @@ if(grouping.position.dependent.peaks){
   # prepare step is in the MARA_functions.R
   xx = run.MARA.atac.spatial(keep, cc)
   
+  
+  
+  
 }
-
 
 
 
