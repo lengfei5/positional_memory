@@ -809,7 +809,7 @@ if(grouping.position.dependent.peaks){
   
   yy <- t(apply(yy, 1, cal_z_score))
   
-  nb_clusters = 8
+  nb_clusters = 6
   
   saveDir = paste0(figureDir, 'positional_peaks_clusters_', nb_clusters)
   if(!dir.exists(saveDir)) dir.create(saveDir)
@@ -870,6 +870,7 @@ if(grouping.position.dependent.peaks){
   
   colnames(stats)[ncol(stats)] = paste0('all_', pp.annots@peakNum)
   
+  scores = c()
   for(m in 1:nb_clusters)
   {
     # m = 1
@@ -883,9 +884,29 @@ if(grouping.position.dependent.peaks){
     stats = data.frame(stats,  plotPeakAnnot_piechart(pp.annots)[, 2])
     colnames(stats)[ncol(stats)] = paste0('cluster', m, '_', pp.annots@peakNum)
     
-    dev.off()
+    test = c()
+    test2 = c()
+    for(i in 1:nrow(stats))
+    {
+      total = length(pp); 
+      mm = round(total * stats[i, 2]/100)
+      nn = total - mm
+      qq = round(pp.annots@peakNum * stats[i, ncol(stats)]/100)
+      test = c(test, phyper(qq-1, mm, nn, pp.annots@peakNum, lower.tail = FALSE, log.p = FALSE))
+      test2 = c(test2, phyper(qq+1, mm, nn, pp.annots@peakNum, lower.tail = TRUE, log.p = FALSE))
+    }
+    scores = cbind(scores, test, test2)
+    colnames(scores)[c(ncol(scores)-1, ncol(scores))] = c(paste0('enrich.pval.cluster', m), paste0('depelet.pval.cluster', m))
     
+    dev.off()
   }
+  rownames(scores) = rownames(scores)
+  
+  stats = data.frame(stats, scores, stringsAsFactors = FALSE)
+  
+  write.csv(stats, file = paste0(saveDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters', 
+                              nb_clusters, '_feature.Enrichment.depeletion.csv'), quote = FALSE, row.names = TRUE)
+  
   
   library(tidyr)
   library(dplyr)
