@@ -665,7 +665,6 @@ if(grouping.position.dependent.peaks){
   
   load(file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata'))
   
-  amex = makeTxDbFromGFF(file = paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf'))
   pp = data.frame(t(sapply(rownames(xx), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
   pp$strand = '*'
   
@@ -818,8 +817,14 @@ if(grouping.position.dependent.peaks){
           {
             return(x);
           }else{
-            return(xx[1]);
+            xx = xx[-length(xx)]
+            xx = xx[length(xx)]
+            return(xx);
           }})
+  gg = as.character(gg)
+  gg = gsub("\\[|\\]", "", gg)
+  gg = gsub(' hs', '', gg)
+  gg = gsub(' nr', '', gg)
   
   rownames(yy) = gg
   sample_colors = c('springgreen4', 'steelblue2', 'gold2')
@@ -844,6 +849,7 @@ if(grouping.position.dependent.peaks){
     
   }
   
+  
   ##########################################
   # first motif activity analysis for positional-dependent peaks 
   ##########################################
@@ -855,6 +861,7 @@ if(grouping.position.dependent.peaks){
   xx = run.MARA.atac.spatial(keep, cc)
   
 }
+
 
 
 
