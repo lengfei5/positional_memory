@@ -16,7 +16,7 @@ source(RNA.QC.functions)
 source('functions_chipSeq.R')
 source('Functions_atac.R')
 
-version.analysis = 'atac_rna_chipseq_analysis_20211007'
+version.analysis = 'CT_analysis_20220217'
 #peakDir = "Peaks/macs2_broad"
 saveTable = TRUE
 
@@ -49,13 +49,38 @@ library(tidyverse)
 # sequence saturation analysis
 ########################################################
 ########################################################
-design = read.table(file = paste0(dataDir, 'R11876_cut.run/sampleInfo_parsed.txt'), header = TRUE)
-design = rbind(design, read.table(paste0(dataDir, 'R12810_cuttag/sampleInfos_conditions_parsed.txt'), header = TRUE))
+dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/R12965_CT/'
+design = read.table(file = paste0(dataDir, 'sampleInfos_v2_parsed.txt'), header = TRUE)
 
-stats = read.table(file = paste0(dataDir, 'R11876_cut.run/nf_out/result/countStatTable.txt'), header = TRUE)
-stats = rbind(stats, read.table(file = paste0(dataDir, 'R12810_cuttag/nf_out/result/countStatTable.txt'), header = TRUE))
+design$sample = sapply(design$fileName, function(x) unlist(strsplit(as.character(x), '_'))[1])
+design$marks = sapply(design$fileName, function(x) unlist(strsplit(as.character(x), '_'))[2])
 
-colnames(stats)[c(1, 3)] = c('fileName', 'trimmed')
+design = design[, -2]
+
+#design = rbind(design, read.table(paste0(dataDir, 'R12810_cuttag/sampleInfos_conditions_parsed.txt'), header = TRUE))
+stats = read.table(file = paste0(dataDir, 'countStatTable.txt'), header = TRUE)
+stats$ids = sapply(stats$Name, function(x) unlist(strsplit(as.character(x), '_'))[1])
+stats = stats[match(design$sampleID, stats$ids), ]
+
+design = data.frame(design, stats, stringsAsFactors = FALSE)
+
+#stats = rbind(stats, read.table(file = paste0(dataDir, 'R12810_cuttag/nf_out/result/countStatTable.txt'), header = TRUE))
+
+colnames(design)[c(4, 6)] = c('fileName', 'trimmed')
+design = design[, -ncol(design)]
+
+for(n in 5:ncol(design))
+{
+  design[,n] = as.numeric(design[,n])/10^6
+}
+
+design$percent.align = design$unique/ design$rmChrM
+design$percent.dup = 1 - design$unique.rmdup/design$unique
+design$percent.usable = design$unique.rmdup/design$Total
+
+design = design[order(design$marks, design$sample), ]
+
+write.csv(design, file = paste0(resDir, '/R12965_CT_QC_stats.csv'), row.names = FALSE, quote = FALSE)
 
 index = c()
 for(n in 1:nrow(design))
@@ -90,6 +115,7 @@ sels = match(c('163648', '163651', '163656', '163659',
                '182553', '182554', '182555', '182556'), design$sampleID)
 
 write.csv(stats, file = paste0(resDir, '/', version.analysis,  '_QCs_stats.csv'), row.names = FALSE)
+
 
 ##########################################
 # saturation analysis 
@@ -507,11 +533,3 @@ ggplot(aes(x = factor(groups, levels = c('other_tissues', 'house_keep', 'limb_lo
   labs(x = "", y= 'normalized data (log2)')
 
   
-
-
-
-
-
-
-
-
