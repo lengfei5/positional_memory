@@ -485,22 +485,6 @@ if(grouping.position.dependent.peaks){
     
     ua$rpkm = ua$rna - log2(10^3/ua$gene.length)
     
-    #ua$promoter[which(is.na(ua$promoter))] = -5
-    load(file = paste0(RdataDir, '/pseudoBulk_scRNAcellPooling_FluidigmC1_stage40.44.mUA_dev_geneSelection.Rdata'))
-    gene.sels2 =  sapply(gene.sels2, function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
-    load(file =  paste0(annotDir, 'axolotl_housekeepingGenes_controls.other.tissues.liver.islet.testis_expressedIn21tissues.Rdata'))
-    
-    hs = controls.tissue$geneIDs[which(controls.tissue$tissues == 'housekeeping')]
-    ctl =  controls.tissue$geneIDs[which(controls.tissue$tissues == '!housekeeping')]
-    
-    plot(ua$rpkm, ua$promoter.max, cex = 0.2, ylim = c(-2, 10))
-    kk = match(gene.sels2, ua$gene)
-    points(ua$rpkm[kk], ua$promoter.max[kk], cex = 0.4, col = 'red')
-    kk = match(hs, ua$gene)
-    points(ua$rpkm[kk], ua$promoter.max[kk], cex = 0.1, col = 'orange')
-    kk = match(ctl, ua$gene)
-    points(ua$rpkm[kk], ua$promoter.max[kk], cex = 0.8, col = 'blue')
-    
     
   }
   
@@ -996,6 +980,79 @@ if(grouping.position.dependent.peaks){
   
   
 }
+
+########################################################
+########################################################
+# Section : compare embryo samples to mature UA  
+# key questions: how do developmental genes required in embryo stages 
+# look like ? lowly expressed in mature sample ? total not expressed 
+# what about their promoter and enhancers in ATAC-seq data ? 
+########################################################
+########################################################
+
+##########################################
+# first import Tobias' scRNA-seq data 
+##########################################
+require(DESeq2)
+library(ggrepel)
+library(dplyr)
+library(tibble)
+
+load(file = paste0(RdataDir, '/pseudoBulk_scRNAcellPooling_FluidigmC1_stage40.44.mUA_dev_geneSelection.Rdata'))
+
+fpm = data.frame(fpm)
+fpm = fpm[which(fpm$genetype != 'ctl'), ]
+
+fpm$genetype[which(fpm$genetype == 'dev.lowlyExp')] = 'lowlyExp.E40.44'
+
+fpm$gene =  sapply(rownames(fpm), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[1])})
+
+dev.genes = 'HOXA13|HOXA11|HOXA9|HOXD13|HOXD11|HOX9|SHH|FGF8|FGF10|HAND2|BMP4|ALX1|
+                           ALX4|PRRX1|GREM1|LHX2|LHX9|TBX2|TBX4|TBX5|LMX1|MEIS1|MEIS2|SALL4|IRX3|IRX5'
+examples.sel = unique(grep(dev.genes,fpm$gene))
+
+ggplot(fpm, aes(x = Stage40, y = mUA, color = genetype, label = gene)) +
+         geom_point(size = 0.4) + 
+  scale_color_manual(values=c("#E69F00", "#999999", "#56B4E9")) + 
+  geom_text_repel(data= fpm[examples.sel, ], size = 4.0, color = 'darkblue') +
+         #geom_hline(yintercept=2.0, colour = "darkgray") + 
+         #geom_vline(xintercept = 2.0, colour = "darkgray")
+geom_abline(slope = 1,  intercept = 0, colour = 'red') +
+  theme_classic() +
+  theme(legend.text = element_text(size=14))
+
+ggsave(paste0(resDir, "Stage40_vs_mUA_devGenes_comparisons.pdf"), width=12, height = 10)
+
+
+
+cpms = cpms[which(maxs > 2.), ]
+ggs = sapply(rownames(cpms), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
+#gene.sels2 =  sapply(gene.sels2, function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
+
+load(file =  paste0(annotDir, 'axolotl_housekeepingGenes_controls.other.tissues.liver.islet.testis_expressedIn21tissues.Rdata'))
+hs = controls.tissue$geneIDs[which(controls.tissue$tissues == 'housekeeping')]
+ctl =  controls.tissue$geneIDs[which(controls.tissue$tissues == '!housekeeping')]
+
+length(intersect(ggs, hs))
+length(intersect(ggs, ctl))
+
+mm = match(ggs, c(hs, ctl))
+cpms = cpms[which(is.na(mm)), ]
+ggs = ggs[which(is.na(mm))] 
+
+
+
+
+
+plot(ua$rpkm, ua$promoter.max, cex = 0.2, ylim = c(-2, 10))
+kk = match(gene.sels2, ua$gene)
+points(ua$rpkm[kk], ua$promoter.max[kk], cex = 0.4, col = 'red')
+kk = match(hs, ua$gene)
+points(ua$rpkm[kk], ua$promoter.max[kk], cex = 0.1, col = 'orange')
+kk = match(ctl, ua$gene)
+points(ua$rpkm[kk], ua$promoter.max[kk], cex = 0.8, col = 'blue')
+
+
 
 
 

@@ -1560,6 +1560,9 @@ pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
   
   save(metadata, scRNAseq.counts, file = paste0(RdataDir, '/Gerber_2018_Fluidigm_C1.Rdata'))
   
+  ##########################################
+  # reload the metadata and counts 
+  ##########################################
   load(file = paste0(RdataDir, '/Gerber_2018_Fluidigm_C1.Rdata'))
   
   counts = scRNAseq.counts[, -1]
@@ -1581,6 +1584,7 @@ pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
   metadata$batch = sapply(metadata$cell_id, function(x) unlist(strsplit(as.character(x), '[.]'))[1])
   rownames(metadata) = metadata$cell_id
   
+  colnames(counts) = rownames(metadata)  
   ##########################################
   # check scRNA-seq data 
   ##########################################
@@ -1588,9 +1592,8 @@ pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
   library(Seurat)
   library(patchwork)
   
-  colnames(counts) = rownames(metadata)
   aa = CreateSeuratObject(counts = counts, project = "limb_regeneration", assay = 'RNA', meta.data = as.data.frame(metadata),
-                          min.cells = 3, min.features = 500)
+                          min.cells = 10, min.features = 500)
   
   VlnPlot(aa, features = c("nFeature_RNA", "nCount_RNA"), ncol = 2)
   FeatureScatter(aa, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
@@ -1613,13 +1616,30 @@ pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
   
   ggsave(paste0(resDir, "/Overview_Gerber2018_Fluidigm.C1_batches.pdf"), width = 12, height = 8)
   
+  # check the difference between stage40 and stage44
+  aa = subset(aa, cells = colnames(aa)[which(aa$condition == 'Stage40'|aa$condition == 'Stage44')])
+  
+  aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 3000)
+  all.genes <- rownames(aa)
+  aa <- ScaleData(aa, features = all.genes)
+  aa <- RunPCA(aa, features = VariableFeatures(object = aa))
+  ElbowPlot(aa)
+  
+  aa <- FindNeighbors(aa, dims = 1:15)
+  aa <- FindClusters(aa, resolution = 0.5)
+  
+  aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.2)
+  p1 = DimPlot(aa, reduction = "umap", group.by = 'timepoint')
+  p2 = DimPlot(aa, reduction = "umap", group.by = 'batch')
+  
+  p1 + p2
+  
   
   ##########################################
   # pool scRNA-seq data to have pseudo-bulk 
   ##########################################
   #sels = which(metadata$timepoint == '0dpa'| metadata$timepoint == 'Stage40' | metadata$timepoint == 'Stage44')
   #metadata = metadata[sels, ]
-  
   raw = counts
   conds = c('0dpa', 'Stage40', 'Stage44')
   pseudo = matrix(NA, ncol = length(conds), nrow = nrow(raw))
@@ -1642,9 +1662,9 @@ pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
     }
   }
   
-  pseudo[, 2] = pseudo[,2] + pseudo[, 3]
-  pseudo = pseudo[, c(1, 2)]
-  colnames(pseudo) = c('mUA', 'stage40.44')
+  #pseudo[, 2] = pseudo[,2] + pseudo[, 3]
+  #pseudo = pseudo[, c(1, 2)]
+  #colnames(pseudo) = c('mUA', 'stage40.44')
   
   annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
                          'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
@@ -1655,40 +1675,62 @@ pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
   rownames(pseudo) = ggs
   
   require(DESeq2)
-  condition = factor(c('mUA', 'stage40.44'))
+  condition = factor(c('mUA', 'stage40', 'stage44'))
   dds <- DESeqDataSetFromMatrix(pseudo, DataFrame(condition), design = ~ condition)
   
-  ss = rowSums(counts(dds))
+  # filtering with stage40/44 samples
+  ss = rowSums(counts(dds)[, c(2:3)])
+  
   hist(log10(ss), breaks = 100)
-  dds = dds[which(ss > 20), ]
+  dds = dds[which(ss > 100), ]
   
   dds = estimateSizeFactors(dds)
   
   ss = rowSums(counts(dds))
   length(which(ss > quantile(ss, probs = 0.75)))
   
+  saveRDS(dds, 
+       file = paste0(RdataDir, '/pseudoBulk_scRNAcellPooling_FluidigmC1_mUA_stage40_44.rds'))
+  
   #ss = rowMeans(counts(dds))
   dd0 = dds[ss > quantile(ss, probs = 0.75), ]
   dd0 = estimateSizeFactors(dd0)
   
   fpm = fpm(dds, robust = TRUE)
-  fpm = log2(fpm + 2^-7)
+  fpm = data.frame(log2(fpm + 2^-7))
   
-  rr = fpm[, 2] - fpm[, 1]
   
-  par(mfrow = c(1, 2))
+  rr = fpm[, 3] - fpm[, 2]
+  
+  fpm$log2fc = rr
+  
+  load(file =  paste0(annotDir, 'axolotl_housekeepingGenes_controls.other.tissues.liver.islet.testis_expressedIn21tissues.Rdata'))
+  hs = controls.tissue$geneIDs[which(controls.tissue$tissues == 'housekeeping')]
+  ctl =  controls.tissue$geneIDs[which(controls.tissue$tissues  != 'housekeeping')]
+  ggs = sapply(rownames(fpm), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
+   
+ 
+  colnames(fpm)[1] = 'mUA'
+  
+  fpm$genetype = 'devGene'
+  
+  mm = match(ggs, hs)
+  xx = fpm[!is.na(mm), ]
+  fpm$genetype[!is.na(mm)] = 'hs'
+  
+  mm = match(ggs, ctl)
+  fpm$genetype[!is.na(mm) & fpm$genetype == 'devGene'] = 'ctl'
+  
+  par(mfrow = c(2, 1))
   hist(fpm[, 2], breaks = 100, main = 'log2 expression of stage40.44');abline(v = 2)
-  plot(fpm, cex = 0.2);
-  abline(0, 1, lwd = 2.0, col = 'red');
-  abline(-1, 1, lwd = 2.0, col = 'red'); 
-  abline(1, 1, lwd = 2.0, col = 'red'); 
-  abline(h = 2)
+  hist(fpm[, 3], breaks = 100, main = 'log2 expression of stage40.44');abline(v = 2)
   
-  gene.sels1 = rownames(fpm)[which((rr)>1 & fpm[,2] >2) ]
-  gene.sels2 = rownames(fpm)[which((rr)>2 & fpm[,2] >2) ]
-  save(dds, gene.sels1, gene.sels2,  
+  fpm$genetype[which(fpm[,2]<2 & fpm[, 3]<2 & fpm$genetype == 'devGene')] = 'dev.lowlyExp'
+  
+  save(dds, fpm,
        file = paste0(RdataDir, '/pseudoBulk_scRNAcellPooling_FluidigmC1_stage40.44.mUA_dev_geneSelection.Rdata'))
-    
+  
+  
 }
 
 compare.Akane.RNAseq.pseudobulk.scRNAseq = function()
