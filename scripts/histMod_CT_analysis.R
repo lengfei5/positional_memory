@@ -25,8 +25,8 @@ RdataDir = paste0(resDir, '/Rdata')
 if(!dir.exists(resDir)) dir.create(resDir)
 if(!dir.exists(RdataDir)) dir.create(RdataDir)
 
-figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
-tableDir = paste0(figureDir, 'tables4plots/')
+# figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
+# tableDir = paste0(figureDir, 'tables4plots/')
 
 annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
 gtf.file =  paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf')
@@ -49,79 +49,117 @@ library(tidyverse)
 # sequence saturation analysis
 ########################################################
 ########################################################
-dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/R12965_CT/'
-design = read.table(file = paste0(dataDir, 'sampleInfos_v2_parsed.txt'), header = TRUE)
-
-design$sample = sapply(design$fileName, function(x) unlist(strsplit(as.character(x), '_'))[1])
-design$marks = sapply(design$fileName, function(x) unlist(strsplit(as.character(x), '_'))[2])
-
-design = design[, -2]
-
-#design = rbind(design, read.table(paste0(dataDir, 'R12810_cuttag/sampleInfos_conditions_parsed.txt'), header = TRUE))
-stats = read.table(file = paste0(dataDir, 'countStatTable.txt'), header = TRUE)
-stats$ids = sapply(stats$Name, function(x) unlist(strsplit(as.character(x), '_'))[1])
-stats = stats[match(design$sampleID, stats$ids), ]
-
-design = data.frame(design, stats, stringsAsFactors = FALSE)
-
-#stats = rbind(stats, read.table(file = paste0(dataDir, 'R12810_cuttag/nf_out/result/countStatTable.txt'), header = TRUE))
-
-colnames(design)[c(4, 6)] = c('fileName', 'trimmed')
-design = design[, -ncol(design)]
-
-for(n in 5:ncol(design))
-{
-  design[,n] = as.numeric(design[,n])/10^6
-}
-
-design$percent.align = design$unique/ design$rmChrM
-design$percent.dup = 1 - design$unique.rmdup/design$unique
-design$percent.usable = design$unique.rmdup/design$Total
-
-design = design[order(design$marks, design$sample), ]
-
-write.csv(design, file = paste0(resDir, '/R12965_CT_QC_stats.csv'), row.names = FALSE, quote = FALSE)
-
-index = c()
-for(n in 1:nrow(design))
-{
-  # n = 1;
-  cat(n, '\n')
-  #cc.files = cnts[grep(design$sampleID[n], cnts)]
-  ii = grep(design$sampleID[n], stats$fileName)
-  if(length(ii) == 1){
-    index = c(index, ii)
-  }else{
-    index = c(index, NA)
-    cat(length(ii), 'fileName Found for ', design$sampleID[n], '\n')
+Process.design.stats = FALSE
+if(Process.design.stats){
+  dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/R12965_CT/'
+  design = read.table(file = paste0(dataDir, 'sampleInfos_v2_parsed.txt'), header = TRUE)
+  
+  design$sample = sapply(design$fileName, function(x) unlist(strsplit(as.character(x), '_'))[1])
+  design$marks = sapply(design$fileName, function(x) unlist(strsplit(as.character(x), '_'))[2])
+  
+  design = design[, -2]
+  
+  #design = rbind(design, read.table(paste0(dataDir, 'R12810_cuttag/sampleInfos_conditions_parsed.txt'), header = TRUE))
+  stats = read.table(file = paste0(dataDir, 'countStatTable.txt'), header = TRUE)
+  stats$ids = sapply(stats$Name, function(x) unlist(strsplit(as.character(x), '_'))[1])
+  stats = stats[match(design$sampleID, stats$ids), ]
+  
+  design = data.frame(design, stats, stringsAsFactors = FALSE)
+  
+  #stats = rbind(stats, read.table(file = paste0(dataDir, 'R12810_cuttag/nf_out/result/countStatTable.txt'), header = TRUE))
+  
+  colnames(design)[c(4, 6)] = c('fileName', 'trimmed')
+  design = design[, -ncol(design)]
+  
+  for(n in 5:ncol(design))
+  {
+    design[,n] = as.numeric(design[,n])/10^6
   }
   
+  design$percent.align = design$unique/ design$rmChrM
+  design$percent.dup = 1 - design$unique.rmdup/design$unique
+  design$percent.usable = design$unique.rmdup/design$Total
+  
+  design = design[order(design$marks, design$sample), ]
+  
+  write.csv(design, file = paste0(resDir, '/R12965_CT_QC_stats.csv'), row.names = FALSE, quote = FALSE)
+  
+  
+  
+  index = c()
+  for(n in 1:nrow(design))
+  {
+    # n = 1;
+    cat(n, '\n')
+    #cc.files = cnts[grep(design$sampleID[n], cnts)]
+    ii = grep(design$sampleID[n], stats$fileName)
+    if(length(ii) == 1){
+      index = c(index, ii)
+    }else{
+      index = c(index, NA)
+      cat(length(ii), 'fileName Found for ', design$sampleID[n], '\n')
+    }
+    
+  }
+  
+  stats = data.frame(design, stats[index, ], stringsAsFactors = FALSE)
+  
+  colnames(stats) = c('sampleID', 'samples', 'fileName', 'total',  'adapter.trimmed', 'mapped', 'chrM.rm', 'unique', 'unique.rmdup')
+  
+  stats$trimming.pct = as.numeric(stats$adapter.trimmed)/as.numeric(stats$total)
+  stats$mapped.pct =  as.numeric(stats$mapped)/as.numeric(stats$adapter.trimmed)
+  stats$mito.pct = 1.0 - as.numeric(stats$chrM.rm)/as.numeric(stats$adapter.trimmed)
+  stats$multimapper.pct = 1- as.numeric(stats$unique) / as.numeric(stats$mapped)
+  stats$dup.rate = 1.0 - as.numeric(stats$unique.rmdup)/as.numeric(stats$unique)
+  stats$pct.usable = stats$unique.rmdup / stats$total
+  
+  stats$usable = stats$unique.rmdup/10^6
+  
+  sels = match(c('163648', '163651', '163656', '163659', 
+                 '182553', '182554', '182555', '182556'), design$sampleID)
+  
+  write.csv(stats, file = paste0(resDir, '/', version.analysis,  '_QCs_stats.csv'), row.names = FALSE)
+  
+}else{
+  
+  design = read.csv(file = paste0(resDir, '/R11876_R12810_CT_QCs_stats.csv'), header = TRUE)
+  design = design[grep('AL1', design$samples, invert = TRUE), ]
+  # 163648, 163651, 163656, 163659 technical replicates of 182553-182556
+  design = design[grep('163648|163651|163656|163659', design$sampleID, invert = TRUE), ] 
+  
+  xx = read.csv(file = paste0(resDir, '/R12965_CT_QC_stats.csv'), header = TRUE)
+  
+  design$sample = sapply(design$samples, function(x) unlist(strsplit(as.character(x), '_'))[1])
+  design$marks = sapply(design$samples, function(x) unlist(strsplit(as.character(x), '_'))[2])
+  design = design[,c(1, 17, 18, 3:16)]
+  
+  design = design[, c(1:10, 12, 15:16)]
+  colnames(design) = colnames(xx)
+  
+  design = rbind(design, xx)
+  design$sample[which(design$sample == 'Hand')] = 'mHand'
+  design$sample[which(design$sample == 'LA')] = 'mLA'
+  design$sample[which(design$sample == 'UA')] = 'mUA'
+  design$sample[which(design$sample == 'BL13days.d')] = 'BL13days.dist'
+  design$sample[which(design$sample == 'BL13days.p')] = 'BL13days.prox'
+  
+  design$marks[which(design$marks == 'K27ac')] = 'H3K27ac'
+  design$marks[which(design$marks == 'K27me3et')] = 'H3K27me3'
+  design$marks[which(design$marks == 'K4me1')] = 'H3K4me1'
+  design$marks[which(design$marks == 'K4me3')] = 'H3K4me3'
+  
+  design$condition = paste0(design$marks, '_', design$sample)
+  
+  
+    
 }
-
-stats = data.frame(design, stats[index, ], stringsAsFactors = FALSE)
-
-colnames(stats) = c('sampleID', 'samples', 'fileName', 'total',  'adapter.trimmed', 'mapped', 'chrM.rm', 'unique', 'unique.rmdup')
-
-stats$trimming.pct = as.numeric(stats$adapter.trimmed)/as.numeric(stats$total)
-stats$mapped.pct =  as.numeric(stats$mapped)/as.numeric(stats$adapter.trimmed)
-stats$mito.pct = 1.0 - as.numeric(stats$chrM.rm)/as.numeric(stats$adapter.trimmed)
-stats$multimapper.pct = 1- as.numeric(stats$unique) / as.numeric(stats$mapped)
-stats$dup.rate = 1.0 - as.numeric(stats$unique.rmdup)/as.numeric(stats$unique)
-stats$pct.usable = stats$unique.rmdup / stats$total
-
-stats$usable = stats$unique.rmdup/10^6
-
-sels = match(c('163648', '163651', '163656', '163659', 
-               '182553', '182554', '182555', '182556'), design$sampleID)
-
-write.csv(stats, file = paste0(resDir, '/', version.analysis,  '_QCs_stats.csv'), row.names = FALSE)
 
 
 ##########################################
 # saturation analysis 
 ##########################################
 source('Functions_utility.R')
-Sequence.Saturation.Analysis(design)
+#Sequence.Saturation.Analysis(design)
 
 
 ########################################################
