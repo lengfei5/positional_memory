@@ -238,7 +238,7 @@ source('Functions_atac.R')
 library(edgeR)
 require("sva")
 require(limma)
-# Global.Normalization.BatchCorrect(design, dds)
+
 
 Split.Mature.Regeneration.samples = TRUE
 if(Split.Mature.Regeneration.samples){
@@ -317,7 +317,8 @@ if(Split.Mature.Regeneration.samples){
   Batch.Correct.mUA.embryoStage = FALSE
   if(Batch.Correct.mUA.embryoStage){
     
-    sels = unique(c(which(design$condition == 'Mature_UA' & (design$batch == '2020'| design$batch == '2021')), 
+    sels = unique(c(which((design$condition == 'Mature_UA'| design$condition == 'Mature_Hand') & 
+                            (design$batch == '2020'| design$batch == '2021')), 
                   grep('Embryo_Stage', design$condition)))
     
     design.sels = design[sels, ]
@@ -363,7 +364,6 @@ if(Split.Mature.Regeneration.samples){
     saveRDS(fpm, file = paste0(RdataDir, '/fpm.bc_TMM_combat_Dev.mUA.samples_batch2020.2021.rds'))
     saveRDS(design.sels, file = paste0(RdataDir, '/design_sels_bc_TMM_combat_Dev.mUA.samples_batch2020.2021.rds'))
     
-      
   }
   
   # regeneration time points and embryo stages
@@ -1212,7 +1212,7 @@ if(Compare.dev.vs.mature.ATACseq.peaks){
   # import batch corrected gene expression and design 
   ##########################################
   fpm = readRDS(file = paste0(RdataDir, '/fpm.bc_TMM_combat_Dev.mUA.samples_batch2020.2021.rds'))
-  saveRDS(design.sels, file = paste0(RdataDir, '/design_sels_bc_TMM_combat_Dev.mUA.samples_batch2020.2021.rds'))
+  design = readRDS(file = paste0(RdataDir, '/design_sels_bc_TMM_combat_Dev.mUA.samples_batch2020.2021.rds'))
     
   # prepare the background distribution
   fpm.bg = fpm[grep('bg_', rownames(fpm), invert = FALSE), ]
@@ -1251,59 +1251,14 @@ if(Compare.dev.vs.mature.ATACseq.peaks){
     
     promoters = select.promoters.regions(upstream = 2000, downstream = 2000, ORF.type.gtf = 'Putative', promoter.select = 'all')
     
-    ##########################################
-    # UA gene expression vs promoter signals  
-    ##########################################
-    ## UA promoter signals 
-    ua.annot = data.frame(pp.annots, mUA = apply(fpm[, grep('Mature_UA', colnames(fpm))], 1, mean))
-    ua.promoters = ua.annot[grep('Promoter', ua.annot$annotation), ]
-    ua.promoters$mUA = as.numeric(ua.promoters$mUA) - log2(10^3/as.numeric(ua.promoters$width))
-    aa = ua.promoters
-    rm(ua.annot)
-    rm(ua.promoters)
-    aa$transcript = sapply(aa$geneId, function(x) {x = unlist(strsplit(as.character(x), '[|]')); return(x[length(x)])})
-    
-    annot = readRDS(paste0(annotDir, 
-                           'AmexT_v47_transcriptID_transcriptCotig_geneSymbol.nr_geneSymbol.hs_geneID_gtf.geneInfo_gtf.transcriptInfo.rds'))
-    aa$Gene = annot$geneID[match(aa$transcript, annot$transcriptID)]
-    
-    load(file = paste0("../results/microarray/Rdata/", 
-                       'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_DEpval.Rdata'))
-    
-    rnas = apply(res[, c(1:3)], 1, mean)
-    ggs = names(rnas)
-    ggs = sapply(ggs, function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
-    
-    ua = data.frame(gene = unique(c(ggs, aa$Gene)) , stringsAsFactors = FALSE)
-    ua$rna = rnas[match(ua$gene, ua$gene)]
-    ua$gene.length = NA
-    ua$promoter.mean = NA
-    ua$promoter.max = NA
-    
-    for(n in 1:nrow(ua))
-    {
-      # n = 1
-      cat(n, '\n')
-      kk = which(annot$geneID == ua$gene[n])
-      ua$gene.length[n] = median(as.numeric(annot$end_transcript[kk]) - as.numeric(annot$start_transcript[kk]))
-      jj = which(aa$Gene == ua$gene[n])
-      if(length(jj)>0) {
-        ua$promoter.max[n] = max(as.numeric(aa$mUA[jj]))
-        ua$promoter.mean[n] = mean(as.numeric(aa$mUA[jj]))
-      }
-    }
-    
-    ua$rpkm = ua$rna - log2(10^3/ua$gene.length)
-    
-    
   }
   
   ##########################################
   # run spatial test for mature samples
   ##########################################
-  Run.test.spatial.peaks = FALSE
+  Run.test.Dev.mUA.peaks = FALSE
   if(Run.test.spatial.peaks){
-    conds = c("Mature_UA", "Mature_LA", "Mature_Hand")
+    conds = c("Mature_UA",  "Mature_Hand", "Embryo_Stage40", "Embryo_Stage44_proximal", "Embryo_Stage44_distal")
     
     sample.sels = c();  cc = c()
     for(n in 1:length(conds)) {
@@ -1313,13 +1268,6 @@ if(Compare.dev.vs.mature.ATACseq.peaks){
       cc = c(cc, rep(conds[n], length(kk)))
       
     }
-    
-    # examples to test
-    #test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
-    #test.examples = c('Hoxa13')
-    #ii.test = which(overlapsAny(pp, promoters[which(!is.na(match(promoters$geneSymbol, test.examples)))]))
-    #ii.Hox = which(overlapsAny(pp, Hoxs))
-    #ii.test = unique(c(ii.test, ii.Hox))
     
     library(tictoc)
     ii.test = c(1:nrow(fpm)) # takes about 2 mins for 40k peaks
@@ -1333,55 +1281,41 @@ if(Compare.dev.vs.mature.ATACseq.peaks){
     
     hist(fpm.bg)
     
-    further.peak.signal.filtering = FALSE
-    if(further.peak.signal.filtering){
-      signal.threshold = 3.0
-      # stringent here, with signal > 2.5 in >=3 samples 
-      nb.above.threshold = apply(as.matrix(cpm), 1, function(x) length(which(x>signal.threshold )))
-      hist(nb.above.threshold, breaks = c(-1:ncol(cpm)))
-      peak.sels = which(nb.above.threshold>=2)
-      cat(length(peak.sels), 'peaks after filtering for mature samples\n')
-      
-      cpm = cpm[peak.sels, ]
-      
-    }
-    
     tic() 
-    res = spatial.peaks.test(cpm = cpm, c = cc, test.Dev.Reg = FALSE)
+    
+    res = dev.mUA.peaks.test(cpm = cpm, c = cc, test.Dev.Reg = FALSE)
+    
     #res = data.frame(res, pp.annots[ii.test, ], stringsAsFactors = FALSE)
     toc()
     
     xx = data.frame(res, pp.annots[match(rownames(res), rownames(pp.annots)), ], stringsAsFactors = FALSE)
     
     res = xx
-    saveRDS(res, file = paste0(RdataDir, '/res_position_dependant_test_', version.analysis, '_v11.rds'))
+    saveRDS(res, file = paste0(RdataDir, '/results_ATACseq.peaks_Dev.vs.mUA.test_', version.analysis, '_v2.rds'))
     
     rm(xx)
     
   }
   
+  
   ##########################################
   # select all positional-dependent loci with below threshold
   ##########################################
-  res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_', version.analysis, '_v11.rds'))
+  res = readRDS(file = paste0(RdataDir, '/results_ATACseq.peaks_Dev.vs.mUA.test_', version.analysis, '_v2.rds'))
   
   # select the positional peaks with pairwise comparisions 
   # limma logFC is in log2 scale
-  fdr.cutoff = 0.05; logfc.cutoff = 1
-  jj = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & abs(res$logFC.mLA.vs.mUA) > logfc.cutoff) |
-               (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & abs(res$logFC.mHand.vs.mUA) > logfc.cutoff)|
-               (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & abs(res$logFC.mHand.vs.mLA) > logfc.cutoff)
-  )
+  fdr.cutoff = 0.05; logfc.cutoff = 1;
+  
+  jj = which((res$adj.P.Val_E40.vs.mUA < fdr.cutoff & abs(res$logFC_E40.vs.mUA) > logfc.cutoff & 
+              res$adj.P.Val_E40.vs.mHand < fdr.cutoff & abs(res$logFC_E40.vs.mHand) > logfc.cutoff) |
+             (res$adj.P.Val_E44prox.vs.mUA < fdr.cutoff & abs(res$logFC_E44prox.vs.mUA) > logfc.cutoff &
+              res$adj.P.Val_E44_dist.vs.mHand < fdr.cutoff & abs(res$logFC_E44_dist.vs.mHand) > logfc.cutoff))
+  
   cat(length(jj), '\n')
   
-  jj1 = which(res$prob.M0< fdr.cutoff & res$log2FC>logfc.cutoff)
-  cat(length(jj1), '\n')
-  jj2 = which(res$pval.lrt < fdr.cutoff & res$log2FC > logfc.cutoff)
-  cat(length(jj2), '\n')
-  
-  
   xx = res[c(jj), ]
-  #xx = xx[order(-xx$log2FC.mature), ]
+  
   xx[grep('HOXA13|SHOX', xx$transcriptId), ]
   # fpm[which(rownames(fpm) == 'chr2p:873464923-873465440'), ]
   
@@ -1390,53 +1324,35 @@ if(Compare.dev.vs.mature.ATACseq.peaks){
   cat(nrow(xx), ' peaks left\n')
   # sort positional peaks with logFC
   #xx = xx[order(-xx$logFC.mean), ]
-  xx = xx[order(-xx$log2FC), ]
+  xx = xx[order(-abs(xx$logFC.mean)), ]
   
   ########
   ## asscociate the signifiant postional peaks with expression matrix
   ########
-  conds = c("Mature_UA", "Mature_LA", "Mature_Hand", 'HEAD')
+  conds = c("Embryo_Stage40", "Embryo_Stage44_proximal", "Embryo_Stage44_distal", "Mature_UA",  "Mature_Hand")
   
   sample.sels = c();  cc = c()
+  sample.means = c()
   for(n in 1:length(conds)) {
     kk = which(design$conds == conds[n]) 
     sample.sels = c(sample.sels, kk)
     cc = c(cc, rep(conds[n], length(kk)))
+    sample.means = cbind(sample.means, apply(fpm[, kk], 1, mean))
+    
   }
   
   keep = fpm[(match(rownames(xx), rownames(fpm))), sample.sels]
   keep = as.matrix(keep)
+  sample.means = sample.means[(match(rownames(xx), rownames(fpm))), ]
   
-  ### filter the peaks from head control sample
-  ## either filter soly based on the head signals or based on the logFC between max(mature samples/control) or both
+  ### filter the peaks with low signals 
   Filtering.peaks.in.Head.samples = TRUE
   if(Filtering.peaks.in.Head.samples){
-    maxs = apply(keep[, grep('Mature_', colnames(keep))], 1, function(x) return(max(c(mean(x[1:5]), mean(x[6:9]), mean(x[10:12])))))
-    mins = apply(keep[, grep('Mature_', colnames(keep))], 1, function(x) return(min(c(mean(x[1:5]), mean(x[6:9]), mean(x[10:12])))))
     
-    ctl.mean = apply(keep[, grep('HEAD', colnames(keep))], 1, mean)
+    maxs = apply(sample.means, 1, max)
+    hist(fpm.bg)
     
-    rr = maxs - ctl.mean
-    #p.ctl = pp[match(names(ctl.sels), names(pp))]
-    #non.overlap = !overlapsAny(p0, p.ctl)
-    plot(maxs, ctl.mean, cex = 0.2);
-    abline(0, 1, lwd = 2.0, col = 'red')
-    abline(v = 3, lwd = 2.0, col = 'red')
-    abline(h = 3, lwd = 2.0, col = 'red')
-    
-    #xx = xx[non.overlap, ]
-    plot(rr, ctl.mean, cex = 0.2);
-    abline(h = 3, col = 'red', lwd = 2.0)
-    abline(v = c(0.5, 1), col = 'red', lwd = 2.0)
-    
-    jj = which(maxs > 3 & mins <3)
-    
-    #jj =  which( maxs > 3 & mins <3 & ctl.mean > 3)
-    #jj = which(rr>1 & ctl.mean<3 & maxs > 3 & mins <3)
-    
-    # jj = which(rr>1 & maxs > 3 & mins <3)
-    
-    sels = which(rr>1 & ctl.mean<3 & maxs > 3 & mins <3)
+    sels = which(maxs > 3)
     cat(length(sels), 'peaks selected \n')
     
     #sels = which(rr >1 & maxs > 3.)
@@ -1449,7 +1365,7 @@ if(Compare.dev.vs.mature.ATACseq.peaks){
   
   dim(xx)
   
-  save(xx, keep, file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata'))
+  save(xx, keep, file = paste0(RdataDir, '/ATACseq_dev.mautre.peaks_filteredLowSignal_', version.analysis, '.Rdata'))
   
   ##########################################
   # quick clustering of postional peaks using three replicates of each segments
@@ -1457,7 +1373,7 @@ if(Compare.dev.vs.mature.ATACseq.peaks){
   library(dendextend)
   library(ggplot2)
   
-  load(file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata'))
+  load(file = paste0(RdataDir, '/ATACseq_dev.mautre.peaks_filteredLowSignal_', version.analysis, '.Rdata'))
   
   pp = data.frame(t(sapply(rownames(xx), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
   pp$strand = '*'
@@ -1469,6 +1385,7 @@ if(Compare.dev.vs.mature.ATACseq.peaks){
   rep.sels = grep('HEAD|102657|102655|74938', colnames(keep), invert = TRUE)
   
   yy = keep[, rep.sels]
+  
   cal_z_score <- function(x){
     (x - mean(x)) / sd(x)
   }
