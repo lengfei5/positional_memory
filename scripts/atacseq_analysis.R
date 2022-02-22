@@ -313,6 +313,59 @@ if(Split.Mature.Regeneration.samples){
     
   }
   
+  # batch correct development samples and mUA
+  Batch.Correct.mUA.embryoStage = FALSE
+  if(Batch.Correct.mUA.embryoStage){
+    
+    sels = unique(c(which(design$condition == 'Mature_UA' & (design$batch == '2020'| design$batch == '2021')), 
+                  grep('Embryo_Stage', design$condition)))
+    
+    design.sels = design[sels, ]
+    #design.sels = design.sels[which(design.sels$SampleID != '74938'), ]
+    
+    design.sels$conds = droplevels(design.sels$conds)
+    
+    #design.sels$batch[grep('749', design.sels$SampleID)] = '2019'
+    #design.sels$batch = droplevels(design.sels$batch)
+    table(design.sels$conds, design.sels$batch)
+    
+    ddx = dds[, sels]
+    ddx$conds = droplevels(ddx$conds)
+    ss = rowSums(counts(ddx))
+    
+    d <- DGEList(counts=counts(ddx), group=design.sels$conds)
+    tmm <- calcNormFactors(d, method='TMM')
+    tmm = cpm(tmm, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 1)
+    
+    bc = as.factor(design.sels$batch)
+    mod = model.matrix(~ as.factor(conds), data = design.sels)
+    
+    # if specify ref.batch, the parameters will be estimated from the ref, inapprioate here, 
+    # because there is no better batche other others 
+    #ref.batch = '2021S'# 2021S as reference is better for some reasons (NOT USED here)    
+    fpm.bc = ComBat(dat=as.matrix(tmm), batch=bc, mod=mod, par.prior=TRUE, ref.batch = NULL) 
+    
+    #design.tokeep<-model.matrix(~ 0 + conds,  data = design.sels)
+    #cpm.bc = limma::removeBatchEffect(tmm, batch = bc, design = design.tokeep)
+    # plot(fpm.bc[,1], tmm[, 1]);abline(0, 1, lwd = 2.0, col = 'red')
+    make.pca.plots(tmm, ntop = 1000, conds.plot = 'all')
+    ggsave(paste0(resDir, "/Dev_mUA_Samples_batchCorrect_before_",  version.analysis, ".pdf"), width = 16, height = 14)
+    
+    
+    make.pca.plots(fpm.bc, ntop = 1000, conds.plot = 'all')
+    ggsave(paste0(resDir, "/Dev_mUA_Samples_batchCorrect_after_",  version.analysis, ".pdf"), width = 16, height = 14)
+    
+    
+    fpm = fpm.bc
+    
+    rm(fpm.bc)
+    
+    saveRDS(fpm, file = paste0(RdataDir, '/fpm.bc_TMM_combat_Dev.mUA.samples_batch2020.2021.rds'))
+    saveRDS(design.sels, file = paste0(RdataDir, '/design_sels_bc_TMM_combat_Dev.mUA.samples_batch2020.2021.rds'))
+    
+      
+  }
+  
   # regeneration time points and embryo stages
   Batch.Correct.regeneration.embryoStage = FALSE
   if(Batch.Correct.regeneration.embryoStage){
@@ -1021,11 +1074,13 @@ limb.go = unique(c(limb.go, dev.example))
 
 fpm$genetype[!is.na(match(fpm$gene, limb.go))] = 'limb.dev.GO'
 
+fpm$genetype[!is.na(fpm$DEgene)] = 'DE.gene'
+
 examples.sel = unique(grep(paste0(dev.example, collapse = '|') ,fpm$gene))
 
 ggplot(fpm, aes(x = Stage40, y = mUA, color = genetype, label = gene)) +
-         geom_point(size = 0.4) + 
-  scale_color_manual(values=c("#E69F00", "#999999", 'darkblue', "#56B4E9" )) + 
+         geom_point(size = 0.25) + 
+  scale_color_manual(values=c('red', "#E69F00", "#999999", 'darkblue', "#56B4E9")) + 
   geom_text_repel(data= fpm[examples.sel, ], size = 4.0, color = 'darkblue') +
   geom_point(data=fpm[which(fpm$genetype == 'limb.dev'), ], aes(x=Stage40, y=mUA), colour="darkblue", size=1.5) +
          #geom_hline(yintercept=2.0, colour = "darkgray") + 
@@ -1063,6 +1118,24 @@ ggp = ggplot(data=pca2save, aes(PC1, PC2, label = name, color= condition, shape 
   geom_text(hjust = 0.7, nudge_y = 1, size=2.5)
 
 plot(ggp)
+
+
+dds$condition = droplevels(dds$condition)
+dds <- estimateDispersions(dds, fitType = 'parametric')
+plotDispEsts(dds, ymin = 10^-3); abline(h = 0.1, col = 'blue', lwd = 2.0)
+# 
+dds = nbinomWaldTest(dds, betaPrior = TRUE)
+resultsNames(dds)
+
+# 
+res.ii = results(dds, contrast=c("condition", 'Embryo_Stage40', 'Mature_UA'), alpha = 0.1)
+colnames(res.ii) = paste0(colnames(res.ii), "_Hand.vs.UA")
+res = data.frame(res.ii[, c(2, 5, 6)])
+# 
+res.ii = results(dds, contrast=c("condition", 'Mature_Hand', 'Mature_LA'), alpha = 0.1)
+colnames(res.ii) = paste0(colnames(res.ii), "_Hand.vs.LA")
+res = data.frame(res, res.ii[, c(2, 5, 6)])
+
 
 cpm = fpm(dds)
 cpm = log2(cpm + 2^-7)
@@ -1123,8 +1196,456 @@ ggplot(cpm, aes(x = stage40, y = mUA, color = genetype, label = gene)) +
         #legend.key.width= unit(1, 'cm')
   )
 
+
 ggsave(paste0(figureDir, "Stage40_vs_mUA_devGenes_comparisons_smartseq2.pdf"), width=12, height = 10)
 
+##########################################
+# ATAC-seq peaks: development-specific peaks and mature peaks 
+##########################################
+Compare.dev.vs.mature.ATACseq.peaks = FALSE
+if(Compare.dev.vs.mature.ATACseq.peaks){
+  
+  require(ChIPpeakAnno)
+  require(ChIPseeker)
+  
+  ##########################################
+  # import batch corrected gene expression and design 
+  ##########################################
+  fpm = readRDS(file = paste0(RdataDir, '/fpm.bc_TMM_combat_Dev.mUA.samples_batch2020.2021.rds'))
+  saveRDS(design.sels, file = paste0(RdataDir, '/design_sels_bc_TMM_combat_Dev.mUA.samples_batch2020.2021.rds'))
+    
+  # prepare the background distribution
+  fpm.bg = fpm[grep('bg_', rownames(fpm), invert = FALSE), ]
+  fpm = fpm[grep('bg_', rownames(fpm), invert = TRUE), ]
+  rownames(fpm) = gsub('_', '-', rownames(fpm))
+  
+  hist(fpm.bg, breaks = 100, main = 'background distribution')
+  abline(v = 3, col = 'red', lwd = 2.0)
+  quantile(fpm.bg, c(0.95, 0.99))
+  
+  ##########################################
+  ## make Granges and annotate peaks
+  ##########################################
+  Make.Granges.and.peakAnnotation = TRUE
+  if(Make.Granges.and.peakAnnotation){
+    pp = data.frame(t(sapply(rownames(fpm), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+    pp$strand = '*'
+    
+    save.peak.bed = FALSE
+    if(save.peak.bed){
+      bed = data.frame(pp[, c(1:3)], rownames(pp), 0, pp[, 4], stringsAsFactors = FALSE)
+      write.table(bed, file = paste0(resDir, '/peakset_', version.analysis, '.bed'), col.names = FALSE, row.names = FALSE,
+                  sep = '\t', quote = FALSE)
+    }
+    
+    pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                  start.field="X2", end.field="X3", strand.field="strand")
+    
+    # annotation from ucsc browser ambMex60DD_genes_putative
+    amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
+    pp.annots = annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+    #plotAnnoBar(pp.annots)
+    
+    pp.annots = as.data.frame(pp.annots)
+    rownames(pp.annots) = rownames(fpm)
+    
+    promoters = select.promoters.regions(upstream = 2000, downstream = 2000, ORF.type.gtf = 'Putative', promoter.select = 'all')
+    
+    ##########################################
+    # UA gene expression vs promoter signals  
+    ##########################################
+    ## UA promoter signals 
+    ua.annot = data.frame(pp.annots, mUA = apply(fpm[, grep('Mature_UA', colnames(fpm))], 1, mean))
+    ua.promoters = ua.annot[grep('Promoter', ua.annot$annotation), ]
+    ua.promoters$mUA = as.numeric(ua.promoters$mUA) - log2(10^3/as.numeric(ua.promoters$width))
+    aa = ua.promoters
+    rm(ua.annot)
+    rm(ua.promoters)
+    aa$transcript = sapply(aa$geneId, function(x) {x = unlist(strsplit(as.character(x), '[|]')); return(x[length(x)])})
+    
+    annot = readRDS(paste0(annotDir, 
+                           'AmexT_v47_transcriptID_transcriptCotig_geneSymbol.nr_geneSymbol.hs_geneID_gtf.geneInfo_gtf.transcriptInfo.rds'))
+    aa$Gene = annot$geneID[match(aa$transcript, annot$transcriptID)]
+    
+    load(file = paste0("../results/microarray/Rdata/", 
+                       'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_DEpval.Rdata'))
+    
+    rnas = apply(res[, c(1:3)], 1, mean)
+    ggs = names(rnas)
+    ggs = sapply(ggs, function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
+    
+    ua = data.frame(gene = unique(c(ggs, aa$Gene)) , stringsAsFactors = FALSE)
+    ua$rna = rnas[match(ua$gene, ua$gene)]
+    ua$gene.length = NA
+    ua$promoter.mean = NA
+    ua$promoter.max = NA
+    
+    for(n in 1:nrow(ua))
+    {
+      # n = 1
+      cat(n, '\n')
+      kk = which(annot$geneID == ua$gene[n])
+      ua$gene.length[n] = median(as.numeric(annot$end_transcript[kk]) - as.numeric(annot$start_transcript[kk]))
+      jj = which(aa$Gene == ua$gene[n])
+      if(length(jj)>0) {
+        ua$promoter.max[n] = max(as.numeric(aa$mUA[jj]))
+        ua$promoter.mean[n] = mean(as.numeric(aa$mUA[jj]))
+      }
+    }
+    
+    ua$rpkm = ua$rna - log2(10^3/ua$gene.length)
+    
+    
+  }
+  
+  ##########################################
+  # run spatial test for mature samples
+  ##########################################
+  Run.test.spatial.peaks = FALSE
+  if(Run.test.spatial.peaks){
+    conds = c("Mature_UA", "Mature_LA", "Mature_Hand")
+    
+    sample.sels = c();  cc = c()
+    for(n in 1:length(conds)) {
+      #kk = which(design$conds == conds[n] & design$SampleID != '136159')
+      kk = which(design$conds == conds[n]) 
+      sample.sels = c(sample.sels, kk)
+      cc = c(cc, rep(conds[n], length(kk)))
+      
+    }
+    
+    # examples to test
+    #test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
+    #test.examples = c('Hoxa13')
+    #ii.test = which(overlapsAny(pp, promoters[which(!is.na(match(promoters$geneSymbol, test.examples)))]))
+    #ii.Hox = which(overlapsAny(pp, Hoxs))
+    #ii.test = unique(c(ii.test, ii.Hox))
+    
+    library(tictoc)
+    ii.test = c(1:nrow(fpm)) # takes about 2 mins for 40k peaks
+    source('Functions_atac.R')
+    
+    # select the mature samples
+    cpm = fpm[, sample.sels]
+    
+    # select the peaks that are above background with >3 samples
+    quantile(fpm.bg, 0.99)
+    
+    hist(fpm.bg)
+    
+    further.peak.signal.filtering = FALSE
+    if(further.peak.signal.filtering){
+      signal.threshold = 3.0
+      # stringent here, with signal > 2.5 in >=3 samples 
+      nb.above.threshold = apply(as.matrix(cpm), 1, function(x) length(which(x>signal.threshold )))
+      hist(nb.above.threshold, breaks = c(-1:ncol(cpm)))
+      peak.sels = which(nb.above.threshold>=2)
+      cat(length(peak.sels), 'peaks after filtering for mature samples\n')
+      
+      cpm = cpm[peak.sels, ]
+      
+    }
+    
+    tic() 
+    res = spatial.peaks.test(cpm = cpm, c = cc, test.Dev.Reg = FALSE)
+    #res = data.frame(res, pp.annots[ii.test, ], stringsAsFactors = FALSE)
+    toc()
+    
+    xx = data.frame(res, pp.annots[match(rownames(res), rownames(pp.annots)), ], stringsAsFactors = FALSE)
+    
+    res = xx
+    saveRDS(res, file = paste0(RdataDir, '/res_position_dependant_test_', version.analysis, '_v11.rds'))
+    
+    rm(xx)
+    
+  }
+  
+  ##########################################
+  # select all positional-dependent loci with below threshold
+  ##########################################
+  res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_', version.analysis, '_v11.rds'))
+  
+  # select the positional peaks with pairwise comparisions 
+  # limma logFC is in log2 scale
+  fdr.cutoff = 0.05; logfc.cutoff = 1
+  jj = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & abs(res$logFC.mLA.vs.mUA) > logfc.cutoff) |
+               (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & abs(res$logFC.mHand.vs.mUA) > logfc.cutoff)|
+               (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & abs(res$logFC.mHand.vs.mLA) > logfc.cutoff)
+  )
+  cat(length(jj), '\n')
+  
+  jj1 = which(res$prob.M0< fdr.cutoff & res$log2FC>logfc.cutoff)
+  cat(length(jj1), '\n')
+  jj2 = which(res$pval.lrt < fdr.cutoff & res$log2FC > logfc.cutoff)
+  cat(length(jj2), '\n')
+  
+  
+  xx = res[c(jj), ]
+  #xx = xx[order(-xx$log2FC.mature), ]
+  xx[grep('HOXA13|SHOX', xx$transcriptId), ]
+  # fpm[which(rownames(fpm) == 'chr2p:873464923-873465440'), ]
+  
+  xx[grep('HOXA13|SHOX|MEIS', xx$transcriptId), ]
+  
+  cat(nrow(xx), ' peaks left\n')
+  # sort positional peaks with logFC
+  #xx = xx[order(-xx$logFC.mean), ]
+  xx = xx[order(-xx$log2FC), ]
+  
+  ########
+  ## asscociate the signifiant postional peaks with expression matrix
+  ########
+  conds = c("Mature_UA", "Mature_LA", "Mature_Hand", 'HEAD')
+  
+  sample.sels = c();  cc = c()
+  for(n in 1:length(conds)) {
+    kk = which(design$conds == conds[n]) 
+    sample.sels = c(sample.sels, kk)
+    cc = c(cc, rep(conds[n], length(kk)))
+  }
+  
+  keep = fpm[(match(rownames(xx), rownames(fpm))), sample.sels]
+  keep = as.matrix(keep)
+  
+  ### filter the peaks from head control sample
+  ## either filter soly based on the head signals or based on the logFC between max(mature samples/control) or both
+  Filtering.peaks.in.Head.samples = TRUE
+  if(Filtering.peaks.in.Head.samples){
+    maxs = apply(keep[, grep('Mature_', colnames(keep))], 1, function(x) return(max(c(mean(x[1:5]), mean(x[6:9]), mean(x[10:12])))))
+    mins = apply(keep[, grep('Mature_', colnames(keep))], 1, function(x) return(min(c(mean(x[1:5]), mean(x[6:9]), mean(x[10:12])))))
+    
+    ctl.mean = apply(keep[, grep('HEAD', colnames(keep))], 1, mean)
+    
+    rr = maxs - ctl.mean
+    #p.ctl = pp[match(names(ctl.sels), names(pp))]
+    #non.overlap = !overlapsAny(p0, p.ctl)
+    plot(maxs, ctl.mean, cex = 0.2);
+    abline(0, 1, lwd = 2.0, col = 'red')
+    abline(v = 3, lwd = 2.0, col = 'red')
+    abline(h = 3, lwd = 2.0, col = 'red')
+    
+    #xx = xx[non.overlap, ]
+    plot(rr, ctl.mean, cex = 0.2);
+    abline(h = 3, col = 'red', lwd = 2.0)
+    abline(v = c(0.5, 1), col = 'red', lwd = 2.0)
+    
+    jj = which(maxs > 3 & mins <3)
+    
+    #jj =  which( maxs > 3 & mins <3 & ctl.mean > 3)
+    #jj = which(rr>1 & ctl.mean<3 & maxs > 3 & mins <3)
+    
+    # jj = which(rr>1 & maxs > 3 & mins <3)
+    
+    sels = which(rr>1 & ctl.mean<3 & maxs > 3 & mins <3)
+    cat(length(sels), 'peaks selected \n')
+    
+    #sels = which(rr >1 & maxs > 3.)
+    #cat(length(sels), 'peaks selected \n')
+    #nonsels = which(rr<=1 | maxs <=2)
+    xx = xx[sels, ]
+    keep = keep[sels, ]
+    
+  }
+  
+  dim(xx)
+  
+  save(xx, keep, file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata'))
+  
+  ##########################################
+  # quick clustering of postional peaks using three replicates of each segments
+  ##########################################
+  library(dendextend)
+  library(ggplot2)
+  
+  load(file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata'))
+  
+  pp = data.frame(t(sapply(rownames(xx), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  pp$strand = '*'
+  
+  pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
+  
+  # make.pca.plots(keep, ntop = 1246, conds.plot = 'Mature')
+  rep.sels = grep('HEAD|102657|102655|74938', colnames(keep), invert = TRUE)
+  
+  yy = keep[, rep.sels]
+  cal_z_score <- function(x){
+    (x - mean(x)) / sd(x)
+  }
+  
+  yy <- t(apply(yy, 1, cal_z_score))
+  
+  nb_clusters = 6
+  
+  saveDir = paste0(figureDir, 'positional_peaks_clusters_', nb_clusters)
+  if(!dir.exists(saveDir)) dir.create(saveDir)
+  
+  my_hclust_gene <- hclust(dist(yy), method = "complete")
+  
+  my_gene_col <- cutree(tree = as.dendrogram(my_hclust_gene), k = nb_clusters)
+  xx$clusters = my_gene_col
+  
+  my_gene_col <- data.frame(cluster =  paste0('cluster_', my_gene_col))
+  rownames(my_gene_col) = rownames(yy)
+  
+  df <- data.frame(rep(conds[1:3], each = 3))
+  rownames(df) = colnames(yy)
+  colnames(df) = 'segments'
+  
+  col3 <- c("#a6cee3", "#1f78b4", "#b2df8a",
+            "#33a02c", "#fb9a99", "#e31a1c",
+            "#fdbf6f", "#ff7f00", "#cab2d6",
+            "#6a3d9a", "#ffff99", "#b15928")
+  
+  sample_colors = c('springgreen4', 'steelblue2', 'gold2')
+  names(sample_colors) = c('Mature_UA', 'Mature_LA', 'Mature_Hand')
+  cluster_col = col3[1:nb_clusters]
+  names(cluster_col) = paste0('cluster_', c(1:nb_clusters))
+  annot_colors = list(
+    segments = sample_colors,
+    cluster = cluster_col)
+  
+  gaps.col = c(3, 6)
+  
+  pheatmap(yy, annotation_row = my_gene_col, 
+           annotation_col = df, show_rownames = FALSE, scale = 'none', 
+           color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdYlGn")))(8), 
+           show_colnames = FALSE,
+           cluster_rows = TRUE, cluster_cols = FALSE,  
+           clustering_method = 'complete', cutree_rows = nb_clusters, 
+           annotation_colors = annot_colors, 
+           gaps_col = gaps.col, 
+           #gaps_row =  gaps.row, 
+           filename = paste0(saveDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
+           width = 6, height = 12)
+  
+  write.csv(xx, file = paste0(saveDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters', 
+                              nb_clusters, '.csv'), quote = FALSE, row.names = TRUE)
+  
+  ## test the distribution of features of different groups
+  source('Functions_atac.R')
+  
+  pdfname = paste0(saveDir, "/Fig1E_positional_peak_feature_distribution_cluster_all.pdf")
+  pdf(pdfname, width = 8, height = 6)
+  par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+  pp.annots = annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+  
+  stats = plotPeakAnnot_piechart(pp.annots)
+  
+  dev.off()
+  
+  colnames(stats)[ncol(stats)] = paste0('all_', pp.annots@peakNum)
+  
+  scores = c()
+  for(m in 1:nb_clusters)
+  {
+    # m = 1
+    cat('cluster - ',  m, '\n')
+    pp.annots = annotatePeak(pp[which(xx$cluster == m)], TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+    
+    pdfname = paste0(saveDir, "/Fig1E_positional_peak_feature_distribution_cluster_", m, ".pdf")
+    pdf(pdfname, width = 8, height = 6)
+    par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+    
+    stats = data.frame(stats,  plotPeakAnnot_piechart(pp.annots)[, 2])
+    colnames(stats)[ncol(stats)] = paste0('cluster', m, '_', pp.annots@peakNum)
+    
+    test = c()
+    test2 = c()
+    for(i in 1:nrow(stats))
+    {
+      total = length(pp); 
+      mm = round(total * stats[i, 2]/100)
+      nn = total - mm
+      qq = round(pp.annots@peakNum * stats[i, ncol(stats)]/100)
+      test = c(test, phyper(qq-1, mm, nn, pp.annots@peakNum, lower.tail = FALSE, log.p = FALSE))
+      test2 = c(test2, phyper(qq+1, mm, nn, pp.annots@peakNum, lower.tail = TRUE, log.p = FALSE))
+    }
+    scores = cbind(scores, test, test2)
+    colnames(scores)[c(ncol(scores)-1, ncol(scores))] = c(paste0('enrich.pval.cluster', m), paste0('depelet.pval.cluster', m))
+    
+    dev.off()
+  }
+  rownames(scores) = rownames(scores)
+  
+  stats = data.frame(stats, scores, stringsAsFactors = FALSE)
+  
+  write.csv(stats, file = paste0(saveDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters', 
+                                 nb_clusters, '_feature.Enrichment.depeletion.csv'), quote = FALSE, row.names = TRUE)
+  
+  
+  library(tidyr)
+  library(dplyr)
+  require(ggplot2)
+  
+  as_tibble(stats) %>%  gather(group, freq,  2:ncol(stats)) %>% 
+    ggplot(aes(fill=group, y=freq, x=Feature)) + 
+    geom_bar(position="dodge", stat="identity") +
+    theme(axis.text.x = element_text(angle = 90, size = 10)) 
+  
+  ggsave(paste0(saveDir, "/Fig1E_positional_peak_feature_distribution_cluster_comparison.pdf"),  width = 12, height = 8)
+  
+  
+  ##########################################
+  # highlight promoter peaks
+  ##########################################
+  load(file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata'))
+  
+  promoter.sels = grep('Promoter', xx$annotation)
+  yy = keep[promoter.sels, rep.sels]
+  xx = xx[promoter.sels, ]
+  
+  xx[grep('HOXA13|MEIS|SHOX|HOXC', xx$transcriptId), ]
+  
+  gg = xx$geneId
+  grep('HOXA13', gg)
+  rownames(yy) = paste0(rownames(yy), '_', gg)
+  #rownames(keep) = gg
+  yy = as.matrix(yy)
+  
+  gg = rownames(yy)
+  gg = sapply(gg, function(x) {x = unlist(strsplit(as.character(x), '_')); return(paste0(x[2:length(x)], collapse = '_'))})
+  gg = sapply(gg, function(x) {
+    xx = unlist(strsplit(as.character(x), '[|]')); 
+    if(xx[1] == 'N/A') 
+    {
+      return(x);
+    }else{
+      xx = xx[-length(xx)]
+      xx = xx[length(xx)]
+      return(xx);
+    }})
+  gg = as.character(gg)
+  gg = gsub("\\[|\\]", "", gg)
+  gg = gsub(' hs', '', gg)
+  gg = gsub(' nr', '', gg)
+  
+  rownames(yy) = gg
+  sample_colors = c('springgreen4', 'steelblue2', 'gold2')
+  names(sample_colors) = c('Mature_UA', 'Mature_LA', 'Mature_Hand')
+  annot_colors = list(segments = sample_colors)
+  
+  pheatmap(yy, 
+           annotation_col = df, show_rownames = TRUE, scale = 'row', 
+           color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdYlGn")))(8), 
+           show_colnames = FALSE,
+           cluster_rows = TRUE, cluster_cols = FALSE, 
+           annotation_colors = annot_colors, 
+           gaps_col = gaps.col, 
+           #gaps_row =  gaps.row, 
+           filename = paste0(figureDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_top.promoters.pdf'), 
+           width = 10, height = 8)
+  
+  if(saveTable){
+    write.csv(data.frame(keep, yy, stringsAsFactors = FALSE), 
+              file = paste0(resDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_top50_promoterPeaks.csv'), 
+              quote = FALSE, row.names = TRUE)
+    
+  }
+  
+  
+  
+}
 
 ########################################################
 ########################################################

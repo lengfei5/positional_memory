@@ -150,8 +150,10 @@ if(Process.design.stats){
   
   design$condition = paste0(design$marks, '_', design$sample)
   
+  saveRDS(design, file = paste0(RdataDir, '/design_matrix_R11876_R12810_R12965_', version.analysis, '.rds'))
   
-    
+  write.csv(design, file = paste0(resDir, '/R11876_R12810_R12965_', version.analysis,  '_QCs_stats.csv'), row.names = FALSE)
+  
 }
 
 
@@ -188,7 +190,7 @@ peaks = peaks[which(peaks$chr != 'chrM'), ]
 dim(peaks)
 
 
-peakDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/R11876_cut.run/nf_out/'
+peakDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/R12965_CT'
 # preapre SAF input for featureCounts
 require(Rsubread)
 
@@ -199,7 +201,7 @@ SAF = data.frame(GeneID=peaks$peak.name,
                  End=peaks$end, 
                  Strand=peaks$strand, stringsAsFactors = FALSE)
 
-write.table(SAF, file = paste0(peakDir, 'amex6_TSS_all.saf'), sep = '\t', row.names = FALSE, 
+write.table(SAF, file = paste0(peakDir, '/amex6_TSS_all.saf'), sep = '\t', row.names = FALSE, 
             col.names = TRUE, quote = FALSE) 
 
 ##########################################
@@ -210,12 +212,14 @@ RNA.QC.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functio
 source(RNA.functions)
 source(RNA.QC.functions)
 
-design = read.delim(file = 
-        '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/R11876_cut.run/sampleInfos_R11876_parsed.txt',
-        header = TRUE, sep = '\t')
+design = readRDS(file = paste0(RdataDir, '/design_matrix_R11876_R12810_R12965_', version.analysis, '.rds'))
+#design = read.delim(file = 
+#        '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/R11876_cut.run/sampleInfos_R11876_parsed.txt',
+#        header = TRUE, sep = '\t')
 
 #mm = match(design$sampleID, as.character(c(161523:161526)))
 #design = design[is.na(mm), ]
+
 xlist<-list.files(path=paste0(peakDir, '/featurecounts_peaks.Q30'),
                   pattern = "*_featureCounts.txt$", full.names = TRUE) ## list of data set to merge
 
@@ -224,19 +228,21 @@ all = cat.countTable(xlist, countsfrom = 'featureCounts')
 colnames(design)[1] = 'SampleID'
 #design = design[grep('90392|90393|108072|108073|108070|108071', design$SampleID, invert = TRUE),]
 
-counts = process.countTable(all=all, design = design[, c(1,2)])
+counts = process.countTable(all=all, design = design[, c(1,14)])
 
 save(design, counts, file = paste0(RdataDir, '/histoneMarkers_samplesDesign_readCounts_axolotlAllTSS.2kb.Rdata'))
 
 ##########################################
-#  signal normalization
+#  signal normalization and PCA QC
 ##########################################
 load(file = paste0(RdataDir, '/histoneMarkers_samplesDesign_readCounts_axolotlAllTSS.2kb.Rdata'))
-design$condition = design$fileName
-design$condition = gsub('K27me3et', 'K27me3', design$condition)
 
-cc.sels = apply(expand.grid(c('UA', 'LA', 'Hand'),  c('K4me3', 'K27me3')), 1, paste, collapse="_")
-sels = match(cc.sels, design$condition)
+#design$condition = design$fileName
+#design$condition = gsub('K27me3et', 'K27me3', design$condition)
+#cc.sels = apply(expand.grid(c('UA', 'LA', 'Hand'),  c('K4me3', 'K27me3')), 1, paste, collapse="_")
+#sels = match(cc.sels, design$condition)
+#sels = grep('IgG', design$marks, invert = TRUE)
+sels = which(design$marks == 'H3K27ac'|design$marks == 'H3K27me3')
 
 design = design[sels, ]
 counts = counts[, c(1, (sels+1))]
@@ -257,15 +263,47 @@ dds <- DESeqDataSetFromMatrix(as.matrix(counts[, -1]), DataFrame(design), design
 ss = rowSums(counts(dds))
 #length(which(ss > quantile(ss, probs = 0.4)))
 
-dd0 = dds[ss > 20, ]
+dd0 = dds[ss > 50, ]
 dd0 = estimateSizeFactors(dd0)
 sizefactors.UQ = sizeFactors(dd0)
 
 sizeFactors(dds) <- sizefactors.UQ
 fpm = fpm(dds, robust = TRUE)
-colnames(fpm) = design$condition
+#colnames(fpm) = design$condition
 
-saveRDS(fpm, file = paste0(RdataDir,  '/histoneMarkers_normSignals_axolotlAllTSS.2kb.rds'))
+#saveRDS(fpm, file = paste0(RdataDir,  '/histoneMarkers_normSignals_axolotlAllTSS.2kb.rds'))
+
+Make.pca.plots = FALSE
+if(Make.pca.plots){
+  library(ggrepel)
+  library(dplyr)
+  library(tibble)
+  
+  vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
+  
+  pca=plotPCA(vsd, intgroup = c('sample', 'marks'), returnData = FALSE)
+  print(pca)
+  
+  pca2save = as.data.frame(plotPCA(vsd, intgroup = c('sample', 'marks'), returnData = TRUE))
+  pca2save$name = paste0(design$condition, '_', design$SampleID)
+  
+  ggplot(data=pca2save, aes(PC1, PC2, label = name, color= sample, shape = marks))  + 
+    geom_point(size=3) + 
+    #geom_text_repel(size = 2.0, color = 'darkblue')
+    geom_text(hjust = 0.2, nudge_y = 0.2, size=2.5)
+  
+  ggsave(paste0(resDir, "/histM_PCA_H3K27ac_H3K27me3.pdf"), width=16, height = 10)
+  
+  
+  ggp = ggplot(data=pca2save[which(pca2save$batch==4), ], aes(PC1, PC2, label = name, color= condition, shape = batch))  + 
+    geom_point(size=3) + 
+    geom_text(hjust = 0.7, nudge_y = 1, size=2.5)
+  
+  plot(ggp) + ggsave(paste0(resDir, "/PCAplot_batch4.pdf"), width=12, height = 8)
+  
+}
+
+
 ##########################################
 # test/explore histone markers for postional-related genes
 # and regeneration-related gened

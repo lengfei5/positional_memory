@@ -1584,7 +1584,8 @@ pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
   metadata$batch = sapply(metadata$cell_id, function(x) unlist(strsplit(as.character(x), '[.]'))[1])
   rownames(metadata) = metadata$cell_id
   
-  colnames(counts) = rownames(metadata)  
+  colnames(counts) = rownames(metadata)
+  
   ##########################################
   # check scRNA-seq data 
   ##########################################
@@ -1615,6 +1616,17 @@ pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
   p1 + p2
   
   ggsave(paste0(resDir, "/Overview_Gerber2018_Fluidigm.C1_batches.pdf"), width = 12, height = 8)
+  
+  
+  ## find DE genes between mUA and stage 40 and stage 44
+  Idents(aa) = aa$timepoint
+  DE.genes1 = FindMarkers(aa, ident.1 = "Stage40", ident.2 = "0dpa", logfc.threshold = 0.5)
+  DE.genes2 = FindMarkers(aa, ident.1 = "Stage44", ident.2 = "0dpa", logfc.threshold = 0.5)
+  
+  DE.genes1 = DE.genes1[which(DE.genes1$p_val_adj < 0.05), ]
+  DE.genes2 = DE.genes2[which(DE.genes2$p_val_adj < 0.05), ]
+  
+  DE.genes = unique(c(rownames(DE.genes1), rownames(DE.genes2)))
   
   # check the difference between stage40 and stage44
   aa = subset(aa, cells = colnames(aa)[which(aa$condition == 'Stage40'|aa$condition == 'Stage44')])
@@ -1682,7 +1694,7 @@ pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
   ss = rowSums(counts(dds)[, c(2:3)])
   
   hist(log10(ss), breaks = 100)
-  dds = dds[which(ss > 100), ]
+  dds = dds[which(ss > 20), ]
   
   dds = estimateSizeFactors(dds)
   
@@ -1700,7 +1712,10 @@ pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
   fpm = data.frame(log2(fpm + 2^-7))
   
   
-  rr = fpm[, 3] - fpm[, 2]
+  rr1 = fpm[, 2] - fpm[, 1]
+  rr2 = fpm[, 3] - fpm[, 1]
+  rr = cbind(rr1, rr2)
+  rr = apply(as.matrix(rr), 1, function(x) {x[which(abs(x) == max(abs(x)))][1]})
   
   fpm$log2fc = rr
   
@@ -1726,6 +1741,8 @@ pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
   hist(fpm[, 3], breaks = 100, main = 'log2 expression of stage40.44');abline(v = 2)
   
   fpm$genetype[which(fpm[,2]<2 & fpm[, 3]<2 & fpm$genetype == 'devGene')] = 'dev.lowlyExp'
+  fpm$DEgene = NA
+  fpm$DEgene[match(DE.genes, ggs)] = 1
   
   save(dds, fpm,
        file = paste0(RdataDir, '/pseudoBulk_scRNAcellPooling_FluidigmC1_stage40.44.mUA_dev_geneSelection.Rdata'))
