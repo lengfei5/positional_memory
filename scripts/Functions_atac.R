@@ -1704,7 +1704,7 @@ pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
   saveRDS(dds, 
        file = paste0(RdataDir, '/pseudoBulk_scRNAcellPooling_FluidigmC1_mUA_stage40_44.rds'))
   
-  #ss = rowMeans(counts(dds))
+  ss = rowMeans(counts(dds))
   dd0 = dds[ss > quantile(ss, probs = 0.75), ]
   dd0 = estimateSizeFactors(dd0)
   
@@ -1743,6 +1743,8 @@ pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
   fpm$genetype[which(fpm[,2]<2 & fpm[, 3]<2 & fpm$genetype == 'devGene')] = 'dev.lowlyExp'
   fpm$DEgene = NA
   fpm$DEgene[match(DE.genes, ggs)] = 1
+  
+  colnames(fpm)[6] = 'DEgene_seuratFindMarker'
   
   save(dds, fpm,
        file = paste0(RdataDir, '/pseudoBulk_scRNAcellPooling_FluidigmC1_stage40.44.mUA_dev_geneSelection.Rdata'))

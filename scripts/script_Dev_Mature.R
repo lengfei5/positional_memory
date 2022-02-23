@@ -222,7 +222,7 @@ if(Split.Mature.Regeneration.samples){
 
 ########################################################
 ########################################################
-# Section : compare embryo samples to mature UA  
+# Section  : compare embryo samples to mature UA at the mRNA levels
 # key questions: how do developmental genes required in embryo stages 
 # look like ? lowly expressed in mature sample ? total not expressed 
 # what about their promoter and enhancers in ATAC-seq data ? 
@@ -237,17 +237,49 @@ library(ggrepel)
 library(dplyr)
 library(tibble)
 
-load(file = paste0(RdataDir, '/pseudoBulk_scRNAcellPooling_FluidigmC1_stage40.44.mUA_dev_geneSelection.Rdata'))
-
+# GO term annotation
 limb.go = read.delim(file = '../data/limb_development_GO_term_summary_20220218_162116.txt', header = FALSE)
 limb.go = unique(limb.go$V2[-1])
 limb.go = toupper(limb.go)
 
+
+##########################################
+# use edgR for DE without replicates but with housekeeping gene
+##########################################
+load(file = paste0(RdataDir, '/pseudoBulk_scRNAcellPooling_FluidigmC1_stage40.44.mUA_dev_geneSelection.Rdata'))
+require(edgeR)
+group = dds$condition
+y <- DGEList(counts=counts(dds), group=group)
+y <- calcNormFactors(y)
+
+y1 = y
+y1$samples$group <- 1
+#group1 = y1$samples$group
+#design <- model.matrix(~group1)
+
+index.hs = which(fpm$genetype == 'hs')
+y0 <- estimateDisp(y1[index.hs,], trend = 'none', tagwise=FALSE)
+
+y$common.dispersion <- y0$common.dispersion
+
+fit <- glmFit(y, design)
+lrt2 <- glmLRT(fit, coef = 2)
+lrt3 = glmLRT(fit, coef = 3)
+
+lrt2 = as.data.frame(topTags(lrt2, adjust.method = "BH", n = nrow(y)))
+lrt3 = as.data.frame(topTags(lrt3, adjust.method = "BH", n = nrow(y)))
+
+DE.genes = unique(c(rownames(lrt2)[which(lrt2$FDR<0.01 & abs(lrt2$logFC) > 1)],
+                  rownames(lrt3)[which(lrt3$FDR <0.01 & abs(lrt3$logFC) >1)]))
+
+fpm$DEgene = NA
+fpm$DEgene[!is.na(match(rownames(fpm), DE.genes))] = '1'
+
 fpm = data.frame(fpm)
 fpm = fpm[which(fpm$genetype != 'ctl'), ]
 
-fpm$genetype[which(fpm$genetype == 'dev.lowlyExp')] = 'lowlyExp.E40.44'
-fpm$genetype[which(fpm$genetype == 'devGene')] = 'Exp.E40.44'
+fpm$genetype[which(fpm$genetype == 'dev.lowlyExp')] = 'Expr.E40.44'
+fpm$genetype[which(fpm$genetype == 'devGene')] = 'Expr.E40.44'
 
 fpm$gene =  sapply(rownames(fpm), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[1])})
 
@@ -258,33 +290,47 @@ dev.example = c('HOXA13', 'HOXA11', 'HOXA9', 'HOXD13','HOXD11', 'HOXD9',
                 'TBX2', 'TBX4', 'TBX5', 'LMX1', 'MEIS1', 'MEIS2', 'SALL4', 'IRX3', 'IRX5')
 limb.go = unique(c(limb.go, dev.example))
 
-fpm$genetype[!is.na(match(fpm$gene, limb.go))] = 'limb.dev.GO'
+fpm$limb.go = NA
+fpm$limb.go[!is.na(match(fpm$gene, limb.go))] = '1'
 
-plot(apply(fpm[which(fpm$genetype == 'hs'), c(1, 2)], 1, mean), 
-     (fpm[which(fpm$genetype == 'hs'), 1] - fpm[which(fpm$genetype == 'hs'), 2]), cex = 0.2)
-ss = seq(-10, 15, length.out = 100)
+#fpm$genetype[!is.na(match(fpm$gene, limb.go))] = 'limb.dev.GO'
+
+#plot(apply(fpm[which(fpm$genetype == 'hs'), c(1, 2)], 1, mean), 
+#     (fpm[which(fpm$genetype == 'hs'), 1] - fpm[which(fpm$genetype == 'hs'), 2]), cex = 0.2)
+#ss = seq(-10, 15, length.out = 100)
 # points(ss, ss*0 + exp(ss)/(1- exp(ss)), lwd = 2.0, col = 'red', type = 'l')
+
+fpm$mins = apply(fpm[, c(1, 3)], 1, min)
+fpm$maxs = apply(fpm[, c(1, 3)], 1, max)
+fpm = fpm[which(fpm$maxs > 1), ]
 
 fpm$genetype[!is.na(fpm$DEgene)] = 'DE.gene'
 
 examples.sel = unique(grep(paste0(dev.example, collapse = '|') ,fpm$gene))
 
 ggplot(fpm, aes(x = Stage40, y = mUA, color = genetype, label = gene)) +
-  geom_point(size = 0.25) + 
+  geom_point(size = 0.2) + 
   scale_color_manual(values=c('red', "#E69F00", "#999999", 'darkblue', "#56B4E9")) + 
-  geom_text_repel(data= fpm[examples.sel, ], size = 4.0, color = 'darkblue') +
-  geom_point(data=fpm[which(fpm$genetype == 'limb.dev'), ], aes(x=Stage40, y=mUA), colour="darkblue", size=1.5) +
+  #geom_point(data=fpm[which(!is.na(fpm$limb.go)), ], aes(x=Stage40, y=mUA), size=2) + 
+  geom_text_repel(data= fpm[examples.sel, ], size = 4.0, color = 'darkblue') + 
   #geom_hline(yintercept=2.0, colour = "darkgray") + 
   #geom_vline(xintercept = 2.0, colour = "darkgray")
-  geom_abline(slope = 1,  intercept = 0, colour = 'red') +
+  geom_abline(slope = 1,  intercept = 0, colour = 'green') +
   theme_classic() +
-  theme(legend.text = element_text(size=10), 
-        #legend.title = element_text(color = "blue", size = 14),
-        legend.key.size = unit(1, 'cm')
+  theme(legend.text = element_text(size=12),
+        legend.title = element_text(size = 14)
+        #legend.key.size = unit(1, 'cm')
         #legend.key.width= unit(1, 'cm')
-  )
+  ) + guides(colour = guide_legend(override.aes = list(size=4)))
 
-ggsave(paste0(figureDir, "Stage40_vs_mUA_devGenes_comparisons_Gerber2018.pseudobulk.pdf"), width=12, height = 10)
+# ggsave(paste0(figureDir, "Stage40_vs_mUA_devGenes_comparisons_Gerber2018.pseudobulk.pdf"), width=12, height = 10)
+
+fpm$DEgene[which(!is.na(fpm$DEgene) & fpm$log2fc>0)] = 'devGene'
+fpm$DEgene[which(!is.na(fpm$DEgene) & fpm$log2fc<0)] = 'matureGene'
+
+
+saveRDS(fpm, file = paste0(RdataDir, '/pseudoBulk_scRNAcellPooling_FluidigmC1_stage40.44.mUA_2500DEgenes.edgR.Rdata'))
+
 
 ##########################################
 # similar comparison mUA vs stage samples for mRNAs 
