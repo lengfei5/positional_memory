@@ -768,8 +768,11 @@ pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
 # 
 ##########################################
 # load results from microarray with limma
-res = readRDS(file = paste0("../results/microarray/Rdata/", 
+res0 = readRDS(file = paste0("../results/microarray/Rdata/", 
               'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_limma.DE.stats.rds'))
+
+res0$gene = sapply(rownames(res0), function(x) unlist(strsplit(as.character(x), '_'))[1])
+res0$geneID = sapply(rownames(res0), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
 
 # load dds normalized object and annotations
 load(file = paste0(RdataDir, 'RNAseq_design_dds.object.Rdata'))
@@ -804,13 +807,18 @@ res.ii = results(dds, contrast=c("condition", 'Mature_LA', 'Mature_UA'), alpha =
 colnames(res.ii) = paste0(colnames(res.ii), "_mLA.vs.mUA")
 res = data.frame(res, res.ii[, c(2, 5, 6)])
 
+res$gene = sapply(rownames(res), function(x) unlist(strsplit(as.character(x), '_'))[1])
+res$geneID = sapply(rownames(res), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
+
 ## volcanoplot for smartseq2 data 
 for(comp in c('mHand.vs.mUA', 'mHand.vs.mLA', 'mLA.vs.mUA'))
 {
-  # cc = 'mHand.vs.mUA'
-  res$fdr = eval(parse(text = paste0('-log10(res$adj.P.Val_', comp, ')')))
-  res$pval = eval(parse(text = paste0('-log10(res$P.Value_', comp, ')')))
-  res$logfc = eval(parse(text = paste0('res$logFC_', comp)))
+  # comp = 'mHand.vs.mUA'
+  # comp = 'mHand.vs.mLA'
+  # comp = 'mLA.vs.mUA'
+  res$fdr = eval(parse(text = paste0('-log10(res$padj_', comp, ')')))
+  res$pval = eval(parse(text = paste0('-log10(res$pvalue_', comp, ')')))
+  res$logfc = eval(parse(text = paste0('res$log2FoldChange_', comp)))
   
   #examples.sel = which(res$pval > 4 & abs(res$logfc) > 2)
   examples.sel = c()
@@ -830,110 +838,21 @@ for(comp in c('mHand.vs.mUA', 'mHand.vs.mLA', 'mLA.vs.mUA'))
     geom_hline(yintercept=-log10(0.001), col="gray") +
     labs(x = "log2FC")
   
-  ggsave(paste0(figureDir, "Fig2C_VolcanoPlot_log2FC_pval_microarray_noLabels_", comp, ".pdf"), width=12, height = 8)
+  ggsave(paste0(figureDir, "Fig2C_VolcanoPlot_log2FC_pval_smartseq2_noLabels_", comp, ".pdf"), width=12, height = 8)
   
-  # xx = apply(res[, grep(cc, colnames(res)[1:9])], 1, mean)
-  # yy = apply(cpm[, grep(cc, colnames(cpm))], 1, mean)
-  # 
-  # gene.sels = intersect(names(xx), names(yy))
-  # xx = xx[match(gene.sels, names(xx))]
-  # yy = yy[match(gene.sels, names(yy))]
-  # 
-  # xx = data.frame(xx, yy)
-  # xx = xx[which(yy>0), ]
+  
+  #res0$fdr = eval(parse(text = paste0('-log10(res0$adj.P.Val_', comp, ')')))
+  #res0$pval = eval(parse(text = paste0('-log10(res0$P.Value_', comp, ')')))
+  res0$logfc = eval(parse(text = paste0('res0$logFC_', comp)))
+  
+  mm = match(res$geneID, res0$geneID)
+  
+  yy = data.frame(log2fc.smartseq2 = res$logfc,  log2fc.microarray = res0$logfc[mm])
+  #plot(yy, xlim = c(-4, 4), ylim = c(-4, 4), cex = 0.3);
+  #abline(0, 1, lwd = 2.0)
+  cat(cor(yy[, 1], yy[, 2], use = "na.or.complete"), '\n')
   
 }
-
-
-# ##########################################
-# # heatmap to visualize all positional genes and regulators (TFs and SPs)
-# ##########################################
-# library("pheatmap")
-# pval.cutoff = 0.001
-# res$pval.max = apply(-log10(res[, grep('pvalue_', colnames(res))]), 1, max)
-# res$logFC.max = apply((res[, grep('log2FoldChange_', colnames(res))]), 1, function(x) return(x[which(abs(x)==max(abs(x)))][1]))
-# 
-# o1 = order(-res$pval.max)
-# res = res[o1, ]
-# cpm = cpm[o1, ]
-# 
-# ggs = sapply(rownames(res), function(x){unlist(strsplit(as.character(x), '_'))[1]})
-# select = which(res$pval.max> 3 & abs(res$logFC.max)> 0)
-# ggs = ggs[select]
-# 
-# print(intersect(ggs, tfs))
-# print(intersect(ggs, sps))
-# print(intersect(ggs, eps))
-# print(intersect(ggs, rbp))
-# 
-# #select = which(res$pvalue_Hand.vs.LA < pval.cutoff | res$pvalue_Hand.vs.UA < pval.cutoff | res$pvalue_LA.vs.UA < pval.cutoff)
-# #cat(length(select), ' positional genes found \n')
-# 
-# 
-# # fdr.cutoff = 0.2
-# # select = which(res$padj_Hand.vs.LA < fdr.cutoff | 
-# #                  res$padj_Hand.vs.UA < fdr.cutoff |
-# #                  res$padj_LA.vs.UA < fdr.cutoff)
-# # cat(length(select), ' positional genes found \n')
-# 
-# df <- as.data.frame(colData(dds)[,c("condition", 'batch')])
-# o1 = c(grep('UA', df$condition), grep('LA', df$condition), grep('Hand', df$condition))
-# 
-# yy = cpm[select, o1]
-# ss = apply(as.matrix(yy), 1, mean)
-# 
-# #yy = yy[which(ss>-2), ]
-# pheatmap(yy, cluster_rows=TRUE, show_rownames=TRUE, fontsize_row = 6,
-#          show_colnames = FALSE,
-#          scale = 'row',
-#          cluster_cols=FALSE, annotation_col=df[o1, ], 
-#          width = 8, height = 20, filename = paste0(figureDir, '/heatmap_DEgenes_matureSamples_pvalmax.3_log2FC.0_.pdf'))
-# 
-# 
-# library(ggrepel)
-# library(dplyr)
-# library(tibble)
-# res$gene = rownames(res)
-# res$gene[select] = ggs
-# 
-# examples.sel = unique(res$gene[which(res$pval.max > 3 & abs(res$logFC.max) > 1)])
-# ggplot(data=res, aes(x=logFC.max, y=pval.max, label = gene)) +
-#   geom_point(size = 1) + 
-#   theme(axis.text.x = element_text(size = 12), 
-#         axis.text.y = element_text(size = 12)) +
-#   #geom_text_repel(data=subset(res, log2FoldChange > 2), size = 4) +
-#   geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel),
-#                    size = 3) + 
-#   #scale_color_manual(values=c("blue", "black", "red")) +
-#   geom_vline(xintercept=c(0), col="red") +
-#   geom_hline(yintercept=5, col="red") +
-#   ggsave(paste0(figureDir, "VolcanoPlot_logFC.max_pval.max_matureSamples.pdf"), width=12, height = 8)
-# 
-# # narrow down to TFs and SPs
-# ggs = sapply(rownames(yy), function(x) unlist(strsplit(as.character(x), '_'))[1])
-# mm = match(ggs, unique(c(tfs[, 3], toupper(sps$gene))))
-# yy1 = yy[!is.na(mm), ]
-# 
-# pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
-#          scale = 'row',
-#          cluster_cols=FALSE, annotation_col=df[o1, ], fontsize_row = 10, 
-#          width = 8, height = 4,
-#          filename = paste0(resDir, '/heatmap_DE.tfs.sps_mature_fdr.0.1.pdf')) 
-# 
-# 
-# if(saveTables){
-#   xx = data.frame(gene = rownames(yy), yy, res[match(rownames(yy), rownames(res)), ], stringsAsFactors = FALSE)
-#   write.csv(xx, file = paste0(resDir, '/position_dependent_genes_from_matureSamples_RNAseq_fdr.0.1.csv'), 
-#             quote = FALSE, col.names = TRUE, row.names = FALSE)
-#   
-# }
-
-
-##########################################
-# compare the positional genes from smartseq2 with ones from microarray 
-##########################################
-
-
 
 
 ########################################################
