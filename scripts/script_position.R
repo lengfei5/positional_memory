@@ -441,50 +441,6 @@ if(grouping.position.dependent.peaks){
     
     promoters = select.promoters.regions(upstream = 2000, downstream = 2000, ORF.type.gtf = 'Putative', promoter.select = 'all')
     
-    ##########################################
-    # UA gene expression vs promoter signals  
-    ##########################################
-    ## UA promoter signals 
-    ua.annot = data.frame(pp.annots, mUA = apply(fpm[, grep('Mature_UA', colnames(fpm))], 1, mean))
-    ua.promoters = ua.annot[grep('Promoter', ua.annot$annotation), ]
-    ua.promoters$mUA = as.numeric(ua.promoters$mUA) - log2(10^3/as.numeric(ua.promoters$width))
-    aa = ua.promoters
-    rm(ua.annot)
-    rm(ua.promoters)
-    aa$transcript = sapply(aa$geneId, function(x) {x = unlist(strsplit(as.character(x), '[|]')); return(x[length(x)])})
-    
-    annot = readRDS(paste0(annotDir, 
-      'AmexT_v47_transcriptID_transcriptCotig_geneSymbol.nr_geneSymbol.hs_geneID_gtf.geneInfo_gtf.transcriptInfo.rds'))
-    aa$Gene = annot$geneID[match(aa$transcript, annot$transcriptID)]
-    
-    load(file = paste0("../results/microarray/Rdata/", 
-                       'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_DEpval.Rdata'))
-    
-    rnas = apply(res[, c(1:3)], 1, mean)
-    ggs = names(rnas)
-    ggs = sapply(ggs, function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
-    
-    ua = data.frame(gene = unique(c(ggs, aa$Gene)) , stringsAsFactors = FALSE)
-    ua$rna = rnas[match(ua$gene, ua$gene)]
-    ua$gene.length = NA
-    ua$promoter.mean = NA
-    ua$promoter.max = NA
-    
-    for(n in 1:nrow(ua))
-    {
-      # n = 1
-      cat(n, '\n')
-      kk = which(annot$geneID == ua$gene[n])
-      ua$gene.length[n] = median(as.numeric(annot$end_transcript[kk]) - as.numeric(annot$start_transcript[kk]))
-      jj = which(aa$Gene == ua$gene[n])
-      if(length(jj)>0) {
-        ua$promoter.max[n] = max(as.numeric(aa$mUA[jj]))
-        ua$promoter.mean[n] = mean(as.numeric(aa$mUA[jj]))
-      }
-    }
-    
-    ua$rpkm = ua$rna - log2(10^3/ua$gene.length)
-    
     
   }
   
@@ -697,17 +653,55 @@ if(grouping.position.dependent.peaks){
   
   gaps.col = c(3, 6)
   
-  pheatmap(yy, annotation_row = my_gene_col, 
+  col<- colorRampPalette(c("steelblue", "white", "darkred"))(8)
+  #col = colorRampPalette(rev(brewer.pal(n = 7, name ="RdYlBu")))(8)
+  
+  plt = pheatmap(yy, annotation_row = my_gene_col, 
            annotation_col = df, show_rownames = FALSE, scale = 'none', 
-           color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdYlGn")))(8), 
+           color = col, 
            show_colnames = FALSE,
            cluster_rows = TRUE, cluster_cols = FALSE,  
            clustering_method = 'complete', cutree_rows = nb_clusters, 
            annotation_colors = annot_colors, 
-           gaps_col = gaps.col, 
+           gaps_col = gaps.col) 
            #gaps_row =  gaps.row, 
-           filename = paste0(saveDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
-           width = 6, height = 12)
+           #filename = paste0(saveDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
+           #width = 6, height = 12)
+  
+  row_order = data.frame(plt$tree_row$order, plt$tree_row$labels, stringsAsFactors = FALSE)
+  colnames(row_order) = c('index', 'name')
+  row_order$name = row_order$name[row_order$index]
+  row_order$cluster = my_gene_col$cluster[match(row_order$name, rownames(my_gene_col))]
+  
+  callback = function(hc, mat = row_order){
+    #sv = svd(t(mat))$v[,1]
+    #clusters_order = 
+    o1 = c()
+    for(co in paste0('cluster_', c(1, 6, 5, 4, 3, 2))) {
+      o1 = c(o1, row_order$index[which(row_order$cluster == co)])
+      #row_order = row_order[o1, ]
+    }
+    dend = reorder(as.dendrogram(hc), wts = o1)
+    as.hclust(dend)
+    
+  }
+  
+  col<- colorRampPalette(c("blue4", "white", "darkred"))(8)
+  col = colorRampPalette(rev(brewer.pal(n = 7, name ="RdGy")))(8)
+  #col = colorRampPalette(rev(brewer.pal(n = 7, name ="PuOr")))(16)
+  col = palette(hcl.colors(8, "Viridis"))
+  
+  pheatmap(yy, annotation_row = my_gene_col, 
+           annotation_col = df, show_rownames = FALSE, scale = 'none', 
+           color = col, 
+           show_colnames = FALSE,
+           cluster_rows = TRUE, cluster_cols = FALSE,  
+           clustering_method = 'complete', cutree_rows = nb_clusters, 
+           annotation_colors = annot_colors, 
+           clustering_callback = callback,
+           gaps_col = gaps.col, 
+          filename = paste0(saveDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
+          width = 6, height = 12)
   
   write.csv(xx, file = paste0(saveDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters', 
                               nb_clusters, '.csv'), quote = FALSE, row.names = TRUE)
