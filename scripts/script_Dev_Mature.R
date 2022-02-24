@@ -268,7 +268,7 @@ y0 <- estimateDisp(y1[index.hs,], trend = 'none', tagwise=FALSE)
 
 y$common.dispersion <- y0$common.dispersion
 
-fit <- glmFit(y, design)
+fit <- glmFit(y)
 lrt2 <- glmLRT(fit, coef = 2)
 lrt3 = glmLRT(fit, coef = 3)
 
@@ -278,11 +278,12 @@ lrt3 = as.data.frame(topTags(lrt3, adjust.method = "BH", n = nrow(y)))
 DE.genes = unique(c(rownames(lrt2)[which(lrt2$FDR<0.01 & abs(lrt2$logFC) > 1)],
                   rownames(lrt3)[which(lrt3$FDR <0.01 & abs(lrt3$logFC) >1)]))
 
+cat(length(DE.genes), ' DE genes found \n')
+
 fpm$DEgene = NA
 fpm$DEgene[!is.na(match(rownames(fpm), DE.genes))] = '1'
 
 fpm = data.frame(fpm)
-fpm = fpm[which(fpm$genetype != 'ctl'), ]
 
 fpm$genetype[which(fpm$genetype == 'dev.lowlyExp')] = 'Expr.E40.44'
 fpm$genetype[which(fpm$genetype == 'devGene')] = 'Expr.E40.44'
@@ -314,7 +315,15 @@ fpm$genetype[!is.na(fpm$DEgene)] = 'DE.gene'
 
 examples.sel = unique(grep(paste0(dev.example, collapse = '|') ,fpm$gene))
 
-ggplot(fpm, aes(x = Stage40, y = mUA, color = genetype, label = gene)) +
+fpm$DEgene[which(!is.na(fpm$DEgene) & fpm$log2fc>0)] = 'devGene'
+fpm$DEgene[which(!is.na(fpm$DEgene) & fpm$log2fc<0)] = 'matureGene'
+
+saveRDS(fpm, file = paste0(RdataDir, '/pseudoBulk_scRNAcellPooling_FluidigmC1_stage40.44.mUA_2500DEgenes.edgR.Rdata'))
+
+
+fpm = fpm[which(fpm$genetype != 'ctl'), ]
+
+scatterplot = ggplot(fpm, aes(x = Stage40, y = mUA, color = genetype, label = gene)) +
   geom_point(size = 0.2) + 
   scale_color_manual(values=c('red', "#E69F00", "#999999", 'darkblue', "#56B4E9")) + 
   #geom_point(data=fpm[which(!is.na(fpm$limb.go)), ], aes(x=Stage40, y=mUA), size=2) + 
@@ -324,18 +333,47 @@ ggplot(fpm, aes(x = Stage40, y = mUA, color = genetype, label = gene)) +
   geom_abline(slope = 1,  intercept = 0, colour = 'green') +
   theme_classic() +
   theme(legend.text = element_text(size=12),
-        legend.title = element_text(size = 14)
+        legend.title = element_text(size = 14),
+        legend.position=c(0.8, 0.2),
+        plot.margin = margin()
         #legend.key.size = unit(1, 'cm')
         #legend.key.width= unit(1, 'cm')
   ) + guides(colour = guide_legend(override.aes = list(size=4)))
 
-# ggsave(paste0(figureDir, "Stage40_vs_mUA_devGenes_comparisons_Gerber2018.pseudobulk.pdf"), width=12, height = 10)
+library("cowplot")
 
-fpm$DEgene[which(!is.na(fpm$DEgene) & fpm$log2fc>0)] = 'devGene'
-fpm$DEgene[which(!is.na(fpm$DEgene) & fpm$log2fc<0)] = 'matureGene'
+# Define marginal histogram
+marginal_distribution <- function(x, var) {
+  ggplot(x, aes_string(x = var)) +
+    geom_histogram(bins = 30, alpha = 0.4, position = "identity") +
+    # geom_density(alpha = 0.4, size = 0.1) +
+    guides(fill = FALSE) +
+    theme_void() +
+    theme(plot.margin = margin())
+}
 
+# Set up marginal histograms
+x_hist <- marginal_distribution(fpm, 'Stage40')
+y_hist <- marginal_distribution(fpm, "mUA") +
+  coord_flip()
 
-saveRDS(fpm, file = paste0(RdataDir, '/pseudoBulk_scRNAcellPooling_FluidigmC1_stage40.44.mUA_2500DEgenes.edgR.Rdata'))
+# Align histograms with scatterplot
+aligned_x_hist <- align_plots(x_hist, scatterplot, align = "v")[[1]]
+aligned_y_hist <- align_plots(y_hist, scatterplot, align = "h")[[1]]
+
+# Arrange plots
+plot_grid(
+  aligned_x_hist
+  , NULL
+  , scatterplot
+  , aligned_y_hist
+  , ncol = 2
+  , nrow = 2
+  , rel_heights = c(0.2, 1)
+  , rel_widths = c(1, 0.2)
+)
+
+ggsave(paste0(figureDir, "Stage40_vs_mUA_devGenes_comparisons_Gerber2018.pseudobulk.pdf"), width=12, height = 10)
 
 ##########################################
 # ATAC-seq peaks: development-specific peaks and mature peaks 
@@ -777,16 +815,19 @@ if(Compare.dev.vs.mature.ATACseq.peaks){
   # select the replicates
   cpm = as.matrix(res[, c(1:14)])
   conds = c("Embryo_Stage40", "Embryo_Stage44_proximal", "Embryo_Stage44_distal", "Mature_UA",  "Mature_Hand")
-  sample.sels = c();  cc = c(); sample.means = c()
-  
+  sample.sels = c();  cc = c(); 
+  sample.means = c()
+  control.means = c()
   for(n in 1:length(conds)) {
     kk = grep(conds[n], colnames(cpm))
     sample.sels = c(sample.sels, kk)
     sample.means = cbind(sample.means, apply(cpm[, kk], 1, mean))
+    control.means = cbind(control.means, apply(fpm.bg[, grep(conds[n], colnames(fpm.bg))], 1, mean))
     cc = c(cc, rep(conds[n], length(kk)))
   }
   
   colnames(sample.means) = conds
+  colnames(control.means) = conds
   res$maxs = apply(sample.means, 1, max)
   res$mins = apply(sample.means, 1, min)
   
@@ -795,18 +836,19 @@ if(Compare.dev.vs.mature.ATACseq.peaks){
   
   # dgs = dgs[!is.na(dgs$DEgene), ]
   dgs$genetype[!is.na(dgs$DEgene)] = dgs$DEgene[!is.na(dgs$DEgene)]
+  dgs = dgs[which(dgs$genetype != 'Expr.E40.44'), ]
   
-    
   dgs$index_promoter = NA
   dgs$index_enhancer = NA
   for(n in 1:nrow(dgs))
   {
     # n = 3
+    if(n%%100 == 0) cat(n, '\n')
     jj = which(res$geneID == dgs$geneID[n])
     
     if(length(jj)>0) {
       
-      cat(n, '\n')
+      
       jj.promoter = jj[grep('Promoter', res$annotation[jj])]
       if(length(jj.promoter) == 1) dgs$index_promoter[n] = jj.promoter
       if(length(jj.promoter) >1){
@@ -821,61 +863,86 @@ if(Compare.dev.vs.mature.ATACseq.peaks){
   
   
   #dgs = dgs[!is.na(dgs$index_promoter) & !is.na(dgs$index_enhancer), ]
-  dgs = dgs[!is.na(dgs$index_promoter), ]
-  
-  fdr.cutoff = 0.05; logfc.cutoff = 1;
-  index.dyp =  which((res$adj.P.Val_E40.vs.mUA < fdr.cutoff & abs(res$logFC_E40.vs.mUA) > logfc.cutoff & 
-                res$adj.P.Val_E40.vs.mHand < fdr.cutoff & abs(res$logFC_E40.vs.mHand) > logfc.cutoff) |
-               (res$adj.P.Val_E44prox.vs.mUA < fdr.cutoff & abs(res$logFC_E44prox.vs.mUA) > logfc.cutoff &
-                  res$adj.P.Val_E44_dist.vs.mHand < fdr.cutoff & abs(res$logFC_E44_dist.vs.mHand) > logfc.cutoff) &
-                 res$maxs > 3 & res$mins < 3 )
-  
-  cat(length(index.dyp), '\n')
-  
-  dgs$dynamic_promoter = NA
-  dgs$dynamic_enhancer = NA
-  dgs$dynamic_promoter[!is.na(match(dgs$index_promoter, index.dyp))] = '1'
-  dgs$dynamic_enhancer[!is.na(match(dgs$index_enhancer, index.dyp))] = '1'
+  x = dgs[!is.na(dgs$index_promoter), ]
+  x = x[which(x$genetype != 'ctl'), ]
   
   
-  df <- data.frame(c(conds, 'Embryo_Stage40', 'Embryo_Stage44_proximal', 'Mature_UA'))
-  rownames(df) = colnames(yy)
-  colnames(df) = 'samples'
+  yy = data.frame(group = x$genetype, sample.means[x$index_promoter, ])
+  ctls = data.frame(group = rep('ctl', nrow(control.means)), control.means)
+  yy = rbind(yy, ctls)
   
-  col3 <- c("#a6cee3", "#1f78b4", "#b2df8a",
-            "#33a02c", "#fb9a99", "#e31a1c",
-            "#fdbf6f", "#ff7f00", "#cab2d6",
-            "#6a3d9a", "#ffff99", "#b15928")
-  
-  sample_colors = c('green', 'green2', 'yellow2', 'springgreen4', 'gold2')
-  names(sample_colors) = conds
-  
-  annot_colors = list(
-     samples = sample_colors)
-  
-  gaps.col = c(5)
-  
-  bg.cutoff = 3
-  #jj = apply(yy[, c(1:5)])
-  
-  yy = data.frame(sample.means[dgs$index_promoter, ], as.matrix(dgs[, c(2:3, 1)]))
-  #yy[, c(1:10)] =  t(apply(yy[, c(1:10)], 1, cal_z_score))
-  #yy[, c(11:13)] = t(apply(yy[, c(11:13)], 1, cal_z_score))
-  yy[, c(6:8)] = t(apply(yy[, c(6:8)], 1, cal_z_score))
-  yy[, c(1:5)] = yy[, c(1:5)] > bg.cutoff
+  ## add controls
   
   
-  pheatmap(yy,  
-           #annotation_row = my_gene_col, clustering_method = 'complete', cutree_rows = nb_clusters, # cluster parameters
-           annotation_col = df,   
-           #color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdYlGn")))(8), 
-           show_colnames = FALSE, scale = 'none', show_rownames = FALSE,
-           cluster_rows = TRUE, cluster_cols = FALSE, 
-           annotation_colors = annot_colors, 
-           gaps_col = gaps.col, 
-           #gaps_row =  gaps.row, 
-           filename = paste0(figureDir, '/heatmap_dev.vs.mature_peaks_devGene_matureGene.pdf'), width = 10, height = 12
-           )
+  library(tidyr)
+  library(dplyr)
+  require(ggplot2)
+  
+  as_tibble(yy) %>%  gather(samples, peak.signal,  2:6) %>% 
+    ggplot(aes(x=samples, y=peak.signal, fill=factor(group, levels = c('ctl', 'devGene', 'matureGene', 'hs')))) + 
+    geom_boxplot(outlier.shape = NA) + #geom_jitter(width = 0.2, size = 0.5)
+    #geom_violin(width = 1.2) +
+    theme(axis.text.x = element_text(angle = 90, size = 10)) + 
+    guides(fill=guide_legend(title="group")) + 
+    theme_classic() + 
+    scale_fill_manual(values=c('darkgray', "blue", "green", "red"))
+  
+  ggsave(paste0(figureDir, "/Promoter_peaks_devGene_matureGene.pdf"), width = 12, height = 8)
+  
+  
+  # fdr.cutoff = 0.05; logfc.cutoff = 1;
+  # index.dyp =  which((res$adj.P.Val_E40.vs.mUA < fdr.cutoff & abs(res$logFC_E40.vs.mUA) > logfc.cutoff & 
+  #               res$adj.P.Val_E40.vs.mHand < fdr.cutoff & abs(res$logFC_E40.vs.mHand) > logfc.cutoff) |
+  #              (res$adj.P.Val_E44prox.vs.mUA < fdr.cutoff & abs(res$logFC_E44prox.vs.mUA) > logfc.cutoff &
+  #                 res$adj.P.Val_E44_dist.vs.mHand < fdr.cutoff & abs(res$logFC_E44_dist.vs.mHand) > logfc.cutoff) &
+  #                res$maxs > 3 & res$mins < 3 )
+  # 
+  # cat(length(index.dyp), '\n')
+  # 
+  # dgs$dynamic_promoter = NA
+  # dgs$dynamic_enhancer = NA
+  # dgs$dynamic_promoter[!is.na(match(dgs$index_promoter, index.dyp))] = '1'
+  # dgs$dynamic_enhancer[!is.na(match(dgs$index_enhancer, index.dyp))] = '1'
+  # 
+  # 
+  # df <- data.frame(c(conds, 'Embryo_Stage40', 'Embryo_Stage44_proximal', 'Mature_UA'))
+  # rownames(df) = colnames(yy)
+  # colnames(df) = 'samples'
+  # 
+  # col3 <- c("#a6cee3", "#1f78b4", "#b2df8a",
+  #           "#33a02c", "#fb9a99", "#e31a1c",
+  #           "#fdbf6f", "#ff7f00", "#cab2d6",
+  #           "#6a3d9a", "#ffff99", "#b15928")
+  # 
+  # sample_colors = c('green', 'green2', 'yellow2', 'springgreen4', 'gold2')
+  # names(sample_colors) = conds
+  # 
+  # annot_colors = list(
+  #    samples = sample_colors)
+  # 
+  # gaps.col = c(5)
+  # 
+  # bg.cutoff = 3
+  # #jj = apply(yy[, c(1:5)])
+  # 
+  # yy = data.frame(sample.means[dgs$index_promoter, ], as.matrix(dgs[, c(2:3, 1)]))
+  # #yy[, c(1:10)] =  t(apply(yy[, c(1:10)], 1, cal_z_score))
+  # #yy[, c(11:13)] = t(apply(yy[, c(11:13)], 1, cal_z_score))
+  # yy[, c(6:8)] = t(apply(yy[, c(6:8)], 1, cal_z_score))
+  # yy[, c(1:5)] = yy[, c(1:5)] > bg.cutoff
+  # 
+  # 
+  # pheatmap(yy,  
+  #          #annotation_row = my_gene_col, clustering_method = 'complete', cutree_rows = nb_clusters, # cluster parameters
+  #          annotation_col = df,   
+  #          #color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdYlGn")))(8), 
+  #          show_colnames = FALSE, scale = 'none', show_rownames = FALSE,
+  #          cluster_rows = TRUE, cluster_cols = FALSE, 
+  #          annotation_colors = annot_colors, 
+  #          gaps_col = gaps.col, 
+  #          #gaps_row =  gaps.row, 
+  #          filename = paste0(figureDir, '/heatmap_dev.vs.mature_peaks_devGene_matureGene.pdf'), width = 10, height = 12
+  #          )
   
 }
 
