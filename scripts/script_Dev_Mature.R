@@ -40,19 +40,20 @@ require(DESeq2)
 require(GenomicRanges)
 require(pheatmap)
 library(tictoc)
+require(ChIPpeakAnno)
+require(ChIPseeker)
 
-
+########################################################
+########################################################
+# Section : import the processed peaks
+# 
+########################################################
+########################################################
 load(file = paste0(RdataDir, '/samplesDesign_readCounts.within_manualConsensusPeaks.pval6_mergedTechnical_', 
                    version.analysis, '.Rdata'))
 design$sampleID = design$SampleID
 design$usable = as.numeric(design$usable)
 design$usable[c(31:32)] = design$usable[c(31:32)]/10^6
-
-saveRDS(design, file = paste0('../data/design_sampleInfos_32atacSamplesUsed.rds'))
-
-
-require(ChIPpeakAnno)
-require(ChIPseeker)
 
 pp = data.frame(t(sapply(counts$gene, function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
 pp$strand = '*'
@@ -60,6 +61,11 @@ pp$strand = '*'
 pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
                               start.field="X2", end.field="X3", strand.field="strand")
 
+amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
+pp.annots = annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+#plotAnnoBar(pp.annots)
+pp.annots = as.data.frame(pp.annots)
+rownames(pp.annots) = paste0(pp.annots$seqnames, ':',  pp.annots$start, '-', pp.annots$end)
 
 ##########################################
 # Select peak consensus across mature, regeneration and embryo 
@@ -330,111 +336,6 @@ fpm$DEgene[which(!is.na(fpm$DEgene) & fpm$log2fc<0)] = 'matureGene'
 
 
 saveRDS(fpm, file = paste0(RdataDir, '/pseudoBulk_scRNAcellPooling_FluidigmC1_stage40.44.mUA_2500DEgenes.edgR.Rdata'))
-
-
-##########################################
-# similar comparison mUA vs stage samples for mRNAs 
-##########################################
-RNAseqDir = "../results/rnaseq_Rxxxx.old_R10724_R161513_mergedTechRep/Rdata/"
-load(file = paste0(RNAseqDir, 'RNAseq_design_dds.object.Rdata'))
-
-# select mature samples
-sels = grep('Mature_UA|Embryo', design.matrix$condition)
-dds = dds[, sels]
-
-dds$condition = droplevels(dds$condition)
-
-vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
-
-pca=plotPCA(vsd, intgroup = c('condition', 'batch'), returnData = FALSE)
-print(pca)
-
-pca2save = as.data.frame(plotPCA(vsd, intgroup = c('condition', 'batch'), returnData = TRUE))
-ggp = ggplot(data=pca2save, aes(PC1, PC2, label = name, color= condition, shape = batch))  + 
-  geom_point(size=3) + 
-  geom_text(hjust = 0.7, nudge_y = 1, size=2.5)
-
-plot(ggp)
-
-
-dds$condition = droplevels(dds$condition)
-dds <- estimateDispersions(dds, fitType = 'parametric')
-plotDispEsts(dds, ymin = 10^-3); abline(h = 0.1, col = 'blue', lwd = 2.0)
-# 
-dds = nbinomWaldTest(dds, betaPrior = TRUE)
-resultsNames(dds)
-
-# 
-res.ii = results(dds, contrast=c("condition", 'Embryo_Stage40', 'Mature_UA'), alpha = 0.1)
-colnames(res.ii) = paste0(colnames(res.ii), "_Hand.vs.UA")
-res = data.frame(res.ii[, c(2, 5, 6)])
-# 
-res.ii = results(dds, contrast=c("condition", 'Mature_Hand', 'Mature_LA'), alpha = 0.1)
-colnames(res.ii) = paste0(colnames(res.ii), "_Hand.vs.LA")
-res = data.frame(res, res.ii[, c(2, 5, 6)])
-
-
-cpm = fpm(dds)
-cpm = log2(cpm + 2^-7)
-
-xx = data.frame(mUA = apply(cpm[, grep('Mature_UA', colnames(cpm))], 1, median), 
-                stage40 = apply(cpm[, grep('Embryo_Stage40', colnames(cpm))], 1, mean), 
-                stage46_prox = apply(cpm[, grep('Embryo_Stage46_proximal', colnames(cpm))], 1, mean), 
-                stage46_dist = apply(cpm[, grep('Embryo_Stage46_distal', colnames(cpm))], 1, mean))
-
-maxs = apply(xx, 1, max)
-
-cpm = xx
-cpm$gene =  sapply(rownames(cpm), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[1])})
-
-jj = grep(paste0(dev.example, collapse = '|') ,cpm$gene)
-cpm = cpm[which(maxs> -1), ]
-
-load(file =  paste0(annotDir, 'axolotl_housekeepingGenes_controls.other.tissues.liver.islet.testis_expressedIn21tissues.Rdata'))
-hs = controls.tissue$geneIDs[which(controls.tissue$tissues == 'housekeeping')]
-ctl =  controls.tissue$geneIDs[which(controls.tissue$tissues  != 'housekeeping')]
-ggs = sapply(rownames(cpm), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
-
-cpm$genetype = NA
-
-mm = match(ggs, hs)
-cpm$genetype[!is.na(mm)] = 'hs'
-
-mm = match(ggs, ctl)
-cpm$genetype[!is.na(mm) & is.na(cpm$genetype)] = 'ctl'
-
-par(mfrow = c(1, 3))
-hist(cpm[, 2], breaks = 100, main = 'log2 expression of stage40');abline(v = 2)
-hist(cpm[, 3], breaks = 100, main = 'log2 expression of stage44_prox');abline(v = 2)
-hist(cpm[, 4], breaks = 100, main = 'log2 expression of stage44_dist');abline(v = 2)
-
-cpm$genetype[which(cpm[,2]< -1 & cpm[, 3]< -1 & cpm[, 4] < -1 & is.na(cpm$genetype))] = 'dev.lowlyExp'
-cpm$genetype[is.na(cpm$genetype)] = 'dev.Exp'
-
-cpm$genetype[!is.na(match(cpm$gene, limb.go))] = 'limb.dev.GO'
-
-examples.sel = unique(grep(paste0(dev.example, collapse = '|') ,cpm$gene))
-
-cpm = data.frame(cpm)
-cpm = cpm[which(cpm$genetype != 'ctl'), ]
-
-ggplot(cpm, aes(x = stage40, y = mUA, color = genetype, label = gene)) +
-  geom_point(size = 0.4) + 
-  scale_color_manual(values=c("#E69F00", "#56B4E9",  "#999999",  'darkblue')) + 
-  geom_text_repel(data= cpm[examples.sel, ], size = 4.0, color = 'darkblue') +
-  geom_point(data=cpm[which(cpm$genetype == 'limb.dev'), ], aes(x=stage40, y=mUA), colour="darkblue", size=1.5) +
-  #geom_hline(yintercept=2.0, colour = "darkgray") + 
-  #geom_vline(xintercept = 2.0, colour = "darkgray")
-  geom_abline(slope = 1,  intercept = 0, colour = 'red') +
-  theme_classic() +
-  theme(legend.text = element_text(size=10), 
-        #legend.title = element_text(color = "blue", size = 14),
-        legend.key.size = unit(1, 'cm')
-        #legend.key.width= unit(1, 'cm')
-  )
-
-
-ggsave(paste0(figureDir, "Stage40_vs_mUA_devGenes_comparisons_smartseq2.pdf"), width=12, height = 10)
 
 ##########################################
 # ATAC-seq peaks: development-specific peaks and mature peaks 
@@ -853,58 +754,128 @@ if(Compare.dev.vs.mature.ATACseq.peaks){
            filename = paste0(saveDir, '/heatmap_dev.vs.mature_peaks_clusters_alternativePromoter_625genes.pdf'), 
            width = 10, height = 12)
   
-  ## further check the dyanmic promoters related to dev genes
+  ##########################################
+  # further check the promoters and enhancers (non-promoters) related to dev and mature genes identified from RNAseq
+  ##########################################
+  annot = readRDS(paste0(annotDir, 
+                         'AmexT_v47_transcriptID_transcriptCotig_geneSymbol.nr_geneSymbol.hs_geneID_gtf.geneInfo_gtf.transcriptInfo.rds'))
+  
   dm = readRDS(file = paste0(RdataDir, '/Dev_vs_Mature_dyanmic_promoters_alterantiveStaticPromoter_withClusters.rds'))
   rownames(dm) = rownames(cpm)[dm$index1]
   
-  dm = dm[which(is.na(dm$index2 & dm$clusters == 2)), ]
+  # dm = dm[which(is.na(dm$index2 & dm$clusters == 2)), ]
+  dgs = readRDS(file = paste0(RdataDir, '/pseudoBulk_scRNAcellPooling_FluidigmC1_stage40.44.mUA_2500DEgenes.edgR.Rdata'))
+  dgs$geneID = sapply(rownames(dgs), function(x){x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
+  
+  #cpm = cpm[match(rownames(res), rownames(cpm)), ]
+  #res = data.frame(cpm, res, stringsAsFactors = FALSE)
+  #saveRDS(res, file = paste0(RdataDir, '/Dev_vs_Mature_ATACseq_peaks_signals_annotation_all.rds'))
+  res = readRDS(file = paste0(RdataDir, '/Dev_vs_Mature_ATACseq_peaks_signals_annotation_all.rds'))
+  #res$transcript = sapply(res$transcriptId, function(x) {x = unlist(strsplit(as.character(x), '[|]')); return(x[length(x)])})
+  #res$geneID = annot$geneID[match(res$transcript, annot$transcriptID)]
+  
+  # select the replicates
+  cpm = as.matrix(res[, c(1:14)])
+  conds = c("Embryo_Stage40", "Embryo_Stage44_proximal", "Embryo_Stage44_distal", "Mature_UA",  "Mature_Hand")
+  sample.sels = c();  cc = c(); sample.means = c()
+  
+  for(n in 1:length(conds)) {
+    kk = grep(conds[n], colnames(cpm))
+    sample.sels = c(sample.sels, kk)
+    sample.means = cbind(sample.means, apply(cpm[, kk], 1, mean))
+    cc = c(cc, rep(conds[n], length(kk)))
+  }
+  
+  colnames(sample.means) = conds
+  res$maxs = apply(sample.means, 1, max)
+  res$mins = apply(sample.means, 1, min)
+  
+  cpm = cpm[ ,sample.sels]
+  cpm = cpm[ ,grep('1373|1361', colnames(cpm), invert = TRUE)]
+  
+  # dgs = dgs[!is.na(dgs$DEgene), ]
+  dgs$genetype[!is.na(dgs$DEgene)] = dgs$DEgene[!is.na(dgs$DEgene)]
+  
+    
+  dgs$index_promoter = NA
+  dgs$index_enhancer = NA
+  for(n in 1:nrow(dgs))
+  {
+    # n = 3
+    jj = which(res$geneID == dgs$geneID[n])
+    
+    if(length(jj)>0) {
+      
+      cat(n, '\n')
+      jj.promoter = jj[grep('Promoter', res$annotation[jj])]
+      if(length(jj.promoter) == 1) dgs$index_promoter[n] = jj.promoter
+      if(length(jj.promoter) >1){
+        mean.promoter = apply(cpm[jj.promoter, ], 1, mean)
+        dgs$index_promoter[n] = jj.promoter[which(mean.promoter == max(mean.promoter))]
+      }
+      
+      jj.enhancer = setdiff(jj, jj.promoter)
+      if(length(jj.enhancer) >0) dgs$index_enhancer[n] = jj.enhancer[which(res$fdr.mean[jj.enhancer] == max(res$fdr.mean[jj.enhancer]))]
+    }
+  }
   
   
-  gg = xx$geneId
-  grep('HOXA13', gg)
-  rownames(yy) = paste0(rownames(yy), '_', gg)
-  #rownames(keep) = gg
-  yy = as.matrix(yy)
+  #dgs = dgs[!is.na(dgs$index_promoter) & !is.na(dgs$index_enhancer), ]
+  dgs = dgs[!is.na(dgs$index_promoter), ]
   
-  gg = rownames(yy)
-  gg = sapply(gg, function(x) {x = unlist(strsplit(as.character(x), '_')); return(paste0(x[2:length(x)], collapse = '_'))})
-  gg = sapply(gg, function(x) {
-    xx = unlist(strsplit(as.character(x), '[|]')); 
-    if(xx[1] == 'N/A') 
-    {
-      return(x);
-    }else{
-      xx = xx[-length(xx)]
-      xx = xx[length(xx)]
-      return(xx);
-    }})
-  gg = as.character(gg)
-  gg = gsub("\\[|\\]", "", gg)
-  gg = gsub(' hs', '', gg)
-  gg = gsub(' nr', '', gg)
+  fdr.cutoff = 0.05; logfc.cutoff = 1;
+  index.dyp =  which((res$adj.P.Val_E40.vs.mUA < fdr.cutoff & abs(res$logFC_E40.vs.mUA) > logfc.cutoff & 
+                res$adj.P.Val_E40.vs.mHand < fdr.cutoff & abs(res$logFC_E40.vs.mHand) > logfc.cutoff) |
+               (res$adj.P.Val_E44prox.vs.mUA < fdr.cutoff & abs(res$logFC_E44prox.vs.mUA) > logfc.cutoff &
+                  res$adj.P.Val_E44_dist.vs.mHand < fdr.cutoff & abs(res$logFC_E44_dist.vs.mHand) > logfc.cutoff) &
+                 res$maxs > 3 & res$mins < 3 )
   
-  rownames(yy) = gg
-  sample_colors = c('springgreen4', 'steelblue2', 'gold2')
-  names(sample_colors) = c('Mature_UA', 'Mature_LA', 'Mature_Hand')
-  annot_colors = list(segments = sample_colors)
+  cat(length(index.dyp), '\n')
   
-  pheatmap(yy, 
-           annotation_col = df, show_rownames = TRUE, scale = 'row', 
-           color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdYlGn")))(8), 
-           show_colnames = FALSE,
+  dgs$dynamic_promoter = NA
+  dgs$dynamic_enhancer = NA
+  dgs$dynamic_promoter[!is.na(match(dgs$index_promoter, index.dyp))] = '1'
+  dgs$dynamic_enhancer[!is.na(match(dgs$index_enhancer, index.dyp))] = '1'
+  
+  
+  df <- data.frame(c(conds, 'Embryo_Stage40', 'Embryo_Stage44_proximal', 'Mature_UA'))
+  rownames(df) = colnames(yy)
+  colnames(df) = 'samples'
+  
+  col3 <- c("#a6cee3", "#1f78b4", "#b2df8a",
+            "#33a02c", "#fb9a99", "#e31a1c",
+            "#fdbf6f", "#ff7f00", "#cab2d6",
+            "#6a3d9a", "#ffff99", "#b15928")
+  
+  sample_colors = c('green', 'green2', 'yellow2', 'springgreen4', 'gold2')
+  names(sample_colors) = conds
+  
+  annot_colors = list(
+     samples = sample_colors)
+  
+  gaps.col = c(5)
+  
+  bg.cutoff = 3
+  #jj = apply(yy[, c(1:5)])
+  
+  yy = data.frame(sample.means[dgs$index_promoter, ], as.matrix(dgs[, c(2:3, 1)]))
+  #yy[, c(1:10)] =  t(apply(yy[, c(1:10)], 1, cal_z_score))
+  #yy[, c(11:13)] = t(apply(yy[, c(11:13)], 1, cal_z_score))
+  yy[, c(6:8)] = t(apply(yy[, c(6:8)], 1, cal_z_score))
+  yy[, c(1:5)] = yy[, c(1:5)] > bg.cutoff
+  
+  
+  pheatmap(yy,  
+           #annotation_row = my_gene_col, clustering_method = 'complete', cutree_rows = nb_clusters, # cluster parameters
+           annotation_col = df,   
+           #color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdYlGn")))(8), 
+           show_colnames = FALSE, scale = 'none', show_rownames = FALSE,
            cluster_rows = TRUE, cluster_cols = FALSE, 
            annotation_colors = annot_colors, 
            gaps_col = gaps.col, 
            #gaps_row =  gaps.row, 
-           filename = paste0(figureDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_top.promoters.pdf'), 
-           width = 10, height = 8)
-  
-  if(saveTable){
-    write.csv(data.frame(keep, yy, stringsAsFactors = FALSE), 
-              file = paste0(resDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_top50_promoterPeaks.csv'), 
-              quote = FALSE, row.names = TRUE)
-    
-  }
+           filename = paste0(figureDir, '/heatmap_dev.vs.mature_peaks_devGene_matureGene.pdf'), width = 10, height = 12
+           )
   
 }
 

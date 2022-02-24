@@ -3446,3 +3446,119 @@ promoter.peaks.analysis.across.mature.dev.regeneraiton = function()
   }
   
 }
+
+
+##########################################
+# compare smartseq2 mature with dev  
+##########################################
+Smartseq2.mature.vs.dev = function()
+{
+  
+  ##########################################
+  # similar comparison mUA vs stage samples for mRNAs 
+  ##########################################
+  RNAseqDir = "../results/rnaseq_Rxxxx.old_R10724_R161513_mergedTechRep/Rdata/"
+  load(file = paste0(RNAseqDir, 'RNAseq_design_dds.object.Rdata'))
+  
+  # select mature samples
+  sels = grep('Mature_UA|Embryo', design.matrix$condition)
+  dds = dds[, sels]
+  
+  dds$condition = droplevels(dds$condition)
+  
+  vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
+  
+  pca=plotPCA(vsd, intgroup = c('condition', 'batch'), returnData = FALSE)
+  print(pca)
+  
+  pca2save = as.data.frame(plotPCA(vsd, intgroup = c('condition', 'batch'), returnData = TRUE))
+  ggp = ggplot(data=pca2save, aes(PC1, PC2, label = name, color= condition, shape = batch))  + 
+    geom_point(size=3) + 
+    geom_text(hjust = 0.7, nudge_y = 1, size=2.5)
+  
+  plot(ggp)
+  
+  
+  dds$condition = droplevels(dds$condition)
+  dds <- estimateDispersions(dds, fitType = 'parametric')
+  plotDispEsts(dds, ymin = 10^-3); abline(h = 0.1, col = 'blue', lwd = 2.0)
+  # 
+  dds = nbinomWaldTest(dds, betaPrior = TRUE)
+  resultsNames(dds)
+  
+  # 
+  res.ii = results(dds, contrast=c("condition", 'Embryo_Stage40', 'Mature_UA'), alpha = 0.1)
+  colnames(res.ii) = paste0(colnames(res.ii), "_Hand.vs.UA")
+  res = data.frame(res.ii[, c(2, 5, 6)])
+  # 
+  res.ii = results(dds, contrast=c("condition", 'Mature_Hand', 'Mature_LA'), alpha = 0.1)
+  colnames(res.ii) = paste0(colnames(res.ii), "_Hand.vs.LA")
+  res = data.frame(res, res.ii[, c(2, 5, 6)])
+  
+  
+  cpm = fpm(dds)
+  cpm = log2(cpm + 2^-7)
+  
+  xx = data.frame(mUA = apply(cpm[, grep('Mature_UA', colnames(cpm))], 1, median), 
+                  stage40 = apply(cpm[, grep('Embryo_Stage40', colnames(cpm))], 1, mean), 
+                  stage46_prox = apply(cpm[, grep('Embryo_Stage46_proximal', colnames(cpm))], 1, mean), 
+                  stage46_dist = apply(cpm[, grep('Embryo_Stage46_distal', colnames(cpm))], 1, mean))
+  
+  maxs = apply(xx, 1, max)
+  
+  cpm = xx
+  cpm$gene =  sapply(rownames(cpm), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[1])})
+  
+  jj = grep(paste0(dev.example, collapse = '|') ,cpm$gene)
+  cpm = cpm[which(maxs> -1), ]
+  
+  load(file =  paste0(annotDir, 'axolotl_housekeepingGenes_controls.other.tissues.liver.islet.testis_expressedIn21tissues.Rdata'))
+  hs = controls.tissue$geneIDs[which(controls.tissue$tissues == 'housekeeping')]
+  ctl =  controls.tissue$geneIDs[which(controls.tissue$tissues  != 'housekeeping')]
+  ggs = sapply(rownames(cpm), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
+  
+  cpm$genetype = NA
+  
+  mm = match(ggs, hs)
+  cpm$genetype[!is.na(mm)] = 'hs'
+  
+  mm = match(ggs, ctl)
+  cpm$genetype[!is.na(mm) & is.na(cpm$genetype)] = 'ctl'
+  
+  par(mfrow = c(1, 3))
+  hist(cpm[, 2], breaks = 100, main = 'log2 expression of stage40');abline(v = 2)
+  hist(cpm[, 3], breaks = 100, main = 'log2 expression of stage44_prox');abline(v = 2)
+  hist(cpm[, 4], breaks = 100, main = 'log2 expression of stage44_dist');abline(v = 2)
+  
+  cpm$genetype[which(cpm[,2]< -1 & cpm[, 3]< -1 & cpm[, 4] < -1 & is.na(cpm$genetype))] = 'dev.lowlyExp'
+  cpm$genetype[is.na(cpm$genetype)] = 'dev.Exp'
+  
+  cpm$genetype[!is.na(match(cpm$gene, limb.go))] = 'limb.dev.GO'
+  
+  examples.sel = unique(grep(paste0(dev.example, collapse = '|') ,cpm$gene))
+  
+  cpm = data.frame(cpm)
+  cpm = cpm[which(cpm$genetype != 'ctl'), ]
+  
+  ggplot(cpm, aes(x = stage40, y = mUA, color = genetype, label = gene)) +
+    geom_point(size = 0.4) + 
+    scale_color_manual(values=c("#E69F00", "#56B4E9",  "#999999",  'darkblue')) + 
+    geom_text_repel(data= cpm[examples.sel, ], size = 4.0, color = 'darkblue') +
+    geom_point(data=cpm[which(cpm$genetype == 'limb.dev'), ], aes(x=stage40, y=mUA), colour="darkblue", size=1.5) +
+    #geom_hline(yintercept=2.0, colour = "darkgray") + 
+    #geom_vline(xintercept = 2.0, colour = "darkgray")
+    geom_abline(slope = 1,  intercept = 0, colour = 'red') +
+    theme_classic() +
+    theme(legend.text = element_text(size=10), 
+          #legend.title = element_text(color = "blue", size = 14),
+          legend.key.size = unit(1, 'cm')
+          #legend.key.width= unit(1, 'cm')
+    )
+  
+  
+  ggsave(paste0(figureDir, "Stage40_vs_mUA_devGenes_comparisons_smartseq2.pdf"), width=12, height = 10)
+  
+  
+}
+
+
