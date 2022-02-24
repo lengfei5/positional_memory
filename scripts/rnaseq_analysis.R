@@ -764,8 +764,13 @@ pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
 
 
 ##########################################
-# DEseq2 normalization of RNA-seq data 
+# DEseq2 normalization of RNA-seq data
+# 
 ##########################################
+# load results from microarray with limma
+res = readRDS(file = paste0("../results/microarray/Rdata/", 
+              'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_limma.DE.stats.rds'))
+
 # load dds normalized object and annotations
 load(file = paste0(RdataDir, 'RNAseq_design_dds.object.Rdata'))
 
@@ -779,40 +784,6 @@ cpm = log2(cpm + 2^-4)
 colnames(cpm) = gsub('Mature_Hand', 'mHand', colnames(cpm))
 colnames(cpm) = gsub('Mature_LA', 'mLA', colnames(cpm))
 colnames(cpm) = gsub('Mature_UA', 'mUA', colnames(cpm))
-
-## compare the microarray data and RNA-seq data
-for(cc in c('mHand', 'mLA', 'mUA'))
-{
-  # cc = 'mHand'
-  
-  xx = apply(res[, grep(cc, colnames(res)[1:9])], 1, mean)
-  yy = apply(cpm[, grep(cc, colnames(cpm))], 1, mean)
-  
-  gene.sels = intersect(names(xx), names(yy))
-  xx = xx[match(gene.sels, names(xx))]
-  yy = yy[match(gene.sels, names(yy))]
-  
-  xx = data.frame(xx, yy)
-  xx = xx[which(yy>0), ]
-    
-  ggplot(data=res, aes(x=logfc, y=pval, label = gene)) +
-    geom_point(size = 0.5) + 
-    geom_point(data=res[which(res$logfc > 1 & res$pval > -log10(0.001)), ], aes(x=logfc, y=pval), colour="red", size=1) +
-    geom_point(data=res[which(res$logfc < -1 & res$pval > -log10(0.001)), ], aes(x=logfc, y=pval), colour="blue", size=1) +
-    theme_classic() + 
-    theme(axis.text.x = element_text(size = 12), 
-          axis.text.y = element_text(size = 12)) + 
-    #geom_text_repel(data= res[examples.sel, ], size = 3.0, color = 'blue') +
-    #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
-    #scale_color_manual(values=c("blue", "black", "red")) +
-    geom_vline(xintercept=c(-1, 1), col='gray') +
-    geom_hline(yintercept=-log10(0.001), col="gray") +
-    labs(x = "log2FC")
-  
-  ggsave(paste0(figureDir, "Fig2C_VolcanoPlot_log2FC_pval_microarray_noLabels_", comp, ".pdf"), width=12, height = 8)
-  
-  
-}
 
 
 # dds$condition = droplevels(dds$condition)
@@ -919,6 +890,46 @@ for(cc in c('mHand', 'mLA', 'mUA'))
 #             quote = FALSE, col.names = TRUE, row.names = FALSE)
 #   
 # }
+
+## compare the microarray data and RNA-seq data
+for(cc in c('mHand', 'mLA', 'mUA'))
+{
+  # cc = 'mHand'
+  
+  xx = apply(res[, grep(cc, colnames(res)[1:9])], 1, mean)
+  yy = apply(cpm[, grep(cc, colnames(cpm))], 1, mean)
+  
+  gene.sels = intersect(names(xx), names(yy))
+  xx = xx[match(gene.sels, names(xx))]
+  yy = yy[match(gene.sels, names(yy))]
+  
+  xx = data.frame(xx, yy)
+  xx = xx[which(yy>0), ]
+  
+  ggplot(data=res, aes(x=logfc, y=pval, label = gene)) +
+    geom_point(size = 0.5) + 
+    geom_point(data=res[which(res$logfc > 1 & res$pval > -log10(0.001)), ], aes(x=logfc, y=pval), colour="red", size=1) +
+    geom_point(data=res[which(res$logfc < -1 & res$pval > -log10(0.001)), ], aes(x=logfc, y=pval), colour="blue", size=1) +
+    theme_classic() + 
+    theme(axis.text.x = element_text(size = 12), 
+          axis.text.y = element_text(size = 12)) + 
+    #geom_text_repel(data= res[examples.sel, ], size = 3.0, color = 'blue') +
+    #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
+    #scale_color_manual(values=c("blue", "black", "red")) +
+    geom_vline(xintercept=c(-1, 1), col='gray') +
+    geom_hline(yintercept=-log10(0.001), col="gray") +
+    labs(x = "log2FC")
+  
+  ggsave(paste0(figureDir, "Fig2C_VolcanoPlot_log2FC_pval_microarray_noLabels_", comp, ".pdf"), width=12, height = 8)
+  
+  
+}
+
+##########################################
+# compare the positional genes from smartseq2 with ones from microarray 
+##########################################
+
+
 
 
 ########################################################
@@ -1057,6 +1068,7 @@ if(Compare_stage44.proximal.distal_BL.UA.day13.promximal.distal){
               quote = FALSE, col.names = TRUE, row.names = FALSE)
     
   }
+  
 }
 
 ########################################################

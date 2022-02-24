@@ -690,6 +690,7 @@ if(grouping.position.dependent.peaks){
   col = colorRampPalette(rev(brewer.pal(n = 7, name ="RdGy")))(8)
   #col = colorRampPalette(rev(brewer.pal(n = 7, name ="PuOr")))(16)
   col = palette(hcl.colors(8, "Viridis"))
+  col = colorRampPalette(c("navy", "white", "red3"))(8)
   
   pheatmap(yy, annotation_row = my_gene_col, 
            annotation_col = df, show_rownames = FALSE, scale = 'none', 
