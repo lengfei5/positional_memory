@@ -453,6 +453,7 @@ eps = readRDS(file = paste0('../data/human_chromatin_remodelers_Epifactors.datab
 rbp = readRDS(file = paste0('../data/human_RBPs_rbpdb.rds'))
 tfs = unique(tfs$`HGNC symbol`)
 sps = toupper(unique(sps$gene))
+sps = setdiff(sps, tfs)
 
 ##########################################
 # microarray data 
@@ -526,6 +527,7 @@ res = res[o1, ]
 saveRDS(res, file = paste0("../results/microarray/Rdata/", 
                      'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_limma.DE.stats.rds'))
 
+
 ggs = sapply(rownames(res), function(x){unlist(strsplit(as.character(x), '_'))[1]})
 
 qv.cutoff = 0.05
@@ -556,14 +558,29 @@ annot_colors = c('springgreen4', 'steelblue2', 'gold2')
 names(annot_colors) = c('mUA', 'mLA', 'mHand')
 annot_colors = list(segments = annot_colors)
 
+sample_colors = c('springgreen4', 'steelblue2', 'gold2')
+names(sample_colors) = c('Mature_UA', 'Mature_LA', 'Mature_Hand')
+annot_colors = list(segments = sample_colors)
+
+
+
 pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
          color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(16), 
          show_colnames = FALSE,
          scale = 'row',
          cluster_cols=FALSE, annotation_col=df,
          annotation_colors = annot_colors,
-         width = 8, height = 12, filename = paste0(figureDir, '/Fig2A_heatmap_DEgenes_matureSample_fdr.0.05_log2fc.1_microarray.pdf')) 
+         width = 8, height = 12, 
+         filename = paste0(figureDir, '/Fig2A_heatmap_DEgenes_matureSample_fdr.0.05_log2fc.1_microarray.pdf')) 
 
+pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+         color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(32), 
+         show_colnames = FALSE,
+         scale = 'none',
+         cluster_cols=FALSE, annotation_col=df,
+         annotation_colors = annot_colors,
+         width = 8, height = 12, 
+         filename = paste0(figureDir, '/Fig2A_heatmap_DEgenes_matureSample_fdr.0.05_log2fc.1_microarray_nonScaled.pdf')) 
 
 ##########################################
 # GO term analysis of DE genes 
@@ -638,21 +655,6 @@ ego <-  enrichGO(gene         = gene.df$ENSEMBL,
                  qvalueCutoff  = 0.05)
 
 head(ego)
-
-# barplot(ego, showCategory=30)
-# 
-# 
-# ego <-  enrichGO(gene         = gene.df$ENSEMBL,
-#                  #universe     = bgs0.df$ENSEMBL,
-#                  #OrgDb         = org.Hs.eg.db,
-#                  OrgDb         = org.Mm.eg.db,
-#                  keyType       = 'ENSEMBL',
-#                  ont           = "BP",
-#                  pAdjustMethod = "BH",
-#                  pvalueCutoff  = 0.01,
-#                  qvalueCutoff  = 0.05)
-# 
-# head(ego)
 
 #barplot(ego, showCategory=30) + ggtitle("Go term enrichment for promoter peaks in Akane's ATAC-seq data")
 
@@ -729,8 +731,17 @@ pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
          color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(16), 
          scale = 'none',
          cluster_cols=FALSE, annotation_col=df, fontsize_row = 8, 
-         width = 8, height = 12,
-         filename = paste0(figureDir, 'FigS2A_heatmap_DE.tfs_eps_mature_qv.0.05_log2fc.1_microarray.pdf')) 
+         width = 8, height = 10,
+         annotation_colors = annot_colors,
+         filename = paste0(figureDir, 'FigS2A_heatmap_DE.tfs_eps_mature_qv.0.05_log2fc.1_microarray_nonScaled.lgo2.geneExp.pdf')) 
+
+pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
+         color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(16), 
+         scale = 'row',
+         cluster_cols=FALSE, annotation_col=df, fontsize_row = 8, 
+         width = 8, height = 10,
+         annotation_colors = annot_colors,
+         filename = paste0(figureDir, 'FigS2A_heatmap_DE.tfs_eps_mature_qv.0.05_log2fc.1_microarray_scaled.log2.geneExp.pdf')) 
 
 mm = match(ggs, unique(c(toupper(sps))))
 yy1 = yy[unique(c(which(!is.na(mm)), grep('CYP2', rownames(yy)))), ]
@@ -739,10 +750,17 @@ pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
          scale = 'none',
          color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(16), 
          cluster_cols=FALSE, annotation_col=df, fontsize_row = 8, 
-         width = 8, height = 12,
-         filename = paste0(figureDir, 'FigS2A_heatmap_DE_sps_mature_qv.0.05_log2FC.1_microarray.pdf')) 
+         width = 8, height = 10,
+         annotation_colors = annot_colors,
+         filename = paste0(figureDir, 'FigS2A_heatmap_DE_sps_mature_qv.0.05_log2FC.1_microarray_nonScaled.log2.geneExp.pdf')) 
 
-
+pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
+         scale = 'row',
+         color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(16), 
+         cluster_cols=FALSE, annotation_col=df, fontsize_row = 8, 
+         width = 8, height = 10,
+         annotation_colors = annot_colors,
+         filename = paste0(figureDir, 'FigS2A_heatmap_DE_sps_mature_qv.0.05_log2FC.1_microarray_scaled.log2.geneExp.pdf')) 
 
 
 ##########################################
