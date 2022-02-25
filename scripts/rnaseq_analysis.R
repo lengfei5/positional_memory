@@ -841,13 +841,16 @@ for(comp in c('mHand.vs.mUA', 'mHand.vs.mLA', 'mLA.vs.mUA'))
   ggsave(paste0(figureDir, "Fig2C_VolcanoPlot_log2FC_pval_smartseq2_noLabels_", comp, ".pdf"), width=12, height = 8)
   
   
-  #res0$fdr = eval(parse(text = paste0('-log10(res0$adj.P.Val_', comp, ')')))
-  #res0$pval = eval(parse(text = paste0('-log10(res0$P.Value_', comp, ')')))
+  res0$fdr = eval(parse(text = paste0('-log10(res0$adj.P.Val_', comp, ')')))
+  res0$pval = eval(parse(text = paste0('-log10(res0$P.Value_', comp, ')')))
   res0$logfc = eval(parse(text = paste0('res0$logFC_', comp)))
   
-  mm = match(res$geneID, res0$geneID)
+  qv.cutoff = 0.05; logfc.cutoff = 1
+  select = which(res0$fdr > -log10(qv.cutoff) & abs(res0$logfc) > logfc.cutoff)
+                   
+  # mm = match(res$geneID, res0$geneID[select])
+  # yy = data.frame(log2fc.smartseq2 = res$logfc[!is.na(mm)],  log2fc.microarray = res0$logfc[mm[!is.na(mm)]])
   
-  yy = data.frame(log2fc.smartseq2 = res$logfc,  log2fc.microarray = res0$logfc[mm])
   #plot(yy, xlim = c(-4, 4), ylim = c(-4, 4), cex = 0.3);
   #abline(0, 1, lwd = 2.0)
   cat(cor(yy[, 1], yy[, 2], use = "na.or.complete"), '\n')
@@ -1012,6 +1015,7 @@ eps = readRDS(file = paste0('../data/human_chromatin_remodelers_Epifactors.datab
 rbp = readRDS(file = paste0('../data/human_RBPs_rbpdb.rds'))
 tfs = unique(tfs$`HGNC symbol`)
 sps = toupper(unique(sps$gene))
+sps = setdiff(sps, tfs)
 
 # select mature samples
 sels = unique(c(which(design.matrix$batch == 3 | design.matrix$condition == 'BL_UA_9days')))

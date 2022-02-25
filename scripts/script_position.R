@@ -690,6 +690,7 @@ if(grouping.position.dependent.peaks){
   col = colorRampPalette(rev(brewer.pal(n = 7, name ="RdGy")))(8)
   #col = colorRampPalette(rev(brewer.pal(n = 7, name ="PuOr")))(16)
   col = palette(hcl.colors(8, "Viridis"))
+  
   col = colorRampPalette(c("navy", "white", "red3"))(8)
   
   pheatmap(yy, annotation_row = my_gene_col, 
@@ -703,6 +704,7 @@ if(grouping.position.dependent.peaks){
            gaps_col = gaps.col, 
           filename = paste0(saveDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
           width = 6, height = 12)
+  
   
   write.csv(xx, file = paste0(saveDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters', 
                               nb_clusters, '.csv'), quote = FALSE, row.names = TRUE)
