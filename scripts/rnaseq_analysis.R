@@ -1018,109 +1018,178 @@ sps = toupper(unique(sps$gene))
 sps = setdiff(sps, tfs)
 
 # select mature samples
-sels = unique(c(which(design.matrix$batch == 3 | design.matrix$condition == 'BL_UA_9days')))
+sels = unique(c(which((design.matrix$batch == 3 | design.matrix$condition == 'BL_UA_9days') & 
+                        design.matrix$SampleID != '136150' & design.matrix$SampleID != '106351')))
+
 dds = dds[, sels]
 dds$condition = droplevels(dds$condition)
 dds$batch = droplevels(dds$batch)
+
+ss = rowSums(counts(dds))
 
 vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
 
 pca=plotPCA(vsd, intgroup = c('condition', 'batch'), returnData = FALSE)
 print(pca)
 
-pca2save = as.data.frame(plotPCA(vsd, intgroup = c('condition', 'batch'), returnData = TRUE))
+pca2save = as.data.frame(plotPCA(vsd, intgroup = c('condition', 'batch'), returnData = TRUE, ntop = 3000))
 ggp = ggplot(data=pca2save, aes(PC1, PC2, label = name, color= condition, shape = batch))  + 
   geom_point(size=3) + 
-  geom_text(hjust = 0.7, nudge_y = 1, size=2.5)
+  geom_text(hjust = 1, nudge_y = 1, size=2.5)
 
 plot(ggp)
 
+ggsave(paste0(resDir, '/PCA_smartseq2_regeneration.timepoints_filteredSamples.pdf'),  width=12, height = 8)
+
 #cpm = log2(fpm0[, sels] + 2^-6)
 dds$condition = droplevels(dds$condition)
+dds$condition <- relevel(dds$condition, ref = "Mature_UA")
 
 dds <- DESeq(dds, test="LRT", reduced=~1, fitType = c("parametric"))
-res <- results(dds, alpha = 0.05)
+plotDispEsts(dds, ymin = 10^-3)
 
-#plotDispEsts(dds, ymin = 10^-3)
-#dds = nbinomWaldTest(dds, betaPrior = TRUE)
-#resultsNames(dds)
+res <- results(dds)
 
-#cpm = cpm[which(res$padj<0.1), ]
 
-# res.ii = results(dds, contrast=c("condition", 'BL_UA_13days_proximal', 'Mature_UA'))
-# colnames(res.ii) = paste0(colnames(res.ii), "_BL.D13.vs.UA")
-# res = data.frame(res.ii[, c(2, 5, 6)])
-# 
-# res.ii = results(dds, contrast=c("condition", 'BL_UA_5days', 'Mature_UA'))
-# colnames(res.ii) = paste0(colnames(res.ii), "_BL.D5.vs.LA")
-# res = data.frame(res, res.ii[, c(2, 5, 6)])
-# 
-# res.ii = results(dds, contrast=c("condition", 'BL_UA_9days', 'Mature_UA'))
-# colnames(res.ii) = paste0(colnames(res.ii), "_BL.D9.vs.UA")
-# res = data.frame(res, res.ii[, c(2, 5, 6)])
+resultsNames(dds)
+#res30 <- results(ddsTC, name="strainmut.minute30", test="Wald")
 
-#dds <- nbinomLRT(dds, reduced = ~1 )
-#res0 <- results(dds)
+res = data.frame(res[, c(2, 5, 6)])
+colnames(res) = paste0(colnames(res), '_LRT')
+
+res.ii = results(dds, name='condition_BL_UA_5days_vs_Mature_UA', test = 'Wald')
+colnames(res.ii) = paste0(colnames(res.ii), "_dpa5.vs.mUA")
+res = data.frame(res, res.ii[, c(2, 5, 6)])
+ 
+res.ii = results(dds, name='condition_BL_UA_9days_vs_Mature_UA', test = 'Wald')
+colnames(res.ii) = paste0(colnames(res.ii), "_dpa9.vs.mUA")
+res = data.frame(res, res.ii[, c(2, 5, 6)])
+
+res.ii = results(dds, name='condition_BL_UA_13days_proximal_vs_Mature_UA', test = 'Wald')
+colnames(res.ii) = paste0(colnames(res.ii), "_dpa13prox.vs.mUA")
+res = data.frame(res, res.ii[, c(2, 5, 6)])
+
+res.ii = results(dds, name='condition_BL_UA_13days_distal_vs_Mature_UA', test = 'Wald')
+colnames(res.ii) = paste0(colnames(res.ii), "_dpa13dist.vs.mUA")
+res = data.frame(res, res.ii[, c(2, 5, 6)])
+
 
 source('Functions_atac.R')
 
-cpm = log2(fpm(dds) + 2^-6)
-o1 = c(grep('Mature_UA', dds$condition), grep('BL_UA_5days', dds$condition), grep('BL_UA_9days', dds$condition), 
-       grep('BL_UA_13days_proximal', dds$condition), grep('BL_UA_13days_distal', dds$condition))
+cpm = fpm(dds)
+cpm = log2(fpm(dds) + 2^-7)
 
-library(tictoc)
-tic()
-## define the dynamic enhancers with mature UA and BL.UA and check them if embryo samples
-xx = t(apply(cpm[, o1], 1, temporal.peaks.test, c = dds$condition[o1]))
-toc()
+conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal",  "BL_UA_13days_distal")
+sample.sels = c();  
+cc = c()
+sample.means = c()
+for(n in 1:length(conds)) 
+{
+  kk = grep(conds[n], colnames(cpm))
+  sample.sels = c(sample.sels, kk)
+  cc = c(cc, rep(conds[n], length(kk)))
+  if(length(kk)>1) {
+    sample.means = cbind(sample.means, apply(cpm[, kk], 1, mean))
+  }else{
+    sample.means = cbind(sample.means, cpm[, kk])
+  }
+  
+}  
 
-test = apply(cpm[, o1], 1, function(x){return(mean(x[c(1:2)]) - max(c(mean(x[c(3:4)]), mean(x[c(5:7)]), 
-                                                                           mean(x[c(8:9)]), mean(x[c(10:11)]))))})
+colnames(sample.means) = conds
 
-res = data.frame(res, xx, log2FC.mUA.vs.others = test, stringsAsFactors = FALSE)
+cpm = cpm[, sample.sels]
 
-saveRDS(res, file = paste0(RdataDir, 'TestStat_regeneration_RNAseq.rds'))
+res$log2fc = apply(sample.means, 1, function(x) max(x) - min(x))
+res$maxs = apply(sample.means, 1, max)
+res$mins = apply(sample.means, 1, min)
 
-#res = readRDS(file = paste0(RdataDir, 'TestStat_regeneration_RNAseq.rds'))
-#res = data.frame(res, cpm[, o1], stringsAsFactors = FALSE)
+res = data.frame(cpm, res, stringsAsFactors = FALSE)
 
+saveRDS(res, file = paste0(RdataDir, 'regeneration_smartseq2_fpm_LRTtest_filteredSamples.rds'))
+
+# o1 = c(grep('Mature_UA', dds$condition), grep('BL_UA_5days', dds$condition), grep('BL_UA_9days', dds$condition), 
+#        grep('BL_UA_13days_proximal', dds$condition), grep('BL_UA_13days_distal', dds$condition))
+# 
+# library(tictoc)
+# tic()
+# ## define the dynamic enhancers with mature UA and BL.UA and check them if embryo samples
+# xx = t(apply(cpm[, o1], 1, temporal.peaks.test, c = dds$condition[o1]))
+# toc()
+# 
+# test = apply(cpm[, o1], 1, function(x){return(mean(x[c(1:2)]) - max(c(mean(x[c(3:4)]), mean(x[c(5:7)]), 
+#                                                                            mean(x[c(8:9)]), mean(x[c(10:11)]))))})
+# 
+# res = data.frame(res, xx, log2FC.mUA.vs.others = test, stringsAsFactors = FALSE)
+# 
+# saveRDS(res, file = paste0(RdataDir, 'TestStat_regeneration_RNAseq.rds'))
+# 
+# #res = readRDS(file = paste0(RdataDir, 'TestStat_regeneration_RNAseq.rds'))
+# #res = data.frame(res, cpm[, o1], stringsAsFactors = FALSE)
 
 ##########################################
 # visualize the restuls
 ##########################################
+res = readRDS(file = paste0(RdataDir, 'regeneration_smartseq2_fpm_LRTtest_filteredSamples.rds'))
+cpm = res[, c(1:9)]
+
 library("pheatmap")
+require(corrplot)
+
+conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal",  "BL_UA_13days_distal")
+
+sample.sels = c();  cc = c()
+sample.means = c()
+for(n in 1:length(conds)) 
+{
+  kk = grep(conds[n], colnames(cpm))
+  sample.sels = c(sample.sels, kk)
+  cc = c(cc, rep(conds[n], length(kk)))
+  if(length(kk)>1) {
+    sample.means = cbind(sample.means, apply(cpm[, kk], 1, mean))
+  }else{
+    sample.means = cbind(sample.means, cpm[, kk])
+  }
+  
+}  
+
+colnames(sample.means) = conds
+
+##########################################
+# select the significant changing genes
+##########################################
 fdr.cutoff = 0.01
-length(which(res$padj<fdr.cutoff))
-length(which(res$prob.M0<0.01))
-length(which(res$padj<fdr.cutoff & res$log2FC>1))
-length(which(res$prob.M0<0.01 & res$log2FC>1))
+logfc.cutoff = 2
 
-#select = which(res$pvalue_BL.D13.vs.UA < pval.cutoff | res$pvalue_BL.D5.vs.LA < pval.cutoff | res$pvalue_BL.D9.vs.UA < pval.cutoff)
-select = which(res$padj < fdr.cutoff & res$log2FC >1)
+length(which(res$padj_LRT<fdr.cutoff))
+length(which(res$padj_LRT<fdr.cutoff & res$log2fc>1))
+length(which(res$padj_LRT<fdr.cutoff & res$log2fc>2))
+length(which(res$padj_LRT<fdr.cutoff & res$log2fc>1.5))
 
+select = which(res$padj_LRT<fdr.cutoff & res$log2fc>2 & res$maxs > 0)
 
-df <- as.data.frame(colData(dds)[,c("condition")])
-colnames(df) = 'condition'
-o1 = c(grep('Mature_UA', df$condition), grep('BL_UA_5days', df$condition), grep('BL_UA_9days', df$condition), 
-       grep('BL_UA_13days_proximal', df$condition), grep('BL_UA_13days_distal', df$condition))
-yy = cpm[select, o1]
-
-df <- as.data.frame(df[o1, ])
+#yy = sample.means[select, ]
+#df <- as.data.frame(conds)
+yy = cpm[select, ]
+df = as.data.frame(cc)
 colnames(df) = 'condition'
 rownames(df) = colnames(yy)
 
-pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, show_colnames = FALSE,
+#corrplot(cor(yy), method = 'number', type = 'upper', diag = TRUE)
+#ggsave(filename = paste0(resDir, '/corrplot_smartseq2_regeneration.pdf'),  width = 10, height = 12)
+
+sample_colors = c('springgreen4', 'springgreen', 'springgreen2', 'springgreen3', 'gold2')
+names(sample_colors) = conds
+annot_colors = list(segments = sample_colors)
+
+pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+         color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
+         show_colnames = FALSE,
          scale = 'row',
-         cluster_cols=FALSE, annotation_col=df, 
-         width = 10, height = 12,
-         filename = paste0(resDir, '/heatmap_DE_regeneration_timepoints_qv.0.05_log2FC.1_RNAseq.pdf')) 
-
-out = pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, show_colnames = FALSE,
-              scale = 'row', clustering_distance_rows="euclidean", cex=1,
-              clustering_method="complete",
-              cluster_cols=FALSE, annotation_col=df)
-
-head(sort(cutree(out$tree_row, k=4)))
+         cluster_cols=FALSE, annotation_col=df,
+         annotation_colors = annot_colors,
+         width = 8, height = 12, 
+         filename = paste0(figureDir, '/heatmap_DEgenes_regeneration_fdr.0.01_log2fc.2_smartseq2.pdf')) 
 
 ##########################################
 # highlight TF, eps and other 
@@ -1133,23 +1202,240 @@ print(intersect(ggs, sps))
 print(intersect(ggs, eps))
 print(intersect(ggs, rbp))
 
-
 for(subg in c('tfs', 'eps', 'sps', 'rbp'))
 {
-  
-  # subg = 'rbp'
   
   mm = eval(parse(text = paste0('match(ggs, unique(', subg, '))')))
   
   yy1 = yy[unique(c(which(!is.na(mm)))), ]
   
-  pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
+  pheatmap(yy1, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+           color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
+           show_colnames = FALSE,
            scale = 'row',
-           cluster_cols=FALSE, annotation_col=df, fontsize_row = 9, 
-           width = 10, height = 28,
-           filename = paste0(resDir, '/heatmap_regeneration_DE_', subg, '_qv.0.05_FDR.1.pdf')) 
+           cluster_cols=FALSE, annotation_col=df,
+           annotation_colors = annot_colors,
+           width = 8, height = 8, 
+           filename = paste0(figureDir, '/heatmap_DEgenes_regeneration_fdr.0.01_log2fc.2_smartseq2_', subg, '.pdf'))
   
+  #write.table(yy, file = paste0(resDir, '/DEtfs_mUA_regeneration_dev.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
+    
+}
+
+
+########################################################
+########################################################
+# Section : regeneration RNA-seq from Gerber et al. 2018
+# 
+########################################################
+########################################################
+Import.scRNAseq = FALSE
+if(Import.scRNAseq){
+  scRNADir = '/Volumes/groups/tanaka/People/current/jiwang/projects/limbRegeneration_scRNA/raw_NGS/axolotl/Gerber_2018/'
+  scRNAseq.counts = read.delim(file = paste0(scRNADir, 'Fluidigm_C1/nf_out/featureCounts/merged_gene_counts.txt'), header = TRUE)
   
-  write.table(yy, file = paste0(resDir, '/DEtfs_mUA_regeneration_dev.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
+  metadata = read.delim(file = paste0(scRNADir, 'Metadata_EBI.ENA_filereport_read_run_PRJNA416091_tsv.txt'), header = TRUE)
+  metadata = data.frame(metadata$run_accession, metadata$sample_title)
+  
+  cellannot = read.csv(file = paste0(scRNADir, 'aaq0681_TableS7.csv'))
+  cellannot = cellannot[, c(1:3)]
+  
+  mm = match(cellannot$cell_id, metadata$metadata.sample_title)
+  metadata = data.frame(cellannot, metadata[mm, ], stringsAsFactors = FALSE)
+  
+  save(metadata, scRNAseq.counts, file = paste0(RdataDir, '/Gerber_2018_Fluidigm_C1.Rdata'))
   
 }
+
+##########################################
+# reload the metadata and counts 
+##########################################
+load(file = paste0(RdataDir, '/Gerber_2018_Fluidigm_C1.Rdata'))
+
+counts = scRNAseq.counts[, -1]
+rownames(counts) = scRNAseq.counts$ENSEMBL_ID
+
+accs = sapply(colnames(counts), function(x) unlist(strsplit(as.character(x), '_'))[1])
+
+mm = match(metadata$metadata.run_accession, accs)
+metadata = metadata[which(!is.na(mm)), ]
+counts = counts[, mm[which(!is.na(mm))]]
+colnames(counts) = as.character(metadata$metadata.run_accession)
+
+metadata$condition = metadata$timepoint
+metadata$sample = as.character(metadata$metadata.run_accession)
+
+#raw = as.matrix(counts[ ,-1])
+#rownames(raw) = counts$ENSEMBL_ID
+
+metadata$batch = sapply(metadata$cell_id, function(x) unlist(strsplit(as.character(x), '[.]'))[1])
+rownames(metadata) = metadata$cell_id
+
+colnames(counts) = rownames(metadata)
+
+##########################################
+# check scRNA-seq data 
+##########################################
+library(dplyr)
+library(Seurat)
+library(patchwork)
+
+aa = CreateSeuratObject(counts = counts, project = "limb_regeneration", assay = 'RNA', meta.data = as.data.frame(metadata),
+                        min.cells = 10, min.features = 500)
+
+VlnPlot(aa, features = c("nFeature_RNA", "nCount_RNA"), ncol = 2)
+FeatureScatter(aa, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+
+aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
+aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 3000)
+all.genes <- rownames(aa)
+aa <- ScaleData(aa, features = all.genes)
+aa <- RunPCA(aa, features = VariableFeatures(object = aa))
+ElbowPlot(aa)
+
+aa <- FindNeighbors(aa, dims = 1:10)
+aa <- FindClusters(aa, resolution = 0.5)
+
+aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.2)
+p1 = DimPlot(aa, reduction = "umap", group.by = 'timepoint')
+p2 = DimPlot(aa, reduction = "umap", group.by = 'batch')
+
+p1 + p2
+
+ggsave(paste0(resDir, "/Overview_Gerber2018_Fluidigm.C1_batches.pdf"), width = 12, height = 8)
+
+
+## find DE genes between mUA and stage 40 and stage 44
+Idents(aa) = aa$timepoint
+DE.genes1 = FindMarkers(aa, ident.1 = "Stage40", ident.2 = "0dpa", logfc.threshold = 0.5)
+DE.genes2 = FindMarkers(aa, ident.1 = "Stage44", ident.2 = "0dpa", logfc.threshold = 0.5)
+
+DE.genes1 = DE.genes1[which(DE.genes1$p_val_adj < 0.05), ]
+DE.genes2 = DE.genes2[which(DE.genes2$p_val_adj < 0.05), ]
+
+DE.genes = unique(c(rownames(DE.genes1), rownames(DE.genes2)))
+
+# check the difference between stage40 and stage44
+aa = subset(aa, cells = colnames(aa)[which(aa$condition == 'Stage40'|aa$condition == 'Stage44')])
+
+aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 3000)
+all.genes <- rownames(aa)
+aa <- ScaleData(aa, features = all.genes)
+aa <- RunPCA(aa, features = VariableFeatures(object = aa))
+ElbowPlot(aa)
+
+aa <- FindNeighbors(aa, dims = 1:15)
+aa <- FindClusters(aa, resolution = 0.5)
+
+aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.2)
+p1 = DimPlot(aa, reduction = "umap", group.by = 'timepoint')
+p2 = DimPlot(aa, reduction = "umap", group.by = 'batch')
+
+p1 + p2
+
+
+##########################################
+# pool scRNA-seq data to have pseudo-bulk 
+##########################################
+#sels = which(metadata$timepoint == '0dpa'| metadata$timepoint == 'Stage40' | metadata$timepoint == 'Stage44')
+#metadata = metadata[sels, ]
+raw = counts
+conds = c('0dpa', '3dpa', '5dpa', '8dpa', '11dpa')
+pseudo = matrix(NA, ncol = length(conds), nrow = nrow(raw))
+colnames(pseudo) = conds
+rownames(pseudo) = rownames(raw)
+
+for(n in 1:length(conds))
+{
+  cat(n, ' : ', conds[n], ' -- ')
+  jj = which(metadata$condition == conds[n])
+  
+  mm = match(metadata$cell_id[jj], colnames(raw))
+  if(length(which(is.na(mm)))>0) {
+    cat('some cells lost \n')
+  }else{
+    cat(length(mm), ' cell found \n')
+    xx = as.matrix(raw[, mm])
+    xx[is.na(xx)] = 0
+    pseudo[,n] = apply(xx, 1, sum)
+  }
+}
+
+#pseudo[, 2] = pseudo[,2] + pseudo[, 3]
+#pseudo = pseudo[, c(1, 2)]
+#colnames(pseudo) = c('mUA', 'stage40.44')
+
+annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                       'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
+
+mm = match(rownames(pseudo), annot$geneID)
+ggs = paste0(annot$gene.symbol.toUse[mm], '_',  annot$geneID[mm])
+ggs[is.na(mm)] = rownames(pseudo)[is.na(mm)]
+rownames(pseudo) = ggs
+
+require(DESeq2)
+conds = c('0dpa', '3dpa', '5dpa', '8dpa', '11dpa')
+condition = factor(conds)
+dds <- DESeqDataSetFromMatrix(pseudo, DataFrame(condition), design = ~ condition)
+
+# filtering with stage40/44 samples
+ss = rowMax(counts(dds))
+
+hist(log10(ss), breaks = 100)
+dds = dds[which(ss > 20), ]
+
+dds = estimateSizeFactors(dds)
+
+ss = rowSums(counts(dds))
+length(which(ss > quantile(ss, probs = 0.75)))
+
+saveRDS(dds, file = paste0(RdataDir, '/pseudoBulk_scRNAcellPooling_FluidigmC1_regeneration.rds'))
+
+ss = rowMeans(counts(dds))
+dd0 = dds[ss > quantile(ss, probs = 0.75), ]
+dd0 = estimateSizeFactors(dd0)
+
+fpm = fpm(dds, robust = TRUE)
+fpm = data.frame(log2(fpm + 2^-7))
+
+#rr1 = fpm[, 2] - fpm[, 1]
+#rr2 = fpm[, 3] - fpm[, 1]
+#rr = cbind(rr1, rr2)
+#rr = apply(as.matrix(rr), 1, function(x) {x[which(abs(x) == max(abs(x)))][1]})
+#fpm$log2fc = rr
+
+load(file =  paste0(annotDir, 'axolotl_housekeepingGenes_controls.other.tissues.liver.islet.testis_expressedIn21tissues.Rdata'))
+hs = controls.tissue$geneIDs[which(controls.tissue$tissues == 'housekeeping')]
+ctl =  controls.tissue$geneIDs[which(controls.tissue$tissues  != 'housekeeping')]
+ggs = sapply(rownames(fpm), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
+
+colnames(fpm)[1] = 'mUA'
+
+fpm$genetype = 'devGene'
+
+mm = match(ggs, hs)
+xx = fpm[!is.na(mm), ]
+fpm$genetype[!is.na(mm)] = 'hs'
+
+mm = match(ggs, ctl)
+fpm$genetype[!is.na(mm) & fpm$genetype == 'devGene'] = 'ctl'
+
+par(mfrow = c(2, 1))
+hist(fpm[, 2], breaks = 100, main = 'log2 expression of stage40.44');abline(v = 2)
+hist(fpm[, 3], breaks = 100, main = 'log2 expression of stage40.44');abline(v = 2)
+
+fpm$genetype[which(fpm[,2]<2 & fpm[, 3]<2 & fpm$genetype == 'devGene')] = 'dev.lowlyExp'
+fpm$DEgene = NA
+fpm$DEgene[match(DE.genes, ggs)] = 1
+
+colnames(fpm)[6] = 'DEgene_seuratFindMarker'
+
+save(dds, fpm,
+     file = paste0(RdataDir, '/pseudoBulk_scRNAcellPooling_FluidigmC1_stage40.44.mUA_dev_geneSelection.Rdata'))
+
+
+
+
+
+
+
