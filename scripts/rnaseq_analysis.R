@@ -999,13 +999,14 @@ if(Compare_stage44.proximal.distal_BL.UA.day13.promximal.distal){
 
 ########################################################
 ########################################################
-# Section V : dynamic gene and TFs, SPs in regeneration (development stages as contorls) 
-# 
+# Section V : dynamic gene and TFs, SPs in regeneration 
+
+# first double check the regeneration sample quality
+# because the quick technical replicate merging from different batches did not work well, e.g. dpa5_136150 from two R10724 and R11635  
+# it turned out Akane's early samples were polyA and later samples were smartseq2 
 ########################################################
 ########################################################
 load(file = paste0(RdataDir, 'RNAseq_design_dds.object.Rdata'))
-#dds0 = dds
-#fpm0 = fpm(dds)
 annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
                        'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
 
@@ -1018,8 +1019,10 @@ sps = toupper(unique(sps$gene))
 sps = setdiff(sps, tfs)
 
 # select mature samples
-sels = unique(c(which((design.matrix$batch == 3 | design.matrix$condition == 'BL_UA_9days') & 
-                        design.matrix$SampleID != '136150' & design.matrix$SampleID != '106351')))
+sels = unique(c(which((design.matrix$batch == 3 | design.matrix$condition == 'BL_UA_9days'))))
+                      
+#sels = unique(c(which((design.matrix$batch == 3 | design.matrix$condition == 'BL_UA_9days') & 
+#                        design.matrix$SampleID != '136150' & design.matrix$SampleID != '106351')))
 
 dds = dds[, sels]
 dds$condition = droplevels(dds$condition)
@@ -1038,6 +1041,8 @@ ggp = ggplot(data=pca2save, aes(PC1, PC2, label = name, color= condition, shape 
   geom_text(hjust = 1, nudge_y = 1, size=2.5)
 
 plot(ggp)
+
+ggsave(paste0(resDir, '/PCA_smartseq2_regeneration.timepoints.pdf'),  width=12, height = 8)
 
 ggsave(paste0(resDir, '/PCA_smartseq2_regeneration.timepoints_filteredSamples.pdf'),  width=12, height = 8)
 
@@ -1432,10 +1437,4 @@ colnames(fpm)[6] = 'DEgene_seuratFindMarker'
 
 save(dds, fpm,
      file = paste0(RdataDir, '/pseudoBulk_scRNAcellPooling_FluidigmC1_stage40.44.mUA_dev_geneSelection.Rdata'))
-
-
-
-
-
-
 
