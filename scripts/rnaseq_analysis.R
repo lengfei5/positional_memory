@@ -1111,35 +1111,19 @@ res$mins = apply(sample.means, 1, min)
 
 res = data.frame(cpm, res, stringsAsFactors = FALSE)
 
-saveRDS(res, file = paste0(RdataDir, 'regeneration_smartseq2_fpm_LRTtest_filteredSamples.rds'))
+saveRDS(res, file = paste0(RdataDir, 'regeneration_smartseq2_fpm_LRTtest_firstMergedSamples.rds'))
 
-# o1 = c(grep('Mature_UA', dds$condition), grep('BL_UA_5days', dds$condition), grep('BL_UA_9days', dds$condition), 
-#        grep('BL_UA_13days_proximal', dds$condition), grep('BL_UA_13days_distal', dds$condition))
-# 
-# library(tictoc)
-# tic()
-# ## define the dynamic enhancers with mature UA and BL.UA and check them if embryo samples
-# xx = t(apply(cpm[, o1], 1, temporal.peaks.test, c = dds$condition[o1]))
-# toc()
-# 
-# test = apply(cpm[, o1], 1, function(x){return(mean(x[c(1:2)]) - max(c(mean(x[c(3:4)]), mean(x[c(5:7)]), 
-#                                                                            mean(x[c(8:9)]), mean(x[c(10:11)]))))})
-# 
-# res = data.frame(res, xx, log2FC.mUA.vs.others = test, stringsAsFactors = FALSE)
-# 
-# saveRDS(res, file = paste0(RdataDir, 'TestStat_regeneration_RNAseq.rds'))
-# 
-# #res = readRDS(file = paste0(RdataDir, 'TestStat_regeneration_RNAseq.rds'))
-# #res = data.frame(res, cpm[, o1], stringsAsFactors = FALSE)
 
 ##########################################
 # visualize the restuls
 ##########################################
-res = readRDS(file = paste0(RdataDir, 'regeneration_smartseq2_fpm_LRTtest_filteredSamples.rds'))
-cpm = res[, c(1:9)]
-
 library("pheatmap")
 require(corrplot)
+
+#res = readRDS(file = paste0(RdataDir, 'regeneration_smartseq2_fpm_LRTtest_filteredSamples.rds'))
+res = readRDS(file = paste0(RdataDir, 'regeneration_smartseq2_fpm_LRTtest_firstMergedSamples.rds'))
+#cpm = res[, c(1:9)]
+cpm = res[, c(1:11)]
 
 conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal",  "BL_UA_13days_distal")
 
@@ -1173,6 +1157,10 @@ length(which(res$padj_LRT<fdr.cutoff & res$log2fc>1.5))
 
 select = which(res$padj_LRT<fdr.cutoff & res$log2fc>2 & res$maxs > 0)
 
+gg.select = rownames(res)[select]
+
+saveRDS(gg.select, file = paste0(RdataDir, 'RRGs_candidates_tempList.rds'))
+
 #yy = sample.means[select, ]
 #df <- as.data.frame(conds)
 yy = cpm[select, ]
@@ -1180,7 +1168,7 @@ df = as.data.frame(cc)
 colnames(df) = 'condition'
 rownames(df) = colnames(yy)
 
-#corrplot(cor(yy), method = 'number', type = 'upper', diag = TRUE)
+corrplot(cor(yy), method = 'number', type = 'upper', diag = TRUE)
 #ggsave(filename = paste0(resDir, '/corrplot_smartseq2_regeneration.pdf'),  width = 10, height = 12)
 
 sample_colors = c('springgreen4', 'springgreen', 'springgreen2', 'springgreen3', 'gold2')
@@ -1194,7 +1182,7 @@ pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
          cluster_cols=FALSE, annotation_col=df,
          annotation_colors = annot_colors,
          width = 8, height = 12, 
-         filename = paste0(figureDir, '/heatmap_DEgenes_regeneration_fdr.0.01_log2fc.2_smartseq2.pdf')) 
+         filename = paste0(resDir, '/heatmap_DEgenes_regeneration_fdr.0.01_log2fc.2_RNAseq_firstMerge.pdf')) 
 
 ##########################################
 # highlight TF, eps and other 

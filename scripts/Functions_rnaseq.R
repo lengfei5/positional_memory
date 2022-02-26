@@ -43,7 +43,8 @@ process_database_huamn_chromatin.remodelers_RBP = function()
       paste0('/Volumes/groups/tanaka/People/current/jiwang/annotations/mouse/mouse_chromatin.remodeler/Epifactors_database.csv'))
   eps = unique(as.character(eps$HGNC.approved.symbol))
   
-  rbp = read.csv(file = '/Volumes/groups/tanaka/People/current/jiwang/annotations/mouse/mouse_RBPDB/RBPDB_v1.3.1_human_2012-11-21_CSV/RBPDB_v1.3.1_proteins_human_2012-11-21.csv', 
+  rbp = read.csv(file = paste0('/Volumes/groups/tanaka/People/current/jiwang/annotations/mouse/', 
+                               'mouse_RBPDB/RBPDB_v1.3.1_human_2012-11-21_CSV/RBPDB_v1.3.1_proteins_human_2012-11-21.csv'), 
                    header = FALSE)
   
   rbp = unique(as.character(rbp$V5))
@@ -557,3 +558,192 @@ Update.samples.160343.160344 = function()
   save(design, all, file=paste0(RdataDir, 'Design_stats_readCounts_updatedResequenced', version.analysis, '.Rdata'))
    
 }
+
+
+########################################################
+########################################################
+# Section : double check the replicates of regeneration samples
+# 
+########################################################
+########################################################
+Check.R10724.136150.sample.Quality = function()
+{
+  
+  ##########################################
+  # first check all regeneration samples from R10724
+  # secondly compare the resequenced sample 136150; resequened 136150 is totally different from the its technical replicate 
+  # and also biological replicate (what ???)
+  # last add the polyA samples and collect all regeneration RNAseq samples
+  
+  ##########################################
+  dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/rnaseq_using/regeneration_RNAseq/'
+  
+  design = read.xlsx(paste0(dataDir, 'sample_Infos.xlsx'))
+  #colnames(design) = c('sampleID', 'fileName')
+  #design = rbind(design, c('136150s', 'BL_UA_5days'))
+  
+  #design$SampleID[13] = '13615x'
+  
+  xlist = list.files(path=paste0(dataDir, 'gene_counts'),
+                     pattern = "*featureCounts.txt$", full.names = TRUE) ## list of data set to merge
+  
+  all = cat.countTable(xlist, countsfrom = 'featureCounts')
+  
+  #colnames(all)[grep('136150s', colnames(all))] = '13615x.txt'
+  colnames(all) =  gsub('[#]', '_', colnames(all))
+  
+  colnames(design)[1] = 'SampleID'
+  
+  
+  counts = process.countTable(all=all, design = design[, c(1,2)], merge.technicalRep.sameID = TRUE)
+  
+  design$condition = design$fileName
+  design$fileName = paste0(design$fileName, '_', design$SampleID)
+  design$conds = design$condition
+  
+  design$batch = NA
+  colnames(counts)[-1] = design$fileName
+  
+  design$batch = as.factor(design$batch)
+  
+  annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                         'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
+  
+  all = counts
+  
+  mm = match(all$gene, annot$geneID)
+  ggs = paste0(annot$gene.symbol.toUse[mm], '_',  annot$geneID[mm])
+  all$gene[!is.na(mm)] = ggs[!is.na(mm)]
+  
+  raw = as.matrix(all[, -1])
+  rownames(raw) = all$gene
+  
+  sels = which(design$SampleID != '13615x')
+  design = design[sels, ]
+  raw = raw[, sels]
+  
+  design$batch = paste0(design$request, '_', design$protocol)
+  #design$batch[which(design$SampleID == '13615x')] = 'R11635'
+  
+  dds <- DESeqDataSetFromMatrix(raw, DataFrame(design), design = ~ condition)
+  
+  save(design, dds, file = paste0(RdataDir, 'design_dds_all_regeneration.samples_allBatches.Rdata'))
+  
+  
+  ss = rowSums(counts(dds))
+  
+  
+  dds = dds[which(ss>20), ]
+  
+  dds = estimateSizeFactors(dds)
+  
+  vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
+  
+  pca=plotPCA(vsd, intgroup = c('condition', 'batch'), returnData = FALSE)
+  print(pca)
+  
+  pca2save = as.data.frame(plotPCA(vsd, intgroup = c('condition', 'batch'), returnData = TRUE, ntop = 1000))
+  ggplot(data=pca2save, aes(PC1, PC2, label = name, color= condition, shape = batch))  + 
+    geom_point(size=3) + 
+    geom_text(hjust = 1, nudge_y = 1, size=2.5)
+  
+  
+  ##########################################
+  # test batch correction 
+  ##########################################
+  source('Functions_atac.R')
+  library(edgeR)
+  require("sva")
+  require(limma)
+  
+  d <- DGEList(counts=counts(dds), group=dds$condition)
+  tmm <- calcNormFactors(d, method='TMM')
+  tmm = cpm(tmm, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 1)
+  
+  bc = as.factor(design$batch)
+  mod = model.matrix(~ as.factor(condition), data = design)
+  
+  # if specify ref.batch, the parameters will be estimated from the ref, inapprioate here, 
+  # because there is no better batche other others 
+  #ref.batch = '2021S'# 2021S as reference is better for some reasons (NOT USED here)   
+  
+  table(design$conds, design$batch)
+  
+  fpm.bc = ComBat(dat=as.matrix(tmm), batch=bc, mod=mod, par.prior=TRUE, ref.batch = NULL) 
+  
+  #design.tokeep<-model.matrix(~ 0 + conds,  data = design.sels)
+  #cpm.bc = limma::removeBatchEffect(tmm, batch = bc, design = design.tokeep)
+  # plot(fpm.bc[,1], tmm[, 1]);abline(0, 1, lwd = 2.0, col = 'red')
+  make.pca.plots(tmm, ntop = 3000, conds.plot = 'all')
+  ggsave(paste0(resDir, "/matureSamples_batchCorrect_before_",  version.analysis, ".pdf"), width = 16, height = 14)
+  
+  
+  make.pca.plots(fpm.bc, ntop = 3000, conds.plot = 'all')
+  ggsave(paste0(resDir, "/matureSamples_batchCorrect_after_",  version.analysis, ".pdf"), width = 16, height = 14)
+  
+  
+  ggsave(paste0(resDir, '/PCA_smartseq2_regeneration.timepoints_R10724_R11635.pdf'),  width=12, height = 8)
+  
+  #cpm = fpm(dds)
+  #cpm = log2(fpm(dds) + 2^-7)
+  cpm = fpm.bc
+  
+  conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal",  "BL_UA_13days_distal")
+  
+  sample.sels = c();  cc = c()
+  sample.means = c()
+  for(n in 1:length(conds)) 
+  {
+    kk = grep(conds[n], colnames(cpm))
+    sample.sels = c(sample.sels, kk)
+    cc = c(cc, rep(conds[n], length(kk)))
+    if(length(kk)>1) {
+      sample.means = cbind(sample.means, apply(cpm[, kk], 1, mean))
+    }else{
+      sample.means = cbind(sample.means, cpm[, kk])
+    }
+    
+  }  
+  
+  colnames(sample.means) = conds
+  
+  require(corrplot)
+  require(pheatmap)
+  require(RColorBrewer)
+  
+  
+  gg.select = readRDS(file = paste0(RdataDir, 'RRGs_candidates_tempList.rds'))
+  select = match(gg.select, rownames(cpm))
+  select = select[!is.na(select)]
+  
+  yy = cpm[, sample.sels]
+  df = as.data.frame(cc)
+  colnames(df) = 'condition'
+  rownames(df) = colnames(yy)
+  
+  corrplot(cor(yy), method = 'number', type = 'upper', diag = TRUE)
+  
+  plot.pair.comparison.plot(yy[, c(8:9)], linear.scale = FALSE)
+  #ggsave(filename = paste0(resDir, '/corrplot_smartseq2_regeneration.pdf'),  width = 10, height = 12)
+  
+  sample_colors = c('springgreen4', 'springgreen', 'springgreen2', 'springgreen3', 'gold2')
+  names(sample_colors) = conds
+  annot_colors = list(segments = sample_colors)
+  
+  pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+           color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
+           show_colnames = FALSE,
+           scale = 'row',
+           cluster_cols=FALSE, annotation_col=df,
+           annotation_colors = annot_colors,
+           width = 8, height = 12, 
+           filename = paste0(resDir, '/heatmap_DEgenes_regeneration_fdr.0.01_log2fc.2_RNAseq_firstMerge.pdf')) 
+  
+  
+  
+}  
+  
+
+
+
+
