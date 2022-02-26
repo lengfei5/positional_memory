@@ -1006,7 +1006,8 @@ if(Compare_stage44.proximal.distal_BL.UA.day13.promximal.distal){
 # it turned out Akane's early samples were polyA and later samples were smartseq2 
 ########################################################
 ########################################################
-load(file = paste0(RdataDir, 'RNAseq_design_dds.object.Rdata'))
+#load(file = paste0(RdataDir, 'RNAseq_design_dds.object.Rdata'))
+
 annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
                        'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
 
@@ -1018,17 +1019,41 @@ tfs = unique(tfs$`HGNC symbol`)
 sps = toupper(unique(sps$gene))
 sps = setdiff(sps, tfs)
 
-# select mature samples
-sels = unique(c(which((design.matrix$batch == 3 | design.matrix$condition == 'BL_UA_9days'))))
-                      
+
+##########################################
+# select the R10724 samples without sample 136150 with is names 13615x
+##########################################
+load(file = paste0(RdataDir, 'design_dds_all_regeneration.samples_allBatches.Rdata'))
+#design$condition = sapply(design$condition, function(x) )
+design$protocol = gsub(' ', '', design$protocol)
+design$batch = paste0(design$request, '_', design$protocol)
+
+table(design$condition, design$batch)
+
+sels = which(design$batch == 'R10724_smartseq2' & design$SampleID != '13615x')
+
+design = design[sels, ]
+dds = dds[,sels]
+
+#dds = DESeqDataSetFromMatrix(raw, DataFrame(design), design = ~ condition)
+dds$condition = droplevels(dds$condition)
+
+ss = rowSums(counts(dds))
+
+hist(log10(ss), breaks = 100);abline(v = log10(20), lwd = 2.0, col = 'red')
+cat(length(which(ss>20)), ' gene selected \n')
+
+dds = dds[which(ss>20), ]
+
+dds$condition = droplevels(dds$condition)
+#dds$batch = droplevels(dds$batch)
+
+dds = estimateSizeFactors(dds)
+
+#sels = unique(c(which((design.matrix$batch == 3 | design.matrix$condition == 'BL_UA_9days'))))
 #sels = unique(c(which((design.matrix$batch == 3 | design.matrix$condition == 'BL_UA_9days') & 
 #                        design.matrix$SampleID != '136150' & design.matrix$SampleID != '106351')))
 
-dds = dds[, sels]
-dds$condition = droplevels(dds$condition)
-dds$batch = droplevels(dds$batch)
-
-ss = rowSums(counts(dds))
 
 vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
 
@@ -1042,9 +1067,9 @@ ggp = ggplot(data=pca2save, aes(PC1, PC2, label = name, color= condition, shape 
 
 plot(ggp)
 
-ggsave(paste0(resDir, '/PCA_smartseq2_regeneration.timepoints.pdf'),  width=12, height = 8)
+#ggsave(paste0(resDir, '/PCA_smartseq2_regeneration.timepoints.pdf'),  width=12, height = 8)
 
-ggsave(paste0(resDir, '/PCA_smartseq2_regeneration.timepoints_filteredSamples.pdf'),  width=12, height = 8)
+ggsave(paste0(resDir, '/PCA_smartseq2_regeneration.timepoints_filteredSamples_onlyR10724.pdf'),  width=12, height = 8)
 
 #cpm = log2(fpm0[, sels] + 2^-6)
 dds$condition = droplevels(dds$condition)
@@ -1117,13 +1142,14 @@ saveRDS(res, file = paste0(RdataDir, 'regeneration_smartseq2_fpm_LRTtest_firstMe
 ##########################################
 # visualize the restuls
 ##########################################
-library("pheatmap")
 require(corrplot)
+require(pheatmap)
+require(RColorBrewer)
 
 #res = readRDS(file = paste0(RdataDir, 'regeneration_smartseq2_fpm_LRTtest_filteredSamples.rds'))
 res = readRDS(file = paste0(RdataDir, 'regeneration_smartseq2_fpm_LRTtest_firstMergedSamples.rds'))
-#cpm = res[, c(1:9)]
-cpm = res[, c(1:11)]
+cpm = res[, c(1:9)]
+#cpm = res[, c(1:11)]
 
 conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal",  "BL_UA_13days_distal")
 
@@ -1148,18 +1174,17 @@ colnames(sample.means) = conds
 # select the significant changing genes
 ##########################################
 fdr.cutoff = 0.01
-logfc.cutoff = 2
+logfc.cutoff = 1
 
 length(which(res$padj_LRT<fdr.cutoff))
 length(which(res$padj_LRT<fdr.cutoff & res$log2fc>1))
 length(which(res$padj_LRT<fdr.cutoff & res$log2fc>2))
 length(which(res$padj_LRT<fdr.cutoff & res$log2fc>1.5))
 
-select = which(res$padj_LRT<fdr.cutoff & res$log2fc>2 & res$maxs > 0)
+select = which(res$padj_LRT<fdr.cutoff & res$log2fc> 1)
 
-gg.select = rownames(res)[select]
-
-saveRDS(gg.select, file = paste0(RdataDir, 'RRGs_candidates_tempList.rds'))
+#gg.select = rownames(res)[select]
+#saveRDS(gg.select, file = paste0(RdataDir, 'RRGs_candidates_tempList.rds'))
 
 #yy = sample.means[select, ]
 #df <- as.data.frame(conds)
@@ -1168,7 +1193,7 @@ df = as.data.frame(cc)
 colnames(df) = 'condition'
 rownames(df) = colnames(yy)
 
-corrplot(cor(yy), method = 'number', type = 'upper', diag = TRUE)
+#corrplot(cor(yy), method = 'number', type = 'upper', diag = TRUE)
 #ggsave(filename = paste0(resDir, '/corrplot_smartseq2_regeneration.pdf'),  width = 10, height = 12)
 
 sample_colors = c('springgreen4', 'springgreen', 'springgreen2', 'springgreen3', 'gold2')
@@ -1181,8 +1206,8 @@ pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
          scale = 'row',
          cluster_cols=FALSE, annotation_col=df,
          annotation_colors = annot_colors,
-         width = 8, height = 12, 
-         filename = paste0(resDir, '/heatmap_DEgenes_regeneration_fdr.0.01_log2fc.2_RNAseq_firstMerge.pdf')) 
+         width = 6, height = 12, 
+         filename = paste0(figureDir, '/heatmap_DEgenes_regeneration_fdr.0.01_log2fc.1_RNAseq_filtered.R10724.pdf')) 
 
 ##########################################
 # highlight TF, eps and other 

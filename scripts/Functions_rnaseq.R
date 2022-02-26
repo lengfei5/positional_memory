@@ -618,16 +618,34 @@ Check.R10724.136150.sample.Quality = function()
   raw = as.matrix(all[, -1])
   rownames(raw) = all$gene
   
-  sels = which(design$SampleID != '13615x')
-  design = design[sels, ]
-  raw = raw[, sels]
-  
   design$batch = paste0(design$request, '_', design$protocol)
-  #design$batch[which(design$SampleID == '13615x')] = 'R11635'
+  
   
   dds <- DESeqDataSetFromMatrix(raw, DataFrame(design), design = ~ condition)
   
   save(design, dds, file = paste0(RdataDir, 'design_dds_all_regeneration.samples_allBatches.Rdata'))
+  
+  ##########################################
+  # reload the data and select the samples needed 
+  ##########################################
+  load(file = paste0(RdataDir, 'design_dds_all_regeneration.samples_allBatches.Rdata'))
+  
+  sels = which(design$SampleID != '13615x')
+  design = design[sels, ]
+  raw = raw[, sels]
+  
+  design$protocol = gsub(' ', '', design$protocol)
+  
+  design$batch = paste0(design$request, '_', design$protocol)
+  
+  table(design$condition, design$batch)
+  
+  sels = which(design$batch == 'R10724_smartseq2' | design$batch == 'R9707_polyA')
+  design = design[sels, ]
+  
+  dds = dds[,sels]
+  
+  dds$condition = droplevels(dds$condition)
   
   
   ss = rowSums(counts(dds))
@@ -716,7 +734,7 @@ Check.R10724.136150.sample.Quality = function()
   select = match(gg.select, rownames(cpm))
   select = select[!is.na(select)]
   
-  yy = cpm[, sample.sels]
+  yy = cpm[select, sample.sels]
   df = as.data.frame(cc)
   colnames(df) = 'condition'
   rownames(df) = colnames(yy)
@@ -737,13 +755,33 @@ Check.R10724.136150.sample.Quality = function()
            cluster_cols=FALSE, annotation_col=df,
            annotation_colors = annot_colors,
            width = 8, height = 12, 
-           filename = paste0(resDir, '/heatmap_DEgenes_regeneration_fdr.0.01_log2fc.2_RNAseq_firstMerge.pdf')) 
+           filename = paste0(resDir, '/heatmap_DEgenes_regeneration_fdr.0.01_log2fc.2_RNAseq_polyA.smartseq2.pdf')) 
+  
+  ##########################################
+  # sample means 
+  ##########################################
+  yy = sample.means[select, ]
+  df = as.data.frame(conds)
+  colnames(df) = 'condition'
+  rownames(df) = colnames(yy)
+  
+  #corrplot(cor(yy), method = 'number', type = 'upper', diag = TRUE)
+  #plot.pair.comparison.plot(yy[, c(8:9)], linear.scale = FALSE)
+  #ggsave(filename = paste0(resDir, '/corrplot_smartseq2_regeneration.pdf'),  width = 10, height = 12)
+  
+  sample_colors = c('springgreen4', 'springgreen', 'springgreen2', 'springgreen3', 'gold2')
+  names(sample_colors) = conds
+  annot_colors = list(segments = sample_colors)
+  
+  pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+           color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
+           show_colnames = FALSE,
+           scale = 'row',
+           cluster_cols=FALSE, annotation_col=df,
+           annotation_colors = annot_colors,
+           width = 8, height = 12, 
+           filename = paste0(resDir, '/heatmap_DEgenes_regeneration_fdr.0.01_log2fc.2_RNAseq_polyA.smartseq2_means.pdf'))
   
   
   
 }  
-  
-
-
-
-
