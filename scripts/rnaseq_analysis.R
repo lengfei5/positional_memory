@@ -1214,6 +1214,7 @@ pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
 ##########################################
 ggs = rownames(yy)
 ggs = sapply(ggs, function(x) unlist(strsplit(as.character(x), '_'))[1])
+#rownames(yy) = ggs
 
 print(intersect(ggs, tfs))
 print(intersect(ggs, sps))
@@ -1223,17 +1224,18 @@ print(intersect(ggs, rbp))
 for(subg in c('tfs', 'eps', 'sps', 'rbp'))
 {
   
+  subg = 'rbp'
   mm = eval(parse(text = paste0('match(ggs, unique(', subg, '))')))
   
   yy1 = yy[unique(c(which(!is.na(mm)))), ]
   
-  pheatmap(yy1, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+  pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, fontsize_row = 5,
            color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
            show_colnames = FALSE,
            scale = 'row',
            cluster_cols=FALSE, annotation_col=df,
            annotation_colors = annot_colors,
-           width = 8, height = 8, 
+           width = 8, height = 10, 
            filename = paste0(figureDir, '/heatmap_DEgenes_regeneration_fdr.0.01_log2fc.2_smartseq2_', subg, '.pdf'))
   
   #write.table(yy, file = paste0(resDir, '/DEtfs_mUA_regeneration_dev.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
@@ -1358,7 +1360,7 @@ p1 + p2
 #sels = which(metadata$timepoint == '0dpa'| metadata$timepoint == 'Stage40' | metadata$timepoint == 'Stage44')
 #metadata = metadata[sels, ]
 raw = counts
-conds = c('0dpa', '3dpa', '5dpa', '8dpa', '11dpa')
+conds = c('0dpa', '1apa', '3dpa', '5dpa', '8dpa', '11dpa', '18dpa')
 pseudo = matrix(NA, ncol = length(conds), nrow = nrow(raw))
 colnames(pseudo) = conds
 rownames(pseudo) = rownames(raw)
@@ -1379,10 +1381,6 @@ for(n in 1:length(conds))
   }
 }
 
-#pseudo[, 2] = pseudo[,2] + pseudo[, 3]
-#pseudo = pseudo[, c(1, 2)]
-#colnames(pseudo) = c('mUA', 'stage40.44')
-
 annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
                        'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
 
@@ -1392,7 +1390,6 @@ ggs[is.na(mm)] = rownames(pseudo)[is.na(mm)]
 rownames(pseudo) = ggs
 
 require(DESeq2)
-conds = c('0dpa', '3dpa', '5dpa', '8dpa', '11dpa')
 condition = factor(conds)
 dds <- DESeqDataSetFromMatrix(pseudo, DataFrame(condition), design = ~ condition)
 
@@ -1421,7 +1418,7 @@ fpm = data.frame(log2(fpm + 2^-7))
 #rr = cbind(rr1, rr2)
 #rr = apply(as.matrix(rr), 1, function(x) {x[which(abs(x) == max(abs(x)))][1]})
 #fpm$log2fc = rr
-
+annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
 load(file =  paste0(annotDir, 'axolotl_housekeepingGenes_controls.other.tissues.liver.islet.testis_expressedIn21tissues.Rdata'))
 hs = controls.tissue$geneIDs[which(controls.tissue$tissues == 'housekeeping')]
 ctl =  controls.tissue$geneIDs[which(controls.tissue$tissues  != 'housekeeping')]
@@ -1429,25 +1426,98 @@ ggs = sapply(rownames(fpm), function(x) {x = unlist(strsplit(as.character(x), '_
 
 colnames(fpm)[1] = 'mUA'
 
-fpm$genetype = 'devGene'
+fpm$genetype = NA
 
 mm = match(ggs, hs)
 xx = fpm[!is.na(mm), ]
 fpm$genetype[!is.na(mm)] = 'hs'
 
 mm = match(ggs, ctl)
-fpm$genetype[!is.na(mm) & fpm$genetype == 'devGene'] = 'ctl'
+fpm$genetype[!is.na(mm)] = 'ctl'
 
-par(mfrow = c(2, 1))
-hist(fpm[, 2], breaks = 100, main = 'log2 expression of stage40.44');abline(v = 2)
-hist(fpm[, 3], breaks = 100, main = 'log2 expression of stage40.44');abline(v = 2)
+##########################################
+# DE genes using edgeR
+##########################################
+require(edgeR)
+group = dds$condition
+y <- DGEList(counts=counts(dds), group=group)
+y <- calcNormFactors(y, method = 'TMM')
 
-fpm$genetype[which(fpm[,2]<2 & fpm[, 3]<2 & fpm$genetype == 'devGene')] = 'dev.lowlyExp'
-fpm$DEgene = NA
-fpm$DEgene[match(DE.genes, ggs)] = 1
+cpm = cpm(y, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 0.1)
 
-colnames(fpm)[6] = 'DEgene_seuratFindMarker'
+y1 = y
+y1$samples$group <- 1
+#group1 = y1$samples$group
+#design <- model.matrix(~group1)
 
-save(dds, fpm,
-     file = paste0(RdataDir, '/pseudoBulk_scRNAcellPooling_FluidigmC1_stage40.44.mUA_dev_geneSelection.Rdata'))
+index.hs = which(fpm$genetype == 'hs')
+y0 <- estimateDisp(y1[index.hs,], trend = 'none', tagwise=FALSE)
+
+y$common.dispersion <- y0$common.dispersion
+
+fit <- glmFit(y)
+lrt <- glmLRT(fit, coef=2:7)
+#lrt3 = glmLRT(fit, coef = 3)
+
+lrt = as.data.frame(topTags(lrt, adjust.method = "BH", n = nrow(y)))
+#lrt3 = as.data.frame(topTags(lrt3, adjust.method = "BH", n = nrow(y)))
+
+lrt$logfc = apply(lrt[, c(1:6)], 1, function(x) max(x) - min(x)) 
+#select = which(lrt$FDR< fdr.cutoff & lrt$logfc>5)
+
+select = c(1:3000)
+
+yy = cpm[match(rownames(lrt)[select], rownames(cpm)), ]
+df = as.data.frame(conds)
+colnames(df) = 'condition'
+rownames(df) = colnames(yy)
+
+#corrplot(cor(yy), method = 'number', type = 'upper', diag = TRUE)
+#ggsave(filename = paste0(resDir, '/corrplot_smartseq2_regeneration.pdf'),  width = 10, height = 12)
+
+sample_colors = c('springgreen4', 'springgreen', 'springgreen2', 'springgreen3', 'gold2', 'darkgray', 'red')
+names(sample_colors) = conds
+annot_colors = list(samples = sample_colors)
+
+pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+         color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
+         show_colnames = FALSE,
+         scale = 'row',
+         cluster_cols=FALSE, annotation_col=df,
+         annotation_colors = annot_colors,
+         width = 6, height = 12, 
+         filename = paste0(resDir, '/heatmap_DEgenes_regeneration_pseudoBulk.pdf')) 
+
+##########################################
+# highlight TF, eps and other 
+##########################################
+ggs = rownames(yy)
+ggs = sapply(ggs, function(x) unlist(strsplit(as.character(x), '_'))[1])
+
+print(intersect(ggs, tfs))
+print(intersect(ggs, sps))
+print(intersect(ggs, eps))
+print(intersect(ggs, rbp))
+
+for(subg in c('tfs', 'eps', 'sps', 'rbp'))
+{
+  
+  mm = eval(parse(text = paste0('match(ggs, unique(', subg, '))')))
+  
+  yy1 = yy[unique(c(which(!is.na(mm)))), ]
+  
+  pheatmap(yy1, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+           color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
+           show_colnames = FALSE,
+           scale = 'row',
+           cluster_cols=FALSE, annotation_col=df,
+           annotation_colors = annot_colors,
+           width = 8, height = 8, 
+           filename = paste0(figureDir, '/heatmap_DEgenes_regeneration_fdr.0.01_log2fc.2_smartseq2_', subg, '.pdf'))
+  
+  #write.table(yy, file = paste0(resDir, '/DEtfs_mUA_regeneration_dev.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
+  
+}
+
+
 
