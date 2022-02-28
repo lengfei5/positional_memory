@@ -1239,7 +1239,7 @@ for(subg in c('tfs', 'eps', 'sps', 'rbp'))
            filename = paste0(figureDir, '/heatmap_DEgenes_regeneration_fdr.0.01_log2fc.2_smartseq2_', subg, '.pdf'))
   
   #write.table(yy, file = paste0(resDir, '/DEtfs_mUA_regeneration_dev.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
-    
+  
 }
 
 
