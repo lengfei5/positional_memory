@@ -1577,7 +1577,7 @@ if(Pool.scRNAseq.pseudobulk){
   conds = c('0dpa', '3dpa', '5dpa', '8dpa', '11dpa', '18dpa', '1apa',  'Stage40', 'Stage44')
   pseudo = c()
   cc = c()
-  
+  plates = c()
   for(n in 1:length(conds))
   {
     cat(n, ' : ', conds[n], ' -- ')
@@ -1588,105 +1588,185 @@ if(Pool.scRNAseq.pseudobulk){
       cat('some cells lost \n')
     }else{
       cat(length(mm), ' cell found \n')
-      xx = as.matrix(raw[, mm])
-      xx[is.na(xx)] = 0
-      pseudo[,n] = apply(xx, 1, sum)
+      
+      bcs = unique(metadata$batch[jj])
+      for(bc in bcs){
+        cat('-- ', bc, '\n')
+        xx = as.matrix(raw[, jj[which(metadata$batch[jj] == bc)]])
+        xx[is.na(xx)] = 0
+        pseudo = cbind(pseudo, apply(xx, 1, sum))
+        cc = c(cc, conds[n])
+        plates = c(plates, bc)
+      }
     }
   }
   
-  colnames(pseudo) = conds
   rownames(pseudo) = rownames(raw)
+  design = data.frame(condition = cc, plates = plates, stringsAsFactors = FALSE)
   
+  colnames(pseudo) = paste0(design$condition, '_', design$plates)
   
-  condition = factor(conds)
-  dds <- DESeqDataSetFromMatrix(pseudo, DataFrame(condition), design = ~ condition)
+  dds <- DESeqDataSetFromMatrix(pseudo, DataFrame(design), design = ~ condition)
   
   # filtering with stage40/44 samples
   ss = rowMax(counts(dds))
   
-  hist(log10(ss), breaks = 100)
-  dds = dds[which(ss > 20), ]
+  hist(log10(ss), breaks = 60)
+  abline(v = log10(c(20, 50, 100)))
+  length(which(ss>20))
+  length(which(ss>50))
+  length(which(ss>100))
   
-  dds = estimateSizeFactors(dds)
+  dds = dds[which(ss > 100), ]
   
-  ss = rowSums(counts(dds))
-  length(which(ss > quantile(ss, probs = 0.75)))
-  
-  saveRDS(dds, file = paste0(RdataDir, '/pseudoBulk_scRNAcellPooling_FluidigmC1_mUA_regeneration_dev.rds'))
-  
-  ss = rowMeans(counts(dds))
-  dd0 = dds[ss > quantile(ss, probs = 0.75), ]
-  dd0 = estimateSizeFactors(dd0)
-  
-  fpm = fpm(dds, robust = TRUE)
-  fpm = data.frame(log2(fpm + 2^-7))
-  
-  #rr1 = fpm[, 2] - fpm[, 1]
-  #rr2 = fpm[, 3] - fpm[, 1]
-  #rr = cbind(rr1, rr2)
-  #rr = apply(as.matrix(rr), 1, function(x) {x[which(abs(x) == max(abs(x)))][1]})
-  #fpm$log2fc = rr
-  annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
-  load(file =  paste0(annotDir, 'axolotl_housekeepingGenes_controls.other.tissues.liver.islet.testis_expressedIn21tissues.Rdata'))
-  hs = controls.tissue$geneIDs[which(controls.tissue$tissues == 'housekeeping')]
-  ctl =  controls.tissue$geneIDs[which(controls.tissue$tissues  != 'housekeeping')]
-  ggs = sapply(rownames(fpm), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
-  
-  colnames(fpm)[1] = 'mUA'
-  
-  fpm$genetype = NA
+  ggs = sapply(rownames(dds), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
   
   mm = match(ggs, hs)
-  xx = fpm[!is.na(mm), ]
-  fpm$genetype[!is.na(mm)] = 'hs'
+  length(which(!is.na(mm)))
   
-  mm = match(ggs, ctl)
-  fpm$genetype[!is.na(mm)] = 'ctl'
+  dd0 = dds[which(!is.na(mm)), ]
+  dd0 = estimateSizeFactors(dd0)
+  
+  #dds = estimateSizeFactors(dds)
+  sizeFactors(dds) = sizeFactors(dd0)
+  
+  cpm = fpm(dds)
+  cpm = data.frame(log2(cpm + 2^-7))
+  
+  vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
+  
+  pca=plotPCA(vsd, intgroup = c('condition', 'plates'), returnData = FALSE)
+  print(pca)
+  
+  pca2save = as.data.frame(plotPCA(vsd, intgroup = c('condition', 'plates'), returnData = TRUE, ntop = 3000))
+  ggp = ggplot(data=pca2save, aes(PC1, PC2, label = name, color= condition, shape = plates))  + 
+    geom_point(size=3) + 
+    geom_text(hjust = 1, nudge_y = 1, size=2.5)
+  
+  plot(ggp)
+  
+  ggsave(paste0(resDir, '/Geber_pooledscRNA_PCA_muA_regeneration_regeneration.pdf'),  width=12, height = 8)
   
   ##########################################
-  # DE genes using edgeR
+  # DE test
   ##########################################
-  require(edgeR)
-  group = dds$condition
-  y <- DGEList(counts=counts(dds), group=group)
-  y <- calcNormFactors(y, method = 'TMM')
+  dds = dds[, which(dds$condition != '1apa')]
   
-  cpm = cpm(y, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 0.5)
+  #cpm = log2(fpm0[, sels] + 2^-6)
+  dds$condition = droplevels(dds$condition)
+  dds$condition <- relevel(dds$condition, ref = "0dpa")
   
-  plot.pair.comparison.plot(cpm, linear.scale = FALSE)
+  dds <- DESeq(dds, test="LRT", reduced=~1, fitType = c("local"))
   
-  y1 = y
-  y1$samples$group <- 1
+  plotDispEsts(dds, ymin = 10^-3)
+  
+  res <- results(dds)
+  
+  resultsNames(dds)
     
-  index.hs = which(fpm$genetype == 'hs')
-  y0 <- estimateDisp(y1[index.hs,], trend = 'none', tagwise=FALSE)
+  res = data.frame(res[, c(2, 5, 6)])
+  colnames(res) = paste0(colnames(res), '_LRT')
   
-  y$common.dispersion <- y0$common.dispersion
+  res.ii = results(dds, name='condition_3dpa_vs_0dpa', test = 'Wald')
+  colnames(res.ii) = paste0(colnames(res.ii), "_3dpa.vs.mUA")
+  res = data.frame(res, res.ii[, c(2, 5, 6)])
   
-  fit <- glmFit(y)
-  lrt <- glmLRT(fit, coef=2:6)
-  #lrt3 = glmLRT(fit, coef = 3)
+  res.ii = results(dds, name='condition_5dpa_vs_0dpa', test = 'Wald')
+  colnames(res.ii) = paste0(colnames(res.ii), "_5dpa.vs.mUA")
+  res = data.frame(res, res.ii[, c(2, 5, 6)])
   
-  lrt = as.data.frame(topTags(lrt, adjust.method = "BH", n = nrow(y)))
-  #lrt3 = as.data.frame(topTags(lrt3, adjust.method = "BH", n = nrow(y)))
+  res.ii = results(dds, name='condition_8dpa_vs_0dpa', test = 'Wald')
+  colnames(res.ii) = paste0(colnames(res.ii), "_8dpa.vs.mUA")
+  res = data.frame(res, res.ii[, c(2, 5, 6)])
   
-  lrt$logfc = apply(lrt[, c(1:6)], 1, function(x) max(x) - min(x)) 
-  #select = which(lrt$FDR< fdr.cutoff & lrt$logfc>5)
+  res.ii = results(dds, name='condition_11dpa_vs_0dpa', test = 'Wald')
+  colnames(res.ii) = paste0(colnames(res.ii), "_11dpa.vs.mUA")
+  res = data.frame(res, res.ii[, c(2, 5, 6)])
   
-  select = c(1:3000)
+  res.ii = results(dds, name='condition_Stage40_vs_0dpa', test = 'Wald')
+  colnames(res.ii) = paste0(colnames(res.ii), "_Stage40.vs.mUA")
+  res = data.frame(res, res.ii[, c(2, 5, 6)])
   
-  yy = cpm[match(rownames(lrt)[select], rownames(cpm)), ]
+  res.ii = results(dds, name='condition_Stage44_vs_0dpa', test = 'Wald')
+  colnames(res.ii) = paste0(colnames(res.ii), "_Stage44.vs.mUA")
+  res = data.frame(res, res.ii[, c(2, 5, 6)])
+  
+  
+  source('Functions_atac.R')
+  
+  cpm = fpm(dds)
+  cpm = log2(fpm(dds) + 2^-7)
+  
+  conds = c("0dpa", "3dpa",  "5dpa",  "8dpa",   "11dpa","Stage40", "Stage44")
+  sample.sels = c();  
+  cc = c()
+  sample.means = c()
+  for(n in 1:length(conds)) 
+  {
+    kk = grep(conds[n], colnames(cpm))
+    sample.sels = c(sample.sels, kk)
+    cc = c(cc, rep(conds[n], length(kk)))
+    if(length(kk)>1) {
+      sample.means = cbind(sample.means, apply(cpm[, kk], 1, mean))
+    }else{
+      sample.means = cbind(sample.means, cpm[, kk])
+    }
+    
+  }  
+  
+  colnames(sample.means) = conds
+  
+  cpm = cpm[, sample.sels]
+  
+  res$log2fc = apply(sample.means, 1, function(x) max(x) - min(x))
+  res$maxs = apply(sample.means, 1, max)
+  res$mins = apply(sample.means, 1, min)
+  
+  res = data.frame(cpm, res, stringsAsFactors = FALSE)
+  
+  saveRDS(res, file = paste0(RdataDir, 'pooled_scRNAseq_mUA_regeneration_dev_LRTtest_DESeq2.rds'))
+  
+  
+  ##########################################
+  # visualize the restuls
+  ##########################################
+  require(corrplot)
+  require(pheatmap)
+  require(RColorBrewer)
+  
+  #res = readRDS(file = paste0(RdataDir, 'pooled_scRNAseq_mUA_regeneration_dev_LRTtest_DESeq2.rds'))
+  #rgs$gene = sapply(rownames(rgs), function(x){x = unlist(strsplit(as.character(x), '_')); return(x[1])})
+  #rgs$geneID = sapply(rownames(rgs), function(x){x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
+  
+  ## select the significant changing genes
+  fdr.cutoff = 0.1
+  logfc.cutoff = 1
+  
+  length(which(res$padj_LRT<fdr.cutoff))
+  length(which(res$padj_LRT<fdr.cutoff & res$log2fc>1))
+  length(which(res$padj_LRT<fdr.cutoff & res$log2fc>2))
+  length(which(res$padj_LRT<fdr.cutoff & res$log2fc>1.5))
+  
+  select = which(res$padj_LRT<fdr.cutoff | 
+                 (res$padj_5dpa.vs.mUA < fdr.cutoff & res$log2FoldChange_5dpa.vs.mUA < logfc.cutoff)| 
+                 (res$padj_8dpa.vs.mUA < fdr.cutoff & res$log2FoldChange_8dpa.vs.mUA < logfc.cutoff) |
+                 (res$padj_11dpa.vs.mUA < fdr.cutoff & res$log2FoldChange_11dpa.vs.mUA < logfc.cutoff) |
+                 (res$padj_Stage40.vs.mUA < fdr.cutoff & res$log2FoldChange_Stage40.vs.mUA < logfc.cutoff ) | 
+                 (res$padj_Stage44.vs.mUA < fdr.cutoff & res$log2FoldChange_Stage44.vs.mUA < logfc.cutoff ))
+  
+  #yy = cpm[select, ]
+  yy = sample.means[select, ]
+  
   df = as.data.frame(conds)
   colnames(df) = 'condition'
   rownames(df) = colnames(yy)
   
-
   #corrplot(cor(yy), method = 'number', type = 'upper', diag = TRUE)
   #ggsave(filename = paste0(resDir, '/corrplot_smartseq2_regeneration.pdf'),  width = 10, height = 12)
   
-  sample_colors = c('springgreen4', 'springgreen', 'springgreen2', 'springgreen3', 'gold2', 'darkgray', 'red')
+  sample_colors = c('springgreen4', 'springgreen', 'springgreen2', 'springgreen3', 'gold2', 'red', 'magenta')
   names(sample_colors) = conds
-  annot_colors = list(samples = sample_colors)
+  annot_colors = list(segments = sample_colors)
   
   pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
            color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
@@ -1695,13 +1775,23 @@ if(Pool.scRNAseq.pseudobulk){
            cluster_cols=FALSE, annotation_col=df,
            annotation_colors = annot_colors,
            width = 6, height = 12, 
-           filename = paste0(resDir, '/heatmap_DEgenes_regeneration_pseudoBulk.pdf')) 
+           filename = paste0(resDir, '/heatmap_DEgenes_regeneration_pooled.scRNAseq.pdf')) 
+  
+  pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+           color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(16), 
+           show_colnames = FALSE,
+           scale = 'none',
+           cluster_cols=FALSE, annotation_col=df,
+           annotation_colors = annot_colors,
+           width = 6, height = 12, 
+           filename = paste0(resDir, '/heatmap_DEgenes_regeneration_pooled.scRNAseq_log2Exp.pdf')) 
   
   ##########################################
   # highlight TF, eps and other 
   ##########################################
   ggs = rownames(yy)
   ggs = sapply(ggs, function(x) unlist(strsplit(as.character(x), '_'))[1])
+  #rownames(yy) = ggs
   
   print(intersect(ggs, tfs))
   print(intersect(ggs, sps))
@@ -1711,22 +1801,112 @@ if(Pool.scRNAseq.pseudobulk){
   for(subg in c('tfs', 'eps', 'sps', 'rbp'))
   {
     
+    #subg = 'rbp'
     mm = eval(parse(text = paste0('match(ggs, unique(', subg, '))')))
     
     yy1 = yy[unique(c(which(!is.na(mm)))), ]
     
-    pheatmap(yy1, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+    pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, fontsize_row = 5,
              color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
              show_colnames = FALSE,
              scale = 'row',
              cluster_cols=FALSE, annotation_col=df,
              annotation_colors = annot_colors,
-             width = 8, height = 8, 
-             filename = paste0(figureDir, '/heatmap_DEgenes_regeneration_fdr.0.01_log2fc.2_smartseq2_', subg, '.pdf'))
+             width = 8, height = 10, 
+             filename = paste0(resDir, '/heatmap_DEgenes_regeneration_pooled.scRNAseq_', subg, '.pdf'))
     
     #write.table(yy, file = paste0(resDir, '/DEtfs_mUA_regeneration_dev.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
     
   }
   
+  
+  edgeR.DE.test = FALSE
+  if(edgeR.DE.test){
+    ##########################################
+    # DE genes using edgeR
+    ##########################################
+    require(edgeR)
+    group = dds$condition
+    y <- DGEList(counts=counts(dds), group=group)
+    y <- calcNormFactors(y, method = 'TMM')
+    
+    cpm = cpm(y, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 0.5)
+    
+    plot.pair.comparison.plot(cpm, linear.scale = FALSE)
+    
+    y1 = y
+    y1$samples$group <- 1
+    
+    index.hs = which(fpm$genetype == 'hs')
+    y0 <- estimateDisp(y1[index.hs,], trend = 'none', tagwise=FALSE)
+    
+    y$common.dispersion <- y0$common.dispersion
+    
+    fit <- glmFit(y)
+    lrt <- glmLRT(fit, coef=2:6)
+    #lrt3 = glmLRT(fit, coef = 3)
+    
+    lrt = as.data.frame(topTags(lrt, adjust.method = "BH", n = nrow(y)))
+    #lrt3 = as.data.frame(topTags(lrt3, adjust.method = "BH", n = nrow(y)))
+    
+    lrt$logfc = apply(lrt[, c(1:6)], 1, function(x) max(x) - min(x)) 
+    #select = which(lrt$FDR< fdr.cutoff & lrt$logfc>5)
+    
+    select = c(1:3000)
+    
+    yy = cpm[match(rownames(lrt)[select], rownames(cpm)), ]
+    df = as.data.frame(conds)
+    colnames(df) = 'condition'
+    rownames(df) = colnames(yy)
+    
+    
+    #corrplot(cor(yy), method = 'number', type = 'upper', diag = TRUE)
+    #ggsave(filename = paste0(resDir, '/corrplot_smartseq2_regeneration.pdf'),  width = 10, height = 12)
+    
+    sample_colors = c('springgreen4', 'springgreen', 'springgreen2', 'springgreen3', 'gold2', 'darkgray', 'red')
+    names(sample_colors) = conds
+    annot_colors = list(samples = sample_colors)
+    
+    pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+             color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
+             show_colnames = FALSE,
+             scale = 'row',
+             cluster_cols=FALSE, annotation_col=df,
+             annotation_colors = annot_colors,
+             width = 6, height = 12, 
+             filename = paste0(resDir, '/heatmap_DEgenes_regeneration_pseudoBulk.pdf')) 
+    
+    ##########################################
+    # highlight TF, eps and other 
+    ##########################################
+    ggs = rownames(yy)
+    ggs = sapply(ggs, function(x) unlist(strsplit(as.character(x), '_'))[1])
+    
+    print(intersect(ggs, tfs))
+    print(intersect(ggs, sps))
+    print(intersect(ggs, eps))
+    print(intersect(ggs, rbp))
+    
+    for(subg in c('tfs', 'eps', 'sps', 'rbp'))
+    {
+      
+      mm = eval(parse(text = paste0('match(ggs, unique(', subg, '))')))
+      
+      yy1 = yy[unique(c(which(!is.na(mm)))), ]
+      
+      pheatmap(yy1, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+               color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
+               show_colnames = FALSE,
+               scale = 'row',
+               cluster_cols=FALSE, annotation_col=df,
+               annotation_colors = annot_colors,
+               width = 8, height = 8, 
+               filename = paste0(figureDir, '/heatmap_DEgenes_regeneration_fdr.0.01_log2fc.2_smartseq2_', subg, '.pdf'))
+      
+      #write.table(yy, file = paste0(resDir, '/DEtfs_mUA_regeneration_dev.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
+      
+    }
+    
+  }
   
 }
