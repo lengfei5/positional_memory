@@ -1389,6 +1389,16 @@ p1 + p2
 
 ggsave(paste0(resDir, "/Overview_Gerber2018_Fluidigm.C1_batches_v3.pdf"), width = 12, height = 8)
 
+aa$timepoint = factor(aa$timepoint, levels = c('0dpa', '3dpa', '5dpa', '8dpa', '11dpa', '18dpa', '1apa', 'Stage40', 'Stage44'))
+
+Idents(aa) = aa$timepoint
+p1 = VlnPlot(aa, features = "nCount_RNA", split.by = "timepoint")
+p2 = VlnPlot(aa, features = "nFeature_RNA", split.by = "timepoint")
+
+p1 + p2
+
+ggsave(paste0(resDir, "/Overview_Gerber2018_Fluidigm.C1_batches_nCount_nFeature.pdf"), width = 12, height = 12)
+
 saveRDS(aa, file = paste0(RdataDir, '/Gerber2018_Fluidigm.C1_dev.mature.regeneration.rds'))
 
 ##########################################
@@ -1556,18 +1566,17 @@ if(Pool.scRNAseq.pseudobulk){
 
 
 ##########################################
-# pool scRNA-seq data to have pseudo-bulk 
+# pool scRNA-seq counts to have pseudo-bulk and analyze with DESeq2 
 ##########################################
 Pool.scRNAseq.pseudobulk = FALSE
 if(Pool.scRNAseq.pseudobulk){
   
   require(DESeq2)
-  
   raw = counts
-  conds = c('0dpa', '5dpa', '8dpa', '11dpa', 'Stage40', 'Stage44')
-  pseudo = matrix(NA, ncol = length(conds), nrow = nrow(raw))
-  colnames(pseudo) = conds
-  rownames(pseudo) = rownames(raw)
+  
+  conds = c('0dpa', '3dpa', '5dpa', '8dpa', '11dpa', '18dpa', '1apa',  'Stage40', 'Stage44')
+  pseudo = c()
+  cc = c()
   
   for(n in 1:length(conds))
   {
@@ -1584,6 +1593,9 @@ if(Pool.scRNAseq.pseudobulk){
       pseudo[,n] = apply(xx, 1, sum)
     }
   }
+  
+  colnames(pseudo) = conds
+  rownames(pseudo) = rownames(raw)
   
   
   condition = factor(conds)
