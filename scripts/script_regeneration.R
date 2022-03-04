@@ -244,9 +244,12 @@ if(Batch.Correct.regeneration.embryoStage){
 ##########################################
 grouping.temporal.peaks = FALSE
 if(grouping.temporal.peaks){
+  require(ChIPpeakAnno)
+  require(ChIPseeker)
   
-  fpm = readRDS(file = paste0(RdataDir, '/fpm.bc_TMM_combat_mUA_regeneration_embryoStages.rds'))
-  design = readRDS(file = paste0(RdataDir, '/design_sels_bc_TMM_combat_mUA_regeneration_embryoStages.rds'))
+  fpm = readRDS(file = paste0(RdataDir, '/fpm.bc_TMM_combat_mUA_regeneration_dev_2Batches.R10723_R7977_', version.analysis, '.rds'))
+  design = readRDS(file = paste0(RdataDir, '/design_sels_bc_TMM_combat_mUA_regeneration_dev_2Batches.R10723_R7977',
+                                 version.analysis, '.rds'))
   
   # prepare the background distribution
   fpm.bg = fpm[grep('bg_', rownames(fpm), invert = FALSE), ]
@@ -254,7 +257,7 @@ if(grouping.temporal.peaks){
   rownames(fpm) = gsub('_', '-', rownames(fpm))
   
   hist(fpm.bg, breaks = 100, main = 'background distribution')
-  abline(v = 1, col = 'red', lwd = 2.0)
+  abline(v = c(1, 2.5, 3), col = 'red', lwd = 2.0)
   quantile(fpm.bg, c(0.95, 0.99))
   
   ##########################################
@@ -262,8 +265,6 @@ if(grouping.temporal.peaks){
   ##########################################
   Make.Granges.and.peakAnnotation = TRUE
   if(Make.Granges.and.peakAnnotation){
-    require(ChIPpeakAnno)
-    require(ChIPseeker)
     
     pp = data.frame(t(sapply(rownames(fpm), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
     pp$strand = '*'
@@ -290,22 +291,23 @@ if(grouping.temporal.peaks){
     
   }
   
+  conds = c("Embryo_Stage40", "Embryo_Stage44_proximal", 'Embryo_Stage44_distal', 
+            "Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal", 'BL_UA_13days_distal')
   
-  conds = c("Embryo_Stage40", "Embryo_Stage44_proximal", "Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal")
   # examples to test
   test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
-  #test.examples = c('Hoxa13')
   ii.test = which(overlapsAny(pp, promoters[which(!is.na(match(promoters$geneSymbol, test.examples)))]))
-  #ii.Hox = which(overlapsAny(pp, Hoxs))
-  #ii.test = unique(c(ii.test, ii.Hox))
+  
   
   sample.sels = c(); cc = c()
+  sample.means = c()
   for(n in 1:length(conds)) {
     kk = which(design$conds == conds[n])
     sample.sels = c(sample.sels, kk)
     cc = c(cc, rep(conds[n], length(kk)))
+    sample.means = cbind(sample.means, apply(fpm[, kk], 1, mean))
   }
-  
+  colnames(sample.means) = conds
   
   Run.temporal.peak.test = FALSE
   if(Run.temporal.peak.test)
@@ -314,18 +316,24 @@ if(grouping.temporal.peaks){
     cpm = fpm[, sample.sels]
     
     # stringent here, with signal > 2.5 in >=3 samples 
-    nb.above.threshold = apply(as.matrix(cpm), 1, function(x) length(which(x> 4.5)))
-    hist(nb.above.threshold, breaks = c(-1:ncol(cpm)))
-    peak.sels = which(nb.above.threshold>=2)
+    #nb.above.threshold = apply(as.matrix(cpm), 1, function(x) length(which(x> 2.5)))
+    #hist(nb.above.threshold, breaks = c(-1:ncol(cpm)))
+    maxs = apply(sample.means, 1, max)
+    length(which(maxs>2))
+    length(which(maxs>2.5))
+    length(which(maxs>3))
+    
+    peak.sels = which(maxs > 2)
     cat(length(peak.sels), 'peaks after filtering for mature samples\n')
     
     cpm = cpm[peak.sels, ]
     
     tic()
     ## define the dynamic enhancers with mature UA and BL.UA and check them if embryo samples
-    sels = grep('Embryo', cc, invert = TRUE) 
-    res = t(apply(cpm[, sels], 1, temporal.peaks.test, c = cc[sels]))
+    #sels = grep('Embryo', cc, invert = TRUE) 
+    res = t(apply(cpm, 1, temporal.peaks.test, c = cc))
     toc()
+    
     
     xx = data.frame(res, pp.annots[match(rownames(cpm), rownames(pp.annots)), ],  stringsAsFactors = FALSE)
     
