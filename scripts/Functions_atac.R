@@ -2307,63 +2307,74 @@ dev.mUA.peaks.test = function(cpm = cpm, c = cc, model.selection = FALSE)
   
 }
 
-temporal.peaks.test = function(x, c = c("Mature_UA", "Mature_UA", "BL_UA_5days", "BL_UA_5days", 'BL_UA_9days', 'BL_UA_9days'), 
-                               testPlot = FALSE)
+temporal.peaks.test = function(cpm, c = c("Mature_UA", "Mature_UA", "BL_UA_5days", "BL_UA_5days", 'BL_UA_9days', 'BL_UA_9days'), 
+                               run.pairwise.comparison.edgeR = TRUE,  testPlot = FALSE)
 {
   #  c = cc[sels]; x = cpm[1, sels]
   library(qvalue)
   library('gam')
+  library('lmtest')
   
-  if(length(x) != length(c)){
+  if(ncol(cpm) != length(c)){
     stop('nb of data is the same as nb of conditions')
   }else{
     
     # reorder the values with the time points
     c.uniq = unique(c)
     
-    y0 = c()
-    tt = c()
-    for(n in 1:length(c.uniq))
+    res0 = matrix(NA, ncol = 7, nrow = nrow(cpm))
+    colnames(res0) = c('prob.M0', 'max', 'min', 'log2FC', 'pval.lrt', 'res2.mean', 'res2.max')
+    
+    for(n in 1:nrow(cpm))
     {
-      # ii1 = which(cc == 'Embryo_Stage40')
-      # ii2 = which(cc == 'Embryo_Stage44_proximal')
-      # ii3 = which(cc == 'Mature_UA')
-      # ii4 = which(cc == 'BL_UA_5days')
-      # ii5 = which(cc == 'BL_UA_9days')
-      # ii6 = which(cc == 'BL_UA_13days_proximal')
-      jj = which(c == c.uniq[n])
-      y0 = c(y0, x[jj])
-      tt = c(tt, rep(n, length(jj)))
+      # n = 1
+      if(n%%1000 == 0) cat(n, '\n')
+      y0 = c()
+      tt = c()
+      for(ic in 1:length(c.uniq))
+      {
+        # ii1 = which(cc == 'Embryo_Stage40')
+        # ii2 = which(cc == 'Embryo_Stage44_proximal')
+        # ii3 = which(cc == 'Mature_UA')
+        # ii4 = which(cc == 'BL_UA_5days')
+        # ii5 = which(cc == 'BL_UA_9days')
+        # ii6 = which(cc == 'BL_UA_13days_proximal')
+        jj = which(c == c.uniq[ic])
+        y0 = c(y0, cpm[n, jj])
+        tt = c(tt, rep(ic, length(jj)))
+        
+      }
       
-      # y0 = as.numeric(x[c(ii1, ii2, ii3, ii4, ii5, ii6)])
-      # tt = c(rep(1, length(ii1)), rep(2, length(ii2)), rep(3, length(ii3)), 
-      #        rep(4, length(ii4)), rep(5, length(ii5)), rep(6, length(ii6)))
-    }
-    y0 = as.numeric(y0)
-    tt = as.numeric(tt)
+      y0 = as.numeric(y0)
+      tt = as.numeric(tt)
+      
+      fit <- gam(y0 ~ s(tt, df=(length(c.uniq)-2)), family = gaussian)
+      fit0 = lm(y0 ~ 1)
+      # summary(fit)
+      #plot(fit)
+      #rss1 = sum(fit$residuals^2)
+      #bic1 = length(x)*log(rss1/length(x)) +  (pen.edf(fit)+2)*log(length(x))
+      
+      bics = BIC(fit0, fit)
+      scores = bics$BIC
+      scores.relavtive = scores-min(scores)
+      prob.model = exp(-0.5*scores.relavtive)
+      prob.model = prob.model/sum(prob.model)
+      
+      lrt = lrtest(fit, fit0)
+      resid2 = fit0$residuals^2
+      
+      #prob.model = prob.model[1]
+      #names(prob.model) = 'prob.m0'
+      
+      # test UA, LA and Hand fitting values are above backgrounds
+      pred = predict(fit)[match(unique(tt), tt)]
+      #pvals = empPvals(pred, bg.dist, pool = TRUE)
+      
+      res0[n,] = c(prob.model[2],  max(pred), min(pred), (max(pred) - min(pred)), lrt$`Pr(>Chisq)`[2], mean(resid2), max(resid2))
+      
+    }  
     
-    fit <- gam(y0 ~ s(tt, df=(length(c.uniq)-2)), family = gaussian)
-    fit0 = lm(y0 ~ 1)
-    # summary(fit)
-    #plot(fit)
-    #rss1 = sum(fit$residuals^2)
-    #bic1 = length(x)*log(rss1/length(x)) +  (pen.edf(fit)+2)*log(length(x))
-    
-    bics = BIC(fit0, fit)
-    scores = bics$BIC
-    scores.relavtive = scores-min(scores)
-    prob.model = exp(-0.5*scores.relavtive)
-    prob.model = prob.model/sum(prob.model)
-    
-    #prob.model = prob.model[1]
-    #names(prob.model) = 'prob.m0'
-    
-    # test UA, LA and Hand fitting values are above backgrounds
-    pred = predict(fit)[match(unique(tt), tt)]
-    #pvals = empPvals(pred, bg.dist, pool = TRUE)
-    
-    res = c(prob.model[1],  max(pred), min(pred), (max(pred) - min(pred)))
-    names(res) = c('prob.M0', 'max', 'min', 'log2FC')
     
     if(testPlot){
       plot(tt, y0, cex = 1, ylim = range(x), xlab = 'time points', 
@@ -2373,13 +2384,94 @@ temporal.peaks.test = function(x, c = c("Mature_UA", "Mature_UA", "BL_UA_5days",
       newtt = seq(0, 7, by = 0.2) 
       points(newtt, predict(fit, newdata = data.frame(tt = newtt)), type = 'l', col = 'orange', lty = 1, lwd = 2.0)
       abline(h = mean(y0), lty = 1, col = 'red', lwd = 2.0)
-      
             
     }
     
-    return(res)
+  }
+  
+  res = data.frame(res0, stringsAsFactors = FALSE)
+  rownames(res) = rownames(cpm)
+  rm(res0)
+  
+  if(run.pairwise.comparison.edgeR){
+    library(edgeR)
+    logCPM = cpm
+    
+    clevels = c('Mature_UA', setdiff(unique(c), 'Mature_UA'))
+    f = factor(c, levels= clevels)
+    
+    mod = model.matrix(~ 0 + f)
+    colnames(mod) = clevels
+    
+    #To make all pair-wise comparisons between the three groups one could proceed
+    fit <- lmFit(logCPM, mod)
+    contrast.matrix <- makeContrasts(Embryo_Stage40 - Mature_UA, 
+                                     Embryo_Stage44_proximal - Mature_UA, 
+                                     Embryo_Stage44_distal - Mature_UA,
+                                     BL_UA_5days - Mature_UA,
+                                     BL_UA_9days - Mature_UA,
+                                     BL_UA_13days_proximal - Mature_UA,
+                                     BL_UA_13days_distal - Mature_UA,
+                                     levels=mod)
+    fit2 <- contrasts.fit(fit, contrast.matrix)
+    fit2 <- eBayes(fit2)
+    
+    #res = data.frame(fit2$p.value)
+    #colnames(res) = paste0(c('s40.vs.mUA', 
+    # 's44p.vs.muA',
+    # 's44d.vs.mUA', 
+    # '5dpa.vs.mUA',
+    # '9dpa.vs.mUA',
+    # '13dpap.vs.mUA',
+    # '13dpad.vs.mUA'
+    # ), '.pval')
+    
+    xx = topTable(fit2, coef = 1, number = nrow(logCPM))
+    xx = xx[, c(1, 4, 5)]
+    colnames(xx) = paste0(colnames(xx), '_s40.vs.mUA')
+    res = data.frame(res, xx[match(rownames(res), rownames(xx)), ])
+    
+    xx = topTable(fit2, coef = 2, number = nrow(logCPM))
+    xx = xx[, c(1, 4, 5)]
+    colnames(xx) = paste0(colnames(xx), '_s44p.vs.mUA')
+    res = data.frame(res, xx[match(rownames(res), rownames(xx)), ])
+    
+    
+    xx = topTable(fit2, coef = 2, number = nrow(logCPM))
+    xx = xx[, c(1, 4, 5)]
+    colnames(xx) = paste0(colnames(xx), '_s44d.vs.mUA')
+    res = data.frame(res, xx[match(rownames(res), rownames(xx)), ])
+    
+    
+    xx = topTable(fit2, coef = 2, number = nrow(logCPM))
+    xx = xx[, c(1, 4, 5)]
+    colnames(xx) = paste0(colnames(xx), '_5dpa.vs.mUA')
+    res = data.frame(res, xx[match(rownames(res), rownames(xx)), ])
+    
+    xx = topTable(fit2, coef = 2, number = nrow(logCPM))
+    xx = xx[, c(1, 4, 5)]
+    colnames(xx) = paste0(colnames(xx), '_9dpa.vs.mUA')
+    res = data.frame(res, xx[match(rownames(res), rownames(xx)), ])
+    
+    xx = topTable(fit2, coef = 2, number = nrow(logCPM))
+    xx = xx[, c(1, 4, 5)]
+    colnames(xx) = paste0(colnames(xx), '_13dpap.vs.mUA')
+    res = data.frame(res, xx[match(rownames(res), rownames(xx)), ])
+    
+    xx = topTable(fit2, coef = 2, number = nrow(logCPM))
+    xx = xx[, c(1, 4, 5)]
+    colnames(xx) = paste0(colnames(xx), '_13dpad.vs.mUA')
+    res = data.frame(res, xx[match(rownames(res), rownames(xx)), ])
+    
+    
+    res$fdr.mean.edgeR = apply(as.matrix(res[, grep('adj.P.Val', colnames(res))]), 1, function(x) return(mean(-log10(x))))
+    res$logFC.mean.edgeR =  apply(as.matrix(res[, grep('logFC', colnames(res))]), 1, function(x) return(mean(abs(x))))
     
   }
+  
+  return(res)
+  
+  
 }
 
 

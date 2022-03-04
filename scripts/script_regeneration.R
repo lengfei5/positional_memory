@@ -291,6 +291,7 @@ if(grouping.temporal.peaks){
     
   }
   
+  
   conds = c("Embryo_Stage40", "Embryo_Stage44_proximal", 'Embryo_Stage44_distal', 
             "Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal", 'BL_UA_13days_distal')
   
@@ -328,10 +329,12 @@ if(grouping.temporal.peaks){
     
     cpm = cpm[peak.sels, ]
     
+    source('Functions_atac.R')
     tic()
     ## define the dynamic enhancers with mature UA and BL.UA and check them if embryo samples
     #sels = grep('Embryo', cc, invert = TRUE) 
-    res = t(apply(cpm, 1, temporal.peaks.test, c = cc))
+    res = temporal.peaks.test(cpm, c = cc)
+    
     toc()
     
     
@@ -339,11 +342,11 @@ if(grouping.temporal.peaks){
     
     res = xx
     
-    saveRDS(res, file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v5.rds'))
+    saveRDS(res, file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v6.rds'))
     
   }
   
-  res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v5.rds'))
+  res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v6.rds'))
   res = res[order(-res$log2FC), ]
   
   # select the temporal dynamic peaks
