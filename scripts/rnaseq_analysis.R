@@ -1678,36 +1678,61 @@ if(Pool.scRNAseq.pseudobulk){
   colnames(res) = paste0(colnames(res), '_LRT')
   
   res.ii = results(dds, name='condition_3dpa_vs_0dpa', test = 'Wald')
+  res.ii <- lfcShrink(dds, coef="condition_3dpa_vs_0dpa")
   colnames(res.ii) = paste0(colnames(res.ii), "_3dpa.vs.mUA")
   res = data.frame(res, res.ii[, c(2, 5, 6)])
   
   res.ii = results(dds, name='condition_5dpa_vs_0dpa', test = 'Wald')
+  res.ii <- lfcShrink(dds, coef="condition_5dpa_vs_0dpa")
   colnames(res.ii) = paste0(colnames(res.ii), "_5dpa.vs.mUA")
   res = data.frame(res, res.ii[, c(2, 5, 6)])
   
   res.ii = results(dds, name='condition_8dpa_vs_0dpa', test = 'Wald')
+  res.ii <- lfcShrink(dds, coef="condition_8dpa_vs_0dpa")
   colnames(res.ii) = paste0(colnames(res.ii), "_8dpa.vs.mUA")
+  
   res = data.frame(res, res.ii[, c(2, 5, 6)])
   
   res.ii = results(dds, name='condition_11dpa_vs_0dpa', test = 'Wald')
+  res.ii <- lfcShrink(dds, coef="condition_11dpa_vs_0dpa")
   colnames(res.ii) = paste0(colnames(res.ii), "_11dpa.vs.mUA")
   res = data.frame(res, res.ii[, c(2, 5, 6)])
   
   res.ii = results(dds, name='condition_Stage40_vs_0dpa', test = 'Wald')
+  res.ii <- lfcShrink(dds, coef="condition_Stage40_vs_0dpa")
   colnames(res.ii) = paste0(colnames(res.ii), "_Stage40.vs.mUA")
   res = data.frame(res, res.ii[, c(2, 5, 6)])
   
   res.ii = results(dds, name='condition_Stage44_vs_0dpa', test = 'Wald')
+  res.ii <- lfcShrink(dds, coef="condition_Stage44_vs_0dpa")
   colnames(res.ii) = paste0(colnames(res.ii), "_Stage44.vs.mUA")
   res = data.frame(res, res.ii[, c(2, 5, 6)])
   
+  res.ii = results(dds, contrast = c('condition', '11dpa','Stage44'), test = 'Wald')
+  res.ii <- lfcShrink(dds, contrast = c('condition', '11dpa','Stage44'))
+  colnames(res.ii) = paste0(colnames(res.ii), "_11dpa.vs.Stage44")
+  res = data.frame(res, res.ii[, c(2, 5, 6)])
   
+  res.ii = results(dds, contrast = c('condition', '11dpa','Stage40'), test = 'Wald')
+  res.ii <- lfcShrink(dds, contrast = c('condition', '11dpa','Stage40'))
+  colnames(res.ii) = paste0(colnames(res.ii), "_11dpa.vs.Stage40")
+  res = data.frame(res, res.ii[, c(2, 5, 6)])
+  
+  saveRDS(res, file = paste0(RdataDir, 'plated_based_pooling_LRT_Waldtest_lfcShrink.rds'))
+  save(res, dds, file = paste0(paste0(RdataDir, 'plated_based_pooling_LRT_Waldtest_lfcShrink_dds_res.Rdata')))
+  
+  ##########################################
+  # check the results
+  ##########################################
+  load(file = paste0(paste0(RdataDir, 'plated_based_pooling_LRT_Waldtest_lfcShrink_dds_res.Rdata')))
   source('Functions_atac.R')
   
   cpm = fpm(dds)
-  cpm = log2(fpm(dds) + 2^-7)
+  cpm = log2(fpm(dds) + 2^-4)
+  #vsd = varianceStabilizingTransformation(dds, blind = FALSE)
+  #cpm = assay(vsd)
   
-  conds = c("0dpa", "3dpa",  "5dpa",  "8dpa",   "11dpa","Stage40", "Stage44")
+  conds = c("Stage40", "Stage44", "0dpa", "3dpa",  "5dpa",  "8dpa",  "11dpa", '18dpa')
   sample.sels = c();  
   cc = c()
   sample.means = c()
@@ -1734,8 +1759,7 @@ if(Pool.scRNAseq.pseudobulk){
   
   res = data.frame(cpm, res, stringsAsFactors = FALSE)
   
-  saveRDS(res, file = paste0(RdataDir, 'pooled_scRNAseq_mUA_regeneration_dev_LRTtest_DESeq2.rds'))
-  
+  #saveRDS(res, file = paste0(RdataDir, 'pooled_scRNAseq_mUA_regeneration_dev_LRTtest_DESeq2_cpm.rds'))
   
   ##########################################
   # visualize the restuls
@@ -1764,37 +1788,73 @@ if(Pool.scRNAseq.pseudobulk){
                  (res$padj_Stage40.vs.mUA < fdr.cutoff & res$log2FoldChange_Stage40.vs.mUA < logfc.cutoff ) | 
                  (res$padj_Stage44.vs.mUA < fdr.cutoff & res$log2FoldChange_Stage44.vs.mUA < logfc.cutoff ))
   
-  #yy = cpm[select, ]
+  cat(length(select), 'DE genes found !\n')
+  
+  ggs = sapply(rownames(res), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
+  
+  length(intersect(hs, ggs[select]))
   yy = sample.means[select, ]
+  
+  
+  cal_z_score <- function(x){
+    (x - mean(x)) / sd(x)
+  }
+  library(dendextend)
+  yy <- t(apply(yy, 1, cal_z_score))
+  
+  nb_clusters = 10
+  my_hclust_gene <- hclust(dist(yy), method = "complete")
+  my_gene_col <- cutree(tree = as.dendrogram(my_hclust_gene), k = nb_clusters)
+  res$clusters = NA; res$clusters[match(names(my_gene_col), rownames(res))] = my_gene_col # save the cluster index in ther res
+  
+  my_gene_col <- data.frame(cluster =  paste0('cluster_', my_gene_col))
+  rownames(my_gene_col) = rownames(yy)
   
   df = as.data.frame(conds)
   colnames(df) = 'condition'
   rownames(df) = colnames(yy)
   
-  #corrplot(cor(yy), method = 'number', type = 'upper', diag = TRUE)
-  #ggsave(filename = paste0(resDir, '/corrplot_smartseq2_regeneration.pdf'),  width = 10, height = 12)
-  
-  sample_colors = c('springgreen4', 'springgreen', 'springgreen2', 'springgreen3', 'gold2', 'red', 'magenta')
+  sample_colors = c('magenta', 'darkblue', 'springgreen4', 'springgreen', 'springgreen2', 'springgreen3', 'gold2',
+                    'red')[c(1:length(conds))]
   names(sample_colors) = conds
-  annot_colors = list(segments = sample_colors)
+  #annot_colors = list(condition = sample_colors)
   
-  pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+  col3 <- c("#a6cee3", "#1f78b4", "#b2df8a",
+            "#33a02c", "#fb9a99", "#e31a1c",
+            "#fdbf6f", "#ff7f00", "#cab2d6",
+            "#6a3d9a", "#ffff99", "#b15928")
+  cluster_col = col3[1:nb_clusters]
+  names(cluster_col) = paste0('cluster_', c(1:nb_clusters))
+  annot_colors = list(
+    condition = sample_colors,
+    cluster = cluster_col)
+  
+  gaps.col = c(2, 3)
+  pheatmap(yy,  annotation_row = my_gene_col, 
+           annotation_col=df,
+           cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
            color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
            show_colnames = FALSE,
-           scale = 'row',
-           cluster_cols=FALSE, annotation_col=df,
+           scale = 'none', gaps_col = gaps.col,
+           clustering_method = 'complete', cutree_rows = nb_clusters, 
+           cluster_cols=FALSE, 
            annotation_colors = annot_colors,
            width = 6, height = 12, 
-           filename = paste0(resDir, '/heatmap_DEgenes_regeneration_pooled.scRNAseq.pdf')) 
+           filename = paste0(figureDir, '/heatmap_DEgenes_regeneration_pooled.scRNAseq.pdf')) 
   
   pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
-           color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(16), 
+           color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(10), 
            show_colnames = FALSE,
            scale = 'none',
            cluster_cols=FALSE, annotation_col=df,
            annotation_colors = annot_colors,
            width = 6, height = 12, 
            filename = paste0(resDir, '/heatmap_DEgenes_regeneration_pooled.scRNAseq_log2Exp.pdf')) 
+  
+  ##########################################
+  # rough clustering for genes 
+  ##########################################
+  
   
   ##########################################
   # highlight TF, eps and other 
