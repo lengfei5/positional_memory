@@ -351,67 +351,56 @@ if(grouping.temporal.peaks){
   ##########################################
   # reload the test result and select dynamic peaks
   ##########################################
+  library(qvalue)
   res = readRDS( file = paste0(RdataDir, '/res_temporal_dynamicPeaks__mUA_regeneration_dev_2Batches.R10723_R7977_v6.rds'))
-  cpm = res[, c(1:20)]
-  res = res[, -c(1:20)]
+  
   res = res[order(-res$log2FC), ]
+  qv = qvalue(res$pval.lrt)
+  res$fdr.lrt = qv$qvalues
   
   # select the temporal dynamic peaks
-  length(which(res$prob.M0<0.05))
-  length(which(res$prob.M0<0.05 & res$log2FC > 1))
-  length(which(res$prob.M0<0.01 & res$log2FC > 1))
-  length(which(res$prob.M0<0.01 & res$log2FC > 1.5))
-  length(which(res$prob.M0<0.01 & res$log2FC > 2))
-  fdr.cutoff = 0.1
-  logfc.cutoff = 1
+  fdr.cutoff = 0.05; logfc.cutoff = 1
   
-  length(which(res$padj_LRT<fdr.cutoff))
-  length(which(res$padj_LRT<fdr.cutoff & res$log2fc>1))
-  length(which(res$padj_LRT<fdr.cutoff & res$log2fc>2))
-  length(which(res$padj_LRT<fdr.cutoff & res$log2fc>1.5))
+  # length(which(res$fdr.lrt < fdr.cutoff))
+  # length(which(res$padj_LRT<fdr.cutoff & res$log2fc>1))
+  # length(which(res$padj_LRT<fdr.cutoff & res$log2fc>2))
+  # length(which(res$padj_LRT<fdr.cutoff & res$log2fc>1.5))
   
-  select = which(res$padj_LRT<fdr.cutoff | 
-                   (res$padj_5dpa.vs.mUA < fdr.cutoff & res$log2FoldChange_5dpa.vs.mUA < logfc.cutoff)| 
-                   (res$padj_8dpa.vs.mUA < fdr.cutoff & res$log2FoldChange_8dpa.vs.mUA < logfc.cutoff) |
-                   (res$padj_11dpa.vs.mUA < fdr.cutoff & res$log2FoldChange_11dpa.vs.mUA < logfc.cutoff) |
-                   (res$padj_Stage40.vs.mUA < fdr.cutoff & res$log2FoldChange_Stage40.vs.mUA < logfc.cutoff ) | 
-                   (res$padj_Stage44.vs.mUA < fdr.cutoff & res$log2FoldChange_Stage44.vs.mUA < logfc.cutoff ))
-  
-  cat(length(select), 'DE genes found !\n')
+  select = which(  (res$adj.P.Val_5dpa.vs.mUA < fdr.cutoff & res$logFC_5dpa.vs.mUA < logfc.cutoff)| 
+                   (res$adj.P.Val_9dpa.vs.mUA < fdr.cutoff & res$logFC_9dpa.vs.mUA < logfc.cutoff) |
+                   (res$adj.P.Val_13dpap.vs.mUA < fdr.cutoff & res$logFC_13dpap.vs.mUA < logfc.cutoff) |
+                   (res$adj.P.Val_13dpad.vs.mUA < fdr.cutoff & res$logFC_13dpad.vs.mUA < logfc.cutoff) |
+                   (res$adj.P.Val_s40.vs.mUA < fdr.cutoff & res$logFC_s40.vs.mUA < logfc.cutoff ) | 
+                   (res$adj.P.Val_s44p.vs.mUA < fdr.cutoff & res$logFC_s44p.vs.mUA < logfc.cutoff ) |
+                   (res$adj.P.Val_s44d.vs.mUA < fdr.cutoff & res$logFC_s44d.vs.mUA < logfc.cutoff ))
   
   
+  cat(length(select), 'DE peaks found !\n')
   
-  #length(which(res$prob.M0<0.001 & res$log2FC > 2))
-  
-  # jj = which(res$prob.M0 < 0.05 & res$log2FC >1 )
-  # jj = which(res$prob.M0 < 0.05 & res$log2FC > 1 )
-  
-  xx = res[c(jj), ]
-  xx = xx[order(-xx$log2FC), ]
-  
-  xx = xx[which(xx$min < 4.5), ]
-  
-  source('Functions_atac.R')
+  res = res[select, ]
+  res = res[order(-res$log2FC), ]
   
   ##########################################
   # heatmap for all regeneration dynamic peaks
   ##########################################
-  keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), ]
-  keep = as.matrix(keep)
+  res$mins =  apply(sample.means[match(rownames(res), rownames(sample.means)), ], 1, min)
+  # xx = xx[which(xx$min < 4.5), ]
   
-  conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal", 'BL_UA_13days_distal',
+  source('Functions_atac.R')
+  conds = c("Mature_UA", "BL_UA_5days",  "BL_UA_9days", "BL_UA_13days_proximal", 'BL_UA_13days_distal',
             "Embryo_Stage40", "Embryo_Stage44_proximal", 'Embryo_Stage44_distal')
   
+  keep = as.matrix(res[, c(1:20)])
   sample.sels = c(); cc = c()
   for(n in 1:length(conds)) {
     kk = which(design$conds == conds[n])
-    if(length(unique(design$batch[kk])) > 1) kk = kk[which(design$batch[kk] == '2021')]
+    #if(length(unique(design$batch[kk])) > 1) kk = kk[which(design$batch[kk] == '2021')]
     sample.sels = c(sample.sels, kk)
     cc = c(cc, as.character(design$conds[kk]))
   }
-  kk = sample.sels
   
-  keep = keep[, kk]
+  keep = keep[, sample.sels]
+  
   df <- data.frame(cc)
   rownames(df) = colnames(keep)
   colnames(df) = 'regeneration time'
