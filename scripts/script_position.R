@@ -242,6 +242,7 @@ require(limma)
 
 Split.Mature.Regeneration.samples = TRUE
 if(Split.Mature.Regeneration.samples){
+ 
   ##########################################
   # batch correct samples separately for mature samples and regeneration samples  
   ##########################################
@@ -310,74 +311,12 @@ if(Split.Mature.Regeneration.samples){
     saveRDS(fpm, file = paste0(RdataDir, '/fpm.bc_TMM_combat_MatureSamples_batch2019.2020.2021.2021S.2022.rds'))
     saveRDS(design.sels, file = paste0(RdataDir, '/design_sels_bc_TMM_combat_MatureSamples_batch2019.2020.2021.2021S.2022.rds'))
     
-    
   }
-  
-  # regeneration time points and embryo stages
-  Batch.Correct.regeneration.embryoStage = FALSE
-  if(Batch.Correct.regeneration.embryoStage){
-    
-    sels = unique(c(setdiff(which(design$batch == '2020'), grep('Mature', design$condition)), 
-                    which(design$batch == '2021'), which(design$condition == 'BL_UA_9days')))
-    
-    sels = sels[which(design$SampleID[sels] != '89542' & design$SampleID[sels] != '89543')]
-    
-    design.sels = design[sels, ]
-    design.sels$conds = droplevels(design.sels$conds)
-    
-    table(design.sels$conds, design.sels$batch)
-    #design.sels$batch[grep('895', design.sels$SampleID)] = '2019'
-    
-    design.sels$batch[which(design.sels$batch == '2021S')] = '2021'
-    #design.sels$batch = droplevels(design.sels$batch)
-    table(design.sels$conds, design.sels$batch)
-    
-    ddx = dds[, sels]
-    ddx$conds = droplevels(ddx$conds)
-    ss = rowSums(counts(ddx))
-    # remove low count genes, otherwise combat returns error 
-    # 'Error in while (change > conv) { : missing value where TRUE/FALSE needed'
-    #ddx = ddx[which(ss>5), ] 
-    #ddx = estimateSizeFactors(ddx)
-    #vsd <- varianceStabilizingTransformation(ddx, blind = TRUE)
-    #tmm = assay(vsd)
-    
-    d <- DGEList(counts=counts(ddx), group=design.sels$conds)
-    tmm <- calcNormFactors(d, method='TMM')
-    tmm = cpm(tmm, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 1)
-    
-    #tmm.vars = apply(as.matrix(tmm), 1, var) # row with var = 0 pose problem for ComBat
-    #tmm = tmm[which(tmm.vars>0 & !is.na(tmm.vars)), ]
-    
-    bc = as.factor(design.sels$batch)
-    mod = model.matrix(~ as.factor(conds), data = design.sels)
-    
-    # if specify ref.batch, the parameters will be estimated from the ref, inapprioate here, 
-    # because there is no better batche other others 
-    #ref.batch = '2021S'# 2021S as reference is better for some reasons (NOT USED here)    
-    fpm.bc = ComBat(dat=as.matrix(tmm), batch=bc, mod=mod, par.prior=TRUE, ref.batch = '2021') 
-    
-    #design.tokeep<-model.matrix(~ 0 + conds,  data = design.sels)
-    #cpm.bc = limma::removeBatchEffect(tmm, batch = bc, design = design.tokeep)
-    # plot(fpm.bc[,1], tmm[, 1]);abline(0, 1, lwd = 2.0, col = 'red')
-    
-    make.pca.plots(tmm, ntop = 1000, conds.plot = 'all')
-    ggsave(paste0(resDir, "/regeneration_embryo_Samples_batchCorrect_before_",  version.analysis, ".pdf"), width = 16, height = 14)
-    
-    make.pca.plots(fpm.bc, ntop = 1000, conds.plot = 'all')
-    ggsave(paste0(resDir, "/matureSamples_batchCorrect_after_",  version.analysis, ".pdf"), width = 16, height = 14)
-    
-    fpm = fpm.bc
-    
-    rm(fpm.bc)
-    
-    saveRDS(fpm, file = paste0(RdataDir, '/fpm.bc_TMM_combat_mUA_regeneration_embryoStages', version.analysis, '.rds'))
-    saveRDS(design.sels, file = paste0(RdataDir, '/design_sels_bc_TMM_combat_mUA_regeneration_embryoStages', version.analysis, 
-                                       '.rds'))
-    
-  }
-  
+      
 }
+  
+  
+  
 
 
 ########################################################
