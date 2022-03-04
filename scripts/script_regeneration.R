@@ -338,15 +338,22 @@ if(grouping.temporal.peaks){
     toc()
     
     
-    xx = data.frame(res, pp.annots[match(rownames(cpm), rownames(pp.annots)), ],  stringsAsFactors = FALSE)
+    xx = data.frame(cpm, res, pp.annots[match(rownames(cpm), rownames(pp.annots)), ],  stringsAsFactors = FALSE)
     
     res = xx
     
-    saveRDS(res, file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v6.rds'))
+    #res = data.frame(cpm, res, stringsAsFactors = FALSE)
+    saveRDS(res, file = paste0(RdataDir, '/res_temporal_dynamicPeaks__mUA_regeneration_dev_2Batches.R10723_R7977_v6.rds'))
+    
     
   }
   
-  res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v6.rds'))
+  ##########################################
+  # reload the test result and select dynamic peaks
+  ##########################################
+  res = readRDS( file = paste0(RdataDir, '/res_temporal_dynamicPeaks__mUA_regeneration_dev_2Batches.R10723_R7977_v6.rds'))
+  cpm = res[, c(1:20)]
+  res = res[, -c(1:20)]
   res = res[order(-res$log2FC), ]
   
   # select the temporal dynamic peaks
@@ -355,12 +362,29 @@ if(grouping.temporal.peaks){
   length(which(res$prob.M0<0.01 & res$log2FC > 1))
   length(which(res$prob.M0<0.01 & res$log2FC > 1.5))
   length(which(res$prob.M0<0.01 & res$log2FC > 2))
+  fdr.cutoff = 0.1
+  logfc.cutoff = 1
+  
+  length(which(res$padj_LRT<fdr.cutoff))
+  length(which(res$padj_LRT<fdr.cutoff & res$log2fc>1))
+  length(which(res$padj_LRT<fdr.cutoff & res$log2fc>2))
+  length(which(res$padj_LRT<fdr.cutoff & res$log2fc>1.5))
+  
+  select = which(res$padj_LRT<fdr.cutoff | 
+                   (res$padj_5dpa.vs.mUA < fdr.cutoff & res$log2FoldChange_5dpa.vs.mUA < logfc.cutoff)| 
+                   (res$padj_8dpa.vs.mUA < fdr.cutoff & res$log2FoldChange_8dpa.vs.mUA < logfc.cutoff) |
+                   (res$padj_11dpa.vs.mUA < fdr.cutoff & res$log2FoldChange_11dpa.vs.mUA < logfc.cutoff) |
+                   (res$padj_Stage40.vs.mUA < fdr.cutoff & res$log2FoldChange_Stage40.vs.mUA < logfc.cutoff ) | 
+                   (res$padj_Stage44.vs.mUA < fdr.cutoff & res$log2FoldChange_Stage44.vs.mUA < logfc.cutoff ))
+  
+  cat(length(select), 'DE genes found !\n')
+  
+  
   
   #length(which(res$prob.M0<0.001 & res$log2FC > 2))
   
-  #jj = which(res$prob.M0 < 0.05 & res$log2FC >1 )
-  
-  jj = which(res$prob.M0 < 0.05 & res$log2FC > 1 )
+  # jj = which(res$prob.M0 < 0.05 & res$log2FC >1 )
+  # jj = which(res$prob.M0 < 0.05 & res$log2FC > 1 )
   
   xx = res[c(jj), ]
   xx = xx[order(-xx$log2FC), ]
@@ -433,6 +457,7 @@ if(grouping.temporal.peaks){
     
   }
   
+  
   ##########################################
   # first motif activity analysis for temporally dynamic peaks 
   ##########################################
@@ -440,4 +465,3 @@ if(grouping.temporal.peaks){
   xx = run.MARA.atac.temporal(keep, cc)
   
 }
-s

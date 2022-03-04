@@ -2348,7 +2348,7 @@ temporal.peaks.test = function(cpm, c = c("Mature_UA", "Mature_UA", "BL_UA_5days
       y0 = as.numeric(y0)
       tt = as.numeric(tt)
       
-      fit <- gam(y0 ~ s(tt, df=(length(c.uniq)-2)), family = gaussian)
+      fit <- gam(y0 ~ s(tt, df=4), family = gaussian)
       fit0 = lm(y0 ~ 1)
       # summary(fit)
       #plot(fit)
