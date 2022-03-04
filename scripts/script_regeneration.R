@@ -162,23 +162,30 @@ library(edgeR)
 require("sva")
 require(limma)
 
+table(design$condition, design$batch)
 
 # regeneration time points and embryo stages
 Batch.Correct.regeneration.embryoStage = FALSE
 if(Batch.Correct.regeneration.embryoStage){
   
-  sels = unique(c(setdiff(which(design$batch == '2020'), grep('Mature', design$condition)), 
-                  which(design$batch == '2021'), which(design$condition == 'BL_UA_9days')))
+  design$batch[which(design$condition == 'BL_UA_9days')] = '2021'
   
-  sels = sels[which(design$SampleID[sels] != '89542' & design$SampleID[sels] != '89543')]
+  table(design$condition, design$batch)
+  
+  sels = which(design$batch == '2021'| (design$batch == '2020' & design$condition != 'Mature_LA' & design$condition != 'Mature_Hand' &
+                                          design$condition != 'Mature_UA'))
+  
+  #sels = sels[which(design$SampleID[sels] != '89542' & design$SampleID[sels] != '89543')]
   
   design.sels = design[sels, ]
   design.sels$conds = droplevels(design.sels$conds)
   
   table(design.sels$conds, design.sels$batch)
-  #design.sels$batch[grep('895', design.sels$SampleID)] = '2019'
   
-  design.sels$batch[which(design.sels$batch == '2021S')] = '2021'
+  #design.sels$batch[grep('749', design.sels$SampleID)] = '2019.1'
+  #design.sels$batch[grep('1026', design.sels$SampleID)] = '2019.2'
+  
+  #design.sels$batch[which(design.sels$batch == '2021S')] = '2021'
   #design.sels$batch = droplevels(design.sels$batch)
   table(design.sels$conds, design.sels$batch)
   
@@ -205,25 +212,26 @@ if(Batch.Correct.regeneration.embryoStage){
   # if specify ref.batch, the parameters will be estimated from the ref, inapprioate here, 
   # because there is no better batche other others 
   #ref.batch = '2021S'# 2021S as reference is better for some reasons (NOT USED here)    
-  fpm.bc = ComBat(dat=as.matrix(tmm), batch=bc, mod=mod, par.prior=TRUE, ref.batch = '2021') 
+  fpm.bc = ComBat(dat=as.matrix(tmm), batch=bc, mod=mod, par.prior=TRUE, ref.batch = NULL) 
   
   #design.tokeep<-model.matrix(~ 0 + conds,  data = design.sels)
   #cpm.bc = limma::removeBatchEffect(tmm, batch = bc, design = design.tokeep)
   # plot(fpm.bc[,1], tmm[, 1]);abline(0, 1, lwd = 2.0, col = 'red')
   
-  make.pca.plots(tmm, ntop = 1000, conds.plot = 'all')
+  make.pca.plots(tmm, ntop = 3000, conds.plot = 'all')
   ggsave(paste0(resDir, "/regeneration_embryo_Samples_batchCorrect_before_",  version.analysis, ".pdf"), width = 16, height = 14)
   
-  make.pca.plots(fpm.bc, ntop = 1000, conds.plot = 'all')
+  make.pca.plots(fpm.bc, ntop = 3000, conds.plot = 'all')
   ggsave(paste0(resDir, "/matureSamples_batchCorrect_after_",  version.analysis, ".pdf"), width = 16, height = 14)
   
   fpm = fpm.bc
   
   rm(fpm.bc)
   
-  saveRDS(fpm, file = paste0(RdataDir, '/fpm.bc_TMM_combat_mUA_regeneration_embryoStages', version.analysis, '.rds'))
-  saveRDS(design.sels, file = paste0(RdataDir, '/design_sels_bc_TMM_combat_mUA_regeneration_embryoStages', version.analysis, 
-                                     '.rds'))
+  saveRDS(fpm, file = paste0(RdataDir, '/fpm.bc_TMM_combat_mUA_regeneration_dev_2Batches.R10723_R7977_', version.analysis, '.rds'))
+  saveRDS(design.sels, file = paste0(RdataDir, '/design_sels_bc_TMM_combat_mUA_regeneration_dev_2Batches.R10723_R7977',
+                                     version.analysis, '.rds'))
+  
   
 }
 

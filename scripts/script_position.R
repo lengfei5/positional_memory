@@ -310,14 +310,11 @@ if(Split.Mature.Regeneration.samples){
     
     saveRDS(fpm, file = paste0(RdataDir, '/fpm.bc_TMM_combat_MatureSamples_batch2019.2020.2021.2021S.2022.rds'))
     saveRDS(design.sels, file = paste0(RdataDir, '/design_sels_bc_TMM_combat_MatureSamples_batch2019.2020.2021.2021S.2022.rds'))
-    
+      
   }
       
 }
   
-  
-  
-
 
 ########################################################
 ########################################################
