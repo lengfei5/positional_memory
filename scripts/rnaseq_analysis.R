@@ -992,10 +992,18 @@ res.ii <- lfcShrink(dds, coef="condition_BL_UA_13days_distal_vs_Mature_UA")
 colnames(res.ii) = paste0(colnames(res.ii), "_dpa13dist.vs.mUA")
 res = data.frame(res, res.ii[, c(2, 5, 6)])
 
+res = data.frame(fpm.bc, res, stringsAsFactors = FALSE)
+saveRDS(res, file = paste0(RdataDir, 'smartseq2_R10724_R11635_cpm.batchCorrect_DESeq2.test.withbatch.log2FC.shrinked.rds'))
 
+
+##########################################
+# check the test result 
+##########################################
 source('Functions_atac.R')
+res = readRDS(file = paste0(RdataDir, 'smartseq2_R10724_R11635_cpm.batchCorrect_DESeq2.test.withbatch.log2FC.shrinked.rds'))
 
-#cpm = fpm(dds)
+cpm = res[, c(1,2, 5:12)]
+res = res[, -c(1:12)]
 #cpm = log2(fpm(dds) + 2^-7)
 
 conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal",  "BL_UA_13days_distal")
@@ -1023,48 +1031,16 @@ res$log2fc = apply(sample.means, 1, function(x) max(x) - min(x))
 res$maxs = apply(sample.means, 1, max)
 res$mins = apply(sample.means, 1, min)
 
-res = data.frame(cpm, res, stringsAsFactors = FALSE)
-
-saveRDS(res, file = paste0(RdataDir, 'regeneration_smartseq2_fpm_LRTtest_firstMergedSamples.rds'))
-
-
-##########################################
-# visualize the restuls
-##########################################
+### select the siganificant genes and visualize the restuls
 require(corrplot)
 require(pheatmap)
 require(RColorBrewer)
 
-#res = readRDS(file = paste0(RdataDir, 'regeneration_smartseq2_fpm_LRTtest_filteredSamples.rds'))
-res = readRDS(file = paste0(RdataDir, 'regeneration_smartseq2_fpm_LRTtest_firstMergedSamples.rds'))
-rgs$gene = sapply(rownames(rgs), function(x){x = unlist(strsplit(as.character(x), '_')); return(x[1])})
-rgs$geneID = sapply(rownames(rgs), function(x){x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
+#res = readRDS(file = paste0(RdataDir, 'regeneration_smartseq2_fpm_LRTtest_firstMergedSamples.rds'))
+#rgs$gene = sapply(rownames(rgs), function(x){x = unlist(strsplit(as.character(x), '_')); return(x[1])})
+#rgs$geneID = sapply(rownames(rgs), function(x){x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
 
-cpm = res[, c(1:9)]
-#cpm = res[, c(1:11)]
 
-conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal",  "BL_UA_13days_distal")
-
-sample.sels = c();  cc = c()
-sample.means = c()
-for(n in 1:length(conds)) 
-{
-  kk = grep(conds[n], colnames(cpm))
-  sample.sels = c(sample.sels, kk)
-  cc = c(cc, rep(conds[n], length(kk)))
-  if(length(kk)>1) {
-    sample.means = cbind(sample.means, apply(cpm[, kk], 1, mean))
-  }else{
-    sample.means = cbind(sample.means, cpm[, kk])
-  }
-  
-}  
-
-colnames(sample.means) = conds
-
-##########################################
-# select the significant changing genes
-##########################################
 fdr.cutoff = 0.01
 logfc.cutoff = 1
 
@@ -1073,13 +1049,16 @@ length(which(res$padj_LRT<fdr.cutoff & res$log2fc>1))
 length(which(res$padj_LRT<fdr.cutoff & res$log2fc>2))
 length(which(res$padj_LRT<fdr.cutoff & res$log2fc>1.5))
 
-select = which(res$padj_LRT<fdr.cutoff & res$log2fc> 1)
+select = which(res$padj_LRT<fdr.cutoff |
+                 (res$padj_dpa5.vs.mUA < fdr.cutoff & abs(res$log2FoldChange_dpa5.vs.mUA) > logfc.cutoff) | 
+                 (res$padj_dpa9.vs.mUA < fdr.cutoff & abs(res$log2FoldChange_dpa9.vs.mUA) > logfc.cutoff) |
+                 (res$padj_dpa13prox.vs.mUA < fdr.cutoff & abs(res$log2FoldChange_dpa13prox.vs.mUA) > logfc.cutoff) |
+                 (res$padj_dpa13dist.vs.mUA < fdr.cutoff & abs(res$log2FoldChange_dpa13dist.vs.mUA) > logfc.cutoff))
 
+cat(length(select), ' DE genes \n')
 #gg.select = rownames(res)[select]
 #saveRDS(gg.select, file = paste0(RdataDir, 'RRGs_candidates_tempList.rds'))
 
-#yy = sample.means[select, ]
-#df <- as.data.frame(conds)
 yy = cpm[select, ]
 df = as.data.frame(cc)
 colnames(df) = 'condition'
@@ -1099,7 +1078,7 @@ pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
          cluster_cols=FALSE, annotation_col=df,
          annotation_colors = annot_colors,
          width = 6, height = 12, 
-         filename = paste0(figureDir, '/heatmap_DEgenes_regeneration_fdr.0.01_log2fc.1_RNAseq_filtered.R10724.pdf')) 
+         filename = paste0(figureDir, '/heatmap_DEgenes_regeneration_fdr.0.01_log2fc.1_RNAseq_filtered.R10724.R11635.pdf')) 
 
 ##########################################
 # highlight TF, eps and other 
@@ -1116,10 +1095,12 @@ print(intersect(ggs, rbp))
 for(subg in c('tfs', 'eps', 'sps', 'rbp'))
 {
   
-  subg = 'rbp'
+  # subg = 'tfs'
   mm = eval(parse(text = paste0('match(ggs, unique(', subg, '))')))
-  
   yy1 = yy[unique(c(which(!is.na(mm)))), ]
+  cat(nrow(yy1), ' ', subg, ' found \n')
+  
+  h = nrow(yy1)*0.1
   
   pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, fontsize_row = 5,
            color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
@@ -1127,7 +1108,7 @@ for(subg in c('tfs', 'eps', 'sps', 'rbp'))
            scale = 'row',
            cluster_cols=FALSE, annotation_col=df,
            annotation_colors = annot_colors,
-           width = 8, height = 10, 
+           width = 8, height = h, 
            filename = paste0(figureDir, '/heatmap_DEgenes_regeneration_fdr.0.01_log2fc.2_smartseq2_', subg, '.pdf'))
   
   #write.table(yy, file = paste0(resDir, '/DEtfs_mUA_regeneration_dev.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
@@ -1149,6 +1130,7 @@ yy = cpm[select[!is.na(select)], ]
 df = as.data.frame(cc)
 colnames(df) = 'condition'
 rownames(df) = colnames(yy)
+
 
 sample_colors = c('springgreen4', 'springgreen', 'springgreen2', 'springgreen3', 'gold2')
 names(sample_colors) = conds
@@ -1178,10 +1160,22 @@ pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
 
 ########################################################
 ########################################################
-# Section : regeneration RNA-seq from Gerber et al. 2018
+# Section : regeneration samples by pooling the scRNA-seq data from Gerber et al. 2018
 # 
 ########################################################
 ########################################################
+annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                       'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
+
+tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
+sps = readRDS(file = '~/workspace/imp/organoid_patterning/results/Rdata/curated_signaling.pathways_gene.list_v2.rds')
+eps = readRDS(file = paste0('../data/human_chromatin_remodelers_Epifactors.database.rds'))
+rbp = readRDS(file = paste0('../data/human_RBPs_rbpdb.rds'))
+tfs = unique(tfs$`HGNC symbol`)
+sps = toupper(unique(sps$gene))
+sps = setdiff(sps, tfs)
+
+
 Import.scRNAseq = FALSE
 if(Import.scRNAseq){
   scRNADir = '/Volumes/groups/tanaka/People/current/jiwang/projects/limbRegeneration_scRNA/raw_NGS/axolotl/Gerber_2018/'
@@ -1512,7 +1506,7 @@ if(Pool.scRNAseq.pseudobulk){
   length(which(ss>50))
   length(which(ss>100))
   
-  dds = dds[which(ss > 100), ]
+  dds = dds[which(ss > 50), ]
   
   dds = estimateSizeFactors(dds)
   
@@ -1607,16 +1601,17 @@ if(Pool.scRNAseq.pseudobulk){
   colnames(res.ii) = paste0(colnames(res.ii), "_11dpa.vs.Stage40")
   res = data.frame(res, res.ii[, c(2, 5, 6)])
   
-  saveRDS(res, file = paste0(RdataDir, 'plated_based_pooling_LRT_Waldtest_lfcShrink.rds'))
-  save(res, dds, file = paste0(paste0(RdataDir, 'plated_based_pooling_LRT_Waldtest_lfcShrink_dds_res.Rdata')))
+  saveRDS(res, file = paste0(RdataDir, 'plated_based_pooling_LRT_Waldtest_lfcShrink_v2.rds'))
+  save(res, dds, file = paste0(paste0(RdataDir, 'plated_based_pooling_LRT_Waldtest_lfcShrink_dds_res_v2.Rdata')))
   
   ##########################################
   # check the results
   ##########################################
-  load(file = paste0(paste0(RdataDir, 'plated_based_pooling_LRT_Waldtest_lfcShrink_dds_res.Rdata')))
+  load(file = paste0(paste0(RdataDir, 'plated_based_pooling_LRT_Waldtest_lfcShrink_dds_res_v2.Rdata')))
   source('Functions_atac.R')
   
   cpm = fpm(dds)
+  
   cpm = log2(fpm(dds) + 2^-4)
   #vsd = varianceStabilizingTransformation(dds, blind = FALSE)
   #cpm = assay(vsd)
@@ -1647,7 +1642,6 @@ if(Pool.scRNAseq.pseudobulk){
   res$mins = apply(sample.means, 1, min)
   
   #res = data.frame(cpm, res, stringsAsFactors = FALSE)
-  
   #saveRDS(res, file = paste0(RdataDir, 'pooled_scRNAseq_mUA_regeneration_dev_LRTtest_DESeq2_cpm.rds'))
   
   ##########################################
@@ -1657,10 +1651,7 @@ if(Pool.scRNAseq.pseudobulk){
   require(pheatmap)
   require(RColorBrewer)
   
-  #res = readRDS(file = paste0(RdataDir, 'pooled_scRNAseq_mUA_regeneration_dev_LRTtest_DESeq2.rds'))
-  #rgs$gene = sapply(rownames(rgs), function(x){x = unlist(strsplit(as.character(x), '_')); return(x[1])})
-  #rgs$geneID = sapply(rownames(rgs), function(x){x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
-  
+    
   ## select the significant changing genes
   fdr.cutoff = 0.1
   logfc.cutoff = 1
@@ -1705,8 +1696,10 @@ if(Pool.scRNAseq.pseudobulk){
   colnames(df) = 'condition'
   rownames(df) = colnames(yy)
   
-  sample_colors = c('magenta', 'darkblue', 'springgreen4', 'springgreen', 'springgreen2', 'springgreen3', 'gold2',
-                    'red')[c(1:length(conds))]
+  sample_colors = c('deepskyblue', 'deepskyblue3', 
+                    'springgreen4', 
+                    'springgreen', 'springgreen2', 'springgreen3', 'chartreuse', 'chartreuse4')[c(1:length(conds))]
+  
   names(sample_colors) = conds
   #annot_colors = list(condition = sample_colors)
   
@@ -1767,18 +1760,18 @@ if(Pool.scRNAseq.pseudobulk){
     
     yy1 = yy[unique(c(which(!is.na(mm)))), ]
     
+    h = nrow(yy1)*0.1 
     pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, fontsize_row = 5,
              color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
              show_colnames = FALSE,
              scale = 'row',
              cluster_cols=FALSE, annotation_col=df,
              annotation_colors = annot_colors,
-             width = 8, height = 10, 
+             width = 8, height = h, 
              filename = paste0(resDir, '/heatmap_DEgenes_regeneration_pooled.scRNAseq_', subg, '.pdf'))
     
     #write.table(yy, file = paste0(resDir, '/DEtfs_mUA_regeneration_dev.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
     
   }
-  
   
 }
