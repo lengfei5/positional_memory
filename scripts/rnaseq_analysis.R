@@ -907,9 +907,11 @@ cat(length(which(ss>50)), ' gene selected \n')
 dds = dds[which(ss>50), ]
 
 dds$condition = droplevels(dds$condition)
+
+x <- DESeqDataSetFromMatrix(counts(dds), DataFrame(design), design = ~ batch + condition )
 #dds$batch = droplevels(dds$batch)
 
-dds = estimateSizeFactors(dds)
+dds = estimateSizeFactors(x)
 
 #sels = unique(c(which((design.matrix$batch == 3 | design.matrix$condition == 'BL_UA_9days'))))
 #sels = unique(c(which((design.matrix$batch == 3 | design.matrix$condition == 'BL_UA_9days') & 
@@ -925,7 +927,6 @@ pca2save = as.data.frame(plotPCA(vsd, intgroup = c('condition', 'batch'), return
 ggplot(data=pca2save, aes(PC1, PC2, label = name, color= condition, shape = batch))  + 
   geom_point(size=3) + 
   geom_text(hjust = 1, nudge_y = 1, size=2.5)
-
 
 ggsave(paste0(resDir, '/PCA_smartseq2_R10724_R11635_regeneration.pdf'),  width=12, height = 8)
 
@@ -957,16 +958,13 @@ ggsave(paste0(resDir, "/smartseq2_R10724_R11635_batchCorrect_after_",  version.a
 
 plot.pair.comparison.plot(fpm.bc[, c(1:6)], linear.scale = FALSE)
 
-
-#cpm = log2(fpm0[, sels] + 2^-6)
-dds$condition = droplevels(dds$condition)
+#dds$condition = droplevels(dds$condition)
 dds$condition <- relevel(dds$condition, ref = "Mature_UA")
 
-dds <- DESeq(dds, test="LRT", reduced=~1, fitType = c("parametric"))
+dds <- DESeq(dds, test="LRT", reduced = ~ batch, fitType = c("parametric"))
 plotDispEsts(dds, ymin = 10^-3)
 
 res <- results(dds)
-
 
 resultsNames(dds)
 #res30 <- results(ddsTC, name="strainmut.minute30", test="Wald")
@@ -975,26 +973,30 @@ res = data.frame(res[, c(2, 5, 6)])
 colnames(res) = paste0(colnames(res), '_LRT')
 
 res.ii = results(dds, name='condition_BL_UA_5days_vs_Mature_UA', test = 'Wald')
+res.ii <- lfcShrink(dds, coef="condition_BL_UA_5days_vs_Mature_UA")
 colnames(res.ii) = paste0(colnames(res.ii), "_dpa5.vs.mUA")
 res = data.frame(res, res.ii[, c(2, 5, 6)])
  
 res.ii = results(dds, name='condition_BL_UA_9days_vs_Mature_UA', test = 'Wald')
+res.ii <- lfcShrink(dds, coef="condition_BL_UA_9days_vs_Mature_UA")
 colnames(res.ii) = paste0(colnames(res.ii), "_dpa9.vs.mUA")
 res = data.frame(res, res.ii[, c(2, 5, 6)])
 
 res.ii = results(dds, name='condition_BL_UA_13days_proximal_vs_Mature_UA', test = 'Wald')
+res.ii <- lfcShrink(dds, coef="condition_BL_UA_13days_proximal_vs_Mature_UA")
 colnames(res.ii) = paste0(colnames(res.ii), "_dpa13prox.vs.mUA")
 res = data.frame(res, res.ii[, c(2, 5, 6)])
 
 res.ii = results(dds, name='condition_BL_UA_13days_distal_vs_Mature_UA', test = 'Wald')
+res.ii <- lfcShrink(dds, coef="condition_BL_UA_13days_distal_vs_Mature_UA")
 colnames(res.ii) = paste0(colnames(res.ii), "_dpa13dist.vs.mUA")
 res = data.frame(res, res.ii[, c(2, 5, 6)])
 
 
 source('Functions_atac.R')
 
-cpm = fpm(dds)
-cpm = log2(fpm(dds) + 2^-7)
+#cpm = fpm(dds)
+#cpm = log2(fpm(dds) + 2^-7)
 
 conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal",  "BL_UA_13days_distal")
 sample.sels = c();  
