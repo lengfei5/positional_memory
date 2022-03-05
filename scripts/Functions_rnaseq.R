@@ -877,4 +877,146 @@ edgeR.DE.test.without.replicates = function()
   
 }  
   
+########################################################
+########################################################
+# a data exploration function
+# compare embryo stage 44 proximal with distal and BL.UA.day13 proximal and distal 
+# trying to check the what deposoits the positional information 
+########################################################
+########################################################
+Compare_stage44.proximal.distal_BL.UA.day13.promximal.distal = function()
+{
+  
+  # load dds normalized object and annotations
+  load(file = paste0(RdataDir, 'RNAseq_design_dds.object.Rdata'))
+  annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                         'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
+  
+  tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
+  sps = readRDS(file = '~/workspace/imp/organoid_patterning/results/Rdata/curated_signaling.pathways_gene.list_v2.rds')
+  eps = readRDS(file = paste0('../data/human_chromatin_remodelers_Epifactors.database.rds'))
+  rbp = readRDS(file = paste0('../data/human_RBPs_rbpdb.rds'))
+  tfs = unique(tfs$`HGNC symbol`)
+  sps = toupper(unique(sps$gene))
+  
+  saveTables = TRUE
+  
+  # select mature samples
+  sels = grep('BL_UA_13days|Embryo_Stage46', design.matrix$condition)
+  dds = dds[, sels]
+  
+  cpm = fpm(dds)
+  cpm = log2(cpm + 2^-4)
+  
+  dds$condition = droplevels(dds$condition)
+  dds <- estimateDispersions(dds, fitType = 'parametric')
+  plotDispEsts(dds, ymin = 10^-3); abline(h = 0.1, col = 'blue', lwd = 2.0)
+  
+  dds = nbinomWaldTest(dds, betaPrior = TRUE)
+  resultsNames(dds)
+  
+  ##########################################
+  # heatmap to visualize all positional genes and regulators (TFs and SPs)
+  ##########################################
+  library("pheatmap")
+  Comparison =  "BL.UA.distal.proximal" 
+  
+  if(Comparison == 'BL.UA.distal.proximal'){
+    # BL_UA_day13 distal vs. proximal
+    res.ii = results(dds, contrast=c("condition", 'BL_UA_13days_distal', 'BL_UA_13days_proximal'), alpha = 0.1)
+    #colnames(res.ii) = paste0(colnames(res.ii), "_BL_UA_13days_distal.vs.proximal")
+    res = data.frame(res.ii[, c(2, 5, 6)])
+    
+  }else{
+    res.ii = results(dds, contrast=c("condition", 'Embryo_Stage46_distal', 'Embryo_Stage46_proximal'), alpha = 0.1)
+    #colnames(res.ii) = paste0(colnames(res.ii), "_Embryo_Stage46_distal.vs.proximal")
+    res = data.frame(res.ii[, c(2, 5, 6)])
+    
+    
+    #pval.cutoff = 0.001
+    #res$pval.max = apply(-log10(res[, grep('pvalue_', colnames(res))]), 1, max)
+    #res$logFC.max = apply((res[, grep('log2FoldChange_', colnames(res))]), 1, function(x) return(x[which(abs(x)==max(abs(x)))][1]))
+  }
+  
+  o1 = order(res$pvalue)
+  res = res[o1, ]
+  cpm = cpm[o1, ]
+  
+  ggs = sapply(rownames(res), function(x){unlist(strsplit(as.character(x), '_'))[1]})
+  select = which(res$padj < 0.1 & abs(res$log2FoldChange)> 1)
+  ggs = ggs[select]
+  
+  print(intersect(ggs, tfs))
+  print(intersect(ggs, sps))
+  print(intersect(ggs, eps))
+  print(intersect(ggs, rbp))
+  
+  #select = which(res$pvalue_Hand.vs.LA < pval.cutoff | res$pvalue_Hand.vs.UA < pval.cutoff | res$pvalue_LA.vs.UA < pval.cutoff)
+  #cat(length(select), ' positional genes found \n')
+  
+  # fdr.cutoff = 0.2
+  # select = which(res$padj_Hand.vs.LA < fdr.cutoff | 
+  #                  res$padj_Hand.vs.UA < fdr.cutoff |
+  #                  res$padj_LA.vs.UA < fdr.cutoff)
+  # cat(length(select), ' positional genes found \n')
+  
+  # df <- as.data.frame(colData(dds)[,c("condition", 'batch')])
+  # o1 = c(grep('UA', df$condition), grep('LA', df$condition), grep('Hand', df$condition))
+  # 
+  # yy = cpm[select, o1]
+  # ss = apply(as.matrix(yy), 1, mean)
+  # 
+  # #yy = yy[which(ss>-2), ]
+  # pheatmap(yy, cluster_rows=TRUE, show_rownames=TRUE, fontsize_row = 6,
+  #          show_colnames = FALSE,
+  #          scale = 'row',
+  #          cluster_cols=FALSE, annotation_col=df[o1, ], 
+  #          width = 8, height = 20, filename = paste0(figureDir, '/heatmap_DEgenes_matureSamples_pvalmax.3_log2FC.0_.pdf'))
+  
+  
+  library(ggrepel)
+  library(dplyr)
+  library(tibble)
+  res$gene = sapply(rownames(res), function(x){unlist(strsplit(as.character(x), '_'))[1]})
+  res$padj = -log10(res$padj)
+  
+  examples.sel = unique(res$gene[which(res$padj >10 | abs(res$log2FoldChange) > 5)])
+  #examples.sel = unique(intersect(res$, tfs)
+  
+  
+  ggplot(data=res, aes(x=log2FoldChange, y=padj, label = gene)) +
+    geom_point(size = 1) + 
+    theme(axis.text.x = element_text(size = 12), 
+          axis.text.y = element_text(size = 12)) +
+    #geom_text_repel(data=subset(res, log2FoldChange > 2), size = 4) +
+    geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel),
+                     size = 3) + 
+    #scale_color_manual(values=c("blue", "black", "red")) +
+    geom_vline(xintercept=c(0), col="red") +
+    geom_hline(yintercept=5, col="red") + 
+    ggsave(paste0(figureDir, "VolcanoPlot_logFC_padj_EmbryoStage.proximal.vs.distal.pdf"), width=12, height = 8)
+  
+  # # narrow down to TFs and SPs
+  # ggs = sapply(rownames(yy), function(x) unlist(strsplit(as.character(x), '_'))[1])
+  # mm = match(ggs, unique(c(tfs[, 3], toupper(sps$gene))))
+  # yy1 = yy[!is.na(mm), ]
+  # 
+  # pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
+  #          scale = 'row',
+  #          cluster_cols=FALSE, annotation_col=df[o1, ], fontsize_row = 10, 
+  #          width = 8, height = 4,
+  #          filename = paste0(resDir, '/heatmap_DE.tfs.sps_mature_fdr.0.1.pdf')) 
+  
+  
+  if(saveTables){
+    xx = data.frame(gene = rownames(yy), yy, res[match(rownames(yy), rownames(res)), ], stringsAsFactors = FALSE)
+    write.csv(xx, file = paste0(resDir, '/position_dependent_genes_from_matureSamples_RNAseq_fdr.0.1.csv'), 
+              quote = FALSE, col.names = TRUE, row.names = FALSE)
+    
+  }
+  
+}
+
+
+
 
