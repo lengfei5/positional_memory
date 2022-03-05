@@ -1597,8 +1597,9 @@ if(Pool.scRNAseq.pseudobulk){
       
       bcs = unique(metadata$batch[jj])
       for(bc in bcs){
-        cat('-- ', bc, '\n')
+        cat('-- ', bc, '--')
         xx = as.matrix(raw[, jj[which(metadata$batch[jj] == bc)]])
+        cat(ncol(xx), ' cells \n')
         xx[is.na(xx)] = 0
         pseudo = cbind(pseudo, apply(xx, 1, sum))
         cc = c(cc, conds[n])
@@ -1609,7 +1610,6 @@ if(Pool.scRNAseq.pseudobulk){
   
   rownames(pseudo) = rownames(raw)
   design = data.frame(condition = cc, plates = plates, stringsAsFactors = FALSE)
-  
   colnames(pseudo) = paste0(design$condition, '_', design$plates)
   
   dds <- DESeqDataSetFromMatrix(pseudo, DataFrame(design), design = ~ condition)
@@ -1757,7 +1757,7 @@ if(Pool.scRNAseq.pseudobulk){
   res$maxs = apply(sample.means, 1, max)
   res$mins = apply(sample.means, 1, min)
   
-  res = data.frame(cpm, res, stringsAsFactors = FALSE)
+  #res = data.frame(cpm, res, stringsAsFactors = FALSE)
   
   #saveRDS(res, file = paste0(RdataDir, 'pooled_scRNAseq_mUA_regeneration_dev_LRTtest_DESeq2_cpm.rds'))
   
@@ -1781,31 +1781,33 @@ if(Pool.scRNAseq.pseudobulk){
   length(which(res$padj_LRT<fdr.cutoff & res$log2fc>2))
   length(which(res$padj_LRT<fdr.cutoff & res$log2fc>1.5))
   
-  select = which(res$padj_LRT<fdr.cutoff | 
-                 (res$padj_5dpa.vs.mUA < fdr.cutoff & res$log2FoldChange_5dpa.vs.mUA < logfc.cutoff)| 
-                 (res$padj_8dpa.vs.mUA < fdr.cutoff & res$log2FoldChange_8dpa.vs.mUA < logfc.cutoff) |
-                 (res$padj_11dpa.vs.mUA < fdr.cutoff & res$log2FoldChange_11dpa.vs.mUA < logfc.cutoff) |
-                 (res$padj_Stage40.vs.mUA < fdr.cutoff & res$log2FoldChange_Stage40.vs.mUA < logfc.cutoff ) | 
-                 (res$padj_Stage44.vs.mUA < fdr.cutoff & res$log2FoldChange_Stage44.vs.mUA < logfc.cutoff ))
-  
+  select = which( 
+                 (res$padj_5dpa.vs.mUA < fdr.cutoff & abs(res$log2FoldChange_5dpa.vs.mUA) > logfc.cutoff) | 
+                 (res$padj_8dpa.vs.mUA < fdr.cutoff & abs(res$log2FoldChange_8dpa.vs.mUA) > logfc.cutoff) |
+                 (res$padj_11dpa.vs.mUA < fdr.cutoff & abs(res$log2FoldChange_11dpa.vs.mUA) > logfc.cutoff) |
+                 (res$padj_Stage40.vs.mUA < fdr.cutoff & abs(res$log2FoldChange_Stage40.vs.mUA) > logfc.cutoff) | 
+                 (res$padj_Stage44.vs.mUA < fdr.cutoff & abs(res$log2FoldChange_Stage44.vs.mUA) > logfc.cutoff) )
   cat(length(select), 'DE genes found !\n')
   
   ggs = sapply(rownames(res), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
   
   length(intersect(hs, ggs[select]))
+  
   yy = sample.means[select, ]
   
   
   cal_z_score <- function(x){
     (x - mean(x)) / sd(x)
   }
+  
   library(dendextend)
   yy <- t(apply(yy, 1, cal_z_score))
   
-  nb_clusters = 10
+  nb_clusters = 8
   my_hclust_gene <- hclust(dist(yy), method = "complete")
   my_gene_col <- cutree(tree = as.dendrogram(my_hclust_gene), k = nb_clusters)
-  res$clusters = NA; res$clusters[match(names(my_gene_col), rownames(res))] = my_gene_col # save the cluster index in ther res
+  res$clusters = NA; 
+  res$clusters[match(names(my_gene_col), rownames(res))] = my_gene_col # save the cluster index in ther res
   
   my_gene_col <- data.frame(cluster =  paste0('cluster_', my_gene_col))
   rownames(my_gene_col) = rownames(yy)
@@ -1840,7 +1842,7 @@ if(Pool.scRNAseq.pseudobulk){
            cluster_cols=FALSE, 
            annotation_colors = annot_colors,
            width = 6, height = 12, 
-           filename = paste0(figureDir, '/heatmap_DEgenes_regeneration_pooled.scRNAseq.pdf')) 
+           filename = paste0(resDir, '/heatmap_DEgenes_regeneration_pooled.scRNAseq.pdf')) 
   
   pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
            color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(10), 

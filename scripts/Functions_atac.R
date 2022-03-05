@@ -2437,32 +2437,31 @@ temporal.peaks.test = function(cpm, c = c("Mature_UA", "Mature_UA", "BL_UA_5days
     res = data.frame(res, xx[match(rownames(res), rownames(xx)), ])
     
     
-    xx = topTable(fit2, coef = 2, number = nrow(logCPM))
+    xx = topTable(fit2, coef = 3, number = nrow(logCPM))
     xx = xx[, c(1, 4, 5)]
     colnames(xx) = paste0(colnames(xx), '_s44d.vs.mUA')
     res = data.frame(res, xx[match(rownames(res), rownames(xx)), ])
     
     
-    xx = topTable(fit2, coef = 2, number = nrow(logCPM))
+    xx = topTable(fit2, coef = 4, number = nrow(logCPM))
     xx = xx[, c(1, 4, 5)]
     colnames(xx) = paste0(colnames(xx), '_5dpa.vs.mUA')
     res = data.frame(res, xx[match(rownames(res), rownames(xx)), ])
     
-    xx = topTable(fit2, coef = 2, number = nrow(logCPM))
+    xx = topTable(fit2, coef = 5, number = nrow(logCPM))
     xx = xx[, c(1, 4, 5)]
     colnames(xx) = paste0(colnames(xx), '_9dpa.vs.mUA')
     res = data.frame(res, xx[match(rownames(res), rownames(xx)), ])
     
-    xx = topTable(fit2, coef = 2, number = nrow(logCPM))
+    xx = topTable(fit2, coef = 6, number = nrow(logCPM))
     xx = xx[, c(1, 4, 5)]
     colnames(xx) = paste0(colnames(xx), '_13dpap.vs.mUA')
     res = data.frame(res, xx[match(rownames(res), rownames(xx)), ])
     
-    xx = topTable(fit2, coef = 2, number = nrow(logCPM))
+    xx = topTable(fit2, coef = 7, number = nrow(logCPM))
     xx = xx[, c(1, 4, 5)]
     colnames(xx) = paste0(colnames(xx), '_13dpad.vs.mUA')
     res = data.frame(res, xx[match(rownames(res), rownames(xx)), ])
-    
     
     res$fdr.mean.edgeR = apply(as.matrix(res[, grep('adj.P.Val', colnames(res))]), 1, function(x) return(mean(-log10(x))))
     res$logFC.mean.edgeR =  apply(as.matrix(res[, grep('logFC', colnames(res))]), 1, function(x) return(mean(abs(x))))
