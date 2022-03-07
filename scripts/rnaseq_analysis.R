@@ -1641,8 +1641,8 @@ if(Pool.scRNAseq.pseudobulk){
   res$maxs = apply(sample.means, 1, max)
   res$mins = apply(sample.means, 1, min)
   
-  #res = data.frame(cpm, res, stringsAsFactors = FALSE)
-  #saveRDS(res, file = paste0(RdataDir, 'pooled_scRNAseq_mUA_regeneration_dev_LRTtest_DESeq2_cpm.rds'))
+  all = data.frame(sample.means, res, stringsAsFactors = FALSE)
+  saveRDS(all, file = paste0(RdataDir, 'pooled_scRNAseq_mUA_regeneration_dev_LRTtest_DESeq2_sample.means.rds'))
   
   ##########################################
   # visualize the restuls
@@ -1775,3 +1775,145 @@ if(Pool.scRNAseq.pseudobulk){
   }
   
 }
+
+
+########################################################
+########################################################
+# Section : highlight the comparison between Dev and Mature
+# 
+########################################################
+########################################################
+##########################################
+# first import Tobias' scRNA-seq data 
+##########################################
+require(DESeq2)
+library(ggrepel)
+library(dplyr)
+library(tibble)
+library("cowplot")
+
+# GO term annotation
+limb.go = read.delim(file = '../data/limb_development_GO_term_summary_20220218_162116.txt', header = FALSE)
+limb.go = unique(limb.go$V2[-1])
+limb.go = toupper(limb.go)
+
+##########################################
+# use load DE genes from DESeq2 
+##########################################
+aa = readRDS(file = paste0(RdataDir, 'pooled_scRNAseq_mUA_regeneration_dev_LRTtest_DESeq2_sample.means.rds'))
+res = aa[, -c(1:8)]
+fpm = aa[, c(1:8)]
+
+fpm = data.frame(fpm)
+fpm$log2FoldChange_Stage40.vs.mUA = res$log2FoldChange_Stage40.vs.mUA
+fpm$log2FoldChange_Stage44.vs.mUA = res$log2FoldChange_Stage44.vs.mUA
+## house-keeping genes annotated
+annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
+load(file =  paste0(annotDir, 'axolotl_housekeepingGenes_controls.other.tissues.liver.islet.testis_expressedIn21tissues.Rdata'))
+hs = controls.tissue$geneIDs[which(controls.tissue$tissues == 'housekeeping')]
+ctl =  controls.tissue$geneIDs[which(controls.tissue$tissues  != 'housekeeping')]
+
+fdr.cutoff = 0.1
+logfc.cutoff = 1
+
+select = which( 
+  #(res$padj_5dpa.vs.mUA < fdr.cutoff & abs(res$log2FoldChange_5dpa.vs.mUA) > logfc.cutoff) | 
+  #  (res$padj_8dpa.vs.mUA < fdr.cutoff & abs(res$log2FoldChange_8dpa.vs.mUA) > logfc.cutoff) |
+  # (res$padj_11dpa.vs.mUA < fdr.cutoff & abs(res$log2FoldChange_11dpa.vs.mUA) > logfc.cutoff) |
+    (res$padj_Stage40.vs.mUA < fdr.cutoff & abs(res$log2FoldChange_Stage40.vs.mUA) > logfc.cutoff) | 
+    (res$padj_Stage44.vs.mUA < fdr.cutoff & abs(res$log2FoldChange_Stage44.vs.mUA) > logfc.cutoff) )
+cat(length(select), 'DE genes found !\n')
+
+
+fpm$DEgene = NA
+fpm$DEgene[select] = '1'
+
+#fpm$genetype[which(fpm$genetype == 'dev.lowlyExp')] = 'Expr.E40.44'
+
+fpm$gene =  sapply(rownames(fpm), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[1])})
+fpm$geneID = sapply(rownames(fpm), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
+fpm$genetype[!is.na(match(fpm$geneID, hs))] = 'house.keeping'
+
+dev.example = c('HOXA13', 'HOXA11', 'HOXA9', 'HOXD13','HOXD11', 'HOXD9',
+                'SHH', 'FGF8', 'FGF10', 'HAND2', 'BMP4', 'ALX1',
+                'ALX4', 'PRRX1', 'GREM1', 'LHX2', 'LHX9', 
+                'TBX2', 'TBX4', 'TBX5', 'LMX1', 'MEIS1', 'MEIS2', 'SALL4', 'IRX3', 'IRX5')
+limb.go = unique(c(limb.go, dev.example))
+
+
+fpm$limb.go = NA
+fpm$limb.go[!is.na(match(fpm$gene, limb.go))] = '1'
+
+
+fpm$mins = apply(fpm[, c(1, 3)], 1, min)
+fpm$maxs = apply(fpm[, c(1, 3)], 1, max)
+
+fpm = fpm[which(fpm$maxs > 0), ]
+
+#fpm$genetype[!is.na(fpm$DEgene)] = 'DE.gene'
+#fpm$genetype[which(fpm$genetype == 'devGene')] = 'Expr.E40.44'
+
+fpm$dev = apply(fpm[, c(1, 2)], 1, mean)
+fpm$mUA = fpm$X0dpa 
+
+examples.sel = unique(grep(paste0(dev.example, collapse = '|') ,fpm$gene))
+
+fpm$DEgene[which(!is.na(fpm$DEgene) & (fpm$log2FoldChange_Stage40.vs.mUA > 0 |fpm$log2FoldChange_Stage44.vs.mUA >0))] = 'DevGene'
+fpm$DEgene[which(!is.na(fpm$DEgene) & (fpm$log2FoldChange_Stage40.vs.mUA < 0|fpm$log2FoldChange_Stage44.vs.mUA <0 ))] = 'MatureGene'
+
+fpm$genetype[which(!is.na(fpm$DEgene))] = fpm$DEgene[which(!is.na(fpm$DEgene))]
+fpm$genetype[is.na(fpm$genetype)] = 'others'
+
+scatterplot = ggplot(fpm, aes(x = dev, y = mUA, color = genetype, label = gene)) +
+  geom_point(size = 0.1) + 
+  scale_color_manual(values=c('red', "darkgray", 'forestgreen',  "orange",   'black')) + 
+  #geom_point(data=fpm[which(!is.na(fpm$limb.go)), ], aes(x=Stage40, y=mUA), size=2) + 
+  geom_text_repel(data= fpm[examples.sel, ], size = 4.0, color = 'darkblue') + 
+  #geom_hline(yintercept=2.0, colour = "darkgray") + 
+  #geom_vline(xintercept = 2.0, colour = "darkgray")
+  geom_abline(slope = 1,  intercept = 0, colour = 'cyan3') +
+  theme_classic() +
+  theme(legend.text = element_text(size=12),
+        legend.title = element_text(size = 14),
+        legend.position=c(0.8, 0.2),
+        plot.margin = margin()
+        #legend.key.size = unit(1, 'cm')
+        #legend.key.width= unit(1, 'cm')
+  ) + guides(colour = guide_legend(override.aes = list(size=4)))
+
+
+# Define marginal histogram
+marginal_distribution <- function(x, var, col = 'gray') {
+  ggplot(x, aes_string(x = var)) +
+    geom_histogram(bins = 40, alpha = 0.4, position = "identity") +
+    geom_density(alpha = 0.4, size = 0.1) +
+    scale_color_manual(values=col)+
+    scale_fill_manual(values=col) +
+    guides(fill = FALSE) +
+    theme_void() +
+    theme(plot.margin = margin())
+}
+
+# Set up marginal histograms
+x_hist <- marginal_distribution(fpm, 'dev', 'red')
+y_hist <- marginal_distribution(fpm, "mUA", 'forestgreen') +
+  coord_flip()
+
+# Align histograms with scatterplot
+aligned_x_hist <- align_plots(x_hist, scatterplot, align = "v")[[1]]
+aligned_y_hist <- align_plots(y_hist, scatterplot, align = "h")[[1]]
+
+# Arrange plots
+plot_grid(
+  aligned_x_hist
+  , NULL
+  , scatterplot
+  , aligned_y_hist
+  , ncol = 2
+  , nrow = 2
+  , rel_heights = c(0.2, 1)
+  , rel_widths = c(1, 0.2)
+)
+
+ggsave(paste0(figureDir, "Stage40.44_vs_mUA_devGenes_comparisons_Gerber2018.pseudobulk.pdf"), width=12, height = 10)
+

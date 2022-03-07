@@ -1017,6 +1017,42 @@ Compare_stage44.proximal.distal_BL.UA.day13.promximal.distal = function()
   
 }
 
-
-
-
+##########################################
+# edgeR DE test for pooled Dev and Mature from scRNA-seq using house-keeping gene to test 
+##########################################
+Dev.vs.Mature_edgeR.DE.test.without.replicates = function()
+{
+  ## house-keeping genes annotated
+  annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
+  load(file =  paste0(annotDir, 'axolotl_housekeepingGenes_controls.other.tissues.liver.islet.testis_expressedIn21tissues.Rdata'))
+  hs = controls.tissue$geneIDs[which(controls.tissue$tissues == 'housekeeping')]
+  ctl =  controls.tissue$geneIDs[which(controls.tissue$tissues  != 'housekeeping')]
+  load(file = paste0(RdataDir, '/pseudoBulk_scRNAcellPooling_FluidigmC1_stage40.44.mUA_dev_geneSelection.Rdata'))
+  require(edgeR)
+  group = dds$condition
+  y <- DGEList(counts=counts(dds), group=group)
+  y <- calcNormFactors(y)
+  
+  y1 = y
+  y1$samples$group <- 1
+  #group1 = y1$samples$group
+  #design <- model.matrix(~group1)
+  
+  index.hs = which(fpm$genetype == 'hs')
+  y0 <- estimateDisp(y1[index.hs,], trend = 'none', tagwise=FALSE)
+  
+  y$common.dispersion <- y0$common.dispersion
+  
+  fit <- glmFit(y)
+  lrt2 <- glmLRT(fit, coef = 2)
+  lrt3 = glmLRT(fit, coef = 3)
+  
+  lrt2 = as.data.frame(topTags(lrt2, adjust.method = "BH", n = nrow(y)))
+  lrt3 = as.data.frame(topTags(lrt3, adjust.method = "BH", n = nrow(y)))
+  
+  DE.genes = unique(c(rownames(lrt2)[which(lrt2$FDR<0.01 & abs(lrt2$logFC) > 1)],
+                      rownames(lrt3)[which(lrt3$FDR <0.01 & abs(lrt3$logFC) >1)]))
+  
+  cat(length(DE.genes), ' DE genes found \n')
+  
+}
