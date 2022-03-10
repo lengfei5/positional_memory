@@ -591,9 +591,9 @@ if(Save.Peaklist){
   
   bb = readRDS(file = paste0(RdataDir, '/merged_peaks_usedBams_pval.6.rds'))
   
-  bb = readRDS(file = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/
-                             positional_memory/results/R10723_Rxxxx_atacseq_bowtie2.newParam_mtDNA_picardrmdup_20210208/
-                             Rdata/merged_peaks_usedBams_pval.6.rds'))
+  bb = readRDS(file = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/',
+                             'positional_memory/results/R10723_Rxxxx_atacseq_bowtie2.newParam_mtDNA_picardrmdup_20210208/',
+                             'Rdata/merged_peaks_usedBams_pval.6.rds'))
   
   
   source('functions_chipSeq.R')

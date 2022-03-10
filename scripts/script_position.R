@@ -123,6 +123,9 @@ if(Binary.peaks.QCs.analysis){
 # Section I : normalization and batch correction
 ########################################################
 ########################################################
+require(ChIPpeakAnno)
+require(ChIPseeker)
+
 #load(file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical.Rdata'))
 load(file = paste0(RdataDir, '/samplesDesign_readCounts.within_manualConsensusPeaks.pval6_mergedTechnical_', 
                    version.analysis, '.Rdata'))
@@ -130,11 +133,8 @@ design$sampleID = design$SampleID
 design$usable = as.numeric(design$usable)
 design$usable[c(31:32)] = design$usable[c(31:32)]/10^6
 
-saveRDS(design, file = paste0('../data/design_sampleInfos_32atacSamplesUsed.rds'))
+#saveRDS(design, file = paste0('../data/design_sampleInfos_32atacSamplesUsed.rds'))
 
-
-require(ChIPpeakAnno)
-require(ChIPseeker)
 
 pp = data.frame(t(sapply(counts$gene, function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
 pp$strand = '*'
