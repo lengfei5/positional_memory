@@ -61,7 +61,7 @@ Define_limb_expressed_genes = function()
   
   # load dds normalized object and annotations
   Rdata.smartseq2 = "../results/rnaseq_Rxxxx.old_R10724_R161513_mergedTechRep/Rdata/"
-  load(file = paste0(Rdata.smartseq2, 'RNAseq_design_dds.object.Rdata'))
+  load(file = paste0(RdataDir, 'dds_design.matrix_all29smartseq2_beforeFiltering.Rdata'))
   
   # select mature samples
   sels = intersect(which(design.matrix$batch == 4), grep('Mature', design.matrix$condition))

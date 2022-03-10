@@ -307,6 +307,8 @@ rm(design)
 
 dds <- DESeqDataSetFromMatrix(raw, DataFrame(design.matrix), design = ~ condition)
 
+#save(dds, design.matrix, file = paste0(RdataDir, 'dds_design.matrix_all29smartseq2_beforeFiltering.Rdata'))
+
 ss = rowMaxs(counts(dds))
 hist(log10(ss), breaks = 100)
 dds = dds[which(ss > 20), ]
