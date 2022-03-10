@@ -614,9 +614,13 @@ if(Save.Peaklist){
 }
 
 
-##########################################
-# run DESeq2 for QC and detect DE peaks
-##########################################
+########################################################
+########################################################
+# Section :
+# # Run DESeq2 for QC (PCA) and the scaling factors for track normalization
+# The consensus peaks were not filtered here
+########################################################
+########################################################
 RNA.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functions/RNAseq_functions.R'
 RNA.QC.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functions/RNAseq_QCs.R'
 source(RNA.functions)
@@ -651,6 +655,11 @@ counts = process.countTable(all=all, design = design[, c(1,2)])
 # 
 # design = data.frame(design, stats, stringsAsFactors = FALSE)
 
+##########################################
+# IMPORTANT !!!!
+# read counts within peaks are saved without filtering here
+# filtering will be done in the following script 
+##########################################
 save(design, counts, file = paste0(RdataDir, 
                                    '/samplesDesign_readCounts.within_manualConsensusPeaks.pval6_mergedTechnical_', 
                                    version.analysis, '.Rdata'))

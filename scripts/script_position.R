@@ -142,6 +142,7 @@ pp$strand = '*'
 pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
                               start.field="X2", end.field="X3", strand.field="strand")
 
+# export(object = pp,  con = paste0(resDir, "/atacseq_peaks_all_140k.bed"), format = 'bed')
 
 ##########################################
 # Select peak consensus across mature, regeneration and embryo 
@@ -226,6 +227,8 @@ if(Peaks.Background.selection){
     sfs = data.frame(sample = colnames(dds), sf = sizeFactors(dds)*median(colSums(counts(dds))), stringsAsFactors = FALSE)
     
     saveRDS(sfs, file = paste0(RdataDir, '/DESeq2_peaks.based_scalingFactors_forGenomicRanger.rds'))
+    
+    
     
   }
 }
@@ -357,15 +360,10 @@ if(grouping.position.dependent.peaks){
     pp = data.frame(t(sapply(rownames(fpm), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
     pp$strand = '*'
     
-    save.peak.bed = FALSE
-    if(save.peak.bed){
-      bed = data.frame(pp[, c(1:3)], rownames(pp), 0, pp[, 4], stringsAsFactors = FALSE)
-      write.table(bed, file = paste0(resDir, '/peakset_', version.analysis, '.bed'), col.names = FALSE, row.names = FALSE,
-                  sep = '\t', quote = FALSE)
-    }
-    
     pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
                                   start.field="X2", end.field="X3", strand.field="strand")
+    
+    export(object = pp,  con = paste0(resDir, "/atacseq_peaks_filtered_55k.bed"), format = 'bed')
     
     # annotation from ucsc browser ambMex60DD_genes_putative
     amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
