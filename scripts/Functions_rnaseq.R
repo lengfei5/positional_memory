@@ -31,6 +31,46 @@ Refine.ax.gene.annot = function(annot)
   saveRDS(annot, file = paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
                                'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
   
+
+}
+
+##########################################
+# find limb-expressed and limb-non-expressed genes in dev, mature and regeneration  
+##########################################
+Define_limb_expressed_genes = function()
+{
+  ## all transcripts and geneID from v47
+  annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
+  annot = readRDS(paste0(annotDir, 
+                         'AmexT_v47_transcriptID_transcriptCotig_geneSymbol.nr_geneSymbol.hs_geneID_gtf.geneInfo_gtf.transcriptInfo.rds'))
+  
+  ## genes with gene symbols 
+  genes = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                         'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
+  
+  
+  ggs = unique(annot$geneID)
+  ggs = data.frame(geneID = ggs, ORF.type = annot$ORF.type_gtf.transcript[match(ggs, annot$geneID)], stringsAsFactors = FALSE)
+  
+  ggs$geneSymbol = NA
+  ggs$geneSymbol[match(genes$geneID, ggs$geneID)] = genes$gene.symbol.toUse
+  
+  ## will check smartseq2 regeneration samples and pooled scRNA-seq samples to find limb-expressing genes
+  #Rdata.microarray = "../results/microarray/Rdata/"
+  #load(file = paste0(Rdata.microarray, 'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary.Rdata'))
+  
+  # load dds normalized object and annotations
+  Rdata.smartseq2 = "../results/rnaseq_Rxxxx.old_R10724_R161513_mergedTechRep/Rdata/"
+  load(file = paste0(Rdata.smartseq2, 'RNAseq_design_dds.object.Rdata'))
+  
+  # select mature samples
+  sels = intersect(which(design.matrix$batch == 4), grep('Mature', design.matrix$condition))
+  dds = dds[, sels]
+  
+  cpm = fpm(dds)
+  cpm = log2(cpm + 2^-4)
+  
+  
 }
 
 
@@ -1056,3 +1096,8 @@ Dev.vs.Mature_edgeR.DE.test.without.replicates = function()
   cat(length(DE.genes), ' DE genes found \n')
   
 }
+
+
+
+
+
