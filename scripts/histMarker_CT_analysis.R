@@ -16,7 +16,7 @@ source(RNA.QC.functions)
 source('functions_chipSeq.R')
 source('Functions_atac.R')
 
-version.analysis = 'CT_analysis_20220217'
+version.analysis = 'CT_analysis_20220311'
 #peakDir = "Peaks/macs2_broad"
 saveTable = TRUE
 
@@ -29,6 +29,7 @@ if(!dir.exists(RdataDir)) dir.create(RdataDir)
 # tableDir = paste0(figureDir, 'tables4plots/')
 
 annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
+
 gtf.file =  paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf')
 
 require(ggplot2)
@@ -162,6 +163,190 @@ if(Process.design.stats){
 ##########################################
 source('Functions_utility.R')
 #Sequence.Saturation.Analysis(design)
+
+########################################################
+########################################################
+# Section : peak processing and find consensus peaks
+# narrow peaks were called with macs2 for H3K4me3 and H3K4me1
+# H3K27ac is too noise to call peaks 
+# H3K27me3 have broad domains, which are not the main focus for now
+# So the peak consensus will be 
+# - H3K4me3/1 narrow peaks and ATAC-seq peaks (to calculate the scaling factors for tracks)
+# - limb expressed gene promoters and non-expressed gene promoters (negative controls)
+########################################################
+########################################################
+source('functions_chipSeq.R')
+design = read.csv(file = paste0("/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/",
+                                "histMod_CT_using/R11876_R12810_R12965_CT_analysis_20220217_QCs_AK.csv"))
+
+design = design[!is.na(design$sampleID), ]
+design$fileName = paste0(design$condition, '_', design$sampleID)
+
+##########################################
+# process called peaks for H3K4me3/1
+##########################################
+peakDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/histMod_CT_using/calledPeaks/macs2'
+peak.files = list.files(path = peakDir,
+                        pattern = '*_peaks.xls', full.names = TRUE)
+
+design.sel = design[which(design$marks == 'H3K4me1'| design$marks == 'H3K4me3'), ]
+
+# select peak files
+index  = c()
+for(n in 1:nrow(design.sel))
+{
+  test = grep(design.sel$sampleID[n], peak.files)
+  if(length(test) != 1) {
+    cat(length(test), 'peak files Found \n')
+  }else{
+    index = c(index, test)
+  }
+}
+
+peak.files = peak.files[index]
+
+##########################################
+# manually check peak overlapping between replicates and also define consensus peaks
+##########################################
+Manually.identify.peak.consensus = FALSE
+pval.cutoff = 6 # the 10^-6 seems to be better when checking peak overlapping in replicates
+
+if(Manually.identify.peak.consensus){
+  peaks = c()
+  
+  for(n in 1:length(peak.files)) 
+  {
+    cat(n, '\n')
+    p = readPeakFile(peak.files[n], as = "GRanges");
+    #eval(parse(text = paste0("p = pp.", k)));
+    with.p.values = "X.log10.pvalue." %in% colnames(mcols(p))
+    if(with.p.values) {
+      p <- p[mcols(p)[,"X.log10.pvalue."] > pval.cutoff];
+      p = GenomicRanges::reduce(p);
+      #peaks10= c(peaks10, p10);
+    }else{ 
+      cat("no p values conlumn found for -- ", design.matrix$file.name[k], "\n");
+      PLOT.p10 = FALSE;
+    }
+    #p = reduce(p)
+    peaks= c(peaks, p)
+  }
+  
+  names(peaks) = design.sel$fileName
+  
+  saveRDS(peaks, file = paste0(RdataDir, '/histMarkers_macs2peaks_H3K4me3.H3K4me1_32samples_pval.', pval.cutoff, '.rds'))
+  save(peaks, design, design.sel, 
+       file = paste0(RdataDir, '/histMarkers_macs2peaks_H3K4me3.H3K4me1_32samples_pval.', pval.cutoff, '.Rdata'))
+  
+  ##########################################
+  #  # try to merge BL time series
+  ##########################################
+  peaks = readRDS(file = paste0(RdataDir, '/histMarkers_macs2peaks_H3K4me3.H3K4me1_32samples_pval.', pval.cutoff, '.rds'))
+  design.sel$condition = droplevels(design.sel$condition)
+  
+  source('functions_chipSeq.R')
+  
+  conds = as.character(unique(design.sel$condition))
+  for(n in 1:length(conds))
+  {
+    # n = 5
+    cc = conds[n]
+    kk = which(design.sel$condition == cc)
+    
+    cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
+    
+    
+    ol.peaks <- makeVennDiagram(peaks[kk[c(2, 3,4)]], NameOfPeaks=names(peaks)[kk[c(2, 3, 4)]], connectedPeaks="keepAll", main=cc)
+    v <- venn_cnt2venn(ol.peaks$vennCounts)
+    try(plot(v))
+    
+    
+    pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, '2_p', pval.cutoff, '.pdf'), 
+        height = 10, width = 10)
+    try(plot(v))
+    dev.off()
+    
+    ## H3Kme3 UA
+    xx1 = intersect(peaks[[kk[1]]], peaks[[kk[2]]])
+    xx2 = intersect(peaks[[kk[1]]], peaks[[kk[3]]])
+    xx3 = intersect(peaks[[kk[1]]], peaks[[kk[4]]])
+    xx4 = intersect(peaks[[kk[2]]], peaks[[kk[3]]])
+    xx5 = intersect(peaks[[kk[2]]], peaks[[kk[4]]])
+    xx6 = intersect(peaks[[kk[3]]], peaks[[kk[4]]])
+    
+    xx = union(xx1, union(xx2, union(xx3, union(xx4, union(xx5, xx6)))))
+    
+    peaks_H3K4me3_mUA = GenomicRanges::reduce(xx)
+    
+    peaks.merged = peaks_H3K4me3_mUA
+    
+    ## peaks_H3K4me1_mLA 
+    peaks_H3K4me1_mLA = peaks[[kk[2]]]
+    peaks.merged = union(peaks.merged, peaks_H3K4me1_mLA)
+    peaks.merged = GenomicRanges::reduce(peaks.merged)
+    
+    ## H3K4me3_mLA
+    peaks_H3K4me3_mLA = peaks[[kk[2]]]
+    peaks.merged = GenomicRanges::reduce(union(peaks.merged, peaks_H3K4me3_mLA))
+    
+    ## H3K4me3_mHand
+    xx = peaks[[kk[2]]]
+    eval(parse(text = paste0('peaks_', cc, ' = xx')))
+    peaks.merged = GenomicRanges::reduce(union(peaks.merged, xx))
+    
+    
+    # H3K4me1_mUA
+    n = 5
+    cc = conds[n]
+    kk = which(design.sel$condition == cc)
+    
+    cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
+    
+    
+    ol.peaks <- makeVennDiagram(peaks[kk[c(2, 3,4)]], NameOfPeaks=names(peaks)[kk[c(2, 3, 4)]], connectedPeaks="keepAll", main=cc)
+    v <- venn_cnt2venn(ol.peaks$vennCounts)
+    try(plot(v))
+    
+    
+    pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, '2_p', pval.cutoff, '.pdf'), 
+        height = 10, width = 10)
+    try(plot(v))
+    dev.off()
+    
+    xx1 = intersect(peaks[[kk[2]]], peaks[[kk[3]]])
+    xx2 = intersect(peaks[[kk[2]]], peaks[[kk[4]]])
+    xx3 = intersect(peaks[[kk[3]]], peaks[[kk[4]]])
+    
+    xx = union(xx1, union(xx2, xx3))
+    eval(parse(text = paste0('peaks_', cc, ' = xx')))
+    peaks.merged = GenomicRanges::reduce(union(peaks.merged, xx))
+    
+    # n = 6
+    n = 6
+    cc = conds[n]
+    kk = which(design.sel$condition == cc)
+    
+    cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
+    
+    
+    ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main=cc)
+    v <- venn_cnt2venn(ol.peaks$vennCounts)
+    try(plot(v))
+    
+    
+    pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, '2_p', pval.cutoff, '.pdf'), 
+        height = 10, width = 10)
+    try(plot(v))
+    dev.off()
+    
+                                     
+    save(peaks.merged, file = paste0(RdataDir,  
+          '/histMarkers_macs2peaks_H3K4me3.H3K4me1_32samples_consensusPeaks_pval.', pval.cutoff, '.Rdata'))
+  
+  }
+  
+  
+}
 
 
 ########################################################
