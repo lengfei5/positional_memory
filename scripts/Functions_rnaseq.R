@@ -68,7 +68,7 @@ Define_limb_expressed_genes = function()
   dds = dds[, sels]
   
   cpm = fpm(dds)
-  cpm = log2(cpm + 2^-4)
+  cpm = log2(cpm + 2^-7)
   
   
 }
