@@ -141,6 +141,7 @@ pp$strand = '*'
 
 pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
                               start.field="X2", end.field="X3", strand.field="strand")
+saveRDS(pp, file = paste0(RdataDir, '/ATACseq_peak_consensus.rds'))
 
 # export(object = pp,  con = paste0(resDir, "/atacseq_peaks_all_140k.bed"), format = 'bed')
 
