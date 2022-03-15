@@ -141,7 +141,7 @@ pp$strand = '*'
 
 pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
                               start.field="X2", end.field="X3", strand.field="strand")
-saveRDS(pp, file = paste0(RdataDir, '/ATACseq_peak_consensus.rds'))
+saveRDS(pp, file = paste0(RdataDir, '/ATACseq_peak_consensus_140k.rds'))
 
 # export(object = pp,  con = paste0(resDir, "/atacseq_peaks_all_140k.bed"), format = 'bed')
 
@@ -363,6 +363,8 @@ if(grouping.position.dependent.peaks){
     
     pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
                                   start.field="X2", end.field="X3", strand.field="strand")
+    
+    saveRDS(pp, file = paste0(RdataDir, '/ATACseq_peak_consensus_filtered_55k.rds'))
     
     export(object = pp,  con = paste0(resDir, "/atacseq_peaks_filtered_55k.bed"), format = 'bed')
     

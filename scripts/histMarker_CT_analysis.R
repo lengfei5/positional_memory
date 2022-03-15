@@ -781,17 +781,11 @@ if(Test.readCounting.for.promoters){
 # 
 ########################################################
 ########################################################
-RNA.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functions/RNAseq_functions.R'
-RNA.QC.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functions/RNAseq_QCs.R'
-source(RNA.functions)
-source(RNA.QC.functions)
-
 design = read.csv(file = paste0(dataDir, "R11876_R12810_R12965_CT_analysis_20220217_QCs_AK.csv"))
 design = design[!is.na(design$sampleID), ]
 design$fileName = paste0(design$condition, '_', design$sampleID)
 design = design[, c(1:3, 15, 5, 4, 6:14)]
 colnames(design)[5] = 'batch'
-
 
 xlist<-list.files(path=paste0(dataDir, '/featurecounts_peaks.Q30'),
                   pattern = "*_featureCounts.txt$", full.names = TRUE) ## list of data set to merge
@@ -799,7 +793,6 @@ xlist<-list.files(path=paste0(dataDir, '/featurecounts_peaks.Q30'),
 all = cat.countTable(xlist, countsfrom = 'featureCounts')
 
 colnames(design)[1] = 'SampleID'
-#design = design[grep('90392|90393|108072|108073|108070|108071', design$SampleID, invert = TRUE),]
 
 counts = process.countTable(all=all, design = design[, c(1, 4)])
 
@@ -807,43 +800,129 @@ save(design, counts,
      file = paste0(RdataDir, '/histoneMarkers_samplesDesign_readCounts_peaks_histMarkers_ATACseq_missedTSS.dupReduced.Rdata'))
 
 ##########################################
-#  signal normalization and QC with PCA
+## First, for all samples together 
+# - filter peaks with low number of reads but keep some background and the one overlapping atac-seq peaks 
+# 
+# Then for each marker: H3K4me3, H3K4me1, H3K27me3, H3K27ac and IgG
+# - normalization,
+# - QC with PCA and pairwise plot, filter bad samples
+# - batch correction with Combat
+# - save the batch-corrected matrix for mature sample comparison and regeneration comparison
+# 
 ##########################################
 load(file = paste0(RdataDir, '/histoneMarkers_samplesDesign_readCounts_peaks_histMarkers_ATACseq_missedTSS.dupReduced.Rdata'))
 design$unique.rmdup = as.numeric(design$unique.rmdup)
 jj = which(as.numeric(design$unique.rmdup) > 1000)
 design$unique.rmdup[jj] = design$unique.rmdup[jj]/10^6
 
-conds = c('H3K4me3', 'H3K4me1', 'H3K27me3', 'H3K27ac')
-save.scalingFactors.for.deeptools = TRUE
-Make.pca.plots = TRUE
-
-for(n in 1:length(conds))
-{
-  # n = 2
-  cat(n, ' --', conds[n], '\n')
-  sels = which(design$marks == conds[n])
-  
-  design.sel = design[sels, ]
-  counts.sel = counts[, c(1, (sels+1))]
-  
-  ss = apply(as.matrix(counts.sel[, -1]), 1, mean)
-  
-  par(mfrow=c(1,2))
-  hist(log10(as.matrix(counts.sel[, -1])), breaks = 100, xlab = 'log10(nb of reads within peaks)', main = 'distribution')
-  plot(ecdf(log10(as.matrix(counts.sel[, -1]) + 0.1)), xlab = 'log10(nb of reads within peaks)', main = 'cumulative distribution')
-  
-  ss = apply(as.matrix(counts.sel[, -1]), 2, sum)
-  design.sel$usable.reads.withinPeaks = ss
+##########################################
+# filter peaks below certain thrshold of read counts
+##########################################
+if(Filtering.peaks.with.lowReads){
   
   rownames(counts.sel) = counts.sel$gene
   dds <- DESeqDataSetFromMatrix(as.matrix(counts.sel[, -1]), DataFrame(design.sel), design = ~ condition)
+    
+  index_bgs = grep('tss', rownames(dds))
+  ss = rowMaxs(counts(dds))
   
-  ss = rowSums(counts(dds))
   par(mfrow=c(1,1))
-  hist(log10(ss), breaks = 100)
-  hist(log10(ss[grep('tss', names(ss))]), breaks = 100, add = TRUE, col = 'darkgray')
-  length(which(ss > quantile(ss[grep('tss', names(ss))], probs = 0.8)))
+  hist(log10(ss), breaks = 100, main = 'log10(max(reads within peaks across samples))')
+  hist(log10(ss[index_bgs]), breaks = 100, add = TRUE, col = 'darkgray') 
+  length(which(ss > quantile(ss[index_bgs], probs = 0.8)))
+  
+  # check the peak length
+  peakNames = rownames(dds)
+  peakNames = gsub('tss.', '', peakNames)
+  pp = data.frame(t(sapply(peakNames, function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
+  
+  rownames(dds) = paste0(pp$X1, ':', pp$X2, '-', pp$X3)
+  
+  pp$strand = '*'
+  pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
+  ll = width(pp)
+  
+  index_keep = c()
+  
+  # max read counts normalized by length (nb of reads within 500bp) 
+  ss = rowMaxs(counts(dds))/ll*500 
+  hist(log10(ss), breaks = 100, col = 'blue', main = 'log2(max of read counts within peaks) ')
+  hist(log10(ss[index_bgs]), breaks = 100, add = TRUE, col = 'darkgray')
+  abline(v = log10(c(10, 20, 30, 40, 50)), col = 'red', lwd = 2.0)
+  
+  ## manually check the which cutoff is better
+  ii_test = rownames(dds)[which(ss>29.9 & ss<30.1)] # cutoff.peak = 30 look good for H3K4me3
+  
+  cutoff.peak = 30 # cutoff.peak = 30 for H3K4me3  (atac-seq cutoff.peak > 50) 
+  #cutoff.bg = 20
+  cat(length(which(ss >= cutoff.peak)), 'peaks selected with minimum read of the highest peak -- ', cutoff.peak,  '\n')
+  #cat(length(which(ss < cutoff.bg)), 'peaks selected with minimum read of the highest peak -- ', cutoff.bg,  '\n')
+  
+  hist(log10(ss), breaks = 100, col = 'blue', main = 'log2(max of read counts within peaks) ')
+  hist(log10(ss[index_bgs]), breaks = 100, add = TRUE, col = 'darkgray')
+  abline(v= log10(cutoff.peak), col = 'red', lwd = 2.0)
+  #abline(v= log10(cutoff.bg), col = 'blue', lwd = 2.0)
+  
+  #nb.above.threshold = apply(counts(dds), 1, function(x) length(which(x>cutoff.peak)))
+  index_keep = which(ss >= cutoff.peak)
+  
+  ### keep also peaks if they are overlapped by atac-seq peaks
+  atacseq_peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rxxxx_R10723_R11637_R12810_atac/Rdata/',
+                                        'ATACseq_peak_consensus_filtered_55k.rds'))
+  
+  index_keep = unique(c(index_keep, which(overlapsAny(pp, atacseq_peaks) == TRUE)))
+  cat(length(index_keep), ' peaks will be retained \n')
+  
+  if(select.background.for.peaks){
+    ii.bg = which(ss < cutoff.bg)
+    ii.bg = sample(ii.bg, size = 1000, replace = FALSE)
+    rownames(dds)[ii.bg] = paste0('bg_', rownames(dds)[ii.bg])
+    dds = dds[c(ii, ii.bg), ]
+    ll.sels = ll[c(ii, ii.bg)]
+    
+  }else{
+    dds <- dds[ii, ]
+    ll.sels = ll[ss >= cutoff.peak]
+  }
+  
+}
+
+
+conds = c('H3K4me3', 'H3K4me1', 'H3K27me3', 'H3K27ac', 'IgG')
+
+save.scalingFactors.for.deeptools = TRUE
+Make.pca.plots = TRUE
+Filtering.peaks.with.lowReads = TRUE
+Select.background.for.peaks = TRUE
+
+for(n in 1:length(conds))
+{
+  # n = 1
+  sels = which(design$marks == conds[n])
+  cat(n, ' --', conds[n], '--', length(sels), ' samples\n')
+  
+  design.sel = design[sels, ]
+  design.sel$condition = droplevels(design.sel$condition)
+  design.sel$batch = droplevels(design.sel$batch)
+  
+  counts.sel = counts[, c(1, (sels+1))]
+  
+  ss = apply(as.matrix(counts.sel[, -1]), 2, sum)/(design.sel$unique.rmdup*10^6)
+  
+  par(mfrow=c(1,2))
+  hist(log10(as.matrix(counts.sel[, -1])), breaks = 100, xlab = 'log10(nb of reads within peaks)', main = 'distribution')
+  hist(ss, xlab = '% of total reads within peaks')
+  
+  design.sel$usable.reads.withinPeaks = apply(as.matrix(counts.sel[, -1]), 2, sum)
+  
+ 
+    
+  ##########################################
+  # normalization  
+  ##########################################
+  
+
   
   dd0 = dds[ss > 100, ]
   dd0 = estimateSizeFactors(dd0)
@@ -888,7 +967,6 @@ for(n in 1:length(conds))
     
     ggsave(paste0(resDir, "/histM_PCA_", conds[n], ".pdf"), width=16, height = 10)
   }
-  
   
 }
 
