@@ -820,8 +820,8 @@ design$unique.rmdup[jj] = design$unique.rmdup[jj]/10^6
 ##########################################
 if(Filtering.peaks.with.lowReads){
   
-  rownames(counts.sel) = counts.sel$gene
-  dds <- DESeqDataSetFromMatrix(as.matrix(counts.sel[, -1]), DataFrame(design.sel), design = ~ condition)
+  rownames(counts) = counts$gene
+  dds <- DESeqDataSetFromMatrix(as.matrix(counts[, -1]), DataFrame(design), design = ~ condition)
     
   index_bgs = grep('tss', rownames(dds))
   ss = rowMaxs(counts(dds))
@@ -837,6 +837,7 @@ if(Filtering.peaks.with.lowReads){
   pp = data.frame(t(sapply(peakNames, function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
   
   rownames(dds) = paste0(pp$X1, ':', pp$X2, '-', pp$X3)
+  rownames(counts) = rownames(dds)
   
   pp$strand = '*'
   pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
@@ -849,9 +850,11 @@ if(Filtering.peaks.with.lowReads){
   ss = rowMaxs(counts(dds))/ll*500 
   hist(log10(ss), breaks = 100, col = 'blue', main = 'log2(max of read counts within peaks) ')
   hist(log10(ss[index_bgs]), breaks = 100, add = TRUE, col = 'darkgray')
-  abline(v = log10(c(10, 20, 30, 40, 50)), col = 'red', lwd = 2.0)
+  abline(v = log10(c(10, 20, 30, 50)), col = 'red', lwd = 2.0)
   
   ## manually check the which cutoff is better
+  #ii_test = rownames(dds)[which(ss>9.9 & ss<10.1)]
+  #ii_test = rownames(dds)[which(ss>19.9 & ss<20.1)]
   ii_test = rownames(dds)[which(ss>29.9 & ss<30.1)] # cutoff.peak = 30 look good for H3K4me3
   
   cutoff.peak = 30 # cutoff.peak = 30 for H3K4me3  (atac-seq cutoff.peak > 50) 
@@ -865,7 +868,7 @@ if(Filtering.peaks.with.lowReads){
   #abline(v= log10(cutoff.bg), col = 'blue', lwd = 2.0)
   
   #nb.above.threshold = apply(counts(dds), 1, function(x) length(which(x>cutoff.peak)))
-  index_keep = which(ss >= cutoff.peak)
+  index_keep = which(ss > cutoff.peak)
   
   ### keep also peaks if they are overlapped by atac-seq peaks
   atacseq_peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rxxxx_R10723_R11637_R12810_atac/Rdata/',
@@ -874,20 +877,31 @@ if(Filtering.peaks.with.lowReads){
   index_keep = unique(c(index_keep, which(overlapsAny(pp, atacseq_peaks) == TRUE)))
   cat(length(index_keep), ' peaks will be retained \n')
   
-  if(select.background.for.peaks){
-    ii.bg = which(ss < cutoff.bg)
-    ii.bg = sample(ii.bg, size = 1000, replace = FALSE)
-    rownames(dds)[ii.bg] = paste0('bg_', rownames(dds)[ii.bg])
-    dds = dds[c(ii, ii.bg), ]
-    ll.sels = ll[c(ii, ii.bg)]
+  if(Select.background.for.peaks){
+    #ii.bg = which(ss < cutoff.bg)
+    ii.bg = sample(index_bgs, size = 5000, replace = FALSE)
+    rownames(dds)[ii.bg] = paste0('tss.', rownames(dds)[ii.bg])
+    
+    index_keep = unique(c(index_keep, ii.bg))
+    
+    dds = dds[index_keep, ]
+    ll.sels = ll[index_keep]
     
   }else{
     dds <- dds[ii, ]
     ll.sels = ll[ss >= cutoff.peak]
   }
-  
+ 
+  save(design, dds, file = paste0(RdataDir, 
+                                  '/histoneMarkers_samplesDesign_ddsPeaksMatrix_filtered_incl.atacPeak.missedTSS.bgs_150k.Rdata'))
+   
 }
 
+##########################################
+# for each markers, normalization, sample filtering, and batch correction
+##########################################
+load(file = paste0(RdataDir, 
+                   '/histoneMarkers_samplesDesign_ddsPeaksMatrix_filtered_incl.atacPeak.missedTSS.bgs_150k.Rdata'))
 
 conds = c('H3K4me3', 'H3K4me1', 'H3K27me3', 'H3K27ac', 'IgG')
 
@@ -898,66 +912,45 @@ Select.background.for.peaks = TRUE
 
 for(n in 1:length(conds))
 {
-  # n = 1
-  sels = which(design$marks == conds[n])
+  # n = 4
+  sels = which(dds$marks == conds[n] & dds$SampleID != '163652' & dds$SampleID != '163655')
+  
   cat(n, ' --', conds[n], '--', length(sels), ' samples\n')
   
+  ddx = dds[, sels]
   design.sel = design[sels, ]
-  design.sel$condition = droplevels(design.sel$condition)
-  design.sel$batch = droplevels(design.sel$batch)
   
-  counts.sel = counts[, c(1, (sels+1))]
-  
-  ss = apply(as.matrix(counts.sel[, -1]), 2, sum)/(design.sel$unique.rmdup*10^6)
-  
-  par(mfrow=c(1,2))
-  hist(log10(as.matrix(counts.sel[, -1])), breaks = 100, xlab = 'log10(nb of reads within peaks)', main = 'distribution')
-  hist(ss, xlab = '% of total reads within peaks')
-  
-  design.sel$usable.reads.withinPeaks = apply(as.matrix(counts.sel[, -1]), 2, sum)
-  
- 
-    
-  ##########################################
-  # normalization  
-  ##########################################
-  
+  ddx$condition = droplevels(ddx$condition)
+  ddx$batch = droplevels(ddx$batch)
 
+  ## normalization  
+  ss = rowSums(counts(ddx))
+  hist(log10(ss), breaks = 100);
+  abline(v = 2, col = 'red', lwd = 2.0)
   
-  dd0 = dds[ss > 100, ]
+  dd0 = ddx[ss > 100, ]
   dd0 = estimateSizeFactors(dd0)
   sizefactors.UQ = sizeFactors(dd0)
+  sizeFactors(ddx) <- sizefactors.UQ
   
-  sizeFactors(dds) <- sizefactors.UQ
-  fpm = fpm(dds, robust = TRUE)
-  #colnames(fpm) = design$condition
+  fpm = fpm(ddx, robust = TRUE)
+  log2(range(fpm[which(fpm>0)]))
   
-  if(save.scalingFactors.for.deeptools){
-    if(n == 1){
-      xx = data.frame(sampleID = design.sel$SampleID,  
-                      scalingFactor = design.sel$unique.rmdup/(sizeFactors(dds)*median(as.numeric(design.sel$unique.rmdup))),
-                      stringsAsFactors = FALSE)
-    }else{
-      xx0 = data.frame(sampleID = design.sel$SampleID,  
-                         scalingFactor = design.sel$unique.rmdup/(sizeFactors(dds)*median(design.sel$unique.rmdup)),
-                         stringsAsFactors = FALSE)
-      xx = rbind(xx, xx0)
-      
-    }
-    
-  }
+  fpm = log2(fpm + 2^-4)
+  colnames(fpm) = paste0(design.sel$condition, '_', design.sel$SampleID, '_', design.sel$batch)
   
+  ## double check the sample qualities with PCA and scatterplots of replicates
   if(Make.pca.plots){
     library(ggrepel)
     library(dplyr)
     library(tibble)
     
-    vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
+    vsd <- varianceStabilizingTransformation(ddx, blind = FALSE)
     
-    pca=plotPCA(vsd, intgroup = c('condition', 'batch'), returnData = FALSE)
-    print(pca)
+    #pca=plotPCA(vsd, intgroup = c('condition', 'batch'), returnData = FALSE)
+    #print(pca)
     
-    pca2save = as.data.frame(plotPCA(vsd, intgroup = c('condition', 'batch'), returnData = TRUE, ntop = 3000))
+    pca2save = as.data.frame(plotPCA(vsd, intgroup = c('condition', 'batch'), returnData = TRUE, ntop = 5000))
     pca2save$name = paste0(design.sel$condition, '_', design.sel$SampleID)
     
     ggplot(data=pca2save, aes(PC1, PC2, label = name, color= condition, shape = batch))  + 
@@ -965,14 +958,81 @@ for(n in 1:length(conds))
       #geom_text_repel(size = 2.0, color = 'darkblue')
       geom_text(hjust = 0.2, nudge_y = 0.2, size=2.5)
     
-    ggsave(paste0(resDir, "/histM_PCA_", conds[n], ".pdf"), width=16, height = 10)
+    ggsave(paste0(resDir, "/histM_PCA_peakFiltered_", conds[n], ".pdf"), width=16, height = 10)
+    
+    plot.pair.comparison.plot(fpm[c(1:20000), grep('_mUA', colnames(fpm))], linear.scale = FALSE)
+    plot.pair.comparison.plot(fpm[c(1:20000), grep('_mLA', colnames(fpm))], linear.scale = FALSE)
+    plot.pair.comparison.plot(fpm[c(1:20000), grep('_mHand', colnames(fpm))], linear.scale = FALSE)
+    
   }
   
+  ## batch correction
+  require(edgeR)
+  require(sva)
+  source('Functions_atac.R')
+  
+  d <- DGEList(counts=counts(ddx), group=ddx$condition)
+  tmm <- calcNormFactors(d, method='TMM')
+  tmm = cpm(tmm, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 1)
+  
+  design.sel$condition = droplevels(design.sel$condition)
+  design.sel$batch = droplevels(design.sel$batch)
+  
+  bc = as.factor(design.sel$batch)
+  mod = model.matrix(~ as.factor(condition), data = design.sel)
+  # tmm = as.matrix(tmm)
+  # vars = apply(tmm, 1, var)
+  # tmm = tmm[which(vars>0), ]
+  # if specify ref.batch, the parameters will be estimated from the ref, inapprioate here, 
+  # because there is no better batche other others 
+  #ref.batch = '2021S'# 2021S as reference is better for some reasons (NOT USED here)    
+  fpm.bc = ComBat(dat=as.matrix(tmm), batch=bc, mod=mod, par.prior=TRUE, ref.batch = NULL) 
+  
+  #design.tokeep<-model.matrix(~ 0 + conds,  data = design.sels)
+  #cpm.bc = limma::removeBatchEffect(tmm, batch = bc, design = design.tokeep)
+  # plot(fpm.bc[,1], tmm[, 1]);abline(0, 1, lwd = 2.0, col = 'red')
+  make.pca.plots(tmm, ntop = 5000, conds.sel = as.character(unique(design.sel$condition)))
+  ggsave(paste0(resDir, "/histMarker_", conds[n], "_beforeBatchCorrect_",  version.analysis, ".pdf"), width = 16, height = 14)
+  
+  make.pca.plots(fpm.bc, ntop = 5000, conds.sel = as.character(unique(design.sel$condition)))
+  ggsave(paste0(resDir, "/histMarker_", conds[n], "_afterBatchCorrect_",  version.analysis, ".pdf"), width = 16, height = 14)
+  
+  fpm = fpm.bc
+  rm(fpm.bc)
+  
+  saveRDS(fpm, file = paste0(RdataDir, '/fpm_bc_TMM_combat_', conds[n], '_', version.analysis, '.rds'))
+  saveRDS(design.sel, file = paste0(RdataDir, '/design.sels_bc_TMM_combat_', conds[n], '_', version.analysis, '.rds'))
+  
+  
+  ## save scaling factor for deeptools to make bigwig
+  if(save.scalingFactors.for.deeptools){
+    if(n == 1){
+      xx = data.frame(sampleID = design.sel$SampleID,  
+                      scalingFactor = design.sel$unique.rmdup/(sizeFactors(dds)*median(as.numeric(design.sel$unique.rmdup))),
+                      stringsAsFactors = FALSE)
+      
+    }else{
+      xx0 = data.frame(sampleID = design.sel$SampleID,  
+                       scalingFactor = design.sel$unique.rmdup/(sizeFactors(dds)*median(design.sel$unique.rmdup)),
+                       stringsAsFactors = FALSE)
+      xx = rbind(xx, xx0)
+      
+    }
+    
+  }
 }
 
 write.table(xx, file = paste0(resDir, '/histMarkers_DESeq2_scalingFactor_forDeeptools.txt'), sep = '\t',
             col.names = FALSE, row.names = FALSE, quote = FALSE)
 
+
+
+########################################################
+########################################################
+# Section :
+# 
+########################################################
+########################################################
 
 ##########################################
 # test/explore histone markers for postional-related genes

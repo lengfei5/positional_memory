@@ -1265,26 +1265,27 @@ normalize.batch.correct = function(fpm, design, norm.batch.method ='TMM.combat')
 }
 
 
-make.pca.plots = function(fpm, ntop = 1000, conds.plot = 'Dev.Mature')
+make.pca.plots = function(fpm, ntop = 1000, conds.plot = 'Dev.Mature', conds.sel = NULL)
 {
   library(factoextra)
-  
-  if(conds.plot == 'all'){
-    conds.sel = c('Embryo_Stage40',  'Embryo_Stage44_proximal', 'Embryo_Stage44_distal',
-                  'Mature_UA', 'Mature_LA', 'Mature_Hand', 'HEAD', 
-                  'BL_UA_5days',  'BL_UA_9days', 'BL_UA_13days_proximal',  'BL_UA_13days_distal')
-  }
-  
-  if(conds.plot == 'Dev.Regeneration')
-  {
-    conds.sel = c('Embryo_Stage40',  'Embryo_Stage44_proximal', 'Embryo_Stage44_distal',
-                  'BL_UA_5days',  'BL_UA_9days', 'BL_UA_13days_proximal',  'BL_UA_13days_distal')
-  }
-  
-  if(conds.plot == 'Mature'){
-    conds.sel = c('HEAD', 'Mature_UA', 'Mature_LA', 'Mature_Hand')
-  }
+  if(is.null(conds.sel)){
     
+    if(conds.plot == 'all'){
+      conds.sel = c('Embryo_Stage40',  'Embryo_Stage44_proximal', 'Embryo_Stage44_distal',
+                    'Mature_UA', 'Mature_LA', 'Mature_Hand', 'HEAD', 
+                    'BL_UA_5days',  'BL_UA_9days', 'BL_UA_13days_proximal',  'BL_UA_13days_distal')
+    }
+    if(conds.plot == 'Dev.Regeneration')
+    {
+      conds.sel = c('Embryo_Stage40',  'Embryo_Stage44_proximal', 'Embryo_Stage44_distal',
+                    'BL_UA_5days',  'BL_UA_9days', 'BL_UA_13days_proximal',  'BL_UA_13days_distal')
+    }
+    
+    if(conds.plot == 'Mature'){
+      conds.sel = c('HEAD', 'Mature_UA', 'Mature_LA', 'Mature_Hand')
+    }
+  }
+  
   sample.sel = c()
   ii.gaps = c()
   for(n in 1:length(conds.sel)) {
