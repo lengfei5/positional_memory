@@ -892,7 +892,6 @@ for(n in 1:length(conds))
   
 }
 
-
 write.table(xx, file = paste0(resDir, '/histMarkers_DESeq2_scalingFactor_forDeeptools.txt'), sep = '\t',
             col.names = FALSE, row.names = FALSE, quote = FALSE)
 
