@@ -1026,10 +1026,20 @@ write.table(xx, file = paste0(resDir, '/histMarkers_DESeq2_scalingFactor_forDeep
             col.names = FALSE, row.names = FALSE, quote = FALSE)
 
 
+########################################################
+########################################################
+# Section IV : start to characterize the mUA to characterize the mature samples
+# The underlying hypothesise is that the difference between UA, LA and Hand are minor 
+# so once we have good idea of the global picture of mUA, it would be much easier to understand the segment-specific histone markers
+# also to describe the changes during regneration
+########################################################
+########################################################
+
+
 
 ########################################################
 ########################################################
-# Section :
+# Section V : postional-histone markers
 # 
 ########################################################
 ########################################################
@@ -1084,6 +1094,13 @@ ggplot(data=res, aes(x=x1, y=x2, label = gene)) +
 
 ggsave(paste0(figureDir, "histMarker_H3K27me3_scatterplot_Hand.vs.Hand.pdf"), width=12, height = 8)
 
+  
+########################################################
+########################################################
+# Section VI : regeneration-related histone markers
+# 
+########################################################
+########################################################
 ########################################################
 ########################################################
 # Section : Consider the grouping: 
@@ -1232,7 +1249,7 @@ if(Redefine.gene.groups.with.RNAseq){
   
   #jj = which(res$x1>4 & res$x2 >4)
   #xx = res[jj, ]
-    
+  
   kk = which(res$groups == 'limb')
   
   diffs = res$expr.BLday5[kk] - res$expr.mUA[kk]
@@ -1268,11 +1285,11 @@ if(Redefine.gene.groups.with.RNAseq){
   kk = which(res$groups == 'limb')
   
   select = kk[which(res$expr.mUA[kk] < 0 & (res$expr.BLday5[kk] - res$expr.mUA[kk]) < 2 &  (res$expr.BLday9[kk] - res$expr.mUA[kk]) < 2 &
-                    (res$expr.BLday13[kk] - res$expr.mUA[kk]) >2)]
+                      (res$expr.BLday13[kk] - res$expr.mUA[kk]) >2)]
   res$groups[select] = 'upregulated.d13'
   
   select = kk[which(res$expr.mUA[kk] > 0 & (res$expr.mUA[kk] - res$expr.BLday5[kk]) < 2 & (res$expr.mUA[kk] - res$expr.BLday9[kk]) < 2 &
-                (res$expr.mUA[kk] - res$expr.BLday9[kk]) > 2) ]
+                      (res$expr.mUA[kk] - res$expr.BLday9[kk]) > 2) ]
   res$groups[select] = 'downregulated.d13'
   
   
@@ -1310,7 +1327,7 @@ if(Redefine.gene.groups.with.RNAseq){
   select = which((aa$padj >= fdr.cutoff | aa$log2FC <=1) & log2(aa$baseMean) <4) 
   res$groups[!is.na(match(res$geneID, aa$geneID[select])) & res$groups == 'limb_static'] = 'limb_lowlyExp'
   
-    
+  
 }
 
 
@@ -1329,8 +1346,8 @@ ggplot(data=res, aes(x=x1, y=x2, label = gene, color = groups)) +
 #xx = melt(res[], id.vars = c('UA_K4me3', 'UA_K27me3'), variable_name = 'markers')
 res[,c(1, 4, 7:13)] %>% 
   pivot_longer(cols = c('UA_K4me3', 'UA_K27me3'), names_to = 'markers') %>%
-ggplot(aes(x = factor(groups, levels = c('other_tissues', 'house_keep', 'limb_lowlyExp',
-                                          'mature_highlyExp', 'regeneration', 'limb_static')), y=value, fill=markers)) + 
+  ggplot(aes(x = factor(groups, levels = c('other_tissues', 'house_keep', 'limb_lowlyExp',
+                                           'mature_highlyExp', 'regeneration', 'limb_static')), y=value, fill=markers)) + 
   geom_boxplot(outlier.alpha = 0.1) + 
   #geom_jitter(width = 0.1)+
   #geom_violin(width = 1.2) +
@@ -1338,4 +1355,4 @@ ggplot(aes(x = factor(groups, levels = c('other_tissues', 'house_keep', 'limb_lo
   theme(axis.text.x = element_text(angle = 0, size = 14)) +
   labs(x = "", y= 'normalized data (log2)')
 
-  
+
