@@ -1044,6 +1044,7 @@ for(n in 1:length(conds))
   cpm = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', conds[n], '_', version.analysis, '.rds'))
   design.sel = readRDS(file = paste0(RdataDir, '/design.sels_bc_TMM_combat_', conds[n], '_', version.analysis, '.rds'))
   
+  ### extract sample means  
   kk = grep(sample.sel, colnames(cpm))
   if(length(kk) == 0) cat('No sample found ! ERROR !!! \n')
   cat(length(kk), ' samples found for ', conds[n], ' - ', sample.sel, '\n')
@@ -1053,6 +1054,10 @@ for(n in 1:length(conds))
   }else{
     keep = cbind(keep, cpm[, kk])
   }
+  
+  library(edgeR)
+  library(qvalue)
+  
 }  
 
 colnames(keep) = conds
@@ -1083,6 +1088,7 @@ pp = pp[-ii_bgs]
 ii_overlap = which(overlapsAny(pp, atacseq_peaks) == TRUE)
 cpm_nonoverlap = keep[-ii_overlap, ]
 keep = keep[ii_overlap, ]
+
 
 ### scale the hisone marker signals to 0 and 1
 Transform.histMarkers.to.mitigate.different.background.dynamicRanges = FALSE
@@ -1221,27 +1227,65 @@ pheatmap(xx[c(1:20000), ], show_rownames = FALSE, show_colnames = TRUE,
          scale = 'none')
 
 
-pheatmap(yy, annotation_row = my_gene_col, 
-         annotation_col = df, show_rownames = FALSE, scale = 'none', 
-         color = col, 
-         show_colnames = FALSE,
-         cluster_rows = TRUE, cluster_cols = FALSE,  
-         clustering_method = 'complete', cutree_rows = nb_clusters, 
-         annotation_colors = annot_colors, 
-         clustering_callback = callback,
-         gaps_col = gaps.col, 
-         filename = paste0(saveDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
-         width = 6, height = 12)
-
-
-
-
 ########################################################
 ########################################################
 # Section V : postional-histone markers
 # 
 ########################################################
 ########################################################
+conds = c('H3K4me3', 'H3K4me1', 'H3K27me3',   'H3K27ac')
+
+keep = c()
+for(n in 1:length(conds))
+{
+  # n = 1
+  cpm = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', conds[n], '_', version.analysis, '.rds'))
+  design.sel = readRDS(file = paste0(RdataDir, '/design.sels_bc_TMM_combat_', conds[n], '_', version.analysis, '.rds'))
+  
+  ### extract sample means  
+  kk = grep(sample.sel, colnames(cpm))
+  if(length(kk) == 0) cat('No sample found ! ERROR !!! \n')
+  cat(length(kk), ' samples found for ', conds[n], ' - ', sample.sel, '\n')
+  
+  if(length(kk)>1) {
+    keep = cbind(keep, apply(cpm[, kk], 1, mean))
+  }else{
+    keep = cbind(keep, cpm[, kk])
+  }
+  
+  library(edgeR)
+  library(qvalue)
+  
+}  
+
+colnames(keep) = conds
+
+### mainly focus on the atac-seq overlapped peaks
+atacseq_peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rxxxx_R10723_R11637_R12810_atac/Rdata/',
+                                      'ATACseq_peak_consensus_filtered_55k.rds'))
+ii_bgs = grep('tss.', rownames(keep))
+rownames(keep) = gsub('tss.', '', rownames(keep))
+
+pp = data.frame(t(sapply(rownames(keep), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+pp$strand = '*'
+pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                              start.field="X2", end.field="X3", strand.field="strand")
+lls = width(pp)
+
+for(n in 1:ncol(keep))
+{
+  keep[,n] = keep[,n] + log2(1000/lls)
+}
+
+cpm_bgs = keep[ii_bgs, ]
+keep = keep[-ii_bgs, ]
+pp = pp[-ii_bgs]
+
+ii_overlap = which(overlapsAny(pp, atacseq_peaks) == TRUE)
+cpm_nonoverlap = keep[-ii_overlap, ]
+keep = keep[ii_overlap, ]
+
+
 
 ##########################################
 # test/explore histone markers for postional-related genes
