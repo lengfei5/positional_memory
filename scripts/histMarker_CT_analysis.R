@@ -25,8 +25,8 @@ RdataDir = paste0(resDir, '/Rdata')
 if(!dir.exists(resDir)) dir.create(resDir)
 if(!dir.exists(RdataDir)) dir.create(RdataDir)
 
-# figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
-# tableDir = paste0(figureDir, 'tables4plots/')
+figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
+tableDir = paste0(figureDir, 'tables4plots/')
 
 annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
 dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/histMod_CT_using/'
@@ -1034,7 +1034,7 @@ write.table(xx, file = paste0(resDir, '/histMarkers_DESeq2_scalingFactor_forDeep
 # also to describe the changes during regneration
 ########################################################
 ########################################################
-conds = c('H3K4me3', 'H3K27me3',  'H3K4me1', 'H3K27ac')
+conds = c('H3K4me3', 'H3K4me1', 'H3K27me3',   'H3K27ac')
 sample.sel = 'mUA'
 
 keep = c()
@@ -1063,21 +1063,159 @@ colnames(keep) = conds
 atacseq_peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rxxxx_R10723_R11637_R12810_atac/Rdata/',
                                       'ATACseq_peak_consensus_filtered_55k.rds'))
 ii_bgs = grep('tss.', rownames(keep))
-cpm_bgs = keep[ii_bgs, ]
-keep = keep[-ii_bgs, ]
+rownames(keep) = gsub('tss.', '', rownames(keep))
 
 pp = data.frame(t(sapply(rownames(keep), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
 pp$strand = '*'
 pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
                               start.field="X2", end.field="X3", strand.field="strand")
+lls = width(pp)
+
+for(n in 1:ncol(keep))
+{
+  keep[,n] = keep[,n] + log2(1000/lls)
+}
+
+cpm_bgs = keep[ii_bgs, ]
+keep = keep[-ii_bgs, ]
+pp = pp[-ii_bgs]
 
 ii_overlap = which(overlapsAny(pp, atacseq_peaks) == TRUE)
+cpm_nonoverlap = keep[-ii_overlap, ]
 keep = keep[ii_overlap, ]
 
+### scale the hisone marker signals to 0 and 1
+Transform.histMarkers.to.mitigate.different.background.dynamicRanges = FALSE
+if(Transform.histMarkers.to.mitigate.different.background.dynamicRanges){
+  cal_transform_histM = function(x, cutoff.min = 3, cutoff.max = 6)
+  {
+    # x = keep[,1];cutoff.min = 3.5; cutoff.max = 6
+    x[which(x<cutoff.min)] = cutoff.min
+    x[which(x>cutoff.max)] = cutoff.max
+    x = (x - cutoff.min)/(cutoff.max - cutoff.min)
+    
+  }
+  
+  xx = keep
+  n = 1
+  hist(cpm_nonoverlap[,n], breaks = 100, col = 'darkred'); 
+  hist(xx[,n], breaks = 100, col = 'darkblue', add = TRUE);
+  hist(cpm_bgs[,n], breaks = 50, add = TRUE, col = 'darkgray')
+  abline(v = c(2, 1.5), col = 'blue')
+  
+  xx[, n] = cal_transform_histM(keep[, n], cutoff.min = 2., cutoff.max = 4) 
+  
+  n = 2
+  hist(cpm_nonoverlap[,n], breaks = 100, col = 'darkred'); 
+  hist(xx[,n], breaks = 100, col = 'darkblue', add = TRUE);
+  hist(cpm_bgs[,n], breaks = 50, add = TRUE, col = 'darkgray')
+  
+  xx[, 2] = cal_transform_histM(keep[, 2], cutoff.min = 1.5, cutoff.max = 3.5) 
+  
+  n = 3
+  hist(cpm_nonoverlap[,n], breaks = 100, col = 'darkred'); 
+  hist(xx[,n], breaks = 100, col = 'darkblue', add = TRUE);
+  hist(cpm_bgs[,n], breaks = 50, add = TRUE, col = 'darkgray')
+  
+  xx[, 3] = cal_transform_histM(keep[, 3], cutoff.min = 2., cutoff.max = 4) 
+  
+  n = 4
+  hist(cpm_nonoverlap[,n], breaks = 100, col = 'darkred'); 
+  hist(xx[,n], breaks = 100, col = 'darkblue', add = TRUE);
+  hist(cpm_bgs[,n], breaks = 50, add = TRUE, col = 'darkgray')
+  
+  xx[, 4] = cal_transform_histM(keep[, 4], cutoff.min = 1.5, cutoff.max = 3.5) 
+  
+}
 
-col<- colorRampPalette(c("steelblue", "white", "darkred"))(8)
-#col = colorRampPalette(c("white", 'green4', "magenta"))(10)
-pheatmap(keep[c(1:10000), ], show_rownames = FALSE, show_colnames = TRUE, 
+##########################################
+# visualize mUA chromatin states defined by 4 markers
+##########################################
+yy = xx[c(1:25000), ]
+nb_clusters = 8
+
+library(dendextend)
+my_hclust_gene <- hclust(dist(yy), method = "complete")
+
+my_gene_col <- cutree(tree = as.dendrogram(my_hclust_gene), k = nb_clusters)
+
+my_gene_col <- data.frame(cluster =  paste0('cluster_', my_gene_col))
+rownames(my_gene_col) = rownames(yy)
+
+df <- data.frame(conds)
+rownames(df) = colnames(yy)
+colnames(df) = 'histMarker'
+
+col3 <- c("#a6cee3", "#1f78b4", "#b2df8a",
+          "#33a02c", "#fb9a99", "#e31a1c",
+          "#fdbf6f", "#ff7f00", "#cab2d6",
+          "#6a3d9a", "#ffff99", "#b15928")
+
+sample_colors = c('springgreen4', 'steelblue2', 'red', 'darkgreen')
+names(sample_colors) = conds
+cluster_col = col3[1:nb_clusters]
+names(cluster_col) = paste0('cluster_', c(1:nb_clusters))
+annot_colors = list(
+  histMarker = sample_colors,
+  cluster = cluster_col)
+
+#gaps.col = c()
+#col<- colorRampPalette(c("steelblue", "white", "darkred"))(8)
+#col = colorRampPalette(rev(brewer.pal(n = 7, name ="RdYlBu")))(8)
+col = colorRampPalette(c('darkgray',  "orange"))(20)
+plt = pheatmap(yy, annotation_row = my_gene_col, 
+               annotation_col = df, show_rownames = FALSE, scale = 'none', 
+               color = col, 
+               show_colnames = FALSE,
+               cluster_rows = TRUE, cluster_cols = FALSE,  
+               clustering_method = 'complete', cutree_rows = nb_clusters, 
+               annotation_colors = annot_colors
+               #gaps_col = gaps.col
+               ) 
+
+
+row_order = data.frame(plt$tree_row$order, plt$tree_row$labels, stringsAsFactors = FALSE)
+colnames(row_order) = c('index', 'name')
+row_order$name = row_order$name[row_order$index]
+row_order$cluster = my_gene_col$cluster[match(row_order$name, rownames(my_gene_col))]
+
+callback = function(hc, mat){
+  #sv = svd(t(mat))$v[,1]
+  #clusters_order = 
+  sv = svd(t(mat))$v[,1]
+  dend = reorder(as.dendrogram(hc), wts = sv)
+  as.hclust(dend)
+  
+  # o1 = c()
+  # for(co in paste0('cluster_', c(1, 6, 5, 4, 3, 2))) {
+  #   o1 = c(o1, row_order$index[which(row_order$cluster == co)])
+  #   #row_order = row_order[o1, ]
+  # }
+  # dend = reorder(as.dendrogram(hc), wts = o1)
+  # as.hclust(dend)
+  
+}
+
+
+pheatmap(yy, annotation_row = my_gene_col, 
+         annotation_col = df, show_rownames = FALSE, scale = 'none', 
+         color = col, 
+         show_colnames = FALSE,
+         cluster_rows = TRUE, cluster_cols = FALSE,  
+         clustering_method = 'complete', cutree_rows = nb_clusters, 
+         annotation_colors = annot_colors, 
+         clustering_callback = callback,
+         #gaps_col = gaps.col, 
+         filename = paste0(figureDir, '/heatmap_mUA_chromatinStates_histoneMarkers.pdf'), 
+         width = 6, height = 12)
+
+
+#write.csv(xx, file = paste0(saveDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters', 
+#                            nb_clusters, '.csv'), quote = FALSE, row.names = TRUE)
+
+#col = colorRampPalette(c("black",  "orange"))(5)
+#col = colorRampPalette((brewer.pal(n = 7, name ="YlOrRd")))(10)
+pheatmap(xx[c(1:20000), ], show_rownames = FALSE, show_colnames = TRUE, 
          cluster_cols = FALSE, 
          col = col,
          scale = 'none')
