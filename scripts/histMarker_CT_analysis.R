@@ -1233,36 +1233,117 @@ pheatmap(xx[c(1:20000), ], show_rownames = FALSE, show_colnames = TRUE,
 # 
 ########################################################
 ########################################################
+atacseq_peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rxxxx_R10723_R11637_R12810_atac/Rdata/',
+                                      'ATACseq_peak_consensus_filtered_55k.rds'))
+
 conds = c('H3K4me3', 'H3K4me1', 'H3K27me3',   'H3K27ac')
 
-keep = c()
 for(n in 1:length(conds))
 {
   # n = 1
+  #keep = c()
   cpm = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', conds[n], '_', version.analysis, '.rds'))
   design.sel = readRDS(file = paste0(RdataDir, '/design.sels_bc_TMM_combat_', conds[n], '_', version.analysis, '.rds'))
   
-  ### extract sample means  
-  kk = grep(sample.sel, colnames(cpm))
-  if(length(kk) == 0) cat('No sample found ! ERROR !!! \n')
-  cat(length(kk), ' samples found for ', conds[n], ' - ', sample.sel, '\n')
+  ### select the samples and extract sample means
+  conds = c("mUA", "mLA", "mHand")
   
-  if(length(kk)>1) {
-    keep = cbind(keep, apply(cpm[, kk], 1, mean))
-  }else{
-    keep = cbind(keep, cpm[, kk])
-  }
+  sample.sels = c();  
+  cc = c()
+  sample.means = c()
+  
+  for(n in 1:length(conds)) 
+  {
+    kk = grep(conds[n], colnames(cpm))
+    sample.sels = c(sample.sels, kk)
+    cc = c(cc, rep(conds[n], length(kk)))
+    if(length(kk)>1) {
+      sample.means = cbind(sample.means, apply(cpm[, kk], 1, mean))
+    }else{
+      sample.means = cbind(sample.means, cpm[, kk])
+    }
+    
+  }  
+  colnames(sample.means) = conds
+  
+  cpm = cpm[, sample.sels]
+  design.sel = design.sel[sample.sels, ]
   
   library(edgeR)
   library(qvalue)
+  
+  logCPM = cpm
+  f = factor(cc, levels= c('mUA', 'mLA', 'mHand'))
+  
+  mod = model.matrix(~ 0 + f)
+  colnames(mod) = c('mUA', 'mLA', 'mHand')
+  
+  #To make all pair-wise comparisons between the three groups one could proceed
+  fit <- lmFit(logCPM, mod)
+  contrast.matrix <- makeContrasts(mLA - mUA, 
+                                   mHand - mUA, 
+                                   mHand - mLA, levels=mod)
+  fit2 <- contrasts.fit(fit, contrast.matrix)
+  fit2 <- eBayes(fit2)
+  
+  res = data.frame(fit2$p.value)
+  colnames(res) = paste0(c('mLA.vs.mUA', 'mHand.vs.mUA', 'mHand.vs.mLA'), '.pval')
+  
+  xx = topTable(fit2, coef = 1, number = nrow(res))
+  xx = xx[, c(1, 4, 5)]
+  colnames(xx) = paste0(colnames(xx), '.mLA.vs.mUA')
+  res = data.frame(res, xx[match(rownames(res), rownames(xx)), ])
+  
+  xx = topTable(fit2, coef = 2, number = nrow(res))
+  xx = xx[, c(1, 4, 5)]
+  colnames(xx) = paste0(colnames(xx), '.mHand.vs.mUA')
+  res = data.frame(res, xx[match(rownames(res), rownames(xx)), ])
+  
+  xx = topTable(fit2, coef = 3, number = nrow(res))
+  xx = xx[, c(1, 4, 5)]
+  colnames(xx) = paste0(colnames(xx), '.mHand.vs.mLA')
+  res = data.frame(res, xx[match(rownames(res), rownames(xx)), ])
+  
+  res$fdr.mean = apply(as.matrix(res[, grep('adj.P.Val', colnames(res))]), 1, function(x) return(mean(-log10(x))))
+  res$logFC.mean =  apply(as.matrix(res[, grep('logFC', colnames(res))]), 1, function(x) return(mean(abs(x))))
+  
+  res$log2fc = apply(sample.means, 1, function(x) max(x) - min(x))
+  res$maxs = apply(sample.means, 1, max)
+  res$mins = apply(sample.means, 1, min)
+  
+  require(corrplot)
+  require(pheatmap)
+  require(RColorBrewer)
+  
+  fdr.cutoff = 0.05; logfc.cutoff = 1
+  select = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & abs(res$logFC.mLA.vs.mUA) > logfc.cutoff) |
+               (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & abs(res$logFC.mHand.vs.mUA) > logfc.cutoff)|
+               (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & abs(res$logFC.mHand.vs.mLA) > logfc.cutoff)
+  )
+  cat(length(select), ' DE genes \n')
+  
+  yy = sample.means[select, ]
+  df = as.data.frame(conds)
+  colnames(df) = 'segments'
+  rownames(df) = colnames(yy)
+  
+  sample_colors = c('springgreen4', 'steelblue2', 'gold2')
+  annot_colors = list(segments = sample_colors)
+  
+  pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+           color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
+           show_colnames = FALSE,
+           scale = 'row',
+           cluster_cols=FALSE, annotation_col=df,
+           #annotation_colors = annot_colors,
+           width = 6, height = 12, 
+           filename = paste0(figureDir, '/heatmap_histoneMarker_H3K4me3.pdf'))
+  
   
 }  
 
 colnames(keep) = conds
 
-### mainly focus on the atac-seq overlapped peaks
-atacseq_peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rxxxx_R10723_R11637_R12810_atac/Rdata/',
-                                      'ATACseq_peak_consensus_filtered_55k.rds'))
 ii_bgs = grep('tss.', rownames(keep))
 rownames(keep) = gsub('tss.', '', rownames(keep))
 
