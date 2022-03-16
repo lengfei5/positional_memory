@@ -1034,6 +1034,67 @@ write.table(xx, file = paste0(resDir, '/histMarkers_DESeq2_scalingFactor_forDeep
 # also to describe the changes during regneration
 ########################################################
 ########################################################
+conds = c('H3K4me3', 'H3K27me3',  'H3K4me1', 'H3K27ac')
+sample.sel = 'mUA'
+
+keep = c()
+for(n in 1:length(conds))
+{
+  # n = 1
+  cpm = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', conds[n], '_', version.analysis, '.rds'))
+  design.sel = readRDS(file = paste0(RdataDir, '/design.sels_bc_TMM_combat_', conds[n], '_', version.analysis, '.rds'))
+  
+  kk = grep(sample.sel, colnames(cpm))
+  if(length(kk) == 0) cat('No sample found ! ERROR !!! \n')
+  cat(length(kk), ' samples found for ', conds[n], ' - ', sample.sel, '\n')
+  
+  if(length(kk)>1) {
+    keep = cbind(keep, apply(cpm[, kk], 1, mean))
+  }else{
+    keep = cbind(keep, cpm[, kk])
+  }
+}  
+
+colnames(keep) = conds
+
+##########################################
+# focus on the atac-seq overlapped peaks
+##########################################
+atacseq_peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rxxxx_R10723_R11637_R12810_atac/Rdata/',
+                                      'ATACseq_peak_consensus_filtered_55k.rds'))
+ii_bgs = grep('tss.', rownames(keep))
+cpm_bgs = keep[ii_bgs, ]
+keep = keep[-ii_bgs, ]
+
+pp = data.frame(t(sapply(rownames(keep), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+pp$strand = '*'
+pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                              start.field="X2", end.field="X3", strand.field="strand")
+
+ii_overlap = which(overlapsAny(pp, atacseq_peaks) == TRUE)
+keep = keep[ii_overlap, ]
+
+
+col<- colorRampPalette(c("steelblue", "white", "darkred"))(8)
+#col = colorRampPalette(c("white", 'green4', "magenta"))(10)
+pheatmap(keep[c(1:10000), ], show_rownames = FALSE, show_colnames = TRUE, 
+         cluster_cols = FALSE, 
+         col = col,
+         scale = 'none')
+
+
+pheatmap(yy, annotation_row = my_gene_col, 
+         annotation_col = df, show_rownames = FALSE, scale = 'none', 
+         color = col, 
+         show_colnames = FALSE,
+         cluster_rows = TRUE, cluster_cols = FALSE,  
+         clustering_method = 'complete', cutree_rows = nb_clusters, 
+         annotation_colors = annot_colors, 
+         clustering_callback = callback,
+         gaps_col = gaps.col, 
+         filename = paste0(saveDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
+         width = 6, height = 12)
+
 
 
 
