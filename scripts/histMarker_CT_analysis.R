@@ -912,7 +912,7 @@ Select.background.for.peaks = TRUE
 
 for(n in 1:length(conds))
 {
-  # n = 4
+  # n = 3
   sels = which(dds$marks == conds[n] & dds$SampleID != '163652' & dds$SampleID != '163655')
   
   cat(n, ' --', conds[n], '--', length(sels), ' samples\n')
@@ -947,18 +947,15 @@ for(n in 1:length(conds))
     
     vsd <- varianceStabilizingTransformation(ddx, blind = FALSE)
     
-    #pca=plotPCA(vsd, intgroup = c('condition', 'batch'), returnData = FALSE)
-    #print(pca)
-    
     pca2save = as.data.frame(plotPCA(vsd, intgroup = c('condition', 'batch'), returnData = TRUE, ntop = 5000))
-    pca2save$name = paste0(design.sel$condition, '_', design.sel$SampleID)
+    pca2save$name = paste0(design.sel$sample, '_', design.sel$SampleID)
     
     ggplot(data=pca2save, aes(PC1, PC2, label = name, color= condition, shape = batch))  + 
       geom_point(size=3) + 
-      #geom_text_repel(size = 2.0, color = 'darkblue')
-      geom_text(hjust = 0.2, nudge_y = 0.2, size=2.5)
+      geom_text_repel(size = 4.0)
+      #geom_text(hjust = 0.4, nudge_y = 1.0, size=3.5)
     
-    ggsave(paste0(resDir, "/histM_PCA_peakFiltered_", conds[n], ".pdf"), width=16, height = 10)
+    ggsave(paste0(resDir, "/histM_PCA_peakFiltered_", conds[n], ".pdf"), width=10, height = 6)
     
     plot.pair.comparison.plot(fpm[c(1:20000), grep('_mUA', colnames(fpm))], linear.scale = FALSE)
     plot.pair.comparison.plot(fpm[c(1:20000), grep('_mLA', colnames(fpm))], linear.scale = FALSE)
@@ -995,7 +992,7 @@ for(n in 1:length(conds))
   ggsave(paste0(resDir, "/histMarker_", conds[n], "_beforeBatchCorrect_",  version.analysis, ".pdf"), width = 16, height = 14)
   
   make.pca.plots(fpm.bc, ntop = 5000, conds.sel = as.character(unique(design.sel$condition)))
-  ggsave(paste0(resDir, "/histMarker_", conds[n], "_afterBatchCorrect_",  version.analysis, ".pdf"), width = 16, height = 14)
+  ggsave(paste0(resDir, "/histMarker_", conds[n], "_afterBatchCorrect_",  version.analysis, ".pdf"), width = 10, height = 6)
   
   fpm = fpm.bc
   rm(fpm.bc)
@@ -1229,13 +1226,18 @@ pheatmap(xx[c(1:20000), ], show_rownames = FALSE, show_colnames = TRUE,
 
 ########################################################
 ########################################################
-# Section V : postional-histone markers
+# Section V : segment-specific histone markers
 # 
 ########################################################
 ########################################################
+library(edgeR)
+library(qvalue)
+require(corrplot)
+require(pheatmap)
+require(RColorBrewer)
+
 atacseq_peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rxxxx_R10723_R11637_R12810_atac/Rdata/',
                                       'ATACseq_peak_consensus_filtered_55k.rds'))
-
 conds = c('H3K4me3', 'H3K4me1', 'H3K27me3',   'H3K27ac')
 
 for(n in 1:length(conds))
@@ -1247,7 +1249,6 @@ for(n in 1:length(conds))
   
   ### select the samples and extract sample means
   conds = c("mUA", "mLA", "mHand")
-  
   sample.sels = c();  
   cc = c()
   sample.means = c()
@@ -1264,13 +1265,12 @@ for(n in 1:length(conds))
     }
     
   }  
+  
   colnames(sample.means) = conds
   
   cpm = cpm[, sample.sels]
   design.sel = design.sel[sample.sels, ]
   
-  library(edgeR)
-  library(qvalue)
   
   logCPM = cpm
   f = factor(cc, levels= c('mUA', 'mLA', 'mHand'))
@@ -1311,24 +1311,23 @@ for(n in 1:length(conds))
   res$maxs = apply(sample.means, 1, max)
   res$mins = apply(sample.means, 1, min)
   
-  require(corrplot)
-  require(pheatmap)
-  require(RColorBrewer)
-  
+  #### select the significant peaks
   fdr.cutoff = 0.05; logfc.cutoff = 1
   select = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & abs(res$logFC.mLA.vs.mUA) > logfc.cutoff) |
                (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & abs(res$logFC.mHand.vs.mUA) > logfc.cutoff)|
                (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & abs(res$logFC.mHand.vs.mLA) > logfc.cutoff)
   )
   cat(length(select), ' DE genes \n')
-  
   yy = sample.means[select, ]
+  
+  
   df = as.data.frame(conds)
   colnames(df) = 'segments'
   rownames(df) = colnames(yy)
   
   sample_colors = c('springgreen4', 'steelblue2', 'gold2')
   annot_colors = list(segments = sample_colors)
+  
   
   pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
            color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
@@ -1338,7 +1337,6 @@ for(n in 1:length(conds))
            #annotation_colors = annot_colors,
            width = 6, height = 12, 
            filename = paste0(figureDir, '/heatmap_histoneMarker_H3K4me3.pdf'))
-  
   
 }  
 

@@ -34,7 +34,6 @@ gtf.file =  paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf')
 figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
 tableDir = paste0(figureDir, 'tables4plots/')
 
-
 require(ggplot2)
 require(DESeq2)
 require(GenomicRanges)
@@ -299,7 +298,6 @@ if(grouping.temporal.peaks){
   test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
   ii.test = which(overlapsAny(pp, promoters[which(!is.na(match(promoters$geneSymbol, test.examples)))]))
   
-  
   sample.sels = c(); cc = c()
   sample.means = c()
   for(n in 1:length(conds)) {
@@ -352,7 +350,7 @@ if(grouping.temporal.peaks){
   # reload the test result and select dynamic peaks
   ##########################################
   library(qvalue)
-  res = readRDS( file = paste0(RdataDir, '/res_temporal_dynamicPeaks__mUA_regeneration_dev_2Batches.R10723_R7977_v7.rds'))
+  res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks__mUA_regeneration_dev_2Batches.R10723_R7977_v7.rds'))
   
   res = res[order(-res$log2FC), ]
   qv = qvalue(res$pval.lrt)
