@@ -2328,7 +2328,7 @@ temporal.peaks.test = function(cpm, c = c("Mature_UA", "Mature_UA", "BL_UA_5days
     
     for(n in 1:nrow(cpm))
     {
-      # n = 1
+      # n = which(rownames(cpm) == 'chr12p:6136134-6136818')
       if(n%%1000 == 0) cat(n, '\n')
       y0 = c()
       tt = c()
@@ -2378,14 +2378,25 @@ temporal.peaks.test = function(cpm, c = c("Mature_UA", "Mature_UA", "BL_UA_5days
     
     
     if(testPlot){
-      plot(tt, y0, cex = 1, ylim = range(x), xlab = 'time points', 
-           main = paste0('prob.M1 (', signif(prob.model[1], d = 2), ') -- prob.M1 (', 
+      #y0[3] = -0.5
+      # pdfname = paste0(resDir, "/peak_profiles.pdf")
+      # pdf(pdfname, width = 10, height = 6)
+      # par(cex = 1.0, las = 1, mgp = c(3,1,0), mar = c(6,3,2,0.2), tcl = -0.3)
+      
+      plot(tt, y0, cex = 2.0, ylim = range(y0), xlab = '', pch = 16, col = 'blue',
+           ylab = 'log2(peak signals)',  xaxt="n",
+           main = paste0('prob.M0 (', signif(prob.model[1], d = 2), ') -- prob.M1 (', 
                                                            signif(prob.model[2], d = 2), ')'))
-      points(tt, predict(fit0), type = 'l', col = 'blue')
-      newtt = seq(0, 7, by = 0.2) 
-      points(newtt, predict(fit, newdata = data.frame(tt = newtt)), type = 'l', col = 'orange', lty = 1, lwd = 2.0)
-      abline(h = mean(y0), lty = 1, col = 'red', lwd = 2.0)
-            
+      points(tt, predict(fit0), type = 'l', col = 'darkgray', lwd = 6.0)
+      newtt = seq(range(tt)[1], range(tt)[2], by = 0.1) 
+      points(newtt, predict(fit, newdata = data.frame(tt = newtt)), type = 'l', col = 'darkgreen', lty = 1, lwd = 6.0)
+      legend('topleft', lwd = c(6, 6), col = c('darkgray', 'darkgreen'), legend = c('M0', 'M1'), bty = 'n' )
+      #abline(h = mean(y0), lty = 1, col = 'red', lwd = 2.0)
+      axis(1, at=c(1:8), labels= c('s40', 's44_prox', 's44_dist', 'mUA', '5dpa', '9dpa', '13dpa_prox', '13dpa.dist'), 
+           col.axis="blue", las=1, lty = 2.0, cex.axis = 1.2)
+      
+      #dev.off()
+      
     }
     
   }

@@ -294,10 +294,6 @@ if(grouping.temporal.peaks){
   conds = c("Embryo_Stage40", "Embryo_Stage44_proximal", 'Embryo_Stage44_distal', 
             "Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal", 'BL_UA_13days_distal')
   
-  # examples to test
-  test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
-  ii.test = which(overlapsAny(pp, promoters[which(!is.na(match(promoters$geneSymbol, test.examples)))]))
-  
   sample.sels = c(); cc = c()
   sample.means = c()
   for(n in 1:length(conds)) {
@@ -326,6 +322,11 @@ if(grouping.temporal.peaks){
     cat(length(peak.sels), 'peaks after filtering for mature samples\n')
     
     cpm = cpm[peak.sels, ]
+    pp.sel = pp[peak.sels]
+    # examples to test
+    test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
+    ii.test = which(overlapsAny(pp.sel, promoters[which(!is.na(match(promoters$geneSymbol, test.examples)))]))
+    
     
     source('Functions_atac.R')
     tic()
@@ -334,6 +335,7 @@ if(grouping.temporal.peaks){
     res = temporal.peaks.test(cpm, c = cc)
     
     toc()
+    
     
     
     xx = data.frame(cpm, res, pp.annots[match(rownames(cpm), rownames(pp.annots)), ],  stringsAsFactors = FALSE)
