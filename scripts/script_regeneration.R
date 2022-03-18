@@ -337,7 +337,6 @@ if(grouping.temporal.peaks){
     toc()
     
     
-    
     xx = data.frame(cpm, res, pp.annots[match(rownames(cpm), rownames(pp.annots)), ],  stringsAsFactors = FALSE)
     
     res = xx
@@ -507,6 +506,57 @@ if(grouping.temporal.peaks){
   # first motif activity analysis for temporally dynamic peaks 
   ##########################################
   source('MARA_functions.R')
+  
+  library(qvalue)
+  res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks__mUA_regeneration_dev_2Batches.R10723_R7977_v7.rds'))
+  
+  Select.dynamic.peaks.for.MARA = TRUE
+  if(Select.dynamic.peaks.for.MARA){
+    res = res[order(-res$log2FC), ]
+    qv = qvalue(res$pval.lrt)
+    res$fdr.lrt = qv$qvalues
+    
+    # select the temporal dynamic peaks
+    fdr.cutoff = 0.01; logfc.cutoff = 1.
+    
+    # length(which(res$fdr.lrt < fdr.cutoff))
+    # length(which(res$padj_LRT<fdr.cutoff & res$log2fc>1))
+    # length(which(res$padj_LRT<fdr.cutoff & res$log2fc>2))
+    # length(which(res$padj_LRT<fdr.cutoff & res$log2fc>1.5))
+    select = which(  (res$adj.P.Val_5dpa.vs.mUA < fdr.cutoff & abs(res$logFC_5dpa.vs.mUA) > logfc.cutoff)| 
+                       (res$adj.P.Val_9dpa.vs.mUA < fdr.cutoff & abs(res$logFC_9dpa.vs.mUA) > logfc.cutoff) |
+                       (res$adj.P.Val_13dpap.vs.mUA < fdr.cutoff & abs(res$logFC_13dpap.vs.mUA) > logfc.cutoff) |
+                       (res$adj.P.Val_13dpad.vs.mUA < fdr.cutoff & abs(res$logFC_13dpad.vs.mUA) > logfc.cutoff) 
+                       #(res$adj.P.Val_s40.vs.mUA < fdr.cutoff & abs(res$logFC_s40.vs.mUA) < logfc.cutoff ) | 
+                       #(res$adj.P.Val_s44p.vs.mUA < fdr.cutoff & abs(res$logFC_s44p.vs.mUA) < logfc.cutoff ) |
+                       #(res$adj.P.Val_s44d.vs.mUA < fdr.cutoff & abs(res$logFC_s44d.vs.mUA) < logfc.cutoff )
+                       )
+    cat(length(select), 'DE peaks found !\n')
+    
+    res = res[select, ]
+    res = res[order(-res$log2FC), ]
+    keep = as.matrix(res[, c(1:20)])
+    
+    conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal", 'BL_UA_13days_distal')
+    
+    sample.sels = c(); cc = c()
+    for(n in 1:length(conds)) {
+      kk = grep(conds[n], colnames(keep))
+      if(conds[n] == 'BL_UA_5days') kk = kk[grep('136', colnames(keep)[kk])]
+      if(conds[n] == 'Embryo_Stage40') kk = kk[grep('137', colnames(keep)[kk])]
+      #if(length(unique(design$batch[kk])) > 1) kk = kk[which(design$batch[kk] == '2021')]
+      sample.sels = c(sample.sels, kk)
+      cc = c(cc, rep(conds[n], length(kk)))
+    }
+    
+    keep = keep[, sample.sels]
+    
+    
+  }
+  
   xx = run.MARA.atac.temporal(keep, cc)
+  
+  
+  
   
 }

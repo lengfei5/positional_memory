@@ -993,25 +993,25 @@ run.MARA.atac.temporal = function(keep, cc)
     xx = xx[order(-xx$log2FC), ]
     
     keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
-    keep = as.matrix(keep)
-    
-    cc.uniq = unique(cc)
-    Y = matrix(NA, ncol = length(cc.uniq), nrow = nrow(keep))
-    
-    for(n in 1:ncol(Y))
-    {
-      jj = which(cc == cc.uniq[n])
-      if(length(jj) == 1) {
-        Y[,n] = keep[,jj]
-      }else{
-        Y[,n] = apply(keep[ ,jj], 1, mean)
-      }
-    }
-    
-    colnames(Y) = cc.uniq
-    rownames(Y) = rownames(keep)
-    
   }
+  
+  
+  keep = as.matrix(keep)
+  cc.uniq = unique(cc)
+  Y = matrix(NA, ncol = length(cc.uniq), nrow = nrow(keep))
+  
+  for(n in 1:ncol(Y))
+  {
+    jj = which(cc == cc.uniq[n])
+    if(length(jj) == 1) {
+      Y[,n] = keep[,jj]
+    }else{
+      Y[,n] = apply(keep[ ,jj], 1, mean)
+    }
+  }
+  
+  colnames(Y) = cc.uniq
+  rownames(Y) = rownames(keep)
   
   # prepare X matrix from motif occurrency matrix
   motif.oc = readRDS(file = '../results/motif_analysis/motif_oc_fimo_v2.rds')
@@ -1045,7 +1045,7 @@ run.MARA.atac.temporal = function(keep, cc)
     
     r = ridge.regression(N, E, opt$lambda.opt)
     
-    saveRDS(r, file = paste0(RdataDir, '/MARA_Bayesian_ridge_regenerationPeaks.rds'))
+    # saveRDS(r, file = paste0(RdataDir, '/MARA_Bayesian_ridge_regenerationPeaks.rds'))
     
     zz = r$Zscore
     zz = apply(as.matrix(zz[, c(1:3)]), 1, function(x){x.abs = abs(x); return(x[which(x.abs == max(x.abs))][1]); })
@@ -1063,7 +1063,7 @@ run.MARA.atac.temporal = function(keep, cc)
     sort(r$max.Zscore, decreasing=TRUE)[1:40]
     sort(r$max.Zscore, decreasing=TRUE)[1:50]
     
-    topMotifs = sort(r$max.Zscore, decreasing = TRUE)[1:40]
+    topMotifs = sort(r$max.Zscore, decreasing = TRUE)[1:50]
     motif.names = rownames(r$Zscore)
     bb = r$Zscore[match(names(topMotifs), motif.names), ]
     
@@ -1072,11 +1072,87 @@ run.MARA.atac.temporal = function(keep, cc)
     colnames(df) = 'regeneration time'
     
     pheatmap(bb, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE, 
-             scale = 'none', cluster_cols=FALSE, main = paste0("Inferred z-scores (motif activity) by MARA"), 
+             scale = 'none', cluster_cols=FALSE, main = '', 
              na_col = "white", fontsize_row = 12, 
              annotation_col = df, 
              filename = paste0(resDir, '/MARA_bayesianRidge_temporalpeaks.pdf'), 
              width = 10, height = 12) 
+    
+    ##########################################
+    # compare with the smartseq2 data 
+    ##########################################
+    source('Functions_atac.R')
+    rnaDir = "../results/rnaseq_Rxxxx.old_R10724_R161513_mergedTechRep/Rdata/"
+    smartseq2 = readRDS(file = paste0(rnaDir, 'smartseq2_R10724_R11635_cpm.batchCorrect_DESeq2.test.withbatch.log2FC.shrinked.rds'))
+    cpm = smartseq2[, c(1,2, 5:12)]
+    #res = res[, -c(1:12)]
+        
+    #conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal",  "BL_UA_13days_distal")
+    sample.sels = c();  
+    cc = c()
+    sample.means = c()
+    for(n in 1:length(conds)) 
+    {
+      kk = grep(conds[n], colnames(cpm))
+      sample.sels = c(sample.sels, kk)
+      cc = c(cc, rep(conds[n], length(kk)))
+      if(length(kk)>1) {
+        sample.means = cbind(sample.means, apply(cpm[, kk], 1, mean))
+      }else{
+        sample.means = cbind(sample.means, cpm[, kk])
+      }
+      
+    }  
+    colnames(sample.means) = conds
+    ggs = sapply(rownames(sample.means), function(x){unlist(strsplit(as.character(x), '_'))[1]})
+    
+    mm = match(rownames(bb), ggs)
+    
+    bb =data.frame(bb, gene = rownames(bb), stringsAsFactors = FALSE)
+    bb$combine.Zscore = r$combined.Zscore[match(rownames(bb), names(r$combined.Zscore))]
+    bb$rank = c(1:nrow(bb))
+    bb$cor = NA
+    for(n in 1:nrow(bb))
+    {
+      if(!is.na(mm[n])) bb$cor[n] = cor(as.numeric(bb[n, c(1:5)]), sample.means[mm[n], ]) 
+    }
+    
+    require(ggplot2)
+    require(tidyverse)
+    library(ggrepel)
+    
+    xx = bb[which(!is.na(bb$cor)), ]
+    xx$activity = NA
+    xx$activity[xx$cor>0] = 'activator'
+    xx$activity[xx$cor<0] = 'repressor'
+    ggplot(xx, aes(x=rank, y=cor, label = gene)) + 
+      geom_point(aes(x=rank, y=cor, color = activity), size = 3.0) + 
+      scale_color_manual(values=c('blue', 'red')) +
+      geom_text_repel(data= xx , size = 4.0) +
+      theme_classic() +
+      geom_hline(yintercept=0.0, colour = "darkgray", size = 1.5) +
+      xlab("motif activity importance rank") + ylab("Correlation to TF expression") +
+      theme(axis.text.x = element_text(size = 14), 
+            axis.text.y = element_text(size = 14), 
+            axis.title.x = element_text(size=14, face="bold"),
+            axis.title.y = element_text(size=14, face="bold")) 
+     
+    ggsave(paste0(resDir, '/MARA_bayesianRidge_temporalpeaks_motifActivity.rank_vs_TFexpression.pdf'), width=8, height = 6)
+    
+    ggplot(xx, aes(x=combine.Zscore, y=cor, label = gene)) + 
+      geom_point(aes(x=combine.Zscore, y=cor, color = activity), size = 3.0) + 
+      scale_color_manual(values=c('blue', 'red')) +
+      geom_text_repel(data= xx , size = 4.0) +
+      theme_classic() +
+      geom_hline(yintercept=0.0, colour = "darkgray", size = 1.5) +
+      xlab("Motif activity importance (z-score)") + ylab("Correlation to TF expression") +
+      theme(axis.text.x = element_text(size = 14), 
+            axis.text.y = element_text(size = 14), 
+            axis.title.x = element_text(size=14, face="bold"),
+            axis.title.y = element_text(size=14, face="bold")) 
+    
+    ggsave(paste0(resDir, '/MARA_bayesianRidge_temporalpeaks_motifActivity_vs_TFexpression.pdf'), width=8, height = 6)
+    
     
   }
   
