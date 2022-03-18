@@ -1082,6 +1082,7 @@ cpm_bgs = keep[ii_bgs, ]
 keep = keep[-ii_bgs, ]
 pp = pp[-ii_bgs]
 
+
 ii_overlap = which(overlapsAny(pp, atacseq_peaks) == TRUE)
 cpm_nonoverlap = keep[-ii_overlap, ]
 keep = keep[ii_overlap, ]
@@ -1338,8 +1339,12 @@ for(n in 1:length(conds))
            width = 6, height = 12, 
            filename = paste0(figureDir, '/heatmap_histoneMarker_H3K4me3.pdf'))
   
+  
 }  
 
+##########################################
+# 
+##########################################
 colnames(keep) = conds
 
 ii_bgs = grep('tss.', rownames(keep))
@@ -1363,7 +1368,6 @@ pp = pp[-ii_bgs]
 ii_overlap = which(overlapsAny(pp, atacseq_peaks) == TRUE)
 cpm_nonoverlap = keep[-ii_overlap, ]
 keep = keep[ii_overlap, ]
-
 
 ##########################################
 # test/explore histone markers for postional-related genes

@@ -592,7 +592,7 @@ if(grouping.position.dependent.peaks){
   
   gaps.col = c(3, 6)
   
-  #col<- colorRampPalette(c("steelblue", "white", "darkred"))(8)
+  col<- colorRampPalette(c("steelblue", "white", "darkred"))(8)
   #col = colorRampPalette(rev(brewer.pal(n = 7, name ="RdYlBu")))(8)
   
   plt = pheatmap(yy, annotation_row = my_gene_col, 
@@ -651,120 +651,82 @@ if(grouping.position.dependent.peaks){
   ##########################################
   # try to add histone marker with the same order as atac-seq peaks 
   ##########################################
-  test = yy
-  test = test[plt$tree_row$order, ]
-  pheatmap(test, 
-           nnotation_row = my_gene_col, 
-           annotation_col = df, show_rownames = FALSE, scale = 'none', 
-           color = col, 
-           show_colnames = FALSE,
-           cluster_rows = TRUE, cluster_cols = FALSE,  
-           #clustering_method = 'complete', cutree_rows = nb_clusters, 
-           annotation_colors = annot_colors, 
-           clustering_callback = callback,
-           gaps_col = gaps.col)
-  
-  histMs =  c('H3K4me3', 'H3K4me1', 'H3K27me3',   'H3K27ac')
-  for(n in 1:length(histMs))
-  {
-    # n = 1
-    #keep = c()
-    cpm = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', conds[n], '_', version.analysis, '.rds'))
-    design.sel = readRDS(file = paste0(RdataDir, '/design.sels_bc_TMM_combat_', conds[n], '_', version.analysis, '.rds'))
-    
-    ### select the samples and extract sample means
-    conds = c("mUA", "mLA", "mHand")
-    sample.sels = c();  
-    cc = c()
-    sample.means = c()
-    
-    for(n in 1:length(conds)) 
-    {
-      kk = grep(conds[n], colnames(cpm))
-      sample.sels = c(sample.sels, kk)
-      cc = c(cc, rep(conds[n], length(kk)))
-      if(length(kk)>1) {
-        sample.means = cbind(sample.means, apply(cpm[, kk], 1, mean))
-      }else{
-        sample.means = cbind(sample.means, cpm[, kk])
-      }
-      
-    }  
-    
-    colnames(sample.means) = conds
-    
-    cpm = cpm[, sample.sels]
-    design.sel = design.sel[sample.sels, ]
-    
-    
-    logCPM = cpm
-    f = factor(cc, levels= c('mUA', 'mLA', 'mHand'))
-    
-    mod = model.matrix(~ 0 + f)
-    colnames(mod) = c('mUA', 'mLA', 'mHand')
-    
-    #To make all pair-wise comparisons between the three groups one could proceed
-    fit <- lmFit(logCPM, mod)
-    contrast.matrix <- makeContrasts(mLA - mUA, 
-                                     mHand - mUA, 
-                                     mHand - mLA, levels=mod)
-    fit2 <- contrasts.fit(fit, contrast.matrix)
-    fit2 <- eBayes(fit2)
-    
-    res = data.frame(fit2$p.value)
-    colnames(res) = paste0(c('mLA.vs.mUA', 'mHand.vs.mUA', 'mHand.vs.mLA'), '.pval')
-    
-    xx = topTable(fit2, coef = 1, number = nrow(res))
-    xx = xx[, c(1, 4, 5)]
-    colnames(xx) = paste0(colnames(xx), '.mLA.vs.mUA')
-    res = data.frame(res, xx[match(rownames(res), rownames(xx)), ])
-    
-    xx = topTable(fit2, coef = 2, number = nrow(res))
-    xx = xx[, c(1, 4, 5)]
-    colnames(xx) = paste0(colnames(xx), '.mHand.vs.mUA')
-    res = data.frame(res, xx[match(rownames(res), rownames(xx)), ])
-    
-    xx = topTable(fit2, coef = 3, number = nrow(res))
-    xx = xx[, c(1, 4, 5)]
-    colnames(xx) = paste0(colnames(xx), '.mHand.vs.mLA')
-    res = data.frame(res, xx[match(rownames(res), rownames(xx)), ])
-    
-    res$fdr.mean = apply(as.matrix(res[, grep('adj.P.Val', colnames(res))]), 1, function(x) return(mean(-log10(x))))
-    res$logFC.mean =  apply(as.matrix(res[, grep('logFC', colnames(res))]), 1, function(x) return(mean(abs(x))))
-    
-    res$log2fc = apply(sample.means, 1, function(x) max(x) - min(x))
-    res$maxs = apply(sample.means, 1, max)
-    res$mins = apply(sample.means, 1, min)
-    
-    #### select the significant peaks
-    fdr.cutoff = 0.05; logfc.cutoff = 1
-    select = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & abs(res$logFC.mLA.vs.mUA) > logfc.cutoff) |
-                     (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & abs(res$logFC.mHand.vs.mUA) > logfc.cutoff)|
-                     (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & abs(res$logFC.mHand.vs.mLA) > logfc.cutoff)
-    )
-    cat(length(select), ' DE genes \n')
-    yy = sample.means[select, ]
-    
-    
-    df = as.data.frame(conds)
-    colnames(df) = 'segments'
-    rownames(df) = colnames(yy)
-    
-    sample_colors = c('springgreen4', 'steelblue2', 'gold2')
-    annot_colors = list(segments = sample_colors)
-    
-    
-    pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
-             color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
+  Assembly_histMarkers_togetherWith_ATACseq = FALSE
+  if(Assembly_histMarkers_togetherWith_ATACseq){
+    test = yy
+    test = test[plt$tree_row$order, ]
+    pheatmap(test, 
+             nnotation_row = my_gene_col, 
+             annotation_col = df, show_rownames = FALSE, scale = 'none', 
+             color = col, 
              show_colnames = FALSE,
-             scale = 'row',
-             cluster_cols=FALSE, annotation_col=df,
-             #annotation_colors = annot_colors,
-             width = 6, height = 12, 
-             filename = paste0(figureDir, '/heatmap_histoneMarker_H3K4me3.pdf'))
+             cluster_rows = TRUE, cluster_cols = FALSE,  
+             #clustering_method = 'complete', cutree_rows = nb_clusters, 
+             annotation_colors = annot_colors, 
+             clustering_callback = callback,
+             gaps_col = gaps.col)
+    
+    histMs =  c('H3K4me3','H3K27me3', 'H3K4me1', 'H3K27ac')
+    RdataHistM = '/Users/jiwang/workspace/imp/positional_memory/results/CT_analysis_20220311/Rdata'
+    version.analysis.HistM = 'CT_analysis_20220311'
     
     
-  
+    for(n in 1:length(histMs))
+    {
+      # n = 1
+      #keep = c()
+      cpm = readRDS(file = paste0(RdataHistM, '/fpm_bc_TMM_combat_', histMs[n], '_', version.analysis.HistM, '.rds'))
+      design.sel = readRDS(file = paste0(RdataHistM, '/design.sels_bc_TMM_combat_', histMs[n], '_', version.analysis.HistM, '.rds'))
+      
+      ### select the samples and extract sample means
+      conds_histM = c("mUA", "mLA", "mHand")
+      sample.sels = c();  
+      cc = c()
+      sample.means = c()
+      
+      for(n in 1:length(conds_histM)) 
+      {
+        kk = grep(conds_histM[n], colnames(cpm))
+        sample.sels = c(sample.sels, kk)
+        cc = c(cc, rep(conds_histM[n], length(kk)))
+        if(length(kk)>1) {
+          sample.means = cbind(sample.means, apply(cpm[, kk], 1, mean))
+        }else{
+          sample.means = cbind(sample.means, cpm[, kk])
+        }
+      }  
+      colnames(sample.means) = conds_histM
+      
+      cpm = cpm[, sample.sels]
+      design.sel = design.sel[sample.sels, ]
+      
+      pp_histM = data.frame(t(sapply(rownames(cpm), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+      pp_histM$strand = '*'
+      pp_histM = makeGRangesFromDataFrame(pp_histM, seqnames.field=c("X1"),
+                                          start.field="X2", end.field="X3", strand.field="strand")
+      
+      mapping = findOverlaps(pp, pp_histM, type = 'within')
+      
+      yy0 = sample.means[mapping@to, ]
+      
+      df = as.data.frame(conds_histM)
+      colnames(df) = 'segments'
+      rownames(df) = colnames(yy0)
+      
+      sample_colors = c('springgreen4', 'steelblue2', 'gold2')
+      annot_colors = list(segments = sample_colors)
+      
+      pheatmap(yy0, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+               color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
+               show_colnames = FALSE,
+               scale = 'none',
+               cluster_cols=FALSE, annotation_col=df,
+               #annotation_colors = annot_colors,
+               width = 6, height = 12, 
+               filename = paste0(figureDir, '/heatmap_histoneMarker_H3K4me3.pdf'))
+      
+      
+  }
   
   ## test the distribution of features of different groups
   source('Functions_atac.R')
