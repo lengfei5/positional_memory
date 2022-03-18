@@ -1072,7 +1072,8 @@ run.MARA.atac.temporal = function(keep, cc)
     colnames(df) = 'regeneration time'
     
     pheatmap(bb, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE, 
-             scale = 'none', cluster_cols=FALSE, main = '', 
+             colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(10),
+             scale = 'row', cluster_cols=FALSE, main = '', 
              na_col = "white", fontsize_row = 12, 
              annotation_col = df, 
              filename = paste0(resDir, '/MARA_bayesianRidge_temporalpeaks.pdf'), 
@@ -1104,27 +1105,35 @@ run.MARA.atac.temporal = function(keep, cc)
       
     }  
     colnames(sample.means) = conds
-    ggs = sapply(rownames(sample.means), function(x){unlist(strsplit(as.character(x), '_'))[1]})
     
+    ## calculate the correlation with TF expression 
+    ggs = sapply(rownames(sample.means), function(x){unlist(strsplit(as.character(x), '_'))[1]})
     mm = match(rownames(bb), ggs)
     
-    bb =data.frame(bb, gene = rownames(bb), stringsAsFactors = FALSE)
+    bb =data.frame(bb, stringsAsFactors = FALSE)
+    bb$gene = rownames(bb)
     bb$combine.Zscore = r$combined.Zscore[match(rownames(bb), names(r$combined.Zscore))]
     bb$rank = c(1:nrow(bb))
     bb$cor = NA
+    bb$tf.index = mm
     for(n in 1:nrow(bb))
     {
-      if(!is.na(mm[n])) bb$cor[n] = cor(as.numeric(bb[n, c(1:5)]), sample.means[mm[n], ]) 
+      if(!is.na(mm[n])) {
+        bb$cor[n] = cor(as.numeric(bb[n, c(1:5)]), sample.means[mm[n], ]) 
+      }
     }
+    
+    xx = bb[which(!is.na(bb$cor)), ]
+    
+    xx$activity = NA
+    xx$activity[xx$cor>0] = 'activator'
+    xx$activity[xx$cor<0] = 'repressor'
+    
     
     require(ggplot2)
     require(tidyverse)
     library(ggrepel)
     
-    xx = bb[which(!is.na(bb$cor)), ]
-    xx$activity = NA
-    xx$activity[xx$cor>0] = 'activator'
-    xx$activity[xx$cor<0] = 'repressor'
     ggplot(xx, aes(x=rank, y=cor, label = gene)) + 
       geom_point(aes(x=rank, y=cor, color = activity), size = 3.0) + 
       scale_color_manual(values=c('blue', 'red')) +
@@ -1152,6 +1161,28 @@ run.MARA.atac.temporal = function(keep, cc)
             axis.title.y = element_text(size=14, face="bold")) 
     
     ggsave(paste0(resDir, '/MARA_bayesianRidge_temporalpeaks_motifActivity_vs_TFexpression.pdf'), width=8, height = 6)
+    
+    
+    pdfname = paste0(resDir, "/motifActivity_TFexpr_comparison_2.pdf")
+    pdf(pdfname, width = 5, height = 5)
+    par(cex = 1.0, las = 1, mgp = c(3,1,0), mar = c(6,3,2,0.2), tcl = -0.3)
+    
+    jj = 16
+    y0 = scale(as.numeric(xx[jj, c(1:5)]))
+    y1 = scale(as.numeric(sample.means[xx$tf.index[jj], ]))
+    
+    plot(c(1:5), y0, col = 'darkgreen', type = 'l', ylim = range(c(y0, y1)), main = xx$gene[jj], lwd = 2.5, xlab = '', ylab = '',
+         xaxt="n")
+    points(c(1:5), y0, col = 'darkgreen', type = 'p', cex = 2.0, pch = 16)
+    points(c(1:5), y1, col = 'darkblue', type = 'l', lwd = 2.0)
+    points(c(1:5), y1, col = 'darkblue', type = 'p', cex = 2.0, pch = 16)
+    legend('topright', lwd = c(6, 6), col = c('darkgreen', 'darkblue'), legend = c('motif activity', 'TF expression'), bty = 'n' )
+    abline(h = 0, lty = 1, col = 'darkgray', lwd = 2.0)
+    axis(1, at=c(1:5), labels= c('mUA', '5dpa', '9dpa', '13dpa_prox', '13dpa.dist'), 
+          las=1, lty = 2.0, cex.axis = 1.2)
+    
+    dev.off()
+    
     
     
   }
