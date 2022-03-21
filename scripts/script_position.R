@@ -671,12 +671,11 @@ if(grouping.position.dependent.peaks){
              clustering_callback = callback,
              gaps_col = gaps.col)
     
-    
     RdataHistM = '/Users/jiwang/workspace/imp/positional_memory/results/CT_analysis_20220311/Rdata'
     version.analysis.HistM = 'CT_analysis_20220311'
     
     ### collect the four markers with means 
-    histMs =  c('H3K4me3','H3K27me3', 'H3K4me1', 'H3K27ac')
+    histMs =  c('H3K4me3','H3K27me3', 'H3K4me1')
     shm = c()
     
     for(n in 1:length(histMs))
@@ -684,7 +683,9 @@ if(grouping.position.dependent.peaks){
       # n = 1
       cat(n, ' -- ', histMs[n], '\n')
       cpm = readRDS(file = paste0(RdataHistM, '/fpm_bc_TMM_combat_', histMs[n], '_', version.analysis.HistM, '.rds'))
-      design.sel = readRDS(file = paste0(RdataHistM, '/design.sels_bc_TMM_combat_', histMs[n], '_', version.analysis.HistM, '.rds'))
+      cpm = cpm[ , grep(histMs[n], colnames(cpm))]
+      #design.sel = readRDS(file = paste0(RdataHistM, '/design.sels_bc_TMM_combat_DBedgeRtest_', histMs[n], '_', 
+      #                                   version.analysis.HistM, '.rds'))
       
       ### select the samples and extract sample means
       conds_histM = c("mUA", "mLA", "mHand")
@@ -703,14 +704,21 @@ if(grouping.position.dependent.peaks){
           sample.means = cbind(sample.means, cpm[, kk])
         }
       }
-      
       colnames(sample.means) = paste0(conds_histM, '_', histMs[n])
+      
       if(n == 1){
         shm = sample.means
       }else{
         shm = cbind(shm, sample.means[match(rownames(shm), rownames(sample.means)), ])
       }
     }    
+    
+    ## quantile normalization for different histone markers
+    library(preprocessCore)
+    xx = normalize.quantiles(shm)
+    colnames(xx) = colnames(shm)
+    rownames(xx) = rownames(shm)
+    shm = xx
     
     pp_histM = data.frame(t(sapply(rownames(shm), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
     pp_histM$strand = '*'
@@ -724,6 +732,7 @@ if(grouping.position.dependent.peaks){
     
     # reorder the histM according to the atac-seq peak clusters
     yy0 = yy0[plt$tree_row$order, ]
+    yy0 = t(apply(yy0, 1, cal_z_score))
     #test = yy[plt$tree_row$order, ]
     #rownames(yy0) = rownames(yy)
     #yy0 = cbind(yy, yy0)
@@ -731,14 +740,14 @@ if(grouping.position.dependent.peaks){
     df_histM = data.frame(segments = sapply(colnames(yy0), function(x) unlist(strsplit(as.character(x), '_'))[1])
                        #markers = sapply(colnames(yy0), function(x) unlist(strsplit(as.character(x), '_'))[2]), stringsAsFactors = FALSE
                     )
-    colnames(df_histM) = c('segments', 'markers')
+    colnames(df_histM) = c('seg')
     rownames(df_histM) = colnames(yy0)
     sample_colors_histM = c('springgreen4', 'steelblue2', 'gold2')
     names(sample_colors_histM) = c('mUA', 'mLA', 'mHand')
     marker_colors_histM = c('blue', 'red', 'deepskyblue2', 'darkgreen')
     names(marker_colors_histM) = histMs
-    annot_colors_histM = list(segments = sample_colors_histM)
-    gaps.col_histM = seq(3, 11, by = 3)
+    annot_colors_histM = list(seg = sample_colors_histM)
+    gaps.col_histM = seq(1, ncol(yy0), by = 1)
     #clusters <- rownames(subsetDat[heat$tree_row[["order"]],])
     clusters <- sort(cutree(plt$tree_row, k = nb_clusters))
     
@@ -759,7 +768,6 @@ if(grouping.position.dependent.peaks){
              gaps_col = gaps.col, 
              gaps_row = gaps.row)
     
-    
     p2 = pheatmap(yy0, cluster_rows=FALSE, show_rownames=FALSE, fontsize_row = 5,
              color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
              show_colnames = FALSE,
@@ -768,10 +776,12 @@ if(grouping.position.dependent.peaks){
              annotation_colors = annot_colors_histM,
              gaps_col = gaps.col_histM, 
              gaps_row = gaps.row)
+    #grid.arrange(p1, p2,  nrow = 1)
     
     plot_list=list()
     plot_list[['p1']]=p1[[4]]
     plot_list[['p2']]=p2[[4]]
+    #plot_list[['p3']]=p2[[4]]
     grid.arrange(grobs=plot_list, ncol=2)
     
     indexs = data.frame(peak = names(clusters), cluster= clusters, stringsAsFactors = FALSE)
@@ -779,14 +789,17 @@ if(grouping.position.dependent.peaks){
     c_order = unique(indexs$cluster)
     
     yy1 = yy0
-    for(m in 1:ncol(yy1))
-    {
-      jj1 = which(yy1[ ,m] < 1.5)
-      yy1[jj1, m] = 1.5
-      jj2 = which(yy1[ ,m] > 4)
-      yy1[jj2, m] = 4
-       
-    }
+    
+    ### transform the histM to account for different backgrounds and scaling
+    # for(m in 1:ncol(yy1))
+    # {
+    #   jj1 = which(yy1[ ,m] < 1.5)
+    #   yy1[jj1, m] = 1.5
+    #   jj2 = which(yy1[ ,m] > 4)
+    #   yy1[jj2, m] = 4
+    #    
+    # }
+    # 
     
     peakNm = c()
     library(dendextend)
@@ -816,24 +829,67 @@ if(grouping.position.dependent.peaks){
                   annotation_colors = annot_colors, 
                   #clustering_callback = callback,
                   legend = TRUE,
+                  annotation_legend = FALSE,
                   gaps_col = gaps.col, 
                   gaps_row = gaps.row)
     
-    p2 = pheatmap(yy1[new_order, ], cluster_rows=FALSE, show_rownames=FALSE, fontsize_row = 5,
+    gaps.col_histM = c(1:2)
+    df_histM_new = as.data.frame(df_histM[c(1:3),])
+    colnames(df_histM_new) = colnames(df_histM)
+    rownames(df_histM_new) = rownames(df_histM)[c(1:3)]
+    
+    p2 = pheatmap(yy1[new_order, c(1:3)], cluster_rows=FALSE, show_rownames=FALSE, fontsize_row = 5,
+                  color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
+                  show_colnames = FALSE,
+                  scale = 'none',
+                  cluster_cols=FALSE, annotation_col= df_histM_new,
+                  annotation_colors = annot_colors_histM,
+                  gaps_col = gaps.col_histM, 
+                  annotation_legend = FALSE,
+                  gaps_row = gaps.row)
+    
+    df_histM_new = as.data.frame(df_histM[c(4:6),])
+    colnames(df_histM_new) = colnames(df_histM)
+    rownames(df_histM_new) = rownames(df_histM)[c(4:6)]
+    p3 = pheatmap(yy1[new_order, c(4:6)], cluster_rows=FALSE, show_rownames=FALSE, fontsize_row = 5,
                   color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
                   show_colnames = FALSE,
                   scale = 'none',
                   cluster_cols=FALSE, annotation_col=df_histM,
                   annotation_colors = annot_colors_histM,
                   gaps_col = gaps.col_histM, 
+                  annotation_legend = FALSE,
+                  gaps_row = gaps.row)
+    
+    df_histM_new = as.data.frame(df_histM[c(7:9),])
+    colnames(df_histM_new) = colnames(df_histM)
+    rownames(df_histM_new) = rownames(df_histM)[c(7:9)]
+    p4 = pheatmap(yy1[new_order, c(7:9)], cluster_rows=FALSE, show_rownames=FALSE, fontsize_row = 5,
+                  color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
+                  show_colnames = FALSE,
+                  scale = 'none',
+                  cluster_cols=FALSE, annotation_col=df_histM,
+                  annotation_colors = annot_colors_histM,
+                  annotation_legend = FALSE,
+                  gaps_col = gaps.col_histM, 
                   gaps_row = gaps.row)
     
     plot_list=list()
     plot_list[['p1']]=p1[[4]]
     plot_list[['p2']]=p2[[4]]
-    grid.arrange(grobs=plot_list, ncol=2)
+    plot_list[['p3']]=p3[[4]]
+    plot_list[['p4']]=p4[[4]]
     
+    pdf(paste0(figureDir, "/Segemet_specific_chromatin_landscape_atac_histM_firstTry.pdf"),
+        width = 10, height = 12) # Open a new pdf file
+    
+    layout = matrix(c(1, 1, 2, 3, 4), nrow = 1)
+    grid.arrange(grobs=plot_list, nrow= 1,
+                 layout_matrix = layout)
+                 
+    dev.off()
      
+    
   }
   
   ##########################################
