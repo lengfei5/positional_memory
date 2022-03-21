@@ -1101,6 +1101,7 @@ if(Transform.histMarkers.to.mitigate.different.background.dynamicRanges){
   }
   
   xx = keep
+  ## c('H3K4me3', 'H3K4me1', 'H3K27me3',   'H3K27ac')
   n = 1
   hist(cpm_nonoverlap[,n], breaks = 100, col = 'darkred'); 
   hist(xx[,n], breaks = 100, col = 'darkblue', add = TRUE);
@@ -1239,14 +1240,14 @@ require(RColorBrewer)
 
 atacseq_peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rxxxx_R10723_R11637_R12810_atac/Rdata/',
                                       'ATACseq_peak_consensus_filtered_55k.rds'))
-conds = c('H3K4me3', 'H3K4me1', 'H3K27me3',   'H3K27ac')
+conds_histM = c('H3K4me3', 'H3K27me3',  'H3K4me1', 'H3K27ac')
 
-for(n in 1:length(conds))
+for(n in 1:length(conds_histM))
 {
   # n = 1
   #keep = c()
-  cpm = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', conds[n], '_', version.analysis, '.rds'))
-  design.sel = readRDS(file = paste0(RdataDir, '/design.sels_bc_TMM_combat_', conds[n], '_', version.analysis, '.rds'))
+  cpm = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', conds_histM[n], '_', version.analysis, '.rds'))
+  design.sel = readRDS(file = paste0(RdataDir, '/design.sels_bc_TMM_combat_', conds_histM[n], '_', version.analysis, '.rds'))
   
   ### select the samples and extract sample means
   conds = c("mUA", "mLA", "mHand")
@@ -1312,15 +1313,47 @@ for(n in 1:length(conds))
   res$maxs = apply(sample.means, 1, max)
   res$mins = apply(sample.means, 1, min)
   
+  xx = data.frame(cpm[match(rownames(res), rownames(cpm)), ],  res, stringsAsFactors = FALSE) 
+  res = xx
+  
+  saveRDS(res, file = paste0(RdataDir, '/fpm_bc_TMM_combat_DBedgeRtest_', conds_histM[n], '_', version.analysis, '.rds'))
+  
   #### select the significant peaks
   fdr.cutoff = 0.05; logfc.cutoff = 1
   select = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & abs(res$logFC.mLA.vs.mUA) > logfc.cutoff) |
                (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & abs(res$logFC.mHand.vs.mUA) > logfc.cutoff)|
                (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & abs(res$logFC.mHand.vs.mLA) > logfc.cutoff)
   )
-  cat(length(select), ' DE genes \n')
-  yy = sample.means[select, ]
+  cat(length(select), ' DE ', conds_histM[n],  ' \n')
+  res = res[order(-res$log2fc), ]
+  sample.means = sample.means[match(rownames(res), rownames(sample.means)), ]
   
+  ####### focus on the atac-seq peak sets
+  Keep.only.overlapped.by.atacseq.peaks = TRUE
+  if(Keep.only.overlapped.by.atacseq.peaks){
+    ii_bgs = grep('tss.', rownames(res))
+    
+    rownames(res) = gsub('tss.', '', rownames(res))
+    
+    pp = data.frame(t(sapply(rownames(res), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+    pp$strand = '*'
+    pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                  start.field="X2", end.field="X3", strand.field="strand")
+    lls = width(pp)
+    
+    #for(n in 1:ncol(keep))
+    #{
+    #  keep[,n] = keep[,n] + log2(1000/lls)
+    #}
+    #cpm_bgs = keep[ii_bgs, ]
+    #keep = keep[-ii_bgs, ]
+    #pp = pp[-ii_bgs]
+    
+    ii_overlap = which(overlapsAny(pp, atacseq_peaks) == TRUE)
+    cpm_nonoverlap = keep[-ii_overlap, ]
+    keep = keep[ii_overlap, ]
+    
+  }
   
   df = as.data.frame(conds)
   colnames(df) = 'segments'
@@ -1338,7 +1371,6 @@ for(n in 1:length(conds))
            #annotation_colors = annot_colors,
            width = 6, height = 12, 
            filename = paste0(figureDir, '/heatmap_histoneMarker_H3K4me3.pdf'))
-  
   
 }  
 
