@@ -1242,12 +1242,11 @@ atacseq_peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results
                                       'ATACseq_peak_consensus_filtered_55k.rds'))
 conds_histM = c('H3K4me3', 'H3K27me3',  'H3K4me1', 'H3K27ac')
 
-for(n in 1:length(conds_histM))
+for(n_histM in 1:length(conds_histM))
 {
-  # n = 1
-  #keep = c()
-  cpm = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', conds_histM[n], '_', version.analysis, '.rds'))
-  design.sel = readRDS(file = paste0(RdataDir, '/design.sels_bc_TMM_combat_', conds_histM[n], '_', version.analysis, '.rds'))
+  # n_histM = 4
+  cpm = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', conds_histM[n_histM], '_', version.analysis, '.rds'))
+  design.sel = readRDS(file = paste0(RdataDir, '/design.sels_bc_TMM_combat_', conds_histM[n_histM], '_', version.analysis, '.rds'))
   
   ### select the samples and extract sample means
   conds = c("mUA", "mLA", "mHand")
@@ -1316,7 +1315,7 @@ for(n in 1:length(conds_histM))
   xx = data.frame(cpm[match(rownames(res), rownames(cpm)), ],  res, stringsAsFactors = FALSE) 
   res = xx
   
-  saveRDS(res, file = paste0(RdataDir, '/fpm_bc_TMM_combat_DBedgeRtest_', conds_histM[n], '_', version.analysis, '.rds'))
+  saveRDS(res, file = paste0(RdataDir, '/fpm_bc_TMM_combat_DBedgeRtest_', conds_histM[n_histM], '_', version.analysis, '.rds'))
   
   #### select the significant peaks
   fdr.cutoff = 0.05; logfc.cutoff = 1
@@ -1324,7 +1323,7 @@ for(n in 1:length(conds_histM))
                (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & abs(res$logFC.mHand.vs.mUA) > logfc.cutoff)|
                (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & abs(res$logFC.mHand.vs.mLA) > logfc.cutoff)
   )
-  cat(length(select), ' DE ', conds_histM[n],  ' \n')
+  cat(length(select), ' DE ', conds_histM[n_histM],  ' \n')
   res = res[order(-res$log2fc), ]
   sample.means = sample.means[match(rownames(res), rownames(sample.means)), ]
   
@@ -1350,18 +1349,40 @@ for(n in 1:length(conds_histM))
     #pp = pp[-ii_bgs]
     
     ii_overlap = which(overlapsAny(pp, atacseq_peaks) == TRUE)
-    cpm_nonoverlap = keep[-ii_overlap, ]
-    keep = keep[ii_overlap, ]
+    #cpm_nonoverlap = keep[-ii_overlap, ]
+    #keep = keep[ii_overlap, ]
+    kk = match(rownames(res), names(pp)[ii_overlap])
+    res = res[!is.na(kk), ]
+    sample.means = sample.means[!is.na(kk), ]
+      
+    fdr.cutoff = 0.05; logfc.cutoff = 1
+    select = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & abs(res$logFC.mLA.vs.mUA) > logfc.cutoff) |
+                     (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & abs(res$logFC.mHand.vs.mUA) > logfc.cutoff)|
+                     (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & abs(res$logFC.mHand.vs.mLA) > logfc.cutoff)
+    )
+    cat(length(select), ' DE ', conds_histM[n_histM],  ' \n')
+   
+  }
+  
+  cal_transform_histM = function(x, cutoff.min = 1.5, cutoff.max = 4, toScale = FALSE)
+  {
+    # x = keep[,1];cutoff.min = 3.5; cutoff.max = 6
+    x[which(x<cutoff.min)] = cutoff.min
+    x[which(x>cutoff.max)] = cutoff.max
+    if(toScale) x = (x - cutoff.min)/(cutoff.max - cutoff.min)
+    return(x)
     
   }
   
-  df = as.data.frame(conds)
+  yy = res[select, grep(conds_histM[n_histM], colnames(res))]
+  #yy = apply(yy, 2, cal_transform_histM)
+  
+  df = as.data.frame(sapply(colnames(yy), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[2])}))
   colnames(df) = 'segments'
   rownames(df) = colnames(yy)
   
   sample_colors = c('springgreen4', 'steelblue2', 'gold2')
   annot_colors = list(segments = sample_colors)
-  
   
   pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
            color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
@@ -1370,7 +1391,8 @@ for(n in 1:length(conds_histM))
            cluster_cols=FALSE, annotation_col=df,
            #annotation_colors = annot_colors,
            width = 6, height = 12, 
-           filename = paste0(figureDir, '/heatmap_histoneMarker_H3K4me3.pdf'))
+           filename = paste0(figureDir, '/heatmap_histoneMarker_', conds_histM[n_histM], '_overlappedWithAtacseqPeak.pdf'))
+  
   
 }  
 
