@@ -313,6 +313,62 @@ save.peak.bed.file.for.fimo = function()
 }
 
 ##########################################
+# process fimo output .tsv file to bed file 
+##########################################
+make.bed.file.from.fimo.out = function()
+{
+  # manually define big domain for HOXA cluster chr2p:870,541,422-875,470,873 
+  HoxA = data.frame(chr = 'chr2p', start = 870541422, end = 875470873 , strand = '*', stringsAsFactors = FALSE)
+  HoxA = makeGRangesFromDataFrame(HoxA, seqnames.field = 'chr', start.field = 'start', end.field = 'end', strand.field = 'strand')
+  
+  fimo = read.delim(file = paste0('../results/motif_analysis/FIMO/fimo_out/fimo_chr2p.tsv'), header = FALSE)
+  fimo = fimo[, -c(2, 10)]
+  fimo = data.frame(fimo, stringsAsFactors = FALSE)
+  
+  x = data.frame(t(sapply(fimo$V3, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  
+  fimo =data.frame(x, fimo)
+  colnames(fimo)[c(1:3)] = c('chr', 'start', 'end')
+  
+  
+  x$strand = '*'
+  x = makeGRangesFromDataFrame(x, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
+  
+  head(fimo)
+  
+  jj = overlapsAny(x, HoxA)
+  
+  fimo = fimo[jj, ]
+  colnames(fimo)[c(1:3)] = c('chr', 'start', 'end')
+  colnames(fimo)[4:11] = c('motif_id', 'sequence_name', 'start_sequence',  'end_sequence', 'strand_sequence', 'score', 'pval', 'qv')
+  
+  x = fimo[which(fimo$pval < 10^-6), ]
+  ss = table(x$motif_id)
+  ss[ss>0]
+  
+  x$start = as.numeric(as.character(x$start))
+  x$end = as.numeric(as.character(x$end))
+  x$start_sequence = as.numeric(as.character(x$start_sequence))
+  x$end_sequence = as.numeric(as.character(x$end_sequence))
+  
+  kk = which(x$strand_sequence == '+')
+  x$start_sequence[kk] = x$start[kk]+ x$start_sequence[kk]
+  x$end_sequence[kk] = x$start[kk] + x$end_sequence[kk]
+  
+  kk = which(x$strand_sequence == '-')
+  lls = x$end_sequence[kk] - x$start_sequence[kk]
+  x$start_sequence[kk] = x$end[kk] -  x$end_sequence[kk]
+  x$end_sequence[kk] = x$start_sequence[kk] + lls
+ 
+  y = x[, c(1, 6, 7, 4, 10, 8)]
+    
+  write.table(y, file = paste0(resDir, '/fimo_out_HoxACluster.bed'), sep = '\t', 
+              quote = FALSE, row.names = FALSE, col.names = FALSE)
+  
+}
+
+##########################################
 # after running FIMO, make motif occurrency matrix  
 ##########################################
 make.motif.oc.matrix.from.fimo.output = function()
