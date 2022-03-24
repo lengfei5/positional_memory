@@ -232,6 +232,7 @@ convert.cisbp.format.to.meme = function()
   
 }
 
+
 extract.SwissRegulon.meme.from.MotifDb = function()
 {
   library(universalmotif)
@@ -368,9 +369,12 @@ make.bed.file.from.fimo.out = function()
   
 }
 
-##########################################
-# after running FIMO, make motif occurrency matrix  
-##########################################
+########################################################
+########################################################
+# Section : # after running FIMO, make motif occurrency matrix  
+# 
+########################################################
+########################################################
 make.motif.oc.matrix.from.fimo.output = function()
 {
   library(data.table)
