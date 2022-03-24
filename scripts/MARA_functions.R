@@ -219,9 +219,20 @@ extract.TFs.annotation.from.TFClass = function()
 process.jaspar2022.meme = function()
 {
   library(universalmotif)
-  pwm.old = paste0('/Volumes/groups/tanaka/People/current/jiwang/Databases/motifs_TFs/JASPAR2022/',
-                   'JASPAR2022_CORE_vertebrates_non-redundant_pfms_meme.txt')
-  xx = read_matrix(file = pwm.old, skip = 0)
+  dir_jaspar2022 = '/Volumes/groups/tanaka/People/current/jiwang/Databases/motifs_TFs/JASPAR2022/'
+  pwm.old = paste0(dir_jaspar2022, 'JASPAR2022_CORE_vertebrates_non-redundant_pfms_meme.txt')
+  xx = read_meme(file = pwm.old, skip = 0)
+  
+  # convert to PPM to have the propre format
+  yy = convert_type(xx, "PPM")
+  
+  
+  
+  write_meme(yy, overwrite = TRUE,  
+             file = paste0(dir_jaspar2022, 'JASPAR2022_CORE_vertebrates_nonRedundant.meme'))
+  
+  
+  
   
 }
 
