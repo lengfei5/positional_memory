@@ -250,6 +250,19 @@ extract.SwissRegulon.meme.from.MotifDb = function()
 }
 
 
+# manually add extra motifs for hnd-1, pha-4, unc-120 and nhr-67 from dm, mus and homo
+convert.cisbp.format.to.meme = function()
+{
+  library(universalmotif)
+  #pwmDIr = '/Volumes/groups/cochella/jiwang/Databases/motifs_TFs/PWMs_C_elegans/extra_pwm'
+  pwm.cisbp = '../data/test/PWM.txt'
+  xx = read_cisbp(file = pwm.cisbp, skip = 0)
+  yy = convert_type(xx, "PWM")
+  
+  write_meme(yy, file = '../data/test/PWM_converted.meme', overwrite = TRUE)
+  
+}
+
 generate.logos.for.motifs.pwm = function()
 {
   library('universalmotif')
@@ -280,9 +293,180 @@ generate.logos.for.motifs.pwm = function()
   
 }
 
+## modify the motif names with associated TFs
+process.motif.tf.mapping = function()
+{
+  motif.tf = read.table('/Volumes/groups/cochella/jiwang/Databases/motifs_TFs/PWMs_C_elegans/motifs_tfs_mapping_curated_extra.txt', 
+                        header = FALSE, sep = ' ')
+  motif.tf = motif.tf[, c(2:3)]
+  colnames(motif.tf) = c('motifs', 'tfs')
+  
+  # manually modify the motif names
+  motif.tf = data.frame(motif.tf, stringsAsFactors = FALSE)
+  motif.tf$motifs.new = motif.tf$motifs
+  motif.tf$tfs.new = motif.tf$tfs
+  
+  xx = motif.tf
+  #xx$motifs.new = gsub('1.02', '', xx$motifs.new)
+  #xx$motifs.new = gsub('1.02', '', xx$motifs.new)
+  #xx$tfs.new = paste0(xx$tfs.new, '_', xx$tfs)
+  #xx$tfs.new = gsub('-', '', xx$tfs.new)
+  xx$tfs.new = gsub(':', '.', xx$tfs.new)
+  xx$tfs.new = gsub('/', '.', xx$tfs.new)
+  xx$tfs.new = gsub("\\(","", xx$tfs.new)
+  xx$tfs.new = gsub("\\)","", xx$tfs.new)
+  xx$tfs.new = gsub("_Homo_sapiens_DBD*.*",".homo", xx$tfs.new)
+  xx$tfs.new = gsub("_Caenorhabditis_briggsae_DBD*.*","", xx$tfs.new)
+  xx$tfs.new = gsub("_Drosophila_melanogaster_DBD*.*",".dm", xx$tfs.new)
+  xx$tfs.new = gsub("_Mus_musculus_DBD*.*",".mus", xx$tfs.new)
+  xx$tfs.new = gsub("_Brugia_pahangi_DBD*.*","", xx$tfs.new)
+  xx$tfs.new = gsub("_Wuchereria_bancrofti_DBD*.*","", xx$tfs.new)
+  xx$tfs.new = gsub("_PBM_CONSTRUCTS_DBD*.*","", xx$tfs.new)
+  xx$tfs.new = gsub("_Tetraodon_nigroviridis_DBD*.*","", xx$tfs.new)
+  xx$tfs.new = gsub('Mus', '.mus', xx$tfs.new)
+  xx$tfs.new = gsub('Dm', '.dm', xx$tfs.new)
+  xx$tfs.new = gsub('Homo', '.homo', xx$tfs.new)
+  xx$tfs.new = gsub('Hand1', 'hnd-1', xx$tfs.new)
+  xx$tfs.new = gsub('Foxa1', 'pha-4', xx$tfs.new)
+  xx$tfs.new = gsub('SRF', 'unc-120', xx$tfs.new)
+  xx$tfs.new = gsub('Srf', 'unc-120', xx$tfs.new)
+  xx$tfs.new = gsub('Nr2e1', 'nhr-67', xx$tfs.new)
+  xx$tfs.new = gsub('NR2E1', 'nhr-67', xx$tfs.new)
+  
+  xx$motifs.new = paste0(xx$motifs.new, '_', xx$tfs.new)
+  
+  motif.tf = xx
+  
+  saveRDS(motif.tf, file = '../data/motifs_tfs/motif_tf_mapping.rds')
+  
+}
+
+# remove motif redundancies
+remove.motifs.redundancy.by.similarity.clustering = function()
+{
+  library(tidyverse)  # data manipulation
+  library(cluster)    # clustering algorithms
+  library(factoextra) # clustering visualization
+  require(graphics)
+  library(universalmotif)
+  
+  motif.tf = readRDS(file = '../data/motifs_tfs/motif_tf_mapping.rds')
+  motif.tf$motifs.new = paste0(motif.tf$tfs.new, '_', motif.tf$motifs)
+  
+  pwm = '/Volumes/groups/cochella/jiwang/Databases/motifs_TFs/PWMs_C_elegans/All_PWMs_JASPAR_CORE_2016_TRANSFAC_2015_CIS_BP_2015_curated_extra.meme'
+  #pwm = '/Volumes/groups/cochella/jiwang/Databases/motifs_TFs/PWMs_C_elegans/All_PWMs_JASPAR_CORE_2016_TRANSFAC_2015_CIS_BP_2015.meme'
+  
+  meme= read_meme(file = pwm, skip = 0, readsites = FALSE, readsites.meta = FALSE)
+  motifs = convert_motifs(meme, class = "universalmotif-universalmotif")
+  cat(length(motifs), ' motifs \n')
+  
+  pwm.corr <- compare_motifs(motifs, method = "PCC", min.mean.ic = 0,
+                             score.strat = "a.mean")
+  
+  newName = motif.tf$motifs.new[match(rownames(pwm.corr), motif.tf$motifs)]
+  rownames(pwm.corr) = newName
+  colnames(pwm.corr) = newName
+  
+  comparisons <- 1 - pwm.corr
+  dd <- as.dist(comparisons)
+  
+  # Hierarchical clustering using Complete Linkage
+  hc <- hclust(dd, method = "ward.D2" )
+  
+  # Plot the obtained dendrogram
+  #plot(hc, cex = 0.6, hang = -1)
+  #sub_grp <- cutree(hc, h = 0.1)
+  pdfname = paste0(resDir, "/pwm_celegans_similarity_clustering.pdf")
+  pdf(pdfname, width=20, height = 30)
+  par(cex =0.5, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  
+  #plot(hc, cex = 0.5, hang = -1)
+  plot(as.dendrogram(hc), cex=0.5, horiz=TRUE)
+  abline(v = c(0.05, 0.1, 0.15), col = c('blue', 'red', 'green'))
+  #rect.hclust(hc, h = hc.cutoff, border="darkred")
+  #groups <- 
+  length(unique(cutree(hc, h = 0.05)))
+  length(unique(cutree(hc, h = 0.1)))
+  length(unique(cutree(hc, h = 0.15)))
+  length(unique(cutree(hc, h = 0.2)))
+  length(unique(cutree(hc, h = 0.25)))
+  
+  dev.off()
+  
+  change.pwm.logo.names = FALSE
+  if(change.pwm.logo.names){
+    logoDir = '../data/motifs_tfs/pwm_logos'
+    logo.file = list.files(path = logoDir, pattern = '*.pdf', full.names = TRUE)
+    for(n in 1:nrow(motif.tf))
+    {
+      # n = 1 
+      cmd = paste0('mv ', logo.file[grep(motif.tf$motifs[n], logo.file)], ' ', logoDir, '/',  motif.tf$motifs.new[n], '.pdf')
+      system(cmd)
+    }
+    
+  }
+  #fviz_nbclust(diss = comparisons, FUN = hcut, method = "wss")
+  #fviz_nbclust(df, FUN = hcut, method = "silhouette")
+  
+  ##########################################
+  # merge motifs using height = 0.1 and change motif names
+  ##########################################
+  hc.cutoff = 0.1
+  
+  groups <- cutree(hc, h = hc.cutoff)
+  motif.tf = data.frame(motif.tf, group = groups, stringsAsFactors = FALSE)
+  motif.tf$names = NA
+  for(nn in unique(motif.tf$group))
+  {
+    # nn = 5
+    kk = which(motif.tf$group == nn)
+    motif.tf$names[kk] = paste0(paste0(unique(motif.tf$tfs.new[kk]), collapse = '_'), '.M', nn)
+    
+  }
+  
+  # save motif-to-tf mapping with redundancy removal information
+  saveRDS(motif.tf, file = '../data/motifs_tfs/motif_tf_mapping.rds') 
+  
+}
+
+
+
+generate.logos.for.motifs.pwm = function()
+{
+  library('universalmotif')
+  pwm = '/Volumes/groups/cochella/jiwang/Databases/motifs_TFs/PWMs_C_elegans/All_PWMs_JASPAR_CORE_2016_TRANSFAC_2015_CIS_BP_2015_curated_extra.meme'
+  #pwm = '/Volumes/groups/cochella/jiwang/Databases/motifs_TFs/PWMs_C_elegans/All_PWMs_JASPAR_CORE_2016_TRANSFAC_2015_CIS_BP_2015.meme'
+  
+  meme= read_meme(file = pwm, skip = 0, readsites = FALSE, readsites.meta = FALSE)
+  motifs = convert_motifs(meme, class = "universalmotif-universalmotif")
+  # comparisons <- compare_motifs(motifs, method = "PCC", min.mean.ic = 0,
+  #                               score.strat = "a.mean")
+  # write.table(comparisons, file = '../data/motifs_tfs/pwm_similarity_correction_PCC.txt', sep = '\t', col.names = TRUE, 
+  #             row.names = TRUE, quote = FALSE)
+  
+  p1 = view_motifs(motifs[[1]], use.type = 'ICM')
+  plot(p1)
+  
+  for(n in 1:length(motifs))
+  {
+    cat(n, '\n')
+    pdfname = paste0('../data/motifs_tfs/pwm_logos/', motifs[[n]]@name, '.pdf')
+    pdf(pdfname, width=8, height = 6)
+    par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+    p1 = view_motifs(motifs[[n]], use.type = 'ICM')
+    plot(p1)
+    
+    dev.off()
+  }
+  
+}
+
+
+
+
 ########################################################
 ########################################################
-# Section : motif activity analysis 
+# Section : all processing steps before motif activity analysis 
 # 
 ########################################################
 ########################################################
@@ -369,12 +553,9 @@ make.bed.file.from.fimo.out = function()
   
 }
 
-########################################################
-########################################################
-# Section : # after running FIMO, make motif occurrency matrix  
-# 
-########################################################
-########################################################
+##########################################
+# after running FIMO, make motif occurrency matrix 
+##########################################
 make.motif.oc.matrix.from.fimo.output = function()
 {
   library(data.table)
