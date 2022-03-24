@@ -7,6 +7,15 @@
 # Date of creation: Wed May 19 10:47:23 2021
 ##########################################################################
 ##########################################################################
+
+########################################################
+########################################################
+# Section I : utility functions for MARA
+# 
+########################################################
+########################################################
+
+#### TF annotations
 extract.TFs.annotation.from.TFClass = function()
 {
   library(rdflib)
@@ -201,18 +210,18 @@ extract.TFs.annotation.from.TFClass = function()
   saveRDS(human.TF, 
           file = paste0('/Users/jiwang/workspace/imp/positional_memory/results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
   
-  
 }
 
-collect.TFs.gene.expression = function()
+##########################################
+# PWM database collection 
+##########################################
+## double check jaspar2022 database and process
+process.jaspar2022.meme = function()
 {
-  tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
-  load(file = paste0(tfDir, '/RNAseq_fpm_fitered.cutoff.', cutoff.gene, '.Rdata'))
-  annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
-                         'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr.rds'))
-  
-  #kk = match(annot$gene.symbol.hs, tfs)
-  
+  library(universalmotif)
+  pwm.old = paste0('/Volumes/groups/tanaka/People/current/jiwang/Databases/motifs_TFs/JASPAR2022/',
+                   'JASPAR2022_CORE_vertebrates_non-redundant_pfms_meme.txt')
+  xx = read_matrix(file = pwm.old, skip = 0)
   
 }
 
@@ -294,7 +303,7 @@ generate.logos.for.motifs.pwm = function()
 }
 
 ## modify the motif names with associated TFs
-process.motif.tf.mapping = function()
+process.motif.tf.mapping.for.celegans = function()
 {
   motif.tf = read.table('/Volumes/groups/cochella/jiwang/Databases/motifs_TFs/PWMs_C_elegans/motifs_tfs_mapping_curated_extra.txt', 
                         header = FALSE, sep = ' ')
@@ -426,38 +435,6 @@ remove.motifs.redundancy.by.similarity.clustering = function()
   
   # save motif-to-tf mapping with redundancy removal information
   saveRDS(motif.tf, file = '../data/motifs_tfs/motif_tf_mapping.rds') 
-  
-}
-
-
-
-generate.logos.for.motifs.pwm = function()
-{
-  library('universalmotif')
-  pwm = '/Volumes/groups/cochella/jiwang/Databases/motifs_TFs/PWMs_C_elegans/All_PWMs_JASPAR_CORE_2016_TRANSFAC_2015_CIS_BP_2015_curated_extra.meme'
-  #pwm = '/Volumes/groups/cochella/jiwang/Databases/motifs_TFs/PWMs_C_elegans/All_PWMs_JASPAR_CORE_2016_TRANSFAC_2015_CIS_BP_2015.meme'
-  
-  meme= read_meme(file = pwm, skip = 0, readsites = FALSE, readsites.meta = FALSE)
-  motifs = convert_motifs(meme, class = "universalmotif-universalmotif")
-  # comparisons <- compare_motifs(motifs, method = "PCC", min.mean.ic = 0,
-  #                               score.strat = "a.mean")
-  # write.table(comparisons, file = '../data/motifs_tfs/pwm_similarity_correction_PCC.txt', sep = '\t', col.names = TRUE, 
-  #             row.names = TRUE, quote = FALSE)
-  
-  p1 = view_motifs(motifs[[1]], use.type = 'ICM')
-  plot(p1)
-  
-  for(n in 1:length(motifs))
-  {
-    cat(n, '\n')
-    pdfname = paste0('../data/motifs_tfs/pwm_logos/', motifs[[n]]@name, '.pdf')
-    pdf(pdfname, width=8, height = 6)
-    par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-    p1 = view_motifs(motifs[[n]], use.type = 'ICM')
-    plot(p1)
-    
-    dev.off()
-  }
   
 }
 
@@ -1528,6 +1505,19 @@ run.MARA.atac.temporal = function(keep, cc)
              na_col = "white", fontsize_col = 12) 
     
   }
+  
+}
+
+## post-MARA analysis
+collect.TFs.gene.expression = function()
+{
+  tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
+  load(file = paste0(tfDir, '/RNAseq_fpm_fitered.cutoff.', cutoff.gene, '.Rdata'))
+  annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                         'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr.rds'))
+  
+  #kk = match(annot$gene.symbol.hs, tfs)
+  
   
 }
 
