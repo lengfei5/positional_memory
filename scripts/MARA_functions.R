@@ -461,13 +461,11 @@ generate.logos.for.motifs.pwm = function()
   
 }
 
-
-
-
 ########################################################
 ########################################################
-# Section : all processing steps before motif activity analysis 
-# 
+# Section II : all processing steps 
+# after motif scanning 
+# before motif activity analysis
 ########################################################
 ########################################################
 save.peak.bed.file.for.fimo = function()
@@ -705,7 +703,7 @@ make.motif.oc.matrix.from.fimo.output = function()
 
 ########################################################
 ########################################################
-# Section : run MARA for regeneration peaks
+# Section III: run MARA 
 # 
 ########################################################
 ########################################################
