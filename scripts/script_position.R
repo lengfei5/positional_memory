@@ -154,6 +154,7 @@ if(Peaks.Background.selection){
   design$conds = design$condition
   design$unique.rmdup = design$usable
   colnames(design)[which(colnames(design) == 'fileName')] = 'samples'
+  
   #sels = grep('Mature|Embryo|BL_UA', design$conds)
   sels = c(1:nrow(design))
   rownames(counts) = counts$gene
@@ -161,10 +162,10 @@ if(Peaks.Background.selection){
   
   dds <- DESeqDataSetFromMatrix(counts, DataFrame(design[sels, ]), design = ~ conds)
   colnames(dds) = colnames(counts)
-  
+  rownames(dds) = gsub('_', '-', rownames(dds))
   # check the peak length
   peakNames = rownames(dds)
-  pp = data.frame(t(sapply(peakNames, function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
+  pp = data.frame(t(sapply(peakNames, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
   
   pp$strand = '*'
   pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
@@ -179,6 +180,7 @@ if(Peaks.Background.selection){
   select.background.for.peaks = TRUE
   
   if(select.peaks.with.readThreshold){
+    
     #ss = rowMax(counts(dds)[, grep('Embryo_', dds$conds)])
     ss = rowMaxs(counts(dds))/ll*500
     hist(log10(ss), breaks = 200, main = 'log2(max of read counts within peaks) ')
@@ -189,9 +191,24 @@ if(Peaks.Background.selection){
     abline(v= log10(cutoff.peak), col = 'red', lwd = 2.0)
     abline(v= log10(cutoff.bg), col = 'blue', lwd = 2.0)
     
+    cat(length(which(ss >= 30)), 'peaks selected with minimum read of the highest peak -- ', cutoff.peak,  '\n')
+    cat(length(which(ss >= 40)), 'peaks selected with minimum read of the highest peak -- ', cutoff.peak,  '\n')
+    cat(length(which(ss >= 50)), 'peaks selected with minimum read of the highest peak -- ', cutoff.peak,  '\n')
+    
+    ii_test = rownames(dds)[which(ss>29.9 & ss<30.1)] 
+    ii_test[sample(1:length(ii_test), 20)]
+    
+    ii_test = rownames(dds)[which(ss>39.9 & ss<40.1)] 
+    ii_test[sample(1:length(ii_test), 20)]
+    
+    cutoff.peak = 40
     nb.above.threshold = apply(counts(dds), 1, function(x) length(which(x>cutoff.peak)))
-    ii = which(ss >= cutoff.peak)
-    #ii = which(nb.above.threshold>=2)
+    #ii = which(ss >= cutoff.peak)
+    
+    ##########################################
+    # atac-seq peak selection: > 40 cutoff within >= 2 samples
+    ##########################################
+    ii = which(nb.above.threshold>=2)
     cat(length(ii), ' atac-seq peaks selected \n')
     
     if(select.background.for.peaks){
@@ -227,8 +244,6 @@ if(Peaks.Background.selection){
     sfs = data.frame(sample = colnames(dds), sf = sizeFactors(dds)*median(colSums(counts(dds))), stringsAsFactors = FALSE)
     
     saveRDS(sfs, file = paste0(RdataDir, '/DESeq2_peaks.based_scalingFactors_forGenomicRanger.rds'))
-    
-    
     
   }
 }
