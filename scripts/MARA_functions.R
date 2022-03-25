@@ -262,6 +262,7 @@ process.jaspar2022.meme.vetebrate = function()
   }
   
   metadata$name = paste0(metadata$tfs, '_', metadata$motifs)
+  
   ## modify motif name
   for(n in 1:length(yy))
   {
@@ -272,8 +273,10 @@ process.jaspar2022.meme.vetebrate = function()
   
   write_meme(yy, overwrite = TRUE,  
              file = paste0(dir_jaspar2022, 'JASPAR2022_CORE_vertebrates_nonRedundant.meme'))
+  saveRDS(metadata, file = paste0())
   
   
+  ## check the motif redundency
   motifs = convert_motifs(yy, class = "universalmotif-universalmotif")
   cat(length(motifs), ' motifs \n')
   
@@ -293,13 +296,13 @@ process.jaspar2022.meme.vetebrate = function()
   # Plot the obtained dendrogram
   #plot(hc, cex = 0.6, hang = -1)
   #sub_grp <- cutree(hc, h = 0.1)
-  pdfname = paste0(resDir, "/pwm_celegans_similarity_clustering.pdf")
+  pdfname = paste0(resDir, "/Jaspar2022_PWM_similarity_clustering.pdf")
   pdf(pdfname, width=30, height = 100)
   par(cex =0.5, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
   #plot(hc, cex = 0.5, hang = -1)
   plot(as.dendrogram(hc), cex=0.5, horiz=TRUE)
-  abline(v = c(0.02, 0.05, 0.1, 0.15), col = c('orange', 'blue', 'red', 'green'))
+  abline(v = c(0.025, 0.05, 0.1, 0.15), col = c('orange', 'blue', 'red', 'green'))
   #rect.hclust(hc, h = hc.cutoff, border="darkred")
   #groups <- 
   length(unique(cutree(hc, h = 0.01)))
@@ -311,8 +314,59 @@ process.jaspar2022.meme.vetebrate = function()
   
   dev.off()
   
-  #fviz_nbclust(diss = comparisons, FUN = hcut, method = "wss")
-  #fviz_nbclust(df, FUN = hcut, method = "silhouette")
+  pdfname = paste0(resDir, "/Jaspar2022_PWM__similarity_correlations.pdf")
+  pdf(pdfname, width=8, height = 6)
+  par(cex =0.5, mar = c(3,3,2,0.5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  hist(pwm.corr, xlim = c(-0.4, 1))
+  dev.off()
+  
+  ## compare the jaspar2022 with swissregulon human
+  Compare.jaspar2022.vs.swissregulon = FALSE
+  if(Compare.jaspar2022.vs.swissregulon){
+    srg = paste0('/Volumes/groups/tanaka/People/current/jiwang/Databases/motifs_TFs/',
+                 'SwissRegulon_PWMs/hg19_weight_matrices_v2.meme')
+    test = read_meme(file = srg, skip = 0)
+    test = convert_type(test, "PPM")
+    test = convert_motifs(test, class = "universalmotif-universalmotif")
+    pwm.corr <- compare_motifs(test, method = "PCC", min.mean.ic = 0,
+                               score.strat = "a.mean")
+    
+    comparisons <- 1 - pwm.corr
+    dd <- as.dist(comparisons)
+    
+    # Hierarchical clustering using Complete Linkage
+    hc <- hclust(dd, method = "ward.D2" )
+    
+    # Plot the obtained dendrogram
+    #plot(hc, cex = 0.6, hang = -1)
+    #sub_grp <- cutree(hc, h = 0.1)
+    pdfname = paste0(resDir, "/SwissRegulon_PWM__similarity_clustering.pdf")
+    pdf(pdfname, width=30, height = 100)
+    par(cex =0.5, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+    
+    #plot(hc, cex = 0.5, hang = -1)
+    plot(as.dendrogram(hc), cex=0.5, horiz=TRUE)
+    abline(v = c(0.025, 0.05, 0.1, 0.15), col = c('orange', 'blue', 'red', 'green'))
+    rect.hclust(hc, h = 0.8, border="darkred")
+    
+    #groups <- 
+    length(unique(cutree(hc, h = 0.01)))
+    length(unique(cutree(hc, h = 0.05)))
+    length(unique(cutree(hc, h = 0.1)))
+    length(unique(cutree(hc, h = 0.15)))
+    length(unique(cutree(hc, h = 0.2)))
+    length(unique(cutree(hc, h = 0.25)))
+    length(unique(cutree(hc, h = 0.8)))
+    
+    dev.off()
+    
+    pdfname = paste0(resDir, "/SwissRegulon_PWM__similarity_correlations.pdf")
+    pdf(pdfname, width=8, height = 6)
+    par(cex =0.5, mar = c(3,3,2,0.5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+    hist(pwm.corr)
+    dev.off()
+    
+  }
   
   ##########################################
   # merge motifs using height = 0.1 and change motif names
@@ -370,6 +424,8 @@ extract.SwissRegulon.meme.from.MotifDb = function()
   yy = convert_type(xx, "PWM")
   
   write_meme(yy, file = '../results/motif_analysis/SwissRegulon_PWMs/hg19_weight_matrices_v2.meme', overwrite = TRUE)
+  
+  
   
 }
 
