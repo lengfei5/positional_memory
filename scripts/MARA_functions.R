@@ -615,7 +615,9 @@ remove.motifs.redundancy.by.similarity.clustering = function()
 save.peak.bed.file.for.fimo = function()
 {
   #load(file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.withinPeaks.pval6.Rdata'))
-  fpm = readRDS(file = paste0(RdataDir, '/fpm_TMM_combat.rds'))
+  #fpm = readRDS(file = paste0(RdataDir, '/fpm_TMM_combat.rds'))
+  load(file = paste0(RdataDir, '/ATACseq_selected.63k.peaks_cutoff.40.at.least.2sample.Rdata'))
+  fpm = fpm(dds)
   
   # prepare the background distribution
   jj = grep('bg_', rownames(fpm), invert = TRUE)
@@ -632,10 +634,10 @@ save.peak.bed.file.for.fimo = function()
                                 start.field="X2", end.field="X3", strand.field="strand")
   ll = width(pp)
   
-  
-  write.table(pp, file = '../results/motif_analysis/peaks/peaks_for_fimo.bed', row.names = FALSE, col.names = FALSE,
+  saveDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/motif_analysis/peaks/'
+  write.table(pp, file = paste0(saveDir, 'peaks_for_fimo.bed'), 
+              row.names = FALSE, col.names = FALSE,
               quote = FALSE, sep = '\t')
-  
   
 }
 

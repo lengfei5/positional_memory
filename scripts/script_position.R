@@ -253,7 +253,7 @@ if(Peaks.Background.selection){
 
 ########################################################
 ########################################################
-# Section : batch correction 
+# Section II: batch correction 
 # TMM and combat were selected for normalization and batch correction
 ########################################################
 ########################################################
@@ -342,7 +342,7 @@ if(Split.Mature.Regeneration.samples){
 
 ########################################################
 ########################################################
-# Section II : positional peaks
+# Section III : positional peaks
 # ##########################################
 # Position-dependent test
 # mainly use the mature samples, mUA, mLA and mHand

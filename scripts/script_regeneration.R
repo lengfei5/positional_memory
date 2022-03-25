@@ -16,7 +16,6 @@ source(RNA.QC.functions)
 source('functions_chipSeq.R')
 source('Functions_atac.R')
 
-
 version.analysis = 'Rxxxx_R10723_R11637_R12810_atac'
 #peakDir = "Peaks/macs2_broad"
 
@@ -29,7 +28,6 @@ if(!dir.exists(RdataDir)) dir.create(RdataDir)
 dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/'
 annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
 gtf.file =  paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf')
-
 
 figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
 tableDir = paste0(figureDir, 'tables4plots/')
@@ -554,8 +552,6 @@ if(grouping.temporal.peaks){
   }
   
   xx = run.MARA.atac.temporal(keep, cc)
-  
-  
   
   
 }
