@@ -216,7 +216,7 @@ extract.TFs.annotation.from.TFClass = function()
 # PWM database collection 
 ##########################################
 ## double check jaspar2022 database and process
-process.jaspar2022.meme = function()
+process.jaspar2022.meme.vetebrate = function()
 {
   library(universalmotif)
   dir_jaspar2022 = '/Volumes/groups/tanaka/People/current/jiwang/Databases/motifs_TFs/JASPAR2022/'
@@ -226,17 +226,121 @@ process.jaspar2022.meme = function()
   # convert to PPM to have the propre format
   yy = convert_type(xx, "PPM")
   
+  ## collect associated TFs for each motifs
+  metadata = c()
+  for(n in 1:length(yy))
+  {
+    # n = 1
+    tmp = yy[[n]]
+    metadata = rbind(metadata, c(tmp@name, tmp@altname))
+  }
+  colnames(metadata) = c('motifs', 'tfs')
+  metadata = data.frame(metadata, stringsAsFactors = FALSE)
+  metadata$tfs = toupper(metadata$tfs)
   
+  metadata$tfs = gsub('::', '_', metadata$tfs)
+  
+  x = table(metadata$tfs)
+  x[which(x>1)]
+  
+  
+  ## make logos
+  dir_jaspar2022_logos = paste0(dir_jaspar2022, 'logos/')
+  if(!dir.exists(dir_jaspar2022_logos)) dir.create(dir_jaspar2022_logos)
+  for(n in 1:length(yy))
+  {
+    cat(n, '\n')
+    pdfname = paste0(dir_jaspar2022_logos, metadata$tfs[n], '_',  metadata$motifs[n], '.pdf')
+    pdf(pdfname, width=8, height = 6)
+    par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+    
+    p1 = view_motifs(yy[[n]], use.type = 'ICM') + 
+      ggtitle(paste0(metadata$tfs[n], '_',  metadata$motifs[n])) 
+    plot(p1)
+    
+    dev.off()
+  }
+  
+  metadata$name = paste0(metadata$tfs, '_', metadata$motifs)
+  ## modify motif name
+  for(n in 1:length(yy))
+  {
+    cat(n, '\n')
+    yy[[n]]@name = metadata$name[n]
+    
+  }
   
   write_meme(yy, overwrite = TRUE,  
              file = paste0(dir_jaspar2022, 'JASPAR2022_CORE_vertebrates_nonRedundant.meme'))
   
   
+  motifs = convert_motifs(yy, class = "universalmotif-universalmotif")
+  cat(length(motifs), ' motifs \n')
   
+  pwm.corr <- compare_motifs(motifs, method = "PCC", min.mean.ic = 0,
+                             score.strat = "a.mean")
+  
+  #newName = motif.tf$motifs.new[match(rownames(pwm.corr), motif.tf$motifs)]
+  rownames(pwm.corr) = metadata$name
+  colnames(pwm.corr) = metadata$name
+  
+  comparisons <- 1 - pwm.corr
+  dd <- as.dist(comparisons)
+  
+  # Hierarchical clustering using Complete Linkage
+  hc <- hclust(dd, method = "ward.D2" )
+  
+  # Plot the obtained dendrogram
+  #plot(hc, cex = 0.6, hang = -1)
+  #sub_grp <- cutree(hc, h = 0.1)
+  pdfname = paste0(resDir, "/pwm_celegans_similarity_clustering.pdf")
+  pdf(pdfname, width=30, height = 100)
+  par(cex =0.5, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  
+  #plot(hc, cex = 0.5, hang = -1)
+  plot(as.dendrogram(hc), cex=0.5, horiz=TRUE)
+  abline(v = c(0.02, 0.05, 0.1, 0.15), col = c('orange', 'blue', 'red', 'green'))
+  #rect.hclust(hc, h = hc.cutoff, border="darkred")
+  #groups <- 
+  length(unique(cutree(hc, h = 0.01)))
+  length(unique(cutree(hc, h = 0.05)))
+  length(unique(cutree(hc, h = 0.1)))
+  length(unique(cutree(hc, h = 0.15)))
+  length(unique(cutree(hc, h = 0.2)))
+  length(unique(cutree(hc, h = 0.25)))
+  
+  dev.off()
+  
+  #fviz_nbclust(diss = comparisons, FUN = hcut, method = "wss")
+  #fviz_nbclust(df, FUN = hcut, method = "silhouette")
+  
+  ##########################################
+  # merge motifs using height = 0.1 and change motif names
+  ##########################################
+  Merge.similar.motifs = FALSE
+  if(Merge.similar.motifs){
+    hc.cutoff = 0.1
+    
+    groups <- cutree(hc, h = hc.cutoff)
+    motif.tf = data.frame(motif.tf, group = groups, stringsAsFactors = FALSE)
+    motif.tf$names = NA
+    for(nn in unique(motif.tf$group))
+    {
+      # nn = 5
+      kk = which(motif.tf$group == nn)
+      motif.tf$names[kk] = paste0(paste0(unique(motif.tf$tfs.new[kk]), collapse = '_'), '.M', nn)
+      
+    }
+    
+    # save motif-to-tf mapping with redundancy removal information
+    saveRDS(motif.tf, file = '../data/motifs_tfs/motif_tf_mapping.rds') 
+    
+  }
   
 }
 
-# manually add extra motifs for hnd-1, pha-4, unc-120 and nhr-67 from dm, mus and homo
+
+# manually add extra motifs for hnd-1, pha-4, unc-120 and nhr-67 from dm, mus and homo for c elegans motif analysis
 convert.cisbp.format.to.meme = function()
 {
   library(universalmotif)
@@ -266,20 +370,6 @@ extract.SwissRegulon.meme.from.MotifDb = function()
   yy = convert_type(xx, "PWM")
   
   write_meme(yy, file = '../results/motif_analysis/SwissRegulon_PWMs/hg19_weight_matrices_v2.meme', overwrite = TRUE)
-  
-}
-
-
-# manually add extra motifs for hnd-1, pha-4, unc-120 and nhr-67 from dm, mus and homo
-convert.cisbp.format.to.meme = function()
-{
-  library(universalmotif)
-  #pwmDIr = '/Volumes/groups/cochella/jiwang/Databases/motifs_TFs/PWMs_C_elegans/extra_pwm'
-  pwm.cisbp = '../data/test/PWM.txt'
-  xx = read_cisbp(file = pwm.cisbp, skip = 0)
-  yy = convert_type(xx, "PWM")
-  
-  write_meme(yy, file = '../data/test/PWM_converted.meme', overwrite = TRUE)
   
 }
 
@@ -373,7 +463,8 @@ remove.motifs.redundancy.by.similarity.clustering = function()
   motif.tf = readRDS(file = '../data/motifs_tfs/motif_tf_mapping.rds')
   motif.tf$motifs.new = paste0(motif.tf$tfs.new, '_', motif.tf$motifs)
   
-  pwm = '/Volumes/groups/cochella/jiwang/Databases/motifs_TFs/PWMs_C_elegans/All_PWMs_JASPAR_CORE_2016_TRANSFAC_2015_CIS_BP_2015_curated_extra.meme'
+  pwm = paste0('/Volumes/groups/cochella/jiwang/Databases/motifs_TFs/PWMs_C_elegans/',
+               'All_PWMs_JASPAR_CORE_2016_TRANSFAC_2015_CIS_BP_2015_curated_extra.meme')
   #pwm = '/Volumes/groups/cochella/jiwang/Databases/motifs_TFs/PWMs_C_elegans/All_PWMs_JASPAR_CORE_2016_TRANSFAC_2015_CIS_BP_2015.meme'
   
   meme= read_meme(file = pwm, skip = 0, readsites = FALSE, readsites.meta = FALSE)
