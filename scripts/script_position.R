@@ -120,7 +120,7 @@ if(Binary.peaks.QCs.analysis){
 
 ########################################################
 ########################################################
-# Section I : normalization and batch correction
+# Section I :  peak selection
 ########################################################
 ########################################################
 require(ChIPpeakAnno)
@@ -232,6 +232,8 @@ if(Peaks.Background.selection){
   plot(sizeFactors(dds), design$usable, log = 'xy')
   text(sizeFactors(dds), design$usable, labels = design$samples, cex = 0.7)
   
+  save(design, dds, file = paste0(RdataDir, '/ATACseq_selected.63k.peaks_cutoff.40.at.least.2sample.Rdata'))
+  
   save.scalingFactors.for.deeptools = FALSE
   if(save.scalingFactors.for.deeptools){
     xx = data.frame(sampleID = design$SampleID,  
@@ -248,15 +250,19 @@ if(Peaks.Background.selection){
   }
 }
 
-##########################################
-# test normalization and batch correction of ATAC-seq data
+
+########################################################
+########################################################
+# Section : batch correction 
 # TMM and combat were selected for normalization and batch correction
-##########################################
+########################################################
+########################################################
 source('Functions_atac.R')
 library(edgeR)
 require("sva")
 require(limma)
 
+load(file = paste0(RdataDir, '/ATACseq_selected.63k.peaks_cutoff.40.at.least.2sample.Rdata'))
 
 Split.Mature.Regeneration.samples = TRUE
 if(Split.Mature.Regeneration.samples){
