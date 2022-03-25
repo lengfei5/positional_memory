@@ -273,52 +273,61 @@ process.jaspar2022.meme.vetebrate = function()
   
   write_meme(yy, overwrite = TRUE,  
              file = paste0(dir_jaspar2022, 'JASPAR2022_CORE_vertebrates_nonRedundant.meme'))
-  saveRDS(metadata, file = paste0())
   
+  saveRDS(metadata, file = paste0('../data/JASPAR2022_CORE_vertebrates_nonRedundant_metadata.rds'))
+  
+  ### more annotation probably
+  dir_Berando = '/Volumes/groups/tanaka/People/current/jiwang/Databases/motifs_TFs/Shared_byBernado/'
+  motifs = readRDS(file = paste0(dir_Berando, 'TF_motif_human_list.rds'))
+  load(paste0(dir_Berando, 'TF_clusters_PWMs.RData'))
   
   ## check the motif redundency
-  motifs = convert_motifs(yy, class = "universalmotif-universalmotif")
-  cat(length(motifs), ' motifs \n')
-  
-  pwm.corr <- compare_motifs(motifs, method = "PCC", min.mean.ic = 0,
-                             score.strat = "a.mean")
-  
-  #newName = motif.tf$motifs.new[match(rownames(pwm.corr), motif.tf$motifs)]
-  rownames(pwm.corr) = metadata$name
-  colnames(pwm.corr) = metadata$name
-  
-  comparisons <- 1 - pwm.corr
-  dd <- as.dist(comparisons)
-  
-  # Hierarchical clustering using Complete Linkage
-  hc <- hclust(dd, method = "ward.D2" )
-  
-  # Plot the obtained dendrogram
-  #plot(hc, cex = 0.6, hang = -1)
-  #sub_grp <- cutree(hc, h = 0.1)
-  pdfname = paste0(resDir, "/Jaspar2022_PWM_similarity_clustering.pdf")
-  pdf(pdfname, width=30, height = 100)
-  par(cex =0.5, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-  
-  #plot(hc, cex = 0.5, hang = -1)
-  plot(as.dendrogram(hc), cex=0.5, horiz=TRUE)
-  abline(v = c(0.025, 0.05, 0.1, 0.15), col = c('orange', 'blue', 'red', 'green'))
-  #rect.hclust(hc, h = hc.cutoff, border="darkred")
-  #groups <- 
-  length(unique(cutree(hc, h = 0.01)))
-  length(unique(cutree(hc, h = 0.05)))
-  length(unique(cutree(hc, h = 0.1)))
-  length(unique(cutree(hc, h = 0.15)))
-  length(unique(cutree(hc, h = 0.2)))
-  length(unique(cutree(hc, h = 0.25)))
-  
-  dev.off()
-  
-  pdfname = paste0(resDir, "/Jaspar2022_PWM__similarity_correlations.pdf")
-  pdf(pdfname, width=8, height = 6)
-  par(cex =0.5, mar = c(3,3,2,0.5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-  hist(pwm.corr, xlim = c(-0.4, 1))
-  dev.off()
+  Check.motif.redundency = FALSE
+  if(Check.motif.redundency){
+    motifs = convert_motifs(yy, class = "universalmotif-universalmotif")
+    cat(length(motifs), ' motifs \n')
+    
+    pwm.corr <- compare_motifs(motifs, method = "PCC", min.mean.ic = 0,
+                               score.strat = "a.mean")
+    
+    #newName = motif.tf$motifs.new[match(rownames(pwm.corr), motif.tf$motifs)]
+    rownames(pwm.corr) = metadata$name
+    colnames(pwm.corr) = metadata$name
+    
+    comparisons <- 1 - pwm.corr
+    dd <- as.dist(comparisons)
+    
+    # Hierarchical clustering using Complete Linkage
+    hc <- hclust(dd, method = "ward.D2" )
+    
+    # Plot the obtained dendrogram
+    #plot(hc, cex = 0.6, hang = -1)
+    #sub_grp <- cutree(hc, h = 0.1)
+    pdfname = paste0(resDir, "/Jaspar2022_PWM_similarity_clustering.pdf")
+    pdf(pdfname, width=30, height = 100)
+    par(cex =0.5, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+    
+    #plot(hc, cex = 0.5, hang = -1)
+    plot(as.dendrogram(hc), cex=0.5, horiz=TRUE)
+    abline(v = c(0.025, 0.05, 0.1, 0.15), col = c('orange', 'blue', 'red', 'green'))
+    #rect.hclust(hc, h = hc.cutoff, border="darkred")
+    #groups <- 
+    length(unique(cutree(hc, h = 0.01)))
+    length(unique(cutree(hc, h = 0.05)))
+    length(unique(cutree(hc, h = 0.1)))
+    length(unique(cutree(hc, h = 0.15)))
+    length(unique(cutree(hc, h = 0.2)))
+    length(unique(cutree(hc, h = 0.25)))
+    
+    dev.off()
+    
+    pdfname = paste0(resDir, "/Jaspar2022_PWM__similarity_correlations.pdf")
+    pdf(pdfname, width=8, height = 6)
+    par(cex =0.5, mar = c(3,3,2,0.5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+    hist(pwm.corr, xlim = c(-0.4, 1))
+    dev.off()
+    
+  }
   
   ## compare the jaspar2022 with swissregulon human
   Compare.jaspar2022.vs.swissregulon = FALSE

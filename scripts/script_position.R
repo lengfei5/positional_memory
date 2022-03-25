@@ -30,10 +30,8 @@ dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memo
 annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
 gtf.file =  paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf')
 
-
 figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
 tableDir = paste0(figureDir, 'tables4plots/')
-
 
 require(ggplot2)
 require(DESeq2)
