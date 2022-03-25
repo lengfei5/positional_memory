@@ -42,20 +42,20 @@ library(tictoc)
 ##########################################
 # some annotations for all analysis 
 ##########################################
-Import.HoxCluster.annotation = FALSE
-
-if(Import.HoxCluster.annotation){
-  HoxA = data.frame(chr = 'chr2p', start = 873085043, end = 884416919, strand = '*', stringsAsFactors = FALSE)
-  HoxA = makeGRangesFromDataFrame(HoxA, seqnames.field = 'chr', start.field = 'start', end.field = 'end', strand.field = 'strand')
-  
-  HoxD1 = data.frame(chr = 'chr9q', start = 416423355, end = 427456848, strand = '*', stringsAsFactors = FALSE)
-  HoxD1 = makeGRangesFromDataFrame(HoxD1, seqnames.field = 'chr', start.field = 'start', end.field = 'end', strand.field = 'strand')
-  
-  HoxD2 = data.frame(chr = 'chr9q', start = 426557960, end = 435711507, strand = '*', stringsAsFactors = FALSE)
-  HoxD2 = makeGRangesFromDataFrame(HoxD2, seqnames.field = 'chr', start.field = 'start', end.field = 'end', strand.field = 'strand')
-  
-  Hoxs = c(HoxA, HoxD1, HoxD2)
-}
+# Import.HoxCluster.annotation = FALSE
+# 
+# if(Import.HoxCluster.annotation){
+#   HoxA = data.frame(chr = 'chr2p', start = 873085043, end = 884416919, strand = '*', stringsAsFactors = FALSE)
+#   HoxA = makeGRangesFromDataFrame(HoxA, seqnames.field = 'chr', start.field = 'start', end.field = 'end', strand.field = 'strand')
+#   
+#   HoxD1 = data.frame(chr = 'chr9q', start = 416423355, end = 427456848, strand = '*', stringsAsFactors = FALSE)
+#   HoxD1 = makeGRangesFromDataFrame(HoxD1, seqnames.field = 'chr', start.field = 'start', end.field = 'end', strand.field = 'strand')
+#   
+#   HoxD2 = data.frame(chr = 'chr9q', start = 426557960, end = 435711507, strand = '*', stringsAsFactors = FALSE)
+#   HoxD2 = makeGRangesFromDataFrame(HoxD2, seqnames.field = 'chr', start.field = 'start', end.field = 'end', strand.field = 'strand')
+#   
+#   Hoxs = c(HoxA, HoxD1, HoxD2)
+# }
 
 ##########################################
 # Here import design matrix and read counts of pooled peaks across conditions (pval < 10^-6)
@@ -133,18 +133,18 @@ design$usable[c(31:32)] = design$usable[c(31:32)]/10^6
 
 #saveRDS(design, file = paste0('../data/design_sampleInfos_32atacSamplesUsed.rds'))
 
-
 pp = data.frame(t(sapply(counts$gene, function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
 pp$strand = '*'
 
 pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
                               start.field="X2", end.field="X3", strand.field="strand")
-saveRDS(pp, file = paste0(RdataDir, '/ATACseq_peak_consensus_140k.rds'))
 
+#saveRDS(pp, file = paste0(RdataDir, '/ATACseq_peak_consensus_140k.rds'))
 # export(object = pp,  con = paste0(resDir, "/atacseq_peaks_all_140k.bed"), format = 'bed')
 
 ##########################################
 # Select peak consensus across mature, regeneration and embryo 
+# filter peaks below certain thrshold of read counts
 # and choose the background 
 ##########################################
 Peaks.Background.selection = TRUE
