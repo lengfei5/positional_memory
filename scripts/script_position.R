@@ -33,6 +33,8 @@ gtf.file =  paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf')
 figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
 tableDir = paste0(figureDir, 'tables4plots/')
 
+saveTables = FALSE
+
 require(ggplot2)
 require(DESeq2)
 require(GenomicRanges)
@@ -131,16 +133,15 @@ design$sampleID = design$SampleID
 design$usable = as.numeric(design$usable)
 design$usable[c(31:32)] = design$usable[c(31:32)]/10^6
 
-#saveRDS(design, file = paste0('../data/design_sampleInfos_32atacSamplesUsed.rds'))
-
-pp = data.frame(t(sapply(counts$gene, function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
-pp$strand = '*'
-
-pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
-                              start.field="X2", end.field="X3", strand.field="strand")
-
-#saveRDS(pp, file = paste0(RdataDir, '/ATACseq_peak_consensus_140k.rds'))
-# export(object = pp,  con = paste0(resDir, "/atacseq_peaks_all_140k.bed"), format = 'bed')
+if(saveTables){
+  pp = data.frame(t(sapply(counts$gene, function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
+  pp$strand = '*'
+  pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
+  #saveRDS(design, file = paste0('../data/design_sampleInfos_32atacSamplesUsed.rds'))
+  #saveRDS(pp, file = paste0(RdataDir, '/ATACseq_peak_consensus_140k.rds'))
+  # export(object = pp,  con = paste0(resDir, "/atacseq_peaks_all_140k.bed"), format = 'bed')
+}
 
 ##########################################
 # Select peak consensus across mature, regeneration and embryo 
@@ -148,7 +149,6 @@ pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
 # and choose the background 
 ##########################################
 Peaks.Background.selection = TRUE
-
 if(Peaks.Background.selection){
   
   design$conds = design$condition
@@ -192,6 +192,7 @@ if(Peaks.Background.selection){
     nb.above.threshold = apply(counts(dds), 1, function(x) length(which(x>cutoff.peak)))
     ii = which(ss >= cutoff.peak)
     #ii = which(nb.above.threshold>=2)
+    cat(length(ii), ' atac-seq peaks selected \n')
     
     if(select.background.for.peaks){
       ii.bg = which(ss < cutoff.bg)
@@ -251,7 +252,7 @@ if(Split.Mature.Regeneration.samples){
   table(design$condition, design$batch)
   
   # start with mature samples
-  Batch.Correct.matureSamples = FALSE
+  Batch.Correct.matureSamples = FALSE 
   if(Batch.Correct.matureSamples){
     
     sels = grep('Mature|HEAD', design$conds)
