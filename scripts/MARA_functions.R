@@ -1497,6 +1497,30 @@ run.MARA.atac.temporal = function(keep, cc)
              filename = paste0(resDir, '/MARA_bayesianRidge_temporalpeaks_Jaspar2022.pdf'), 
              width = 10, height = 12) 
     
+    bb =data.frame(bb, stringsAsFactors = FALSE)
+    bb$gene = rownames(bb)
+    bb$combine.Zscore = r$combined.Zscore[match(rownames(bb), names(r$combined.Zscore))]
+    bb$rank = order(bb$combine.Zscore)
+    #bb = bb[]
+    require(ggplot2)
+    require(tidyverse)
+    library(ggrepel)
+
+    ggplot(bb, aes(x=combine.Zscore, y=rank, label = gene)) +
+      geom_point(size = 2.0) +
+      #scale_color_manual(values=c('blue', 'red')) +
+      geom_text_repel(data= bb[which(bb$combine.Zscore>2.0), ] , size = 3.0) +
+      theme_classic() +
+      geom_hline(yintercept=0.0, colour = "darkgray", size = 1.5) +
+      xlab("motif activity importance rank") + ylab("Correlation to TF expression") +
+      theme(axis.text.x = element_text(size = 14),
+            axis.text.y = element_text(size = 14),
+            axis.title.x = element_text(size=14, face="bold"),
+            axis.title.y = element_text(size=14, face="bold"))
+
+    ggsave(paste0(resDir, '/MARA_bayesianRidge_temporalpeaks_motifActivity.rank_vs_TFexpression.pdf'), width=8, height = 6)
+
+    
     ##########################################
     # compare with the smartseq2 data 
     ##########################################
