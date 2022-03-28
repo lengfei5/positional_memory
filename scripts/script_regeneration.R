@@ -16,7 +16,7 @@ source(RNA.QC.functions)
 source('functions_chipSeq.R')
 source('Functions_atac.R')
 
-version.analysis = 'Rxxxx_R10723_R11637_R12810_atac'
+version.analysis = 'ATAC_allUsed_20220328'
 #peakDir = "Peaks/macs2_broad"
 
 resDir = paste0("../results/", version.analysis)
@@ -41,123 +41,16 @@ library(tictoc)
 ########################################################
 ########################################################
 # Section I : normalization and batch correction
-########################################################
-########################################################
-#load(file = paste0(RdataDir, '/samplesDesign.cleaned_readCounts.within_manualConsensusPeaks.pval3_mergedTechnical.Rdata'))
-load(file = paste0(RdataDir, '/samplesDesign_readCounts.within_manualConsensusPeaks.pval6_mergedTechnical_', 
-                   version.analysis, '.Rdata'))
-design$sampleID = design$SampleID
-design$usable = as.numeric(design$usable)
-design$usable[c(31:32)] = design$usable[c(31:32)]/10^6
-
-saveRDS(design, file = paste0('../data/design_sampleInfos_32atacSamplesUsed.rds'))
-
-
-require(ChIPpeakAnno)
-require(ChIPseeker)
-
-pp = data.frame(t(sapply(counts$gene, function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
-pp$strand = '*'
-
-pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
-                              start.field="X2", end.field="X3", strand.field="strand")
-
-
-##########################################
-# Select peak consensus across mature, regeneration and embryo 
-# and choose the background 
-##########################################
-Peaks.Background.selection = TRUE
-
-if(Peaks.Background.selection){
-  
-  design$conds = design$condition
-  design$unique.rmdup = design$usable
-  colnames(design)[which(colnames(design) == 'fileName')] = 'samples'
-  #sels = grep('Mature|Embryo|BL_UA', design$conds)
-  sels = c(1:nrow(design))
-  rownames(counts) = counts$gene
-  counts = as.matrix(counts[, -1])
-  
-  dds <- DESeqDataSetFromMatrix(counts, DataFrame(design[sels, ]), design = ~ conds)
-  colnames(dds) = colnames(counts)
-  
-  # check the peak length
-  peakNames = rownames(dds)
-  pp = data.frame(t(sapply(peakNames, function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
-  
-  pp$strand = '*'
-  pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
-                                start.field="X2", end.field="X3", strand.field="strand")
-  ll = width(pp)
-  
-  ##########################################
-  # filter peaks below certain thrshold of read counts
-  # And also consider those filtered peaks as background
-  ##########################################
-  select.peaks.with.readThreshold = TRUE
-  select.background.for.peaks = TRUE
-  
-  if(select.peaks.with.readThreshold){
-    #ss = rowMax(counts(dds)[, grep('Embryo_', dds$conds)])
-    ss = rowMaxs(counts(dds))/ll*500
-    hist(log10(ss), breaks = 200, main = 'log2(max of read counts within peaks) ')
-    cutoff.peak = 50 # 30 as peak cutoff looks good
-    cutoff.bg = 20
-    cat(length(which(ss >= cutoff.peak)), 'peaks selected with minimum read of the highest peak -- ', cutoff.peak,  '\n')
-    cat(length(which(ss < cutoff.bg)), 'peaks selected with minimum read of the highest peak -- ', cutoff.bg,  '\n')
-    abline(v= log10(cutoff.peak), col = 'red', lwd = 2.0)
-    abline(v= log10(cutoff.bg), col = 'blue', lwd = 2.0)
-    
-    nb.above.threshold = apply(counts(dds), 1, function(x) length(which(x>cutoff.peak)))
-    ii = which(ss >= cutoff.peak)
-    #ii = which(nb.above.threshold>=2)
-    
-    if(select.background.for.peaks){
-      ii.bg = which(ss < cutoff.bg)
-      ii.bg = sample(ii.bg, size = 1000, replace = FALSE)
-      rownames(dds)[ii.bg] = paste0('bg_', rownames(dds)[ii.bg])
-      dds = dds[c(ii, ii.bg), ]
-      ll.sels = ll[c(ii, ii.bg)]
-      
-    }else{
-      dds <- dds[ii, ]
-      ll.sels = ll[ss >= cutoff.peak]
-    }
-    
-  }
-  
-  dds <- estimateSizeFactors(dds)
-  
-  plot(sizeFactors(dds), colSums(counts(dds))/median(colSums(counts(dds))), log = 'xy')
-  
-  plot(sizeFactors(dds), design$usable, log = 'xy')
-  text(sizeFactors(dds), design$usable, labels = design$samples, cex = 0.7)
-  
-  save.scalingFactors.for.deeptools = FALSE
-  if(save.scalingFactors.for.deeptools){
-    xx = data.frame(sampleID = design$SampleID,  
-                    scalingFactor = design$unique.rmdup/(sizeFactors(dds)*median(design$unique.rmdup)),
-                    stringsAsFactors = FALSE)
-    
-    write.table(xx, file = paste0(resDir, '/DESeq2_scalingFactor_forDeeptools.txt'), sep = '\t',
-                col.names = FALSE, row.names = FALSE, quote = FALSE)
-    
-    sfs = data.frame(sample = colnames(dds), sf = sizeFactors(dds)*median(colSums(counts(dds))), stringsAsFactors = FALSE)
-    
-    saveRDS(sfs, file = paste0(RdataDir, '/DESeq2_peaks.based_scalingFactors_forGenomicRanger.rds'))
-    
-  }
-}
-
-##########################################
-# test normalization and batch correction of ATAC-seq data
 # TMM and combat were selected for normalization and batch correction
-##########################################
+########################################################
+########################################################
 source('Functions_atac.R')
 library(edgeR)
 require("sva")
 require(limma)
+
+load(file = paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata', 
+                   '/ATACseq_selected.63k.peaks_cutoff.40.at.least.2sample.Rdata'))
 
 table(design$condition, design$batch)
 
@@ -172,7 +65,7 @@ if(Batch.Correct.regeneration.embryoStage){
   sels = which(design$batch == '2021'| (design$batch == '2020' & design$condition != 'Mature_LA' & design$condition != 'Mature_Hand' &
                                           design$condition != 'Mature_UA'))
   
-  #sels = sels[which(design$SampleID[sels] != '89542' & design$SampleID[sels] != '89543')]
+  # sels = sels[which(design$SampleID[sels] != '89542' & design$SampleID[sels] != '89543')]
   
   design.sels = design[sels, ]
   design.sels$conds = droplevels(design.sels$conds)
@@ -234,7 +127,7 @@ if(Batch.Correct.regeneration.embryoStage){
 
 ########################################################
 ########################################################
-# Section IV : regeneration peaks
+# Section II : regeneration peaks
 # or temporal-peaks test
 ########################################################
 ########################################################
@@ -251,7 +144,7 @@ if(grouping.temporal.peaks){
   # prepare the background distribution
   fpm.bg = fpm[grep('bg_', rownames(fpm), invert = FALSE), ]
   fpm = fpm[grep('bg_', rownames(fpm), invert = TRUE), ]
-  rownames(fpm) = gsub('_', '-', rownames(fpm))
+  # rownames(fpm) = gsub('_', '-', rownames(fpm))
   
   hist(fpm.bg, breaks = 100, main = 'background distribution')
   abline(v = c(1, 2.5, 3), col = 'red', lwd = 2.0)
@@ -276,7 +169,8 @@ if(grouping.temporal.peaks){
     pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
                                   start.field="X2", end.field="X3", strand.field="strand")
     
-    # annotation from ucsc browser ambMex60DD_genes_putative
+    ## annotation from ucsc browser ambMex60DD_genes_putative
+    ## to update in the future 
     amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
     pp.annots = annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
     #plotAnnoBar(pp.annots)
@@ -315,15 +209,15 @@ if(grouping.temporal.peaks){
     length(which(maxs>2.5))
     length(which(maxs>3))
     
-    peak.sels = which(maxs > 2)
-    cat(length(peak.sels), 'peaks after filtering for mature samples\n')
+    # no further filtering anymore
+    # peak.sels = which(maxs > 2)
+    # cat(length(peak.sels), 'peaks after filtering for mature samples\n')
+    # cpm = cpm[peak.sels, ]
+    # pp.sel = pp[peak.sels]
     
-    cpm = cpm[peak.sels, ]
-    pp.sel = pp[peak.sels]
     # examples to test
     test.examples = c('HAND2', 'FGF8', 'KLF4', 'Gli3', 'Grem1')
     ii.test = which(overlapsAny(pp.sel, promoters[which(!is.na(match(promoters$geneSymbol, test.examples)))]))
-    
     
     source('Functions_atac.R')
     tic()
@@ -334,12 +228,14 @@ if(grouping.temporal.peaks){
     toc()
     
     
+    saveRDS(res, file = paste0(RdataDir, '/res_temporal_dynamicPeaks_mUA_regeneration_dev_2Batches.R10723_R7977_v8_noPeakAnnot.rds'))
+    
     xx = data.frame(cpm, res, pp.annots[match(rownames(cpm), rownames(pp.annots)), ],  stringsAsFactors = FALSE)
     
     res = xx
     
     #res = data.frame(cpm, res, stringsAsFactors = FALSE)
-    saveRDS(res, file = paste0(RdataDir, '/res_temporal_dynamicPeaks__mUA_regeneration_dev_2Batches.R10723_R7977_v7.rds'))
+    saveRDS(res, file = paste0(RdataDir, '/res_temporal_dynamicPeaks__mUA_regeneration_dev_2Batches.R10723_R7977_peakAnnot_v8.rds'))
     
     
   }
@@ -348,14 +244,17 @@ if(grouping.temporal.peaks){
   # reload the test result and select dynamic peaks
   ##########################################
   library(qvalue)
-  res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks__mUA_regeneration_dev_2Batches.R10723_R7977_v7.rds'))
+  res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks__mUA_regeneration_dev_2Batches.R10723_R7977_peakAnnot_v8.rds'))
+  
+  # select only the dynamic peak results without annotation part
+  res = res[, c(1:50)]
   
   res = res[order(-res$log2FC), ]
   qv = qvalue(res$pval.lrt)
   res$fdr.lrt = qv$qvalues
   
   # select the temporal dynamic peaks
-  fdr.cutoff = 0.05; logfc.cutoff = 1
+  fdr.cutoff = 0.01; logfc.cutoff = 1
   
   # length(which(res$fdr.lrt < fdr.cutoff))
   # length(which(res$padj_LRT<fdr.cutoff & res$log2fc>1))
@@ -363,12 +262,12 @@ if(grouping.temporal.peaks){
   # length(which(res$padj_LRT<fdr.cutoff & res$log2fc>1.5))
   
   select = which(  (res$adj.P.Val_5dpa.vs.mUA < fdr.cutoff & abs(res$logFC_5dpa.vs.mUA) > logfc.cutoff)| 
-                   (res$adj.P.Val_9dpa.vs.mUA < fdr.cutoff & abs(res$logFC_9dpa.vs.mUA) < logfc.cutoff) |
-                   (res$adj.P.Val_13dpap.vs.mUA < fdr.cutoff & abs(res$logFC_13dpap.vs.mUA) < logfc.cutoff) |
-                   (res$adj.P.Val_13dpad.vs.mUA < fdr.cutoff & abs(res$logFC_13dpad.vs.mUA) < logfc.cutoff) |
-                   (res$adj.P.Val_s40.vs.mUA < fdr.cutoff & abs(res$logFC_s40.vs.mUA) < logfc.cutoff ) | 
-                   (res$adj.P.Val_s44p.vs.mUA < fdr.cutoff & abs(res$logFC_s44p.vs.mUA) < logfc.cutoff ) |
-                   (res$adj.P.Val_s44d.vs.mUA < fdr.cutoff & abs(res$logFC_s44d.vs.mUA) < logfc.cutoff ))
+                   (res$adj.P.Val_9dpa.vs.mUA < fdr.cutoff & abs(res$logFC_9dpa.vs.mUA) > logfc.cutoff) |
+                   (res$adj.P.Val_13dpap.vs.mUA < fdr.cutoff & abs(res$logFC_13dpap.vs.mUA) > logfc.cutoff) |
+                   (res$adj.P.Val_13dpad.vs.mUA < fdr.cutoff & abs(res$logFC_13dpad.vs.mUA) > logfc.cutoff) |
+                   (res$adj.P.Val_s40.vs.mUA < fdr.cutoff & abs(res$logFC_s40.vs.mUA) > logfc.cutoff ) | 
+                   (res$adj.P.Val_s44p.vs.mUA < fdr.cutoff & abs(res$logFC_s44p.vs.mUA) > logfc.cutoff ) |
+                   (res$adj.P.Val_s44d.vs.mUA < fdr.cutoff & abs(res$logFC_s44d.vs.mUA) > logfc.cutoff ))
   
   cat(length(select), 'DE peaks found !\n')
   
@@ -499,59 +398,67 @@ if(grouping.temporal.peaks){
     
   }
   
-  ##########################################
-  # first motif activity analysis for temporally dynamic peaks 
-  ##########################################
-  source('MARA_functions.R')
+}
+
+
+########################################################
+########################################################
+# Section III : motif analysis
+# 
+########################################################
+########################################################
+##########################################
+# first motif activity analysis for temporally dynamic peaks 
+##########################################
+source('MARA_functions.R')
+library(qvalue)
+res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks__mUA_regeneration_dev_2Batches.R10723_R7977_peakAnnot_v8.rds'))
+
+Select.dynamic.peaks.for.MARA = TRUE
+if(Select.dynamic.peaks.for.MARA){
+  res = res[order(-res$log2FC), ]
+  qv = qvalue(res$pval.lrt)
+  res$fdr.lrt = qv$qvalues
   
-  library(qvalue)
-  res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks__mUA_regeneration_dev_2Batches.R10723_R7977_v7.rds'))
+  # select the temporal dynamic peaks
+  fdr.cutoff = 0.01; logfc.cutoff = 1.
   
-  Select.dynamic.peaks.for.MARA = TRUE
-  if(Select.dynamic.peaks.for.MARA){
-    res = res[order(-res$log2FC), ]
-    qv = qvalue(res$pval.lrt)
-    res$fdr.lrt = qv$qvalues
-    
-    # select the temporal dynamic peaks
-    fdr.cutoff = 0.01; logfc.cutoff = 1.
-    
-    # length(which(res$fdr.lrt < fdr.cutoff))
-    # length(which(res$padj_LRT<fdr.cutoff & res$log2fc>1))
-    # length(which(res$padj_LRT<fdr.cutoff & res$log2fc>2))
-    # length(which(res$padj_LRT<fdr.cutoff & res$log2fc>1.5))
-    select = which(  (res$adj.P.Val_5dpa.vs.mUA < fdr.cutoff & abs(res$logFC_5dpa.vs.mUA) > logfc.cutoff)| 
-                       (res$adj.P.Val_9dpa.vs.mUA < fdr.cutoff & abs(res$logFC_9dpa.vs.mUA) > logfc.cutoff) |
-                       (res$adj.P.Val_13dpap.vs.mUA < fdr.cutoff & abs(res$logFC_13dpap.vs.mUA) > logfc.cutoff) |
-                       (res$adj.P.Val_13dpad.vs.mUA < fdr.cutoff & abs(res$logFC_13dpad.vs.mUA) > logfc.cutoff) 
-                       #(res$adj.P.Val_s40.vs.mUA < fdr.cutoff & abs(res$logFC_s40.vs.mUA) < logfc.cutoff ) | 
-                       #(res$adj.P.Val_s44p.vs.mUA < fdr.cutoff & abs(res$logFC_s44p.vs.mUA) < logfc.cutoff ) |
-                       #(res$adj.P.Val_s44d.vs.mUA < fdr.cutoff & abs(res$logFC_s44d.vs.mUA) < logfc.cutoff )
-                       )
-    cat(length(select), 'DE peaks found !\n')
-    
-    res = res[select, ]
-    res = res[order(-res$log2FC), ]
-    keep = as.matrix(res[, c(1:20)])
-    
-    conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal", 'BL_UA_13days_distal')
-    
-    sample.sels = c(); cc = c()
-    for(n in 1:length(conds)) {
-      kk = grep(conds[n], colnames(keep))
-      if(conds[n] == 'BL_UA_5days') kk = kk[grep('136', colnames(keep)[kk])]
-      if(conds[n] == 'Embryo_Stage40') kk = kk[grep('137', colnames(keep)[kk])]
-      #if(length(unique(design$batch[kk])) > 1) kk = kk[which(design$batch[kk] == '2021')]
-      sample.sels = c(sample.sels, kk)
-      cc = c(cc, rep(conds[n], length(kk)))
-    }
-    
-    keep = keep[, sample.sels]
-    
-    
+  # length(which(res$fdr.lrt < fdr.cutoff))
+  # length(which(res$padj_LRT<fdr.cutoff & res$log2fc>1))
+  # length(which(res$padj_LRT<fdr.cutoff & res$log2fc>2))
+  # length(which(res$padj_LRT<fdr.cutoff & res$log2fc>1.5))
+  select = which(  (res$adj.P.Val_5dpa.vs.mUA < fdr.cutoff & abs(res$logFC_5dpa.vs.mUA) > logfc.cutoff)| 
+                     (res$adj.P.Val_9dpa.vs.mUA < fdr.cutoff & abs(res$logFC_9dpa.vs.mUA) > logfc.cutoff) |
+                     (res$adj.P.Val_13dpap.vs.mUA < fdr.cutoff & abs(res$logFC_13dpap.vs.mUA) > logfc.cutoff) |
+                     (res$adj.P.Val_13dpad.vs.mUA < fdr.cutoff & abs(res$logFC_13dpad.vs.mUA) > logfc.cutoff) 
+                   #(res$adj.P.Val_s40.vs.mUA < fdr.cutoff & abs(res$logFC_s40.vs.mUA) < logfc.cutoff ) | 
+                   #(res$adj.P.Val_s44p.vs.mUA < fdr.cutoff & abs(res$logFC_s44p.vs.mUA) < logfc.cutoff ) |
+                   #(res$adj.P.Val_s44d.vs.mUA < fdr.cutoff & abs(res$logFC_s44d.vs.mUA) < logfc.cutoff )
+  )
+  cat(length(select), 'DE peaks found !\n')
+  
+  res = res[select, ]
+  res = res[order(-res$log2FC), ]
+  keep = as.matrix(res[, c(1:20)])
+  
+  conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal", 'BL_UA_13days_distal')
+  
+  sample.sels = c(); cc = c()
+  for(n in 1:length(conds)) {
+    kk = grep(conds[n], colnames(keep))
+    if(conds[n] == 'BL_UA_5days') kk = kk[grep('136', colnames(keep)[kk])]
+    if(conds[n] == 'Embryo_Stage40') kk = kk[grep('137', colnames(keep)[kk])]
+    #if(length(unique(design$batch[kk])) > 1) kk = kk[which(design$batch[kk] == '2021')]
+    sample.sels = c(sample.sels, kk)
+    cc = c(cc, rep(conds[n], length(kk)))
   }
   
-  xx = run.MARA.atac.temporal(keep, cc)
+  keep = keep[, sample.sels]
   
   
 }
+
+xx = run.MARA.atac.temporal(keep, cc)
+
+
+

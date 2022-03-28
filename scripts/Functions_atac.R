@@ -2308,6 +2308,7 @@ dev.mUA.peaks.test = function(cpm = cpm, c = cc, model.selection = FALSE)
   
 }
 
+
 temporal.peaks.test = function(cpm, c = c("Mature_UA", "Mature_UA", "BL_UA_5days", "BL_UA_5days", 'BL_UA_9days', 'BL_UA_9days'), 
                                run.pairwise.comparison.edgeR = TRUE,  testPlot = FALSE)
 {

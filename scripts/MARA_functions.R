@@ -241,7 +241,15 @@ process.jaspar2022.meme.vetebrate = function()
   metadata$tfs = gsub('::', '_', metadata$tfs)
   
   x = table(metadata$tfs)
-  x[which(x>1)]
+  y = x[which(x>1)]
+  
+  pdfname = paste0(resDir, "/Jaspar2022_PWM_multipleMotifs_perTF.pdf")
+  pdf(pdfname, width=12, height = 10)
+  par(cex =0.5, mar = c(4,10,4,5)+0.1, mgp = c(2.5,1.5,0),las = 0, tcl = 0.3)
+  
+  barplot(y, names.arg = names(y), horiz = TRUE, las = 2)
+  
+  dev.off()
   
   
   ## make logos
@@ -703,13 +711,38 @@ make.bed.file.from.fimo.out = function()
 make.motif.oc.matrix.from.fimo.output = function()
 {
   library(data.table)
+  
   #motif.tf = readRDS( '../data/motifs_tfs/motif_tf_mapping.rds')
-  fimo.out = '../results/motif_analysis/FIMO/fimo_out/fimo.tsv'
+  fimo.out = '../results/motif_analysis/FIMO_jaspar2022_v1/fimo_out/fimo.tsv'
   fimo = fread(fimo.out, header = TRUE)
+  
   motif.oc = table(fimo$motif_id, fimo$sequence_name, useNA = 'ifany')
   motif.oc = t(motif.oc)
   
-  print(head(rownames(motif.oc)))
+  print(head(rownames(motif.oc), 20))
+  
+  saveRDS(motif.oc, file = '../results/motif_analysis/motif_oc_fimo_jaspar2022_pval.0.0001_v1.rds')
+  
+  jj = which(fimo$`p-value`<10^-5)
+  cat(length(jj)/nrow(fimo)*100, 'percents motifs \n')
+  
+  motif.oc = table(fimo$motif_id[jj], fimo$sequence_name[jj], useNA = 'ifany')
+  motif.oc = t(motif.oc)
+  
+  print(head(rownames(motif.oc), 20))
+  
+  saveRDS(motif.oc, file = '../results/motif_analysis/motif_oc_fimo_jaspar2022_pval.0.00001_v1.rds')
+  
+  
+  jj = which(fimo$`p-value`<10^-6)
+  cat(length(jj)/nrow(fimo)*100, 'percents motifs \n')
+  
+  motif.oc = table(fimo$motif_id[jj], fimo$sequence_name[jj], useNA = 'ifany')
+  motif.oc = t(motif.oc)
+  
+  print(head(rownames(motif.oc), 20))
+  
+  saveRDS(motif.oc, file = '../results/motif_analysis/motif_oc_fimo_jaspar2022_pval.0.000001_v1.rds')
   
   ##########################################
   # associate the scanned regions with gene
@@ -842,8 +875,6 @@ make.motif.oc.matrix.from.fimo.output = function()
     motif.oc = xx;
     remove(xx)
   }
-  
-  saveRDS(motif.oc, file = '../results/motif_analysis/motif_oc_fimo_v2.rds')
   
 }
 
@@ -1334,11 +1365,6 @@ run.MARA.atac.spatial = function(keep, cc)
 
 run.MARA.atac.temporal = function(keep, cc)
 {
-  require(glmnet)
-  library(pheatmap)
-  library(RColorBrewer)
-  library(scchicFuncs)
-  
   # prepare Y response matrix
   Prepare.Response.Matrix = FALSE
   if(Prepare.Response.Matrix){
@@ -1380,7 +1406,7 @@ run.MARA.atac.temporal = function(keep, cc)
     keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
   }
   
-  
+  ## prepare reponse matrix with selected dynamic peaks
   keep = as.matrix(keep)
   cc.uniq = unique(cc)
   Y = matrix(NA, ncol = length(cc.uniq), nrow = nrow(keep))
@@ -1398,8 +1424,9 @@ run.MARA.atac.temporal = function(keep, cc)
   colnames(Y) = cc.uniq
   rownames(Y) = rownames(keep)
   
+  
   # prepare X matrix from motif occurrency matrix
-  motif.oc = readRDS(file = '../results/motif_analysis/motif_oc_fimo_v2.rds')
+  motif.oc = readRDS(file = '../results/motif_analysis/motif_oc_fimo_jaspar2022_pval.0.0001_v1.rds')
   mm = match(rownames(motif.oc), rownames(Y))
   motif.oc = motif.oc[!is.na(mm), ]
   
@@ -1415,22 +1442,29 @@ run.MARA.atac.temporal = function(keep, cc)
   X = as.matrix(motif.oc)
   Y = as.matrix(Y)
   
+  
   Run.Bayesian.ridge = FALSE
   if(Run.Bayesian.ridge){ 
+    
+    library(pheatmap)
+    library(RColorBrewer)
+    library(scchicFuncs)
+  
     # the original code from Jake 
     # https://github.com/jakeyeung/scchic-functions/blob/master/scripts/motevo_scripts/lib/run_ridge_regression2.R
-    
     E = as.matrix(Y) # exp: matrix of expression, row centered.
     N = as.matrix(X)
     
     E = t(apply(E, 1, scale, center = TRUE, scale = FALSE))
     colnames(E) = colnames(Y)
     
+    ## use mUA as background 
+    #for(ii in 1:ncol(E)) E[, ii] = E[,ii] - E[, 1]
+    #E = E[, -1]
+   
+    # run lambda optimization and regression
     opt =  scchicFuncs::optimize.lambda(N, E)
-    
     r = ridge.regression(N, E, opt$lambda.opt)
-    
-    # saveRDS(r, file = paste0(RdataDir, '/MARA_Bayesian_ridge_regenerationPeaks.rds'))
     
     zz = r$Zscore
     zz = apply(as.matrix(zz[, c(1:3)]), 1, function(x){x.abs = abs(x); return(x[which(x.abs == max(x.abs))][1]); })
@@ -1441,11 +1475,10 @@ run.MARA.atac.temporal = function(keep, cc)
     #r$max.Zscore = zz
     
     # = sort(r$combined.Zscore, decreasing=TRUE)[1:50]
-    sort(r$combined.Zscore, decreasing=TRUE)[1:20]
-    
-    sort(r$max.Zscore, decreasing=TRUE)[1:20]
-    sort(r$max.Zscore, decreasing=TRUE)[1:30]
-    sort(r$max.Zscore, decreasing=TRUE)[1:40]
+    sort(r$combined.Zscore, decreasing=TRUE)[1:50]
+    #sort(r$max.Zscore, decreasing=TRUE)[1:20]
+    #sort(r$max.Zscore, decreasing=TRUE)[1:30]
+    #sort(r$max.Zscore, decreasing=TRUE)[1:40]
     sort(r$max.Zscore, decreasing=TRUE)[1:50]
     
     topMotifs = sort(r$max.Zscore, decreasing = TRUE)[1:50]
@@ -1461,7 +1494,7 @@ run.MARA.atac.temporal = function(keep, cc)
              scale = 'row', cluster_cols=FALSE, main = '', 
              na_col = "white", fontsize_row = 12, 
              annotation_col = df, 
-             filename = paste0(resDir, '/MARA_bayesianRidge_temporalpeaks.pdf'), 
+             filename = paste0(resDir, '/MARA_bayesianRidge_temporalpeaks_Jaspar2022.pdf'), 
              width = 10, height = 12) 
     
     ##########################################
@@ -1493,7 +1526,8 @@ run.MARA.atac.temporal = function(keep, cc)
     
     ## calculate the correlation with TF expression 
     ggs = sapply(rownames(sample.means), function(x){unlist(strsplit(as.character(x), '_'))[1]})
-    mm = match(rownames(bb), ggs)
+    tfs = sapply(rownames(bb), function(x){unlist(strsplit(as.character(x), '_'))[1]})
+    mm = match(tfs, ggs)
     
     bb =data.frame(bb, stringsAsFactors = FALSE)
     bb$gene = rownames(bb)
@@ -1501,10 +1535,11 @@ run.MARA.atac.temporal = function(keep, cc)
     bb$rank = c(1:nrow(bb))
     bb$cor = NA
     bb$tf.index = mm
+    
     for(n in 1:nrow(bb))
     {
       if(!is.na(mm[n])) {
-        bb$cor[n] = cor(as.numeric(bb[n, c(1:5)]), sample.means[mm[n], ]) 
+        bb$cor[n] = cor(as.numeric(bb[n, c(1:5)]), sample.means[mm[n], c(1:5)]) 
       }
     }
     
@@ -1518,20 +1553,20 @@ run.MARA.atac.temporal = function(keep, cc)
     require(ggplot2)
     require(tidyverse)
     library(ggrepel)
-    
-    ggplot(xx, aes(x=rank, y=cor, label = gene)) + 
-      geom_point(aes(x=rank, y=cor, color = activity), size = 3.0) + 
-      scale_color_manual(values=c('blue', 'red')) +
-      geom_text_repel(data= xx , size = 4.0) +
-      theme_classic() +
-      geom_hline(yintercept=0.0, colour = "darkgray", size = 1.5) +
-      xlab("motif activity importance rank") + ylab("Correlation to TF expression") +
-      theme(axis.text.x = element_text(size = 14), 
-            axis.text.y = element_text(size = 14), 
-            axis.title.x = element_text(size=14, face="bold"),
-            axis.title.y = element_text(size=14, face="bold")) 
-     
-    ggsave(paste0(resDir, '/MARA_bayesianRidge_temporalpeaks_motifActivity.rank_vs_TFexpression.pdf'), width=8, height = 6)
+    # 
+    # ggplot(xx, aes(x=rank, y=cor, label = gene)) + 
+    #   geom_point(aes(x=rank, y=cor, color = activity), size = 3.0) + 
+    #   scale_color_manual(values=c('blue', 'red')) +
+    #   geom_text_repel(data= xx , size = 4.0) +
+    #   theme_classic() +
+    #   geom_hline(yintercept=0.0, colour = "darkgray", size = 1.5) +
+    #   xlab("motif activity importance rank") + ylab("Correlation to TF expression") +
+    #   theme(axis.text.x = element_text(size = 14), 
+    #         axis.text.y = element_text(size = 14), 
+    #         axis.title.x = element_text(size=14, face="bold"),
+    #         axis.title.y = element_text(size=14, face="bold")) 
+    #  
+    # ggsave(paste0(resDir, '/MARA_bayesianRidge_temporalpeaks_motifActivity.rank_vs_TFexpression.pdf'), width=8, height = 6)
     
     ggplot(xx, aes(x=combine.Zscore, y=cor, label = gene)) + 
       geom_point(aes(x=combine.Zscore, y=cor, color = activity), size = 3.0) + 
@@ -1574,6 +1609,8 @@ run.MARA.atac.temporal = function(keep, cc)
   
   Run.glmnet = FALSE
   if(Run.glmnet){
+    require(glmnet)
+    
     # prepare Y matrix 
     cc.uniq = unique(cc)
     Y = matrix(NA, ncol = length(cc.uniq), nrow = nrow(keep))
