@@ -16,7 +16,7 @@ source(RNA.QC.functions)
 source('functions_chipSeq.R')
 source('Functions_atac.R')
 
-version.analysis = 'CT_analysis_20220311'
+version.analysis = 'CT_merged_20220328'
 #peakDir = "Peaks/macs2_broad"
 saveTable = TRUE
 
@@ -30,7 +30,7 @@ tableDir = paste0(figureDir, 'tables4plots/')
 
 annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
 dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/histMod_CT_using/'
-gtf.file =  paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf')
+#gtf.file =  paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf')
 
 require(ggplot2)
 require(DESeq2)
