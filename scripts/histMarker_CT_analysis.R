@@ -432,7 +432,7 @@ if(Manually.identify.peak.consensus){
                                               '/histMarkers_macs2peaks_H3K4me3_consensusPeaks_pval.', pval.cutoff, '.rds'))
   
   ##########################################
-  # H3K4me1
+  # H3K4me1 peak consensus
   ##########################################
   ## peaks_H3K4me1_mLA
   n = 2 
@@ -453,8 +453,8 @@ if(Manually.identify.peak.consensus){
   
   peaks_H3K4me1_mLA = peaks[[kk[2]]]
   
-  # peaks.merged = peaks_H3K4me1_mLA
-  peaks.merged = union(peaks.merged, peaks_H3K4me1_mLA)
+  peaks.merged = peaks_H3K4me1_mLA
+  #peaks.merged = union(peaks.merged, peaks_H3K4me1_mLA)
   peaks.merged = GenomicRanges::reduce(peaks.merged)
   
   # H3K4me1_mUA
@@ -548,7 +548,6 @@ if(Manually.identify.peak.consensus){
   try(plot(v))
   dev.off()
   
-  
   xx = intersect(peaks[[kk[1]]], peaks[[kk[2]]])
   eval(parse(text = paste0('peaks_', cc, ' = xx')))
   peaks.merged = GenomicRanges::reduce(union(peaks.merged, xx))
@@ -570,7 +569,6 @@ if(Manually.identify.peak.consensus){
   pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, 'p', pval.cutoff, '.pdf'),  height = 10, width = 10)
   try(plot(v))
   dev.off()
-  
   
   xx = intersect(peaks[[kk[1]]], peaks[[kk[2]]])
   eval(parse(text = paste0('peaks_', cc, ' = xx')))
@@ -603,7 +601,6 @@ if(Manually.identify.peak.consensus){
   peaks.merged.H3K4me1 =  peaks.merged
   saveRDS(peaks.merged.H3K4me1, file = paste0(RdataDir,  
                                               '/histMarkers_macs2peaks_H3K4me1_consensusPeaks_pval.', pval.cutoff, '.rds'))
-  
   
   ##########################################
   # merge peaks from K4me3 and K4me1
@@ -698,20 +695,6 @@ peaks_histM_atac_tss = union(peaks.all, tss_missed)
 saveRDS(peaks_histM_atac_tss, file = paste0(RdataDir, '/Peaks_histMarkers_ATACseq_missedTSS.dupReduced.rds'))
 
 export(object = peaks_histM_atac_tss,  con = paste0(resDir, "/Peaks_histMarkers_ATACseq_missedTSS.dupReduced.bed"), format = 'bed')
-
-## too slow for some reasons
-# ol.peaks <- makeVennDiagram(list(peaks.all, pp), 
-#                             NameOfPeaks=c('peaks.histM', 'all.annotated.tss'), connectedPeaks="keepAll", 
-#                             main='histM_vs_allTSS')
-# 
-# v <- venn_cnt2venn(ol.peaks$vennCounts)
-# 
-# try(plot(v))
-# 
-# pdf(paste0(resDir, '/manualCheck_peakOverlapping_H3K4me1.3_vs_atacseq_', 'p', pval.cutoff, '.pdf'),  height = 10, width = 10)
-# try(plot(v))
-# dev.off()
-# 
 
 ##########################################
 #  make saf files
