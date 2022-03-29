@@ -48,6 +48,7 @@ library(tidyverse)
 # Section I : sequencing quality controls
 # fragment size distribution 
 # sequence saturation analysis
+# update the design with the usable reads after merging the resequenced samples
 ########################################################
 ########################################################
 Process.design.stats = FALSE
@@ -84,8 +85,6 @@ if(Process.design.stats){
   design = design[order(design$marks, design$sample), ]
   
   write.csv(design, file = paste0(resDir, '/R12965_CT_QC_stats.csv'), row.names = FALSE, quote = FALSE)
-  
-  
   
   index = c()
   for(n in 1:nrow(design))
@@ -157,7 +156,6 @@ if(Process.design.stats){
   
 }
 
-
 ##########################################
 # saturation analysis 
 ##########################################
@@ -181,10 +179,30 @@ design = read.csv(file = paste0("/Volumes/groups/tanaka/People/current/jiwang/pr
 
 design = design[!is.na(design$sampleID), ]
 design$fileName = paste0(design$condition, '_', design$sampleID)
+design$usable = NA
+
+xlist = list.files(path = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/R13191_CT/QCs/BamStat',
+                   pattern = '*stat.txt', full.names = TRUE)
+
+for(n in 1:nrow(design))
+{
+  kk = grep(design$sampleID[n], xlist)
+  cat(n, ' -- sample - ', design$sampleID[n], ' : ', basename(xlist[kk]), '\n')
+  if(length(kk) == 1){
+    tmp = read.table(xlist[kk], sep = '\t', header = TRUE)
+    design$usable[n] = tmp$rmdup_uniq[1]/10^6
+  }else{
+    stop('Error')
+  }
+}
+
+saveRDS(design, file = paste0(RdataDir, '/histM_CT_design_info.rds'))
 
 ##########################################
-# process called peaks for H3K4me3/1
+# process called peaks for H3K4me3, 
 ##########################################
+design = readRDS(file = paste0(RdataDir, '/histM_CT_design_info.rds'))
+
 peakDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/histMod_CT_using/calledPeaks/macs2'
 peak.files = list.files(path = peakDir,
                         pattern = '*_peaks.xls', full.names = TRUE)
