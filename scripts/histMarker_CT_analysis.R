@@ -199,7 +199,7 @@ for(n in 1:nrow(design))
 saveRDS(design, file = paste0(RdataDir, '/histM_CT_design_info.rds'))
 
 ##########################################
-# process called peaks for H3K4me3, 
+# process called peaks for H3K4me3 and H3K4me1
 ##########################################
 design = readRDS(file = paste0(RdataDir, '/histM_CT_design_info.rds'))
 
@@ -307,11 +307,9 @@ if(Manually.identify.peak.consensus){
   
   cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
   
-  
-  ol.peaks <- makeVennDiagram(peaks[kk[c(2, 3,4)]], NameOfPeaks=names(peaks)[kk[c(2, 3, 4)]], connectedPeaks="keepAll", main=cc)
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main=cc)
   v <- venn_cnt2venn(ol.peaks$vennCounts)
   try(plot(v))
-  
   
   pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, '2_p', pval.cutoff, '.pdf'), 
       height = 10, width = 10)
@@ -328,7 +326,7 @@ if(Manually.identify.peak.consensus){
   
   cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
   
-  ol.peaks <- makeVennDiagram(peaks[kk[c(2, 3,4)]], NameOfPeaks=names(peaks)[kk[c(2, 3, 4)]], connectedPeaks="keepAll", main=cc)
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main=cc)
   v <- venn_cnt2venn(ol.peaks$vennCounts)
   try(plot(v))
   
@@ -349,7 +347,6 @@ if(Manually.identify.peak.consensus){
   kk = which(design.sel$condition == cc)
   
   cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
-  
   
   ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main=cc)
   v <- venn_cnt2venn(ol.peaks$vennCounts)
@@ -380,7 +377,6 @@ if(Manually.identify.peak.consensus){
   try(plot(v))
   dev.off()
   
-  
   xx = intersect(peaks[[kk[1]]], peaks[[kk[2]]])
   eval(parse(text = paste0('peaks_', cc, ' = xx')))
   peaks.merged = GenomicRanges::reduce(union(peaks.merged, xx))
@@ -402,7 +398,6 @@ if(Manually.identify.peak.consensus){
   pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, 'p', pval.cutoff, '.pdf'),  height = 10, width = 10)
   try(plot(v))
   dev.off()
-  
   
   xx = intersect(peaks[[kk[1]]], peaks[[kk[2]]])
   eval(parse(text = paste0('peaks_', cc, ' = xx')))
@@ -446,8 +441,7 @@ if(Manually.identify.peak.consensus){
   
   cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
   
-  
-  ol.peaks <- makeVennDiagram(peaks[kk[c(2, 3,4)]], NameOfPeaks=names(peaks)[kk[c(2, 3, 4)]], connectedPeaks="keepAll", main=cc)
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main=cc)
   v <- venn_cnt2venn(ol.peaks$vennCounts)
   try(plot(v))
   
@@ -470,13 +464,20 @@ if(Manually.identify.peak.consensus){
   
   cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
   
+  ol.peaks <- makeVennDiagram(peaks[kk[c(1, 2, 3)]], NameOfPeaks=names(peaks)[kk[c(1, 2, 3)]], connectedPeaks="keepAll", main=cc)
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, '_1_p', pval.cutoff, '.pdf'), 
+      height = 10, width = 10)
+  try(plot(v))
+  dev.off()
   
   ol.peaks <- makeVennDiagram(peaks[kk[c(2, 3,4)]], NameOfPeaks=names(peaks)[kk[c(2, 3, 4)]], connectedPeaks="keepAll", main=cc)
   v <- venn_cnt2venn(ol.peaks$vennCounts)
   try(plot(v))
   
-  
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, '2_p', pval.cutoff, '.pdf'), 
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, '_2_p', pval.cutoff, '.pdf'), 
       height = 10, width = 10)
   try(plot(v))
   dev.off()
@@ -517,7 +518,6 @@ if(Manually.identify.peak.consensus){
   kk = which(design.sel$condition == cc)
   
   cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
-  
   
   ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main=cc)
   v <- venn_cnt2venn(ol.peaks$vennCounts)
@@ -604,6 +604,10 @@ if(Manually.identify.peak.consensus){
   saveRDS(peaks.merged.H3K4me1, file = paste0(RdataDir,  
                                               '/histMarkers_macs2peaks_H3K4me1_consensusPeaks_pval.', pval.cutoff, '.rds'))
   
+  
+  ##########################################
+  # merge peaks from K4me3 and K4me1
+  ##########################################
   peaks.all = union(peaks.merged.H3K4me3, peaks.merged.H3K4me1)
   
   save(peaks.all, file = paste0(RdataDir,  
