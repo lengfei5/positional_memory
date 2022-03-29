@@ -790,12 +790,14 @@ if(Test.readCounting.for.promoters){
 # 
 ########################################################
 ########################################################
-design = read.csv(file = paste0(dataDir, "R11876_R12810_R12965_CT_analysis_20220217_QCs_AK.csv"))
-design = design[!is.na(design$sampleID), ]
+design = readRDS(file = paste0(RdataDir, '/histM_CT_design_info.rds'))
+#design = read.csv(file = paste0(dataDir, "R11876_R12810_R12965_CT_analysis_20220217_QCs_AK.csv"))
+#design = design[!is.na(design$sampleID), ]
 design$fileName = paste0(design$condition, '_', design$sampleID)
-design = design[, c(1:3, 15, 5, 4, 6:14)]
+design = design[, c(1:3, 15, 5, 16, 4, 6:14)]
 colnames(design)[5] = 'batch'
 
+## read counts within peaks
 xlist<-list.files(path=paste0(dataDir, '/featurecounts_peaks.Q30'),
                   pattern = "*_featureCounts.txt$", full.names = TRUE) ## list of data set to merge
 
@@ -819,6 +821,7 @@ save(design, counts,
 # - save the batch-corrected matrix for mature sample comparison and regeneration comparison
 # 
 ##########################################
+
 load(file = paste0(RdataDir, '/histoneMarkers_samplesDesign_readCounts_peaks_histMarkers_ATACseq_missedTSS.dupReduced.Rdata'))
 design$unique.rmdup = as.numeric(design$unique.rmdup)
 jj = which(as.numeric(design$unique.rmdup) > 1000)
