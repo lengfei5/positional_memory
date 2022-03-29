@@ -610,8 +610,11 @@ if(Manually.identify.peak.consensus){
   save(peaks.all, file = paste0(RdataDir,  
                                    '/histMarkers_macs2peaks_H3K4me3.H3K4me1_32samples_consensusPeaks_pval.', pval.cutoff, '.Rdata'))
   
+  saveRDS(peaks.all, file = paste0(RdataDir, 
+                                   '/histMarkers_macs2peaks_H3K4me3.H3K4me1_32samples_consensusPeaks_pval.', pval.cutoff, '.rds'))
+  
   sum(overlapsAny(peaks.merged.H3K4me3, peaks.merged.H3K4me1))
- 
+  
   
   ol.peaks <- makeVennDiagram(list(peaks.merged.H3K4me1, peaks.merged.H3K4me3), 
                               NameOfPeaks=c('peaks.merged.H3K4me1', 'peaks.merged.H3K4me3'), connectedPeaks="keepAll", main=cc)
@@ -656,7 +659,7 @@ peaks.all = union(peaks.all, pp)
 saveRDS(peaks.all, file = paste0(RdataDir, 
                                  '/histMarkers_macs2peaks_H3K4me3.H3K4me1_32samples_consensusPeaks_and_ATACseq_consensusPeaks.rds'))
 
-export(object = peaks.all,  con = paste0(resDir, "/histM_peaks_plus_atacseqPeaks_450k.bed"), format = 'bed')
+export(object = peaks.all,  con = paste0(resDir, "/histM_peaks_plus_atacseqPeaks_570k.bed"), format = 'bed')
 
 ##########################################
 # compare the histM peaks considered with all annotated TSS
@@ -703,6 +706,7 @@ peaks = readRDS(file = paste0(RdataDir, '/Peaks_histMarkers_ATACseq_missedTSS.du
 tss = readRDS(file = paste0(RdataDir, '/missedTSS_dupReduced_90k_inHistM_atacseq_peaks_transcriptID_geneID_with.1kb.width.rds'))
 
 kk = which(overlapsAny(peaks, tss) == TRUE)
+
 # clean peaks
 peaks = data.frame(peaks)
 colnames(peaks)[c(1:3)] = c("chr", "start", "end")
