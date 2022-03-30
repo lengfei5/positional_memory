@@ -52,6 +52,20 @@ require(limma)
 load(file = paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata', 
                    '/ATACseq_selected.63k.peaks_cutoff.40.at.least.2sample.Rdata'))
 
+Save.peak.consensus = FALSE
+if(Save.peak.consensus){
+  pp = data.frame(t(sapply(rownames(dds), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  pp$strand = '*'
+
+  bed = data.frame(pp[, c(1:3)], rownames(pp), 0, pp[, 4], stringsAsFactors = FALSE)
+  write.table(bed, file = paste0(resDir, '/ATAC_peakset_64K_', version.analysis, '.bed'), col.names = FALSE, row.names = FALSE,
+              sep = '\t', quote = FALSE)
+  
+  pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                              start.field="X2", end.field="X3", strand.field="strand")
+  saveRDS(pp, file = paste0(RdataDir, '/ATACseq_peak_consensus_filtered_64k.rds'))
+  
+}
 
 
 table(design$condition, design$batch)

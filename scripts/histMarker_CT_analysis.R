@@ -835,6 +835,7 @@ if(Filtering.peaks.with.lowReads){
   dds <- DESeqDataSetFromMatrix(as.matrix(counts[, -1]), DataFrame(design), design = ~ condition)
     
   index_bgs = grep('tss', rownames(dds))
+  
   ss = rowMaxs(counts(dds))
   
   par(mfrow=c(1,1))
@@ -882,8 +883,8 @@ if(Filtering.peaks.with.lowReads){
   index_keep = which(ss > cutoff.peak)
   
   ### keep also peaks if they are overlapped by atac-seq peaks
-  atacseq_peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rxxxx_R10723_R11637_R12810_atac/Rdata/',
-                                        'ATACseq_peak_consensus_filtered_55k.rds'))
+  atacseq_peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/ATAC_allUsed_20220328/Rdata/',
+                                        'ATACseq_peak_consensus_filtered_64k.rds'))
   
   index_keep = unique(c(index_keep, which(overlapsAny(pp, atacseq_peaks) == TRUE)))
   cat(length(index_keep), ' peaks will be retained \n')
@@ -907,6 +908,7 @@ if(Filtering.peaks.with.lowReads){
                                   '/histoneMarkers_samplesDesign_ddsPeaksMatrix_filtered_incl.atacPeak.missedTSS.bgs_150k.Rdata'))
    
 }
+
 
 ##########################################
 # for each markers, normalization, sample filtering, and batch correction
