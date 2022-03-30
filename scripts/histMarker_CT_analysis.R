@@ -821,7 +821,6 @@ save(design, counts,
 # - save the batch-corrected matrix for mature sample comparison and regeneration comparison
 # 
 ##########################################
-
 load(file = paste0(RdataDir, '/histoneMarkers_samplesDesign_readCounts_peaks_histMarkers_ATACseq_missedTSS.dupReduced.Rdata'))
 design$unique.rmdup = as.numeric(design$unique.rmdup)
 jj = which(as.numeric(design$unique.rmdup) > 1000)
@@ -869,7 +868,7 @@ if(Filtering.peaks.with.lowReads){
   #ii_test = rownames(dds)[which(ss>19.9 & ss<20.1)]
   ii_test = rownames(dds)[which(ss>29.9 & ss<30.1)] # cutoff.peak = 30 look good for H3K4me3
   
-  cutoff.peak = 30 # cutoff.peak = 30 for H3K4me3  (atac-seq cutoff.peak > 50) 
+  cutoff.peak = 30 # cutoff.peak = 30 for H3K4me3  (atac-seq cutoff.peak > 40 for >= 2 samples) 
   #cutoff.bg = 20
   cat(length(which(ss >= cutoff.peak)), 'peaks selected with minimum read of the highest peak -- ', cutoff.peak,  '\n')
   #cat(length(which(ss < cutoff.bg)), 'peaks selected with minimum read of the highest peak -- ', cutoff.bg,  '\n')

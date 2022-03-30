@@ -52,6 +52,8 @@ require(limma)
 load(file = paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata', 
                    '/ATACseq_selected.63k.peaks_cutoff.40.at.least.2sample.Rdata'))
 
+
+
 table(design$condition, design$batch)
 
 # regeneration time points and embryo stages
