@@ -955,7 +955,6 @@ if(SaveHistM.peaks.afterFiltering){
 
 conds = c('H3K4me3', 'H3K4me1', 'H3K27me3', 'H3K27ac', 'IgG')
 
-
 save.scalingFactors.for.deeptools = TRUE
 Make.pca.plots = TRUE
 Filtering.peaks.with.lowReads = TRUE
@@ -982,7 +981,7 @@ for(n in 1:length(conds))
   hist(log10(ss[jj]), breaks = 100, col = 'darkgray', add = TRUE);
   abline(v = c(log10(50), 2, log10(500), 3), col = 'red', lwd = 2.0)
   
-  dd0 = ddx[ss > 50, ]
+  dd0 = ddx[ss > 0, ]
   dd0 = estimateSizeFactors(dd0)
   sizeFactors(ddx) <- sizeFactors(dd0)
   
@@ -1035,7 +1034,7 @@ for(n in 1:length(conds))
     }else{
       tmm <- calcNormFactors(d, method='TMM')
     }
-    tmm = cpm(tmm, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 1)
+    tmm = cpm(tmm, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 0.01)
     
     # ii_bgs = grep('tss', rownames(tmm))
     # tmm = tmm[-ii_bgs, ]
@@ -1094,6 +1093,9 @@ write.table(sfs, file = paste0(resDir, '/histMarkers_DESeq2_scalingFactor_forDee
 ##########################################
 # subtrat the IgG signals when there is a peaks there in IgG for each markers and each condition  
 ##########################################
+load(file = paste0(RdataDir, 
+                   '/histoneMarkers_samplesDesign_ddsPeaksMatrix_filtered_incl.atacPeak.missedTSS.bgs_324k.Rdata'))
+
 igg = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', 'IgG', '_', version.analysis, '.rds'))
 
 conds_histM = unique(design$sample)
@@ -1119,6 +1121,24 @@ for(n in 1:length(markers))
   # n = 1
   cpm = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', markers[n], '_', version.analysis, '.rds'))
   design.sel = readRDS(file = paste0(RdataDir, '/design.sels_bc_TMM_combat_', markers[n], '_', version.analysis, '.rds'))
+  
+  inputs = ctl.means[match(rownames(cpm), rownames(ctl.means)), ]
+  
+  for(m in 1:length(conds_histM))
+  {
+    # m = 1
+    jj = grep(conds_histM[m], colnames(cpm))
+    smean = apply(cpm[, jj], 1, mean)
+    
+    hist(smean, breaks = 100)
+    hist(inputs[,m], breaks = 100, col = 'gray', add = TRUE)
+    
+    ratios = inputs[,m] - smean
+    ratios = ratios[order(-ratios)]
+    
+    head(ratios[which(ratios > 4.5 & ratios)])
+     
+  }
   
     
 }
