@@ -963,10 +963,10 @@ Select.background.for.peaks = TRUE
 
 for(n in 1:length(conds))
 {
-  # n = 2
-  sels = which(dds$marks == conds[n] & dds$SampleID != '163655')
+  # n = 5
+  sels = which(dds$marks == conds[n] & dds$SampleID != '163655' & dds$SampleID != '185743')
   
-  cat(n, ' --', conds[n], '--', length(sels), ' samples\n')
+  cat(n, ' --', conds[n], '--', length(sels), 'samples\n')
   
   ddx = dds[, sels]
   design.sel = design[sels, ]
@@ -976,19 +976,20 @@ for(n in 1:length(conds))
   
   ## normalization  
   ss = rowSums(counts(ddx))
+  
   jj = grep('tss', rownames(dds))
   hist(log10(ss[-jj]), breaks = 100);
   hist(log10(ss[jj]), breaks = 100, col = 'darkgray', add = TRUE);
-  abline(v = c(2, log10(500), 3), col = 'red', lwd = 2.0)
+  abline(v = c(log10(50), 2, log10(500), 3), col = 'red', lwd = 2.0)
   
-  dd0 = ddx[ss > 500, ]
+  dd0 = ddx[ss > 50, ]
   dd0 = estimateSizeFactors(dd0)
   sizeFactors(ddx) <- sizeFactors(dd0)
   
   fpm = fpm(ddx, robust = TRUE)
   log2(range(fpm[which(fpm>0)]))
   
-  fpm = log2(fpm + 2^-5)
+  fpm = log2(fpm + 2^-3)
   colnames(fpm) = paste0(design.sel$condition, '_', design.sel$SampleID, '_', design.sel$batch)
   
   ## double check the sample qualities with PCA and scatterplots of replicates
@@ -1029,17 +1030,25 @@ for(n in 1:length(conds))
     source('Functions_atac.R')
     
     d <- DGEList(counts=counts(ddx), group=ddx$condition)
-    tmm <- calcNormFactors(d, method='TMM')
+    if(conds[n] == 'H3K27ac' | conds[n] == 'IgG'){
+      tmm <- calcNormFactors(d, method='TMMwsp') # TMMwsp used for H3K27ac
+    }else{
+      tmm <- calcNormFactors(d, method='TMM')
+    }
     tmm = cpm(tmm, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 1)
+    
+    # ii_bgs = grep('tss', rownames(tmm))
+    # tmm = tmm[-ii_bgs, ]
     
     design.sel$condition = droplevels(design.sel$condition)
     design.sel$batch = droplevels(design.sel$batch)
     
     bc = as.factor(design.sel$batch)
     mod = model.matrix(~ as.factor(condition), data = design.sel)
-    # tmm = as.matrix(tmm)
+    tmm = as.matrix(tmm)
     # vars = apply(tmm, 1, var)
-    # tmm = tmm[which(vars>0), ]
+    # sums = 
+    # tmm = tmm[which(vars>0.5), ]
     # if specify ref.batch, the parameters will be estimated from the ref, inapprioate here, 
     # because there is no better batche other others 
     #ref.batch = '2021S'# 2021S as reference is better for some reasons (NOT USED here)    
@@ -1079,7 +1088,7 @@ for(n in 1:length(conds))
   
 }
 
-write.table(xx, file = paste0(resDir, '/histMarkers_DESeq2_scalingFactor_forDeeptools.txt'), sep = '\t',
+write.table(sfs, file = paste0(resDir, '/histMarkers_DESeq2_scalingFactor_forDeeptools.txt'), sep = '\t',
             col.names = FALSE, row.names = FALSE, quote = FALSE)
 
 
