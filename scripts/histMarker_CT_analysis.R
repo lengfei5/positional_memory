@@ -1094,17 +1094,31 @@ write.table(sfs, file = paste0(resDir, '/histMarkers_DESeq2_scalingFactor_forDee
 ##########################################
 # subtrat the IgG signals when there is a peaks there in IgG for each markers and each condition  
 ##########################################
-conds = c('H3K4me3', 'H3K4me1', 'H3K27me3', 'H3K27ac')
-
 igg = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', 'IgG', '_', version.analysis, '.rds'))
 
-for(n in 1:length(conds))
+conds_histM = unique(design$sample)
+ctl.means = c()
+
+for(ii in 1:length(conds_histM)) 
+{
+  kk = grep(conds_histM[ii], colnames(igg))
+  if(length(kk)>1) {
+    ctl.means = cbind(ctl.means, apply(igg[, kk], 1, mean))
+  }else{
+    ctl.means = cbind(ctl.means, igg[, kk])
+  }
+}
+
+colnames(ctl.means) = conds_histM
+
+plot.pair.comparison.plot(ctl.means[c(1:20000), ], linear.scale = FALSE)
+
+markers = c('H3K4me3', 'H3K4me1', 'H3K27me3', 'H3K27ac')
+for(n in 1:length(markers))
 {
   # n = 1
-  cpm = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', conds[n], '_', version.analysis, '.rds'))
-  design.sel = readRDS(file = paste0(RdataDir, '/design.sels_bc_TMM_combat_', conds[n], '_', version.analysis, '.rds'))
-  
-  
+  cpm = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', markers[n], '_', version.analysis, '.rds'))
+  design.sel = readRDS(file = paste0(RdataDir, '/design.sels_bc_TMM_combat_', markers[n], '_', version.analysis, '.rds'))
   
     
 }
