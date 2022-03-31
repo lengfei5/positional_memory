@@ -639,7 +639,8 @@ pval.cutoff = 6
 peaks.all = readRDS(file = paste0(RdataDir, 
                                   '/histMarkers_macs2peaks_H3K4me3.H3K4me1_32samples_consensusPeaks_pval.', pval.cutoff, '.rds'))
 
-# export(object = peaks.all,  con = paste0(resDir, "/histM_peaks_all_440k.bed"), format = 'bed')
+export(object = peaks.all,  con = paste0(resDir, "/histM_peaks_all_565k.bed"), format = 'bed')
+
 pp = readRDS(file = "../results/Rxxxx_R10723_R11637_R12810_atac/Rdata/ATACseq_peak_consensus.rds")
 
 sum(overlapsAny(pp, peaks.all))
@@ -655,6 +656,9 @@ dev.off()
 
 
 peaks.all = union(peaks.all, pp)
+
+cat(length(peaks.all), ' consensus peaks by adding atac-seq peaks \n')
+
 #peaks.all = GenomicRanges::reduce(peaks.all)
 saveRDS(peaks.all, file = paste0(RdataDir, 
                                  '/histMarkers_macs2peaks_H3K4me3.H3K4me1_32samples_consensusPeaks_and_ATACseq_consensusPeaks.rds'))
@@ -667,8 +671,10 @@ export(object = peaks.all,  con = paste0(resDir, "/histM_peaks_plus_atacseqPeaks
 peaks.all = readRDS(file = paste0(RdataDir, 
                                   '/histMarkers_macs2peaks_H3K4me3.H3K4me1_32samples_consensusPeaks_and_ATACseq_consensusPeaks.rds'))
 
+cat(length(peaks.all), ' consensus peaks currently \n')
+
 annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
-                       'AmexT_v47_transcriptID_transcriptCotig_geneSymbol.nr_geneSymbol.hs_geneID_gtf.geneInfo_gtf.transcriptInfo.rds'))
+              'AmexT_v47_transcriptID_transcriptCotig_geneSymbol.nr_geneSymbol.hs_geneID_gtf.geneInfo_gtf.transcriptInfo.rds'))
 
 tss_all = data.frame(annot$chr_transcript, annot$start_transcript, (as.numeric(annot$start_transcript) + 1), 
                      annot$strand_transcript, annot$transcriptID, annot$geneID)
@@ -680,6 +686,8 @@ xx = resize(pp, width = 1000, fix = 'center', use.names = TRUE)
 
 pp = xx
 
+cat(length(pp), ' promoters in total \n')
+
 saveRDS(pp, file = paste0(RdataDir, '/all_181985_TSS_transcriptID_geneID_with.1kb.width.rds'))
 
 #pp = GenomicRanges::reduce(pp)
@@ -687,22 +695,25 @@ saveRDS(pp, file = paste0(RdataDir, '/all_181985_TSS_transcriptID_geneID_with.1k
 sum(overlapsAny(xx, peaks.all,  ignore.strand=TRUE))
 
 tss_missed = pp[!overlapsAny(pp, peaks.all, ignore.strand=TRUE)]
+cat(length(tss_missed), ' tss missed in consensus peaks \n')
 
-saveRDS(tss_missed, file = paste0(RdataDir, '/missedTSS_140k_inHistM_atacseq_peaks_transcriptID_geneID_with.1kb.width.rds'))
+# saveRDS(tss_missed, file = paste0(RdataDir, '/missedTSS_140k_inHistM_atacseq_peaks_transcriptID_geneID_with.1kb.width.rds'))
 
 xx = GenomicRanges::reduce(tss_missed) 
 saveRDS(xx, file = paste0(RdataDir, '/missedTSS_dupReduced_90k_inHistM_atacseq_peaks_transcriptID_geneID_with.1kb.width.rds'))
 
 peaks_histM_atac_tss = union(peaks.all, tss_missed)
 
-saveRDS(peaks_histM_atac_tss, file = paste0(RdataDir, '/Peaks_histMarkers_ATACseq_missedTSS.dupReduced.rds'))
+saveRDS(peaks_histM_atac_tss, file = paste0(RdataDir, '/Peaks_histMarkers_ATACseq_missedTSS.dupReduced_662k.rds'))
 
-export(object = peaks_histM_atac_tss,  con = paste0(resDir, "/Peaks_histMarkers_ATACseq_missedTSS.dupReduced.bed"), format = 'bed')
+export(object = peaks_histM_atac_tss,  con = paste0(resDir, "/Peaks_histMarkers_ATACseq_missedTSS.dupReduced_662k.bed"), 
+       format = 'bed')
 
 ##########################################
 #  make saf files
 ##########################################
-peaks = readRDS(file = paste0(RdataDir, '/Peaks_histMarkers_ATACseq_missedTSS.dupReduced.rds'))
+peaks = readRDS(file = paste0(RdataDir, '/Peaks_histMarkers_ATACseq_missedTSS.dupReduced_662k.rds'))
+
 tss = readRDS(file = paste0(RdataDir, '/missedTSS_dupReduced_90k_inHistM_atacseq_peaks_transcriptID_geneID_with.1kb.width.rds'))
 
 kk = which(overlapsAny(peaks, tss) == TRUE)
@@ -712,22 +723,31 @@ peaks = data.frame(peaks)
 colnames(peaks)[c(1:3)] = c("chr", "start", "end")
 dim(peaks)
 
+length(grep('tss', peaks$peak.name))
+
 peaks$peak.name = paste0(peaks$chr,  "_", peaks$start, "_", peaks$end)
 peaks$peak.name[kk] = paste0('tss.', peaks$peak.name[kk])
+
+cat(nrow(peaks), ' peaks considered in total \n')
+
+length(grep('tss', peaks$peak.name))
 
 # remove duplications
 jj = match(unique(peaks$peak.name), peaks$peak.name)
 peaks = peaks[jj, ];
 dim(peaks)
 
-# remove contigs
+# remove contigs and many tss from contigs 
 peaks = peaks[grep('chr', peaks$chr), ]
 dim(peaks)
+
+length(grep('tss', peaks$peak.name))
 
 # remove chrM
 peaks = peaks[which(peaks$chr != 'chrM'), ]
 dim(peaks)
 
+length(grep('tss', peaks$peak.name))
 
 peakDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/histMod_CT_using'
 # preapre SAF input for featureCounts
@@ -740,7 +760,9 @@ SAF = data.frame(GeneID=peaks$peak.name,
                  End=peaks$end, 
                  Strand=peaks$strand, stringsAsFactors = FALSE)
 
-write.table(SAF, file = paste0(peakDir, '/Peaks_histMarkers_ATACseq_missedTSS.dupReduced.saf'), sep = '\t', row.names = FALSE, 
+length(grep('tss', SAF$GeneID))
+
+write.table(SAF, file = paste0(peakDir, '/Peaks_histMarkers_ATACseq_missedTSS.dupReduced_v2.saf'), sep = '\t', row.names = FALSE, 
             col.names = TRUE, quote = FALSE) 
 
 ##########################################
@@ -841,15 +863,15 @@ if(Filtering.peaks.with.lowReads){
   par(mfrow=c(1,1))
   hist(log10(ss), breaks = 100, main = 'log10(max(reads within peaks across samples))')
   hist(log10(ss[index_bgs]), breaks = 100, add = TRUE, col = 'darkgray') 
-  length(which(ss > quantile(ss[index_bgs], probs = 0.8)))
+  length(which(ss > quantile(ss[index_bgs], probs = 0.95)))
   
   # check the peak length
   peakNames = rownames(dds)
   peakNames = gsub('tss.', '', peakNames)
   pp = data.frame(t(sapply(peakNames, function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
   
-  rownames(dds) = paste0(pp$X1, ':', pp$X2, '-', pp$X3)
-  rownames(counts) = rownames(dds)
+  # rownames(dds) = paste0(pp$X1, ':', pp$X2, '-', pp$X3)
+  # rownames(counts) = rownames(dds)
   
   pp$strand = '*'
   pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
@@ -871,16 +893,16 @@ if(Filtering.peaks.with.lowReads){
   
   cutoff.peak = 30 # cutoff.peak = 30 for H3K4me3  (atac-seq cutoff.peak > 40 for >= 2 samples) 
   #cutoff.bg = 20
-  cat(length(which(ss >= cutoff.peak)), 'peaks selected with minimum read of the highest peak -- ', cutoff.peak,  '\n')
+  cat(length(which(ss > cutoff.peak)), 'peaks selected with minimum read of the highest peak -- ', cutoff.peak,  '\n')
   #cat(length(which(ss < cutoff.bg)), 'peaks selected with minimum read of the highest peak -- ', cutoff.bg,  '\n')
   
   hist(log10(ss), breaks = 100, col = 'blue', main = 'log2(max of read counts within peaks) ')
   hist(log10(ss[index_bgs]), breaks = 100, add = TRUE, col = 'darkgray')
   abline(v= log10(cutoff.peak), col = 'red', lwd = 2.0)
-  #abline(v= log10(cutoff.bg), col = 'blue', lwd = 2.0)
   
   #nb.above.threshold = apply(counts(dds), 1, function(x) length(which(x>cutoff.peak)))
   index_keep = which(ss > cutoff.peak)
+  cat(length(index_keep), ' peaks will be retained \n')
   
   ### keep also peaks if they are overlapped by atac-seq peaks
   atacseq_peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/ATAC_allUsed_20220328/Rdata/',
@@ -891,10 +913,11 @@ if(Filtering.peaks.with.lowReads){
   
   if(Select.background.for.peaks){
     #ii.bg = which(ss < cutoff.bg)
-    ii.bg = sample(index_bgs, size = 5000, replace = FALSE)
-    rownames(dds)[ii.bg] = paste0('tss.', rownames(dds)[ii.bg])
+    #ii.bg = sample(index_bgs, size = 5000, replace = FALSE)
+    #rownames(dds)[ii.bg] = paste0('tss.', rownames(dds)[ii.bg])
     
-    index_keep = unique(c(index_keep, ii.bg))
+    index_keep = unique(c(index_keep, index_bgs))
+    cat(length(index_keep), ' peaks will be retained \n')
     
     dds = dds[index_keep, ]
     ll.sels = ll[index_keep]
@@ -903,9 +926,9 @@ if(Filtering.peaks.with.lowReads){
     dds <- dds[ii, ]
     ll.sels = ll[ss >= cutoff.peak]
   }
- 
+  
   save(design, dds, file = paste0(RdataDir, 
-                                  '/histoneMarkers_samplesDesign_ddsPeaksMatrix_filtered_incl.atacPeak.missedTSS.bgs_150k.Rdata'))
+                                  '/histoneMarkers_samplesDesign_ddsPeaksMatrix_filtered_incl.atacPeak.missedTSS.bgs_324k.Rdata'))
    
 }
 
@@ -914,7 +937,7 @@ if(Filtering.peaks.with.lowReads){
 # for each markers, normalization, sample filtering, and batch correction
 ##########################################
 load(file = paste0(RdataDir, 
-                   '/histoneMarkers_samplesDesign_ddsPeaksMatrix_filtered_incl.atacPeak.missedTSS.bgs_150k.Rdata'))
+                   '/histoneMarkers_samplesDesign_ddsPeaksMatrix_filtered_incl.atacPeak.missedTSS.bgs_324k.Rdata'))
 
 conds = c('H3K4me3', 'H3K4me1', 'H3K27me3', 'H3K27ac', 'IgG')
 
@@ -1698,7 +1721,6 @@ if(Redefine.gene.groups.with.RNAseq){
   
   
 }
-
 
 ggplot(data=res, aes(x=x1, y=x2, label = gene, color = groups)) +
   geom_point(size = 0.4) + 
