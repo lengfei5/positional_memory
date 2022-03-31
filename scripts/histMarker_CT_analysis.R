@@ -1091,6 +1091,23 @@ for(n in 1:length(conds))
 write.table(sfs, file = paste0(resDir, '/histMarkers_DESeq2_scalingFactor_forDeeptools.txt'), sep = '\t',
             col.names = FALSE, row.names = FALSE, quote = FALSE)
 
+##########################################
+# subtrat the IgG signals when there is a peaks there in IgG for each markers and each condition  
+##########################################
+conds = c('H3K4me3', 'H3K4me1', 'H3K27me3', 'H3K27ac')
+
+igg = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', 'IgG', '_', version.analysis, '.rds'))
+
+for(n in 1:length(conds))
+{
+  # n = 1
+  cpm = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', conds[n], '_', version.analysis, '.rds'))
+  design.sel = readRDS(file = paste0(RdataDir, '/design.sels_bc_TMM_combat_', conds[n], '_', version.analysis, '.rds'))
+  
+  
+  
+    
+}
 
 ########################################################
 ########################################################
