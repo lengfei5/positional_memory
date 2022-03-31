@@ -939,7 +939,22 @@ if(Filtering.peaks.with.lowReads){
 load(file = paste0(RdataDir, 
                    '/histoneMarkers_samplesDesign_ddsPeaksMatrix_filtered_incl.atacPeak.missedTSS.bgs_324k.Rdata'))
 
+SaveHistM.peaks.afterFiltering = FALSE
+if(SaveHistM.peaks.afterFiltering){
+  peakNames = rownames(dds)
+  peakNames = gsub('tss.', '', peakNames)
+  pp = data.frame(t(sapply(peakNames, function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
+  
+  pp$strand = '*'
+  pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
+  export(object = pp,  con = paste0(resDir, "/histM_peaks_all_afterFiltering_323k.bed"), format = 'bed')
+  
+  
+}
+
 conds = c('H3K4me3', 'H3K4me1', 'H3K27me3', 'H3K27ac', 'IgG')
+
 
 save.scalingFactors.for.deeptools = TRUE
 Make.pca.plots = TRUE
@@ -948,8 +963,8 @@ Select.background.for.peaks = TRUE
 
 for(n in 1:length(conds))
 {
-  # n = 3
-  sels = which(dds$marks == conds[n] & dds$SampleID != '163652' & dds$SampleID != '163655')
+  # n = 2
+  sels = which(dds$marks == conds[n] & dds$SampleID != '163655')
   
   cat(n, ' --', conds[n], '--', length(sels), ' samples\n')
   
@@ -958,21 +973,22 @@ for(n in 1:length(conds))
   
   ddx$condition = droplevels(ddx$condition)
   ddx$batch = droplevels(ddx$batch)
-
+  
   ## normalization  
   ss = rowSums(counts(ddx))
-  hist(log10(ss), breaks = 100);
-  abline(v = 2, col = 'red', lwd = 2.0)
+  jj = grep('tss', rownames(dds))
+  hist(log10(ss[-jj]), breaks = 100);
+  hist(log10(ss[jj]), breaks = 100, col = 'darkgray', add = TRUE);
+  abline(v = c(2, log10(500), 3), col = 'red', lwd = 2.0)
   
-  dd0 = ddx[ss > 100, ]
+  dd0 = ddx[ss > 500, ]
   dd0 = estimateSizeFactors(dd0)
-  sizefactors.UQ = sizeFactors(dd0)
-  sizeFactors(ddx) <- sizefactors.UQ
+  sizeFactors(ddx) <- sizeFactors(dd0)
   
   fpm = fpm(ddx, robust = TRUE)
   log2(range(fpm[which(fpm>0)]))
   
-  fpm = log2(fpm + 2^-4)
+  fpm = log2(fpm + 2^-5)
   colnames(fpm) = paste0(design.sel$condition, '_', design.sel$SampleID, '_', design.sel$batch)
   
   ## double check the sample qualities with PCA and scatterplots of replicates
@@ -983,7 +999,7 @@ for(n in 1:length(conds))
     
     vsd <- varianceStabilizingTransformation(ddx, blind = FALSE)
     
-    pca2save = as.data.frame(plotPCA(vsd, intgroup = c('condition', 'batch'), returnData = TRUE, ntop = 5000))
+    pca2save = as.data.frame(plotPCA(vsd, intgroup = c('condition', 'batch'), returnData = TRUE, ntop = 3000))
     pca2save$name = paste0(design.sel$sample, '_', design.sel$SampleID)
     
     ggplot(data=pca2save, aes(PC1, PC2, label = name, color= condition, shape = batch))  + 
@@ -993,66 +1009,74 @@ for(n in 1:length(conds))
     
     ggsave(paste0(resDir, "/histM_PCA_peakFiltered_", conds[n], ".pdf"), width=10, height = 6)
     
+    pdfname = paste0(resDir, "/histM_peakFiltered_", conds[n], ".pdf")
+    pdf(pdfname, width = 10, height = 10)
+    
     plot.pair.comparison.plot(fpm[c(1:20000), grep('_mUA', colnames(fpm))], linear.scale = FALSE)
-    plot.pair.comparison.plot(fpm[c(1:20000), grep('_mLA', colnames(fpm))], linear.scale = FALSE)
-    plot.pair.comparison.plot(fpm[c(1:20000), grep('_mHand', colnames(fpm))], linear.scale = FALSE)
+    plot.pair.comparison.plot(fpm[c(1:20000), grep('_mLA|_mHand', colnames(fpm))], linear.scale = FALSE)
+    plot.pair.comparison.plot(fpm[c(1:20000), grep('_BL5|_BL9', colnames(fpm))], linear.scale = FALSE)
+    plot.pair.comparison.plot(fpm[c(1:20000), grep('_BL13', colnames(fpm))], linear.scale = FALSE)
+    
+    dev.off()
     
   }
   
   ## batch correction
-  require(edgeR)
-  require(sva)
-  source('Functions_atac.R')
-  
-  d <- DGEList(counts=counts(ddx), group=ddx$condition)
-  tmm <- calcNormFactors(d, method='TMM')
-  tmm = cpm(tmm, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 1)
-  
-  design.sel$condition = droplevels(design.sel$condition)
-  design.sel$batch = droplevels(design.sel$batch)
-  
-  bc = as.factor(design.sel$batch)
-  mod = model.matrix(~ as.factor(condition), data = design.sel)
-  # tmm = as.matrix(tmm)
-  # vars = apply(tmm, 1, var)
-  # tmm = tmm[which(vars>0), ]
-  # if specify ref.batch, the parameters will be estimated from the ref, inapprioate here, 
-  # because there is no better batche other others 
-  #ref.batch = '2021S'# 2021S as reference is better for some reasons (NOT USED here)    
-  fpm.bc = ComBat(dat=as.matrix(tmm), batch=bc, mod=mod, par.prior=TRUE, ref.batch = NULL) 
-  
-  #design.tokeep<-model.matrix(~ 0 + conds,  data = design.sels)
-  #cpm.bc = limma::removeBatchEffect(tmm, batch = bc, design = design.tokeep)
-  # plot(fpm.bc[,1], tmm[, 1]);abline(0, 1, lwd = 2.0, col = 'red')
-  make.pca.plots(tmm, ntop = 5000, conds.sel = as.character(unique(design.sel$condition)))
-  ggsave(paste0(resDir, "/histMarker_", conds[n], "_beforeBatchCorrect_",  version.analysis, ".pdf"), width = 16, height = 14)
-  
-  make.pca.plots(fpm.bc, ntop = 5000, conds.sel = as.character(unique(design.sel$condition)))
-  ggsave(paste0(resDir, "/histMarker_", conds[n], "_afterBatchCorrect_",  version.analysis, ".pdf"), width = 10, height = 6)
-  
-  fpm = fpm.bc
-  rm(fpm.bc)
-  
-  saveRDS(fpm, file = paste0(RdataDir, '/fpm_bc_TMM_combat_', conds[n], '_', version.analysis, '.rds'))
-  saveRDS(design.sel, file = paste0(RdataDir, '/design.sels_bc_TMM_combat_', conds[n], '_', version.analysis, '.rds'))
-  
+  Batch.Correction.combat = TRUE
+  if(Batch.Correction.combat){
+    require(edgeR)
+    require(sva)
+    source('Functions_atac.R')
+    
+    d <- DGEList(counts=counts(ddx), group=ddx$condition)
+    tmm <- calcNormFactors(d, method='TMM')
+    tmm = cpm(tmm, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 1)
+    
+    design.sel$condition = droplevels(design.sel$condition)
+    design.sel$batch = droplevels(design.sel$batch)
+    
+    bc = as.factor(design.sel$batch)
+    mod = model.matrix(~ as.factor(condition), data = design.sel)
+    # tmm = as.matrix(tmm)
+    # vars = apply(tmm, 1, var)
+    # tmm = tmm[which(vars>0), ]
+    # if specify ref.batch, the parameters will be estimated from the ref, inapprioate here, 
+    # because there is no better batche other others 
+    #ref.batch = '2021S'# 2021S as reference is better for some reasons (NOT USED here)    
+    fpm.bc = ComBat(dat=as.matrix(tmm), batch=bc, mod=mod, par.prior=TRUE, ref.batch = NULL) 
+    
+    #design.tokeep<-model.matrix(~ 0 + conds,  data = design.sels)
+    #cpm.bc = limma::removeBatchEffect(tmm, batch = bc, design = design.tokeep)
+    # plot(fpm.bc[,1], tmm[, 1]);abline(0, 1, lwd = 2.0, col = 'red')
+    make.pca.plots(tmm, ntop = 5000, conds.sel = as.character(unique(design.sel$condition)))
+    ggsave(paste0(resDir, "/histMarker_", conds[n], "_beforeBatchCorrect_",  version.analysis, ".pdf"), width = 16, height = 14)
+    
+    make.pca.plots(fpm.bc, ntop = 5000, conds.sel = as.character(unique(design.sel$condition)))
+    ggsave(paste0(resDir, "/histMarker_", conds[n], "_afterBatchCorrect_",  version.analysis, ".pdf"), width = 10, height = 6)
+    
+    fpm = fpm.bc
+    rm(fpm.bc)
+    
+    saveRDS(fpm, file = paste0(RdataDir, '/fpm_bc_TMM_combat_', conds[n], '_', version.analysis, '.rds'))
+    saveRDS(design.sel, file = paste0(RdataDir, '/design.sels_bc_TMM_combat_', conds[n], '_', version.analysis, '.rds'))
+    
+  }
   
   ## save scaling factor for deeptools to make bigwig
   if(save.scalingFactors.for.deeptools){
     if(n == 1){
-      xx = data.frame(sampleID = design.sel$SampleID,  
-                      scalingFactor = design.sel$unique.rmdup/(sizeFactors(dds)*median(as.numeric(design.sel$unique.rmdup))),
+      sfs = data.frame(sampleID = design.sel$SampleID,  
+                      scalingFactor = design.sel$usable/(sizeFactors(ddx)*median(as.numeric(design.sel$usable))),
                       stringsAsFactors = FALSE)
       
     }else{
-      xx0 = data.frame(sampleID = design.sel$SampleID,  
-                       scalingFactor = design.sel$unique.rmdup/(sizeFactors(dds)*median(design.sel$unique.rmdup)),
+      sfs0 = data.frame(sampleID = design.sel$SampleID,  
+                       scalingFactor = design.sel$usable/(sizeFactors(ddx)*median(as.numeric(design.sel$usable))),
                        stringsAsFactors = FALSE)
-      xx = rbind(xx, xx0)
-      
+      sfs = rbind(sfs, sfs0)
     }
-    
   }
+  
 }
 
 write.table(xx, file = paste0(resDir, '/histMarkers_DESeq2_scalingFactor_forDeeptools.txt'), sep = '\t',
