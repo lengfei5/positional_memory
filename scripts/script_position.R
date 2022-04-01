@@ -972,3 +972,65 @@ if(grouping.position.dependent.peaks){
   
 }
 
+########################################################
+########################################################
+# Section :address specific positional memory related questions  
+# 
+########################################################
+########################################################
+
+##########################################
+# histone markers and atac-seq of positional genes
+# 
+##########################################
+Explore_histM_positional.genes = FALSE
+if(Explore_histM_positional.genes){
+  fpm = readRDS(file = paste0(RdataDir,  '/histoneMarkers_normSignals_axolotlAllTSS.2kb.rds'))
+  res = data.frame(log2(fpm + 1), stringsAsFactors = FALSE)
+  
+  res$gene = sapply(rownames(res), function(x){unlist(strsplit(as.character(x), '_'))[2]})
+  
+  
+  res$x1 = res$Hand_K4me3
+  res$x2 = res$UA_K4me3
+  rr = res$x1 - res$x2
+  
+  examples.sel = which(abs(rr)>2 & (res$x1>5|res$x2>5))
+  examples.sel = unique(c(examples.sel, grep('HOXA11|HOXA9|HOXD13|HOXD11|HOXD9|MEIS', res$gene)))
+  
+  ggplot(data=res, aes(x=x1, y=x2, label = gene)) +
+    geom_point(size = 0.6) + 
+    theme(axis.text.x = element_text(size = 12), 
+          axis.text.y = element_text(size = 12)) +
+    geom_text_repel(data= res[examples.sel, ], size = 3.0, color = 'blue') +
+    #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
+    #scale_color_manual(values=c("blue", "black", "red")) +
+    geom_vline(xintercept=5, col='darkgray') +
+    geom_hline(yintercept=5, col="darkgray") +
+    labs(x = "Hand_H3K4me3", y= 'UA_H3K4me3')
+  
+  ggsave(paste0(figureDir, "histMarker_H3K4me3_scatterplot_Hand.vs.Hand.pdf"), width=12, height = 8)
+  
+  res$x1 = res$Hand_K27me3
+  res$x2 = res$UA_K27me3
+  rr = res$x1 - res$x2
+  
+  examples.sel = which(abs(rr)>2 & (res$x1>5|res$x2>5))
+  examples.sel = unique(c(examples.sel, grep('HOXA11|HOXA9|HOXD13|HOXD11|HOXD9|MEIS', res$gene)))
+  
+  ggplot(data=res, aes(x=x1, y=x2, label = gene)) +
+    geom_point(size = 0.6) + 
+    theme(axis.text.x = element_text(size = 12), 
+          axis.text.y = element_text(size = 12)) +
+    geom_text_repel(data= res[examples.sel, ], size = 3.0, color = 'blue') +
+    #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
+    #scale_color_manual(values=c("blue", "black", "red")) +
+    geom_vline(xintercept=5, col='darkgray') +
+    geom_hline(yintercept=5, col="darkgray") +
+    labs(x = "Hand_H3K27me3", y= 'UA_H3K27me3')
+  
+  ggsave(paste0(figureDir, "histMarker_H3K27me3_scatterplot_Hand.vs.Hand.pdf"), width=12, height = 8)
+  
+}
+
+
