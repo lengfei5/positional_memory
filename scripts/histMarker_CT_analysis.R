@@ -1095,12 +1095,11 @@ write.table(sfs, file = paste0(resDir, '/histMarkers_DESeq2_scalingFactor_forDee
 ##########################################
 load(file = paste0(RdataDir, 
                    '/histoneMarkers_samplesDesign_ddsPeaksMatrix_filtered_incl.atacPeak.missedTSS.bgs_324k.Rdata'))
-
 igg = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', 'IgG', '_', version.analysis, '.rds'))
 
 conds_histM = unique(design$sample)
-ctl.means = c()
 
+ctl.means = c()
 for(ii in 1:length(conds_histM)) 
 {
   kk = grep(conds_histM[ii], colnames(igg))
@@ -1113,34 +1112,91 @@ for(ii in 1:length(conds_histM))
 
 colnames(ctl.means) = conds_histM
 
-plot.pair.comparison.plot(ctl.means[c(1:20000), ], linear.scale = FALSE)
+### Reason : reduce the ctl.mean with a fixed global factor and then fix the IgG signals
+### scale each marker data based on the common IgG background 
+ctl.means = ctl.means - 3.5
+igg_peak = 4.0 - 3.5 # cutoff for peaks in IgG
+#plot.pair.comparison.plot(ctl.means[c(1:20000), ], linear.scale = FALSE)
 
 markers = c('H3K4me3', 'H3K4me1', 'H3K27me3', 'H3K27ac')
+
 for(n in 1:length(markers))
 {
-  # n = 1
+  # n = 4
   cpm = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', markers[n], '_', version.analysis, '.rds'))
   design.sel = readRDS(file = paste0(RdataDir, '/design.sels_bc_TMM_combat_', markers[n], '_', version.analysis, '.rds'))
+  cpm0 = cpm
   
   inputs = ctl.means[match(rownames(cpm), rownames(ctl.means)), ]
+  
+  ### global cutoff is probably more robust
+  marker.means = c()
+  for(ii in 1:length(conds_histM)) 
+  {
+    kk = grep(conds_histM[ii], colnames(cpm))
+    if(length(kk)>1) {
+      marker.means = cbind(marker.means, apply(cpm[, kk], 1, mean))
+    }else{
+     marker.means = cbind(marker.means, cpm[, kk])
+    }
+  }
+  colnames(marker.means) = conds_histM
+  
+  marker.means = apply(marker.means, 1, mean)
+  inputs.means = apply(inputs, 1, mean)
+  
+  #hist(marker.means, breaks = 100, xlim = range(c(marker.means, inputs.means)), ylim = c(0, 2*10^4))
+  #hist(inputs.means, breaks = 100, col = 'gray', add = TRUE)
+  
+  ## find global scaling factors for between this marker and IgG
+  ## by assuming that only few 100 peaks solely due to IgG background instead of real peaks
+  ratios = inputs.means - marker.means
+  
+  plot(inputs.means, ratios, cex = 0.2)
+  abline(v = c(2, 2.5, 3.5, 4), col = 'red')
+  
+  igg_cutoff = 2.5 # global factor for IgG
+  cat(length(which(inputs.means> igg_cutoff)), ' peaks considered solely due to IgG \n')
+  
+  global_scaling = median(ratios[which(inputs.means > igg_cutoff)])
+  cat('global scaling factor -- ', global_scaling, '\n')
+  abline(h = global_scaling, col = 'blue')
+  
+  #bgs = inputs.means - global_scaling
+  #igg_peak_new = igg_peak - median(ratios[which(inputs.means > igg_cutoff)])
+  marker.means_new = marker.means + global_scaling
+  ratios_new = inputs.means - marker.means_new
+  cat('after sacling the markers ratios becomes : ', median(ratios_new[which(inputs.means > igg_cutoff)]))
+  
+  hist(marker.means_new, breaks = 100)
+  hist(inputs.means, breaks = 100, add = TRUE, col = 'red')
+  abline(v = igg_peak, col = 'blue')
+  
+  cpm = cpm + global_scaling
   
   for(m in 1:length(conds_histM))
   {
     # m = 1
     jj = grep(conds_histM[m], colnames(cpm))
-    smean = apply(cpm[, jj], 1, mean)
     
-    hist(smean, breaks = 100)
-    hist(inputs[,m], breaks = 100, col = 'gray', add = TRUE)
+    bgs = inputs[, which(colnames(inputs) == conds_histM[m])]
+    # bgs = bgs - global_scaling
+    j_cor = which(bgs > igg_peak)
     
-    ratios = inputs[,m] - smean
-    ratios = ratios[order(-ratios)]
+    cat(markers[n], '-',  as.character(conds_histM[m]), '-',
+        length(j_cor), ' peaks will subtract IgG signals  \n')
     
-    head(ratios[which(ratios > 4.5 & ratios)])
-     
+    for(j in jj) 
+    {
+      cpm[j_cor, j] = cpm[j_cor, j] - bgs[j_cor]
+    }
+    
   }
   
-    
+  saveRDS(cpm, file = paste0(RdataDir, '/fpm_bc_TMM_combat_', markers[n], '_IgG.subtrated_', 
+                        version.analysis, '.rds'))
+  
+  
 }
 
 ########################################################
