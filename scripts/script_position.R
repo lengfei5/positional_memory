@@ -974,7 +974,7 @@ if(grouping.position.dependent.peaks){
 
 ########################################################
 ########################################################
-# Section :address specific positional memory related questions  
+# Section : segment-specific histone markers
 # 
 ########################################################
 ########################################################
@@ -989,7 +989,6 @@ if(Explore_histM_positional.genes){
   res = data.frame(log2(fpm + 1), stringsAsFactors = FALSE)
   
   res$gene = sapply(rownames(res), function(x){unlist(strsplit(as.character(x), '_'))[2]})
-  
   
   res$x1 = res$Hand_K4me3
   res$x2 = res$UA_K4me3

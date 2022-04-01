@@ -1237,8 +1237,8 @@ colnames(keep) = conds
 ##########################################
 # focus on the atac-seq overlapped peaks
 ##########################################
-atacseq_peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rxxxx_R10723_R11637_R12810_atac/Rdata/',
-                                      'ATACseq_peak_consensus_filtered_55k.rds'))
+atacseq_peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/ATAC_allUsed_20220328/Rdata/',
+                                      'ATACseq_peak_consensus_filtered_64k.rds'))
 ii_bgs = grep('tss.', rownames(keep))
 rownames(keep) = gsub('tss.', '', rownames(keep))
 
@@ -1402,7 +1402,7 @@ pheatmap(xx[c(1:20000), ], show_rownames = FALSE, show_colnames = TRUE,
 
 ########################################################
 ########################################################
-# Section V : segment-specific histone markers
+# Section V : test of segment-specific histone markers
 # 
 ########################################################
 ########################################################
@@ -1412,14 +1412,14 @@ require(corrplot)
 require(pheatmap)
 require(RColorBrewer)
 
-atacseq_peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rxxxx_R10723_R11637_R12810_atac/Rdata/',
-                                      'ATACseq_peak_consensus_filtered_55k.rds'))
+atacseq_peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/ATAC_allUsed_20220328/Rdata/',
+                                      'ATACseq_peak_consensus_filtered_64k.rds'))
 
 conds_histM = c('H3K4me3', 'H3K27me3',  'H3K4me1', 'H3K27ac')
 
 for(n_histM in 1:length(conds_histM))
 {
-  # n_histM = 4
+  # n_histM = 1
   cpm = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', markers[n], '_IgG.subtrated_', version.analysis, '.rds'))
   design.sel = readRDS(file = paste0(RdataDir, '/design.sels_bc_TMM_combat_', conds_histM[n_histM], '_', version.analysis, '.rds'))
   
