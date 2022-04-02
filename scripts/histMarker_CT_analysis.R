@@ -1737,13 +1737,21 @@ if(Assembly_histMarkers_togetherWith_ATACseq){
   
   #peaks = read.csv(paste0(figureDir, 'positional_peaks_clusters_6/', 
   #                        'position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters6.csv'))
+  peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rdata/', 
+                  'position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters_6.rds'))
+  pp_atac = data.frame(t(sapply(rownames(peaks), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  pp_atac$strand = '*'
+  pp_atac = makeGRangesFromDataFrame(pp_atac, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
   
-  df = as.data.frame(sapply(colnames(yy), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[2])}))
-  colnames(df) = 'segments'
-  rownames(df) = colnames(yy)
+  pp_histM = data.frame(t(sapply(rownames(yy), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  pp_histM$strand = '*'
+  pp_histM = makeGRangesFromDataFrame(pp_histM, seqnames.field=c("X1"),
+                                      start.field="X2", end.field="X3", strand.field="strand")
   
-  sample_colors = c('springgreen4', 'steelblue2', 'gold2')
-  annot_colors = list(segments = sample_colors)
+  mapping = findOverlaps(pp_atac, pp_histM)
+  yy1 = yy[mapping@to, ]
+  
   
   cal_centering <- function(x){
     (x - mean(x, na.rm =TRUE))
@@ -1760,78 +1768,24 @@ if(Assembly_histMarkers_togetherWith_ATACseq){
     yy1[,jj] = t(apply(yy[,jj], 1, cal_centering))
   }
   
+  df = as.data.frame(sapply(colnames(yy), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[2])}))
+  colnames(df) = 'segments'
+  rownames(df) = colnames(yy)
   
-  
-  test = yy
-  test = test[plt$tree_row$order, ]
-  pheatmap(test, 
-           nnotation_row = my_gene_col, 
-           annotation_col = df, show_rownames = FALSE, scale = 'none', 
-           color = col, 
-           show_colnames = FALSE,
-           cluster_rows = TRUE, cluster_cols = FALSE,  
-           #clustering_method = 'complete', cutree_rows = nb_clusters, 
-           annotation_colors = annot_colors, 
-           clustering_callback = callback,
-           gaps_col = gaps.col)
-  
-  RdataHistM = '/Users/jiwang/workspace/imp/positional_memory/results/CT_analysis_20220311/Rdata'
-  version.analysis.HistM = 'CT_analysis_20220311'
-  
-  ### collect the four markers with means 
-  histMs =  c('H3K4me3','H3K27me3', 'H3K4me1')
-  shm = c()
-  
-  for(n in 1:length(histMs))
-  {
-    # n = 1
-    cat(n, ' -- ', histMs[n], '\n')
-    cpm = readRDS(file = paste0(RdataHistM, '/fpm_bc_TMM_combat_', histMs[n], '_', version.analysis.HistM, '.rds'))
-    cpm = cpm[ , grep(histMs[n], colnames(cpm))]
-    #design.sel = readRDS(file = paste0(RdataHistM, '/design.sels_bc_TMM_combat_DBedgeRtest_', histMs[n], '_', 
-    #                                   version.analysis.HistM, '.rds'))
-    
-    ### select the samples and extract sample means
-    conds_histM = c("mUA", "mLA", "mHand")
-    sample.sels = c();  
-    cc = c()
-    
-    sample.means = c()
-    for(ii in 1:length(conds_histM)) 
-    {
-      kk = grep(conds_histM[ii], colnames(cpm))
-      sample.sels = c(sample.sels, kk)
-      cc = c(cc, rep(conds_histM[ii], length(kk)))
-      if(length(kk)>1) {
-        sample.means = cbind(sample.means, apply(cpm[, kk], 1, mean))
-      }else{
-        sample.means = cbind(sample.means, cpm[, kk])
-      }
-    }
-    colnames(sample.means) = paste0(conds_histM, '_', histMs[n])
-    
-    if(n == 1){
-      shm = sample.means
-    }else{
-      shm = cbind(shm, sample.means[match(rownames(shm), rownames(sample.means)), ])
-    }
-  }    
+  sample_colors = c('springgreen4', 'steelblue2', 'gold2')
+  annot_colors = list(segments = sample_colors)
   
   ## quantile normalization for different histone markers
-  library(preprocessCore)
-  xx = normalize.quantiles(shm)
-  colnames(xx) = colnames(shm)
-  rownames(xx) = rownames(shm)
-  shm = xx
+  Quantile.normalize.histMarker = FALSE
+  if(Quantile.normalize.histMarker){
+    library(preprocessCore)
+    xx = normalize.quantiles(shm)
+    colnames(xx) = colnames(shm)
+    rownames(xx) = rownames(shm)
+    shm = xx
+  }
   
-  pp_histM = data.frame(t(sapply(rownames(shm), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
-  pp_histM$strand = '*'
-  pp_histM = makeGRangesFromDataFrame(pp_histM, seqnames.field=c("X1"),
-                                      start.field="X2", end.field="X3", strand.field="strand")
   
-  mapping = findOverlaps(pp, pp_histM, type = 'within')
-  
-  yy0 = shm[mapping@to, ]
   #rownames(yy0) = rownames(yy)
   
   # reorder the histM according to the atac-seq peak clusters
