@@ -1421,7 +1421,7 @@ conds_histM = c('H3K4me3', 'H3K27me3',  'H3K4me1', 'H3K27ac')
 
 for(n_histM in 1:length(conds_histM))
 {
-  # n_histM = 4
+  # n_histM = 1
   #cpm = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', conds_histM[n_histM], '_IgG.subtrated_', version.analysis, '.rds'))
   cpm = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', conds_histM[n_histM], '_', version.analysis, '.rds'))
   design.sel = readRDS(file = paste0(RdataDir, '/design.sels_bc_TMM_combat_', conds_histM[n_histM], '_', version.analysis, '.rds'))
@@ -1743,6 +1743,14 @@ if(Assembly_histMarkers_togetherWith_ATACseq){
   pp_atac$strand = '*'
   pp_atac = makeGRangesFromDataFrame(pp_atac, seqnames.field=c("X1"),
                                 start.field="X2", end.field="X3", strand.field="strand")
+  
+  peaks2 = readRDS(file = paste0('~/workspace/imp/positional_memory/results/ATAC_allUsed_20220328/',
+                                 'position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters_6.rds'))
+  
+  pp2_atac = data.frame(t(sapply(rownames(peaks2), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  pp2_atac$strand = '*'
+  pp2_atac = makeGRangesFromDataFrame(pp2_atac, seqnames.field=c("X1"),
+                                     start.field="X2", end.field="X3", strand.field="strand")
   
   pp_histM = data.frame(t(sapply(rownames(yy), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
   pp_histM$strand = '*'

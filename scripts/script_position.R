@@ -16,7 +16,7 @@ source(RNA.QC.functions)
 source('functions_chipSeq.R')
 source('Functions_atac.R')
 
-version.analysis = 'Rxxxx_R10723_R11637_R12810_atac'
+version.analysis = 'ATAC_allUsed_20220328'
 #peakDir = "Peaks/macs2_broad"
 
 resDir = paste0("../results/", version.analysis)
@@ -31,8 +31,6 @@ gtf.file =  paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf')
 
 figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
 tableDir = paste0(figureDir, 'tables4plots/')
-
-saveTables = FALSE
 
 require(ggplot2)
 require(DESeq2)
@@ -51,7 +49,8 @@ library(edgeR)
 require("sva")
 require(limma)
 
-load(file = paste0(RdataDir, '/ATACseq_selected.63k.peaks_cutoff.40.at.least.2sample.Rdata'))
+load(file = paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata', 
+                   '/ATACseq_selected.63k.peaks_cutoff.40.at.least.2sample.Rdata'))
 
 Split.Mature.Regeneration.samples = TRUE
 
@@ -149,8 +148,6 @@ if(grouping.position.dependent.peaks){
   ##########################################
   # import batch corrected gene expression and design 
   ##########################################
-  #fpm = readRDS(file = paste0(RdataDir, '/fpm.bc_TMM_combat_MatureSamples_batch2020.2021.2021S_rmOldBatch.rds'))
-  #design = readRDS(file = paste0(RdataDir, '/design_sels_bc_TMM_combat_MatureSamples_batch2020.2021.2021S_rmOldBatch.rds'))
   fpm = readRDS(file = paste0(RdataDir, '/fpm.bc_TMM_combat_MatureSamples_batch2019.2020.2021.2021S.2022.rds'))
   design = readRDS(file = paste0(RdataDir, '/design_sels_bc_TMM_combat_MatureSamples_batch2019.2020.2021.2021S.2022.rds'))
   
@@ -170,13 +167,12 @@ if(grouping.position.dependent.peaks){
   if(Make.Granges.and.peakAnnotation){
     pp = data.frame(t(sapply(rownames(fpm), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
     pp$strand = '*'
-    
     pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
                                   start.field="X2", end.field="X3", strand.field="strand")
     
-    saveRDS(pp, file = paste0(RdataDir, '/ATACseq_peak_consensus_filtered_55k.rds'))
+    saveRDS(pp, file = paste0(RdataDir, '/ATACseq_peak_consensus_filtered_62k.rds'))
     
-    export(object = pp,  con = paste0(resDir, "/atacseq_peaks_filtered_55k.bed"), format = 'bed')
+    export(object = pp,  con = paste0(resDir, "/atacseq_peaks_filtered_62k.bed"), format = 'bed')
     
     # annotation from ucsc browser ambMex60DD_genes_putative
     amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
@@ -187,7 +183,6 @@ if(grouping.position.dependent.peaks){
     rownames(pp.annots) = rownames(fpm)
     
     promoters = select.promoters.regions(upstream = 2000, downstream = 2000, ORF.type.gtf = 'Putative', promoter.select = 'all')
-    
     
   }
   
@@ -247,7 +242,7 @@ if(grouping.position.dependent.peaks){
     xx = data.frame(res, pp.annots[match(rownames(res), rownames(pp.annots)), ], stringsAsFactors = FALSE)
     
     res = xx
-    saveRDS(res, file = paste0(RdataDir, '/res_position_dependant_test_', version.analysis, '_v11.rds'))
+    saveRDS(res, file = paste0(RdataDir, '/res_position_dependant_test_', version.analysis, '_v12.rds'))
     
     rm(xx)
     
@@ -256,7 +251,7 @@ if(grouping.position.dependent.peaks){
   ##########################################
   # select all positional-dependent loci with below threshold
   ##########################################
-  res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_', version.analysis, '_v11.rds'))
+  res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_', version.analysis, '_v12.rds'))
   
   # select the positional peaks with pairwise comparisions 
   # limma logFC is in log2 scale
@@ -370,7 +365,7 @@ if(grouping.position.dependent.peaks){
   
   yy <- t(apply(yy, 1, cal_z_score))
   
-  nb_clusters = 6
+  nb_clusters = 8
   
   saveDir = paste0(figureDir, 'positional_peaks_clusters_', nb_clusters)
   if(!dir.exists(saveDir)) dir.create(saveDir)
