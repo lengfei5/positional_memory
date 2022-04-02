@@ -16,7 +16,7 @@ source(RNA.QC.functions)
 source('functions_chipSeq.R')
 source('Functions_atac.R')
 
-version.analysis = 'ATAC_allUsed_20220328'
+version.analysis = 'Rxxxx_R10723_R11637_R12810_atac'
 #peakDir = "Peaks/macs2_broad"
 
 resDir = paste0("../results/", version.analysis)
@@ -32,12 +32,13 @@ gtf.file =  paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf')
 figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
 tableDir = paste0(figureDir, 'tables4plots/')
 
+saveTables = FALSE
+
 require(ggplot2)
 require(DESeq2)
 require(GenomicRanges)
 require(pheatmap)
 library(tictoc)
-
 
 ########################################################
 ########################################################
@@ -449,9 +450,11 @@ if(grouping.position.dependent.peaks){
            annotation_colors = annot_colors, 
            clustering_callback = callback,
            gaps_col = gaps.col, 
-          filename = paste0(saveDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
+          filename = paste0(figureDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
           width = 6, height = 12)
   
+  
+  saveRDS(xx, file = paste0(resDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters_6.rds'))
   
   write.csv(xx, file = paste0(saveDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters', 
                               nb_clusters, '.csv'), quote = FALSE, row.names = TRUE)

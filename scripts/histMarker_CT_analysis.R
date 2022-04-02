@@ -1104,7 +1104,7 @@ for(ii in 1:length(conds_histM))
 {
   kk = grep(conds_histM[ii], colnames(igg))
   if(length(kk)>1) {
-    ctl.means = cbind(ctl.means, apply(igg[, kk], 1, mean))
+    ctl.means = cbind(ctl.means, apply(igg[, kk], 1, median))
   }else{
     ctl.means = cbind(ctl.means, igg[, kk])
   }
@@ -1115,14 +1115,14 @@ colnames(ctl.means) = conds_histM
 ### Reason : reduce the ctl.mean with a fixed global factor and then fix the IgG signals
 ### scale each marker data based on the common IgG background 
 ctl.means = ctl.means - 3.5
-igg_peak = 4.0 - 3.5 # cutoff for peaks in IgG
+igg_peak = 4.5 - 3.5 # cutoff for peaks in IgG
 #plot.pair.comparison.plot(ctl.means[c(1:20000), ], linear.scale = FALSE)
 
 markers = c('H3K4me3', 'H3K4me1', 'H3K27me3', 'H3K27ac')
 
 for(n in 1:length(markers))
 {
-  # n = 4
+  # n = 1
   cpm = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', markers[n], '_', version.analysis, '.rds'))
   design.sel = readRDS(file = paste0(RdataDir, '/design.sels_bc_TMM_combat_', markers[n], '_', version.analysis, '.rds'))
   cpm0 = cpm
@@ -1153,9 +1153,9 @@ for(n in 1:length(markers))
   ratios = inputs.means - marker.means
   
   plot(inputs.means, ratios, cex = 0.2)
-  abline(v = c(2, 2.5, 3.5, 4), col = 'red')
+  abline(v = c(2.5,  3., 4), col = 'red')
   
-  igg_cutoff = 2.5 # global factor for IgG
+  igg_cutoff = 3 # global factor for IgG
   cat(length(which(inputs.means> igg_cutoff)), ' peaks considered solely due to IgG \n')
   
   global_scaling = median(ratios[which(inputs.means > igg_cutoff)])
@@ -1166,7 +1166,7 @@ for(n in 1:length(markers))
   #igg_peak_new = igg_peak - median(ratios[which(inputs.means > igg_cutoff)])
   marker.means_new = marker.means + global_scaling
   ratios_new = inputs.means - marker.means_new
-  cat('after sacling the markers ratios becomes : ', median(ratios_new[which(inputs.means > igg_cutoff)]))
+  cat('after sacling the markers ratios becomes : ', median(ratios_new[which(inputs.means > igg_cutoff)]), '\n')
   
   hist(marker.means_new, breaks = 100)
   hist(inputs.means, breaks = 100, add = TRUE, col = 'red')
@@ -1177,11 +1177,13 @@ for(n in 1:length(markers))
   for(m in 1:length(conds_histM))
   {
     # m = 1
+    cat('condition -- ', conds_histM[m], '\n')
     jj = grep(conds_histM[m], colnames(cpm))
     
     bgs = inputs[, which(colnames(inputs) == conds_histM[m])]
     # bgs = bgs - global_scaling
-    j_cor = which(bgs > igg_peak)
+    ss_mean = apply(cpm[,jj], 1, mean)
+    j_cor = which(bgs > igg_peak & ss_mean > bgs + 1)
     
     cat(markers[n], '-',  as.character(conds_histM[m]), '-',
         length(j_cor), ' peaks will subtract IgG signals  \n')
@@ -1402,7 +1404,7 @@ pheatmap(xx[c(1:20000), ], show_rownames = FALSE, show_colnames = TRUE,
 
 ########################################################
 ########################################################
-# Section V : test of segment-specific histone markers
+# Section V : DE test for segment-specific histone markers
 # 
 ########################################################
 ########################################################
@@ -1419,8 +1421,9 @@ conds_histM = c('H3K4me3', 'H3K27me3',  'H3K4me1', 'H3K27ac')
 
 for(n_histM in 1:length(conds_histM))
 {
-  # n_histM = 1
-  cpm = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', markers[n], '_IgG.subtrated_', version.analysis, '.rds'))
+  # n_histM = 4
+  #cpm = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', conds_histM[n_histM], '_IgG.subtrated_', version.analysis, '.rds'))
+  cpm = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', conds_histM[n_histM], '_', version.analysis, '.rds'))
   design.sel = readRDS(file = paste0(RdataDir, '/design.sels_bc_TMM_combat_', conds_histM[n_histM], '_', version.analysis, '.rds'))
   
   ### select the samples and extract sample means
@@ -1440,13 +1443,15 @@ for(n_histM in 1:length(conds_histM))
       sample.means = cbind(sample.means, cpm[, kk])
     }
     
-  }  
-  
+  }
   colnames(sample.means) = conds
+  
+  ii_bgs = grep('tss', rownames(cpm))
+  hist(sample.means[-ii_bgs, ], breaks = 100, main = conds_histM[n_histM])
+  hist(sample.means[ii_bgs, ], col = 'darkred', breaks = 60, add = TRUE)
   
   cpm = cpm[, sample.sels]
   design.sel = design.sel[sample.sels, ]
-  
   
   logCPM = cpm
   f = factor(cc, levels= c('mUA', 'mLA', 'mHand'))
@@ -1480,6 +1485,7 @@ for(n_histM in 1:length(conds_histM))
   colnames(xx) = paste0(colnames(xx), '.mHand.vs.mLA')
   res = data.frame(res, xx[match(rownames(res), rownames(xx)), ])
   
+  res$pval.mean = apply(as.matrix(res[, grep('P.Value.', colnames(res))]), 1, function(x) return(mean(-log10(x))))
   res$fdr.mean = apply(as.matrix(res[, grep('adj.P.Val', colnames(res))]), 1, function(x) return(mean(-log10(x))))
   res$logFC.mean =  apply(as.matrix(res[, grep('logFC', colnames(res))]), 1, function(x) return(mean(abs(x))))
   
@@ -1492,15 +1498,20 @@ for(n_histM in 1:length(conds_histM))
   
   saveRDS(res, file = paste0(RdataDir, '/fpm_bc_TMM_combat_DBedgeRtest_', conds_histM[n_histM], '_', version.analysis, '.rds'))
   
+  
   #### select the significant peaks
+  res = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_DBedgeRtest_', conds_histM[n_histM], '_', version.analysis, '.rds'))
+  
   fdr.cutoff = 0.05; logfc.cutoff = 1
   select = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & abs(res$logFC.mLA.vs.mUA) > logfc.cutoff) |
                (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & abs(res$logFC.mHand.vs.mUA) > logfc.cutoff)|
                (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & abs(res$logFC.mHand.vs.mLA) > logfc.cutoff)
   )
   cat(length(select), ' DE ', conds_histM[n_histM],  ' \n')
-  res = res[order(-res$log2fc), ]
-  sample.means = sample.means[match(rownames(res), rownames(sample.means)), ]
+  
+  # res = res[order(-res$log2fc), ]
+  # sample.means = sample.means[match(rownames(res), rownames(sample.means)), ]
+  # xx = res[select, ]
   
   ####### focus on the atac-seq peak sets
   Keep.only.overlapped.by.atacseq.peaks = TRUE
@@ -1509,7 +1520,11 @@ for(n_histM in 1:length(conds_histM))
     
     rownames(res) = gsub('tss.', '', rownames(res))
     
-    pp = data.frame(t(sapply(rownames(res), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+    pp = data.frame(t(sapply(rownames(res), function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
+    
+    rownames(res) = paste0(pp[,1], ':', pp[,2], '-', pp[,3])
+    rownames(pp) = rownames(res)
+    
     pp$strand = '*'
     pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
                                   start.field="X2", end.field="X3", strand.field="strand")
@@ -1527,19 +1542,30 @@ for(n_histM in 1:length(conds_histM))
     #cpm_nonoverlap = keep[-ii_overlap, ]
     #keep = keep[ii_overlap, ]
     kk = match(rownames(res), names(pp)[ii_overlap])
+    
     res = res[!is.na(kk), ]
+    
     sample.means = sample.means[!is.na(kk), ]
-      
-    fdr.cutoff = 0.05; logfc.cutoff = 1
-    select = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & abs(res$logFC.mLA.vs.mUA) > logfc.cutoff) |
+    
+    fdr.cutoff = 0.05; logfc.cutoff = 1; 
+    marker.cutoff = 2;
+    select = which(((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & abs(res$logFC.mLA.vs.mUA) > logfc.cutoff) |
                      (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & abs(res$logFC.mHand.vs.mUA) > logfc.cutoff)|
-                     (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & abs(res$logFC.mHand.vs.mLA) > logfc.cutoff)
+                     (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & abs(res$logFC.mHand.vs.mLA) > logfc.cutoff)) &
+                     res$maxs > marker.cutoff
     )
     cat(length(select), ' DE ', conds_histM[n_histM],  ' \n')
-   
+    
+    xx = res[select, ]
+    xx = xx[order(-xx$log2fc), ]
+    
   }
   
-  cal_transform_histM = function(x, cutoff.min = 1.5, cutoff.max = 4, toScale = FALSE)
+  ii_bgs = grep('tss', rownames(cpm))
+  hist(cpm[-ii_bgs, 1], breaks = 100)
+  hist(cpm[ii_bgs, 1], breaks = 50, col = 'red', add = TRUE)
+  
+  cal_transform_histM = function(x, cutoff.min = 1., cutoff.max = 5, toScale = FALSE)
   {
     # x = keep[,1];cutoff.min = 3.5; cutoff.max = 6
     x[which(x<cutoff.min)] = cutoff.min
@@ -1550,7 +1576,7 @@ for(n_histM in 1:length(conds_histM))
   }
   
   yy = res[select, grep(conds_histM[n_histM], colnames(res))]
-  #yy = apply(yy, 2, cal_transform_histM)
+  #yy = t(apply(yy, 1, cal_transform_histM, cutoff.min = 0.0, cutoff.max = 6))
   
   df = as.data.frame(sapply(colnames(yy), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[2])}))
   colnames(df) = 'segments'
@@ -1567,9 +1593,410 @@ for(n_histM in 1:length(conds_histM))
            #annotation_colors = annot_colors,
            width = 6, height = 12, 
            filename = paste0(figureDir, '/heatmap_histoneMarker_', conds_histM[n_histM], '_overlappedWithAtacseqPeak.pdf'))
-  
-  
+    
+  pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+           color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
+           show_colnames = FALSE,
+           scale = 'none',
+           cluster_cols=FALSE, annotation_col=df,
+           #annotation_colors = annot_colors,
+           width = 6, height = 12, 
+           filename = paste0(figureDir, '/heatmap_histoneMarker_', conds_histM[n_histM], '_overlappedWithAtacseqPeak_nonscaled.pdf'))
 }  
+
+
+##########################################
+# Combine all four markers  
+##########################################
+atacseq_peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/ATAC_allUsed_20220328/Rdata/',
+                                      'ATACseq_peak_consensus_filtered_64k.rds'))
+conds_histM = c('H3K4me3', 'H3K27me3',  'H3K4me1', 'H3K27ac')
+
+keep = c()
+DE.locus = c()
+
+for(n_histM in 1:length(conds_histM))
+{
+  # n_histM = 1
+  res = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_DBedgeRtest_', conds_histM[n_histM], '_', version.analysis, '.rds'))
+  
+  fdr.cutoff = 0.05; logfc.cutoff = 1;marker.cutoff = 2;
+  
+  select = which(((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & abs(res$logFC.mLA.vs.mUA) > logfc.cutoff) |
+                    (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & abs(res$logFC.mHand.vs.mUA) > logfc.cutoff)|
+                    (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & abs(res$logFC.mHand.vs.mLA) > logfc.cutoff)) &
+                   res$maxs > marker.cutoff
+  )
+  
+  cat(length(select), ' DE ', conds_histM[n_histM],  ' in total \n')
+  
+  ### focus on the atac-seq peak sets
+  ii_bgs = grep('tss.', rownames(res))
+  rownames(res) = gsub('tss.', '', rownames(res))
+  
+  pp = data.frame(t(sapply(rownames(res), function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
+  rownames(res) = paste0(pp[,1], ':', pp[,2], '-', pp[,3])
+  rownames(res)[ii_bgs] = paste0('tss.', rownames(res)[ii_bgs])
+  
+  rownames(pp) = rownames(res)
+  pp$strand = '*'
+  pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
+  # lls = width(pp)
+  #olp = GenomicRanges::findOverlaps(atacseq_peaks, )
+  ii_overlap = which(overlapsAny(pp, atacseq_peaks) == TRUE)
+  
+  res_sel = res[ii_overlap, ]
+  
+  select = which(((res_sel$adj.P.Val.mLA.vs.mUA < fdr.cutoff & abs(res_sel$logFC.mLA.vs.mUA) > logfc.cutoff) |
+                    (res_sel$adj.P.Val.mHand.vs.mUA < fdr.cutoff & abs(res_sel$logFC.mHand.vs.mUA) > logfc.cutoff)|
+                    (res_sel$adj.P.Val.mHand.vs.mLA < fdr.cutoff & abs(res_sel$logFC.mHand.vs.mLA) > logfc.cutoff)) &
+                   res_sel$maxs > marker.cutoff
+  )
+  
+  cat(length(select), ' DE ', conds_histM[n_histM],  ' overlapping with atac-seq peaks \n')
+  xx = res_sel
+  colnames(xx) = paste0(colnames(xx), '_', conds_histM[n_histM])
+  
+  if(conds_histM[n_histM] != 'H3K27ac') DE.locus = unique(c(DE.locus, rownames(res_sel)[select]))
+      
+  if(n_histM == 1){
+    keep = data.frame(xx, stringsAsFactors = FALSE)
+  }else{
+    keep = data.frame(keep, xx[match(rownames(keep), rownames(xx)), ], stringsAsFactors = FALSE)  
+  }
+  
+}
+
+save(keep, DE.locus, file = paste0(RdataDir, '/combined_4histMarkers_DE.Rdata'))
+
+
+### reload the combined markers
+load(file = paste0(RdataDir, '/combined_4histMarkers_DE.Rdata'))
+yy = keep[match(DE.locus, rownames(keep)), c(53:60, 27:34, 1:8)]
+design = readRDS(file = paste0(RdataDir, '/histM_CT_design_info.rds'))
+
+sampleID = sapply(colnames(yy), function(x) unlist(strsplit(as.character(x), '_'))[3])
+mm = match(sampleID, design$sampleID)
+colnames(yy) = paste0(design$condition[mm], '_', design$Batch[mm], '_', design$sampleID[mm])
+#yy = yy[, grep('mRep1|mRep2', colnames(yy))]
+
+df = as.data.frame(sapply(colnames(yy), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[2])}))
+colnames(df) = 'segments'
+rownames(df) = colnames(yy)
+
+sample_colors = c('springgreen4', 'steelblue2', 'gold2')
+annot_colors = list(segments = sample_colors)
+
+cal_centering <- function(x){
+  (x - mean(x, na.rm =TRUE))
+}
+
+cal_z_score <- function(x){
+  (x - mean(x)) / sd(x)
+}
+
+yy1 = yy
+for(n in 1:length(conds_histM))
+{
+  jj = grep(conds_histM[n], colnames(yy))
+  yy1[,jj] = t(apply(yy[,jj], 1, cal_centering))
+}
+
+#yy <- t(apply(yy, 1, cal_z_score))
+gaps_col = c(8, 16)
+pheatmap(yy1, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+         color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
+         show_colnames = FALSE,
+         scale = 'none',
+         cluster_cols=FALSE, annotation_col=df,
+         gaps_col = gaps_col,
+         #annotation_colors = annot_colors,
+         width = 10, height = 12, 
+         filename = paste0(figureDir, '/heatmap_histoneMarker_', conds_histM[n_histM], '_DE_allmarkers.pdf'))
+
+
+##########################################
+# plot histone marker with the same cluster order as atac-seq peaks 
+##########################################
+Assembly_histMarkers_togetherWith_ATACseq = FALSE
+if(Assembly_histMarkers_togetherWith_ATACseq){
+  library(gridExtra)
+  library(grid)
+  library(ggplot2)
+  library(lattice)
+  
+  load(file = paste0(RdataDir, '/combined_4histMarkers_DE.Rdata'))
+  design = readRDS(file = paste0(RdataDir, '/histM_CT_design_info.rds'))
+  
+  yy = keep[, c(53:60, 27:34, 1:8)]
+  sampleID = sapply(colnames(yy), function(x) unlist(strsplit(as.character(x), '_'))[3])
+  mm = match(sampleID, design$sampleID)
+  colnames(yy) = paste0(design$condition[mm], '_', design$Batch[mm], '_', design$sampleID[mm])
+  #yy = yy[, grep('mRep1|mRep2', colnames(yy))]
+  
+  #peaks = read.csv(paste0(figureDir, 'positional_peaks_clusters_6/', 
+  #                        'position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters6.csv'))
+  
+  df = as.data.frame(sapply(colnames(yy), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[2])}))
+  colnames(df) = 'segments'
+  rownames(df) = colnames(yy)
+  
+  sample_colors = c('springgreen4', 'steelblue2', 'gold2')
+  annot_colors = list(segments = sample_colors)
+  
+  cal_centering <- function(x){
+    (x - mean(x, na.rm =TRUE))
+  }
+  
+  cal_z_score <- function(x){
+    (x - mean(x)) / sd(x)
+  }
+  
+  yy1 = yy
+  for(n in 1:length(conds_histM))
+  {
+    jj = grep(conds_histM[n], colnames(yy))
+    yy1[,jj] = t(apply(yy[,jj], 1, cal_centering))
+  }
+  
+  
+  
+  test = yy
+  test = test[plt$tree_row$order, ]
+  pheatmap(test, 
+           nnotation_row = my_gene_col, 
+           annotation_col = df, show_rownames = FALSE, scale = 'none', 
+           color = col, 
+           show_colnames = FALSE,
+           cluster_rows = TRUE, cluster_cols = FALSE,  
+           #clustering_method = 'complete', cutree_rows = nb_clusters, 
+           annotation_colors = annot_colors, 
+           clustering_callback = callback,
+           gaps_col = gaps.col)
+  
+  RdataHistM = '/Users/jiwang/workspace/imp/positional_memory/results/CT_analysis_20220311/Rdata'
+  version.analysis.HistM = 'CT_analysis_20220311'
+  
+  ### collect the four markers with means 
+  histMs =  c('H3K4me3','H3K27me3', 'H3K4me1')
+  shm = c()
+  
+  for(n in 1:length(histMs))
+  {
+    # n = 1
+    cat(n, ' -- ', histMs[n], '\n')
+    cpm = readRDS(file = paste0(RdataHistM, '/fpm_bc_TMM_combat_', histMs[n], '_', version.analysis.HistM, '.rds'))
+    cpm = cpm[ , grep(histMs[n], colnames(cpm))]
+    #design.sel = readRDS(file = paste0(RdataHistM, '/design.sels_bc_TMM_combat_DBedgeRtest_', histMs[n], '_', 
+    #                                   version.analysis.HistM, '.rds'))
+    
+    ### select the samples and extract sample means
+    conds_histM = c("mUA", "mLA", "mHand")
+    sample.sels = c();  
+    cc = c()
+    
+    sample.means = c()
+    for(ii in 1:length(conds_histM)) 
+    {
+      kk = grep(conds_histM[ii], colnames(cpm))
+      sample.sels = c(sample.sels, kk)
+      cc = c(cc, rep(conds_histM[ii], length(kk)))
+      if(length(kk)>1) {
+        sample.means = cbind(sample.means, apply(cpm[, kk], 1, mean))
+      }else{
+        sample.means = cbind(sample.means, cpm[, kk])
+      }
+    }
+    colnames(sample.means) = paste0(conds_histM, '_', histMs[n])
+    
+    if(n == 1){
+      shm = sample.means
+    }else{
+      shm = cbind(shm, sample.means[match(rownames(shm), rownames(sample.means)), ])
+    }
+  }    
+  
+  ## quantile normalization for different histone markers
+  library(preprocessCore)
+  xx = normalize.quantiles(shm)
+  colnames(xx) = colnames(shm)
+  rownames(xx) = rownames(shm)
+  shm = xx
+  
+  pp_histM = data.frame(t(sapply(rownames(shm), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  pp_histM$strand = '*'
+  pp_histM = makeGRangesFromDataFrame(pp_histM, seqnames.field=c("X1"),
+                                      start.field="X2", end.field="X3", strand.field="strand")
+  
+  mapping = findOverlaps(pp, pp_histM, type = 'within')
+  
+  yy0 = shm[mapping@to, ]
+  #rownames(yy0) = rownames(yy)
+  
+  # reorder the histM according to the atac-seq peak clusters
+  yy0 = yy0[plt$tree_row$order, ]
+  yy0 = t(apply(yy0, 1, cal_z_score))
+  #test = yy[plt$tree_row$order, ]
+  #rownames(yy0) = rownames(yy)
+  #yy0 = cbind(yy, yy0)
+  
+  df_histM = data.frame(segments = sapply(colnames(yy0), function(x) unlist(strsplit(as.character(x), '_'))[1])
+                        #markers = sapply(colnames(yy0), function(x) unlist(strsplit(as.character(x), '_'))[2]), stringsAsFactors = FALSE
+  )
+  colnames(df_histM) = c('seg')
+  rownames(df_histM) = colnames(yy0)
+  sample_colors_histM = c('springgreen4', 'steelblue2', 'gold2')
+  names(sample_colors_histM) = c('mUA', 'mLA', 'mHand')
+  marker_colors_histM = c('blue', 'red', 'deepskyblue2', 'darkgreen')
+  names(marker_colors_histM) = histMs
+  annot_colors_histM = list(seg = sample_colors_histM)
+  gaps.col_histM = seq(1, ncol(yy0), by = 1)
+  #clusters <- rownames(subsetDat[heat$tree_row[["order"]],])
+  clusters <- sort(cutree(plt$tree_row, k = nb_clusters))
+  
+  # cluster order : 6, 1, 5, 3, 4, 2
+  gaps.row = c(32, 32+76, 31 + 32 + 76, 292 + 31 + 32 + 76, 292 + 31 + 32 + 76 + 103)
+  
+  #yy0 = yy0[plt$tree_row$order, ]
+  p1 = pheatmap(test, 
+                nnotation_row = my_gene_col, 
+                annotation_col = df, show_rownames = FALSE, scale = 'none', 
+                color = col, 
+                show_colnames = FALSE,
+                cluster_rows = FALSE, cluster_cols = FALSE,  
+                #clustering_method = 'complete', cutree_rows = nb_clusters, 
+                annotation_colors = annot_colors, 
+                #clustering_callback = callback,
+                legend = TRUE,
+                gaps_col = gaps.col, 
+                gaps_row = gaps.row)
+  
+  p2 = pheatmap(yy0, cluster_rows=FALSE, show_rownames=FALSE, fontsize_row = 5,
+                color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
+                show_colnames = FALSE,
+                scale = 'none',
+                cluster_cols=FALSE, annotation_col=df_histM,
+                annotation_colors = annot_colors_histM,
+                gaps_col = gaps.col_histM, 
+                gaps_row = gaps.row)
+  #grid.arrange(p1, p2,  nrow = 1)
+  
+  plot_list=list()
+  plot_list[['p1']]=p1[[4]]
+  plot_list[['p2']]=p2[[4]]
+  #plot_list[['p3']]=p2[[4]]
+  grid.arrange(grobs=plot_list, ncol=2)
+  
+  indexs = data.frame(peak = names(clusters), cluster= clusters, stringsAsFactors = FALSE)
+  indexs = indexs[match(rownames(test), rownames(indexs)), ]
+  c_order = unique(indexs$cluster)
+  
+  yy1 = yy0
+  
+  ### transform the histM to account for different backgrounds and scaling
+  # for(m in 1:ncol(yy1))
+  # {
+  #   jj1 = which(yy1[ ,m] < 1.5)
+  #   yy1[jj1, m] = 1.5
+  #   jj2 = which(yy1[ ,m] > 4)
+  #   yy1[jj2, m] = 4
+  #    
+  # }
+  # 
+  
+  peakNm = c()
+  library(dendextend)
+  library(ggplot2)
+  
+  for(ac in c_order)
+  {
+    # ac = 6
+    kk = which(indexs$cluster == ac)
+    cat('clsuter ', ac, ' -- ', length(kk), ' peaks \n')
+    
+    hm_hclust <- hclust(dist(as.matrix(yy1[kk,])), method = "complete")
+    #hm_cluster <- cutree(tree = as.dendrogram(hm_hclust), h = 5)
+    peakNm = c(peakNm, hm_hclust$labels[hm_hclust$order])
+    
+  }
+  
+  new_order = match(peakNm, rownames(yy1))
+  
+  p1 = pheatmap(test[new_order, ], 
+                nnotation_row = my_gene_col, 
+                annotation_col = df, show_rownames = FALSE, scale = 'none', 
+                color = col, 
+                show_colnames = FALSE,
+                cluster_rows = FALSE, cluster_cols = FALSE,  
+                #clustering_method = 'complete', cutree_rows = nb_clusters, 
+                annotation_colors = annot_colors, 
+                #clustering_callback = callback,
+                legend = TRUE,
+                annotation_legend = FALSE,
+                gaps_col = gaps.col, 
+                gaps_row = gaps.row)
+  
+  gaps.col_histM = c(1:2)
+  df_histM_new = as.data.frame(df_histM[c(1:3),])
+  colnames(df_histM_new) = colnames(df_histM)
+  rownames(df_histM_new) = rownames(df_histM)[c(1:3)]
+  
+  p2 = pheatmap(yy1[new_order, c(1:3)], cluster_rows=FALSE, show_rownames=FALSE, fontsize_row = 5,
+                color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
+                show_colnames = FALSE,
+                scale = 'none',
+                cluster_cols=FALSE, annotation_col= df_histM_new,
+                annotation_colors = annot_colors_histM,
+                gaps_col = gaps.col_histM, 
+                annotation_legend = FALSE,
+                gaps_row = gaps.row)
+  
+  df_histM_new = as.data.frame(df_histM[c(4:6),])
+  colnames(df_histM_new) = colnames(df_histM)
+  rownames(df_histM_new) = rownames(df_histM)[c(4:6)]
+  p3 = pheatmap(yy1[new_order, c(4:6)], cluster_rows=FALSE, show_rownames=FALSE, fontsize_row = 5,
+                color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
+                show_colnames = FALSE,
+                scale = 'none',
+                cluster_cols=FALSE, annotation_col=df_histM,
+                annotation_colors = annot_colors_histM,
+                gaps_col = gaps.col_histM, 
+                annotation_legend = FALSE,
+                gaps_row = gaps.row)
+  
+  df_histM_new = as.data.frame(df_histM[c(7:9),])
+  colnames(df_histM_new) = colnames(df_histM)
+  rownames(df_histM_new) = rownames(df_histM)[c(7:9)]
+  p4 = pheatmap(yy1[new_order, c(7:9)], cluster_rows=FALSE, show_rownames=FALSE, fontsize_row = 5,
+                color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
+                show_colnames = FALSE,
+                scale = 'none',
+                cluster_cols=FALSE, annotation_col=df_histM,
+                annotation_colors = annot_colors_histM,
+                annotation_legend = FALSE,
+                gaps_col = gaps.col_histM, 
+                gaps_row = gaps.row)
+  
+  plot_list=list()
+  plot_list[['p1']]=p1[[4]]
+  plot_list[['p2']]=p2[[4]]
+  plot_list[['p3']]=p3[[4]]
+  plot_list[['p4']]=p4[[4]]
+  
+  pdf(paste0(figureDir, "/Segemet_specific_chromatin_landscape_atac_histM_firstTry.pdf"),
+      width = 10, height = 12) # Open a new pdf file
+  
+  layout = matrix(c(1, 1, 2, 3, 4), nrow = 1)
+  grid.arrange(grobs=plot_list, nrow= 1,
+               layout_matrix = layout)
+  
+  dev.off()
+  
+  
+}
+
+
 
 
 ########################################################
