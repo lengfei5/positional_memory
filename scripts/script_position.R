@@ -16,7 +16,7 @@ source(RNA.QC.functions)
 source('functions_chipSeq.R')
 source('Functions_atac.R')
 
-version.analysis = 'ATAC_allUsed_20220328'
+version.analysis = 'Rxxxx_R10723_R11637_R12810_atac'
 #peakDir = "Peaks/macs2_broad"
 
 resDir = paste0("../results/", version.analysis)
@@ -31,6 +31,8 @@ gtf.file =  paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf')
 
 figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
 tableDir = paste0(figureDir, 'tables4plots/')
+
+saveTables = FALSE
 
 require(ggplot2)
 require(DESeq2)
@@ -49,8 +51,7 @@ library(edgeR)
 require("sva")
 require(limma)
 
-load(file = paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata', 
-                   '/ATACseq_selected.63k.peaks_cutoff.40.at.least.2sample.Rdata'))
+load(file = paste0(RdataDir, '/ATACseq_selected.63k.peaks_cutoff.40.at.least.2sample.Rdata'))
 
 Split.Mature.Regeneration.samples = TRUE
 
@@ -170,9 +171,8 @@ if(grouping.position.dependent.peaks){
     pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
                                   start.field="X2", end.field="X3", strand.field="strand")
     
-    saveRDS(pp, file = paste0(RdataDir, '/ATACseq_peak_consensus_filtered_62k.rds'))
-    
-    export(object = pp,  con = paste0(resDir, "/atacseq_peaks_filtered_62k.bed"), format = 'bed')
+    # saveRDS(pp, file = paste0(RdataDir, '/ATACseq_peak_consensus_filtered_55k.rds'))
+    # export(object = pp,  con = paste0(resDir, "/atacseq_peaks_filtered_55k.bed"), format = 'bed')
     
     # annotation from ucsc browser ambMex60DD_genes_putative
     amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
@@ -365,7 +365,7 @@ if(grouping.position.dependent.peaks){
   
   yy <- t(apply(yy, 1, cal_z_score))
   
-  nb_clusters = 8
+  nb_clusters = 6
   
   saveDir = paste0(figureDir, 'positional_peaks_clusters_', nb_clusters)
   if(!dir.exists(saveDir)) dir.create(saveDir)
