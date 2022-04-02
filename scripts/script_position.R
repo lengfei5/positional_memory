@@ -427,6 +427,7 @@ if(grouping.position.dependent.peaks){
     }
     dend = reorder(as.dendrogram(hc), wts = o1)
     as.hclust(dend)
+    
   }
   
   col<- colorRampPalette(c("blue4", "white", "darkred"))(8)

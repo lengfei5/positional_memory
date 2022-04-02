@@ -765,47 +765,6 @@ length(grep('tss', SAF$GeneID))
 write.table(SAF, file = paste0(peakDir, '/Peaks_histMarkers_ATACseq_missedTSS.dupReduced_v2.saf'), sep = '\t', row.names = FALSE, 
             col.names = TRUE, quote = FALSE) 
 
-##########################################
-# read counting within promoters
-##########################################
-Test.readCounting.for.promoters = FALSE
-if(Test.readCounting.for.promoters){
-  promoters = select.promoters.regions(upstream = 2000, downstream = 2000, ORF.type.gtf = 'Putative', promoter.select = 'all')
-  
-  # clean peaks
-  peaks = promoters
-  peaks = data.frame(peaks)
-  colnames(peaks)[c(1:3)] = c("chr", "start", "end")
-  
-  dim(peaks)
-  
-  peaks$peak.name = paste0(peaks$geneID, '_', peaks$geneSymbol, '_', peaks$chr,  "_", peaks$start, "_", peaks$end)
-  
-  jj = match(unique(peaks$peak.name), peaks$peak.name)
-  peaks = peaks[jj, ];
-  dim(peaks)
-  
-  peaks = peaks[which(peaks$chr != 'chrM'), ]
-  
-  dim(peaks)
-  
-  
-  peakDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/R12965_CT'
-  # preapre SAF input for featureCounts
-  require(Rsubread)
-  
-  #counts = quantify.signals.within.peaks(peaks = peak.merged, bam.list=bam.list, rpkm.normalization = FALSE, isPairedEnd = FALSE)
-  SAF = data.frame(GeneID=peaks$peak.name, 
-                   Chr=peaks$chr, 
-                   Start=peaks$start, 
-                   End=peaks$end, 
-                   Strand=peaks$strand, stringsAsFactors = FALSE)
-  
-  write.table(SAF, file = paste0(peakDir, '/amex6_TSS_all.saf'), sep = '\t', row.names = FALSE, 
-              col.names = TRUE, quote = FALSE) 
-  
-}
-
 ########################################################
 ########################################################
 # Section III : processing read counts within consensus peaks 
