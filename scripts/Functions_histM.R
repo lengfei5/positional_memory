@@ -21,12 +21,396 @@ cal_transform_histM = function(x, cutoff.min = 1., cutoff.max = 5, toScale = FAL
   
 }
 
+cal_centering <- function(x){
+  (x - mean(x, na.rm =TRUE))
+}
 
+cal_z_score <- function(x){
+  (x - mean(x)) / sd(x)
+}
 
 
 ##########################################
 # try to subtract the input IgG 
 ##########################################
+Manually_define_histM_peakConsensus = function()
+{
+  peaks = c()
+  
+  for(n in 1:length(peak.files)) 
+  {
+    cat(n, '\n')
+    p = readPeakFile(peak.files[n], as = "GRanges");
+    #eval(parse(text = paste0("p = pp.", k)));
+    with.p.values = "X.log10.pvalue." %in% colnames(mcols(p))
+    if(with.p.values) {
+      p <- p[mcols(p)[,"X.log10.pvalue."] > pval.cutoff];
+      p = GenomicRanges::reduce(p);
+      #peaks10= c(peaks10, p10);
+    }else{ 
+      cat("no p values conlumn found for -- ", design.matrix$file.name[k], "\n");
+      PLOT.p10 = FALSE;
+    }
+    #p = reduce(p)
+    peaks= c(peaks, p)
+  }
+  
+  names(peaks) = design.sel$fileName
+  
+  saveRDS(peaks, file = paste0(RdataDir, '/histMarkers_macs2peaks_H3K4me3.H3K4me1_32samples_pval.', pval.cutoff, '.rds'))
+  save(peaks, design, design.sel, 
+       file = paste0(RdataDir, '/histMarkers_macs2peaks_H3K4me3.H3K4me1_32samples_pval.', pval.cutoff, '.Rdata'))
+  
+  ##########################################
+  #  # try to merge BL time series
+  ##########################################
+  peaks = readRDS(file = paste0(RdataDir, '/histMarkers_macs2peaks_H3K4me3.H3K4me1_32samples_pval.', pval.cutoff, '.rds'))
+  design.sel$condition = droplevels(design.sel$condition)
+  
+  source('functions_chipSeq.R')
+  
+  conds = as.character(unique(design.sel$condition))
+  
+  ##########################################
+  # H3K4me3
+  ##########################################
+  ## H3Kme3 UA
+  n = 1
+  cc = conds[n]
+  kk = which(design.sel$condition == cc)
+  
+  cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
+  
+  
+  ol.peaks <- makeVennDiagram(peaks[kk[c(2, 3,4)]], NameOfPeaks=names(peaks)[kk[c(2, 3, 4)]], connectedPeaks="keepAll", main=cc)
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, '2_p', pval.cutoff, '.pdf'), 
+      height = 10, width = 10)
+  try(plot(v))
+  dev.off()
+  
+  xx1 = intersect(peaks[[kk[1]]], peaks[[kk[2]]])
+  xx2 = intersect(peaks[[kk[1]]], peaks[[kk[3]]])
+  xx3 = intersect(peaks[[kk[1]]], peaks[[kk[4]]])
+  xx4 = intersect(peaks[[kk[2]]], peaks[[kk[3]]])
+  xx5 = intersect(peaks[[kk[2]]], peaks[[kk[4]]])
+  xx6 = intersect(peaks[[kk[3]]], peaks[[kk[4]]])
+  
+  xx = union(xx1, union(xx2, union(xx3, union(xx4, union(xx5, xx6)))))
+  
+  peaks_H3K4me3_mUA = GenomicRanges::reduce(xx)
+  
+  peaks.merged = xx
+  
+  
+  ## H3K4me3_mLA
+  n = 3
+  cc = conds[n]
+  kk = which(design.sel$condition == cc)
+  
+  cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
+  
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main=cc)
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, '2_p', pval.cutoff, '.pdf'), 
+      height = 10, width = 10)
+  try(plot(v))
+  dev.off()
+  
+  peaks_H3K4me3_mLA = peaks[[kk[2]]]
+  peaks.merged = GenomicRanges::reduce(union(peaks.merged, peaks_H3K4me3_mLA))
+  
+  ## H3K4me3_mHand
+  n = 4
+  cc = conds[n]
+  kk = which(design.sel$condition == cc)
+  
+  cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
+  
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main=cc)
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, '2_p', pval.cutoff, '.pdf'), 
+      height = 10, width = 10)
+  try(plot(v))
+  dev.off()
+  
+  xx = peaks[[kk[2]]]
+  eval(parse(text = paste0('peaks_', cc, ' = xx')))
+  peaks.merged = GenomicRanges::reduce(union(peaks.merged, xx))
+  
+  
+  # H3K4me3_BL5days
+  n = 8
+  cc = conds[n]
+  kk = which(design.sel$condition == cc)
+  
+  cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
+  
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main=cc)
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, 'p', pval.cutoff, '.pdf'),  height = 10, width = 10)
+  try(plot(v))
+  dev.off()
+  
+  xx = peaks[[kk[1]]]
+  eval(parse(text = paste0('peaks_', cc, ' = xx')))
+  peaks.merged = GenomicRanges::reduce(union(peaks.merged, xx))
+  cat(length(xx), ' new peaks \n')
+  cat(length(peaks.merged), ' merged peaks \n')
+  
+  # H3K4me3_BL9days
+  n = 10
+  cc = conds[n]
+  kk = which(design.sel$condition == cc)
+  
+  cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
+  
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main=cc)
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, 'p', pval.cutoff, '.pdf'),  height = 10, width = 10)
+  try(plot(v))
+  dev.off()
+  
+  xx = intersect(peaks[[kk[1]]], peaks[[kk[2]]])
+  eval(parse(text = paste0('peaks_', cc, ' = xx')))
+  peaks.merged = GenomicRanges::reduce(union(peaks.merged, xx))
+  cat(length(xx), ' new peaks \n')
+  cat(length(peaks.merged), ' merged peaks \n')
+  
+  
+  # H3K4me3_BL13days.prox
+  n = 12
+  cc = conds[n]
+  kk = which(design.sel$condition == cc)
+  
+  cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
+  
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main=cc)
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, 'p', pval.cutoff, '.pdf'),  height = 10, width = 10)
+  try(plot(v))
+  dev.off()
+  
+  xx = intersect(peaks[[kk[1]]], peaks[[kk[2]]])
+  eval(parse(text = paste0('peaks_', cc, ' = xx')))
+  peaks.merged = GenomicRanges::reduce(union(peaks.merged, xx))
+  cat(length(xx), ' new peaks \n')
+  cat(length(peaks.merged), ' merged peaks \n')
+  
+  # H3K4me3_BL13days.dist
+  n = 14
+  cc = conds[n]
+  kk = which(design.sel$condition == cc)
+  
+  cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
+  
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main=cc)
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, 'p', pval.cutoff, '.pdf'),  height = 10, width = 10)
+  try(plot(v))
+  dev.off()
+  
+  xx = intersect(peaks[[kk[1]]], peaks[[kk[2]]])
+  eval(parse(text = paste0('peaks_', cc, ' = xx')))
+  peaks.merged = GenomicRanges::reduce(union(peaks.merged, xx))
+  cat(length(xx), ' new peaks \n')
+  cat(length(peaks.merged), ' merged peaks \n')
+  
+  
+  peaks.merged.H3K4me3 =  peaks.merged
+  saveRDS(peaks.merged.H3K4me3, file = paste0(RdataDir,  
+                                              '/histMarkers_macs2peaks_H3K4me3_consensusPeaks_pval.', pval.cutoff, '.rds'))
+  
+  ##########################################
+  # H3K4me1 peak consensus
+  ##########################################
+  ## peaks_H3K4me1_mLA
+  n = 2 
+  cc = conds[n]
+  kk = which(design.sel$condition == cc)
+  
+  cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
+  
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main=cc)
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, '2_p', pval.cutoff, '.pdf'), 
+      height = 10, width = 10)
+  try(plot(v))
+  dev.off()
+  
+  peaks_H3K4me1_mLA = peaks[[kk[2]]]
+  
+  peaks.merged = peaks_H3K4me1_mLA
+  #peaks.merged = union(peaks.merged, peaks_H3K4me1_mLA)
+  peaks.merged = GenomicRanges::reduce(peaks.merged)
+  
+  # H3K4me1_mUA
+  n = 5
+  cc = conds[n]
+  kk = which(design.sel$condition == cc)
+  
+  cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
+  
+  ol.peaks <- makeVennDiagram(peaks[kk[c(1, 2, 3)]], NameOfPeaks=names(peaks)[kk[c(1, 2, 3)]], connectedPeaks="keepAll", main=cc)
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, '_1_p', pval.cutoff, '.pdf'), 
+      height = 10, width = 10)
+  try(plot(v))
+  dev.off()
+  
+  ol.peaks <- makeVennDiagram(peaks[kk[c(2, 3,4)]], NameOfPeaks=names(peaks)[kk[c(2, 3, 4)]], connectedPeaks="keepAll", main=cc)
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, '_2_p', pval.cutoff, '.pdf'), 
+      height = 10, width = 10)
+  try(plot(v))
+  dev.off()
+  
+  xx1 = intersect(peaks[[kk[2]]], peaks[[kk[3]]])
+  xx2 = intersect(peaks[[kk[2]]], peaks[[kk[4]]])
+  xx3 = intersect(peaks[[kk[3]]], peaks[[kk[4]]])
+  
+  xx = union(xx1, union(xx2, xx3))
+  eval(parse(text = paste0('peaks_', cc, ' = xx')))
+  peaks.merged = GenomicRanges::reduce(union(peaks.merged, xx))
+  
+  # H3K4me1_mHand
+  n = 6
+  cc = conds[n]
+  kk = which(design.sel$condition == cc)
+  
+  cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
+  
+  
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main=cc)
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, 'p', pval.cutoff, '.pdf'), 
+      height = 10, width = 10)
+  try(plot(v))
+  dev.off()
+  
+  xx = peaks[[kk[2]]]
+  eval(parse(text = paste0('peaks_', cc, ' = xx')))
+  peaks.merged = GenomicRanges::reduce(union(peaks.merged, xx))
+  
+  # H3K4me1_BL5days
+  n = 7
+  cc = conds[n]
+  kk = which(design.sel$condition == cc)
+  
+  cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
+  
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main=cc)
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, 'p', pval.cutoff, '.pdf'),  height = 10, width = 10)
+  try(plot(v))
+  dev.off()
+  
+  xx = peaks[[kk[1]]]
+  eval(parse(text = paste0('peaks_', cc, ' = xx')))
+  peaks.merged = GenomicRanges::reduce(union(peaks.merged, xx))
+  cat(length(xx), ' new peaks \n')
+  cat(length(peaks.merged), ' merged peaks \n')
+  
+  # H3K4me1_BL9days
+  n = 9
+  cc = conds[n]
+  kk = which(design.sel$condition == cc)
+  
+  cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
+  
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main=cc)
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, 'p', pval.cutoff, '.pdf'),  height = 10, width = 10)
+  try(plot(v))
+  dev.off()
+  
+  xx = intersect(peaks[[kk[1]]], peaks[[kk[2]]])
+  eval(parse(text = paste0('peaks_', cc, ' = xx')))
+  peaks.merged = GenomicRanges::reduce(union(peaks.merged, xx))
+  cat(length(xx), ' new peaks \n')
+  cat(length(peaks.merged), ' merged peaks \n')
+  
+  
+  # H3K4me1_BL13days.prox
+  n = 11
+  cc = conds[n]
+  kk = which(design.sel$condition == cc)
+  
+  cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
+  
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main=cc)
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, 'p', pval.cutoff, '.pdf'),  height = 10, width = 10)
+  try(plot(v))
+  dev.off()
+  
+  xx = intersect(peaks[[kk[1]]], peaks[[kk[2]]])
+  eval(parse(text = paste0('peaks_', cc, ' = xx')))
+  peaks.merged = GenomicRanges::reduce(union(peaks.merged, xx))
+  cat(length(xx), ' new peaks \n')
+  cat(length(peaks.merged), ' merged peaks \n')
+  
+  
+  # H3K4me1_BL13days.dist
+  n = 13
+  cc = conds[n]
+  kk = which(design.sel$condition == cc)
+  
+  cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
+  
+  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main=cc)
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, 'p', pval.cutoff, '.pdf'),  height = 10, width = 10)
+  try(plot(v))
+  dev.off()
+  
+  xx = intersect(peaks[[kk[1]]], peaks[[kk[2]]])
+  eval(parse(text = paste0('peaks_', cc, ' = xx')))
+  peaks.merged = GenomicRanges::reduce(union(peaks.merged, xx))
+  cat(length(xx), ' new peaks \n')
+  cat(length(peaks.merged), ' merged peaks \n')
+  
+  peaks.merged.H3K4me1 =  peaks.merged
+  saveRDS(peaks.merged.H3K4me1, file = paste0(RdataDir,  
+                                              '/histMarkers_macs2peaks_H3K4me1_consensusPeaks_pval.', pval.cutoff, '.rds'))
+  
+  
+}
+
+
 Subtract.IgG.inputs_viaGlobalScaling = function()
 {
   load(file = paste0(RdataDir, 

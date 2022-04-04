@@ -230,377 +230,8 @@ Manually.identify.peak.consensus = FALSE
 pval.cutoff = 6 # the 10^-6 seems to be better when checking peak overlapping in replicates
 
 if(Manually.identify.peak.consensus){
-  peaks = c()
   
-  for(n in 1:length(peak.files)) 
-  {
-    cat(n, '\n')
-    p = readPeakFile(peak.files[n], as = "GRanges");
-    #eval(parse(text = paste0("p = pp.", k)));
-    with.p.values = "X.log10.pvalue." %in% colnames(mcols(p))
-    if(with.p.values) {
-      p <- p[mcols(p)[,"X.log10.pvalue."] > pval.cutoff];
-      p = GenomicRanges::reduce(p);
-      #peaks10= c(peaks10, p10);
-    }else{ 
-      cat("no p values conlumn found for -- ", design.matrix$file.name[k], "\n");
-      PLOT.p10 = FALSE;
-    }
-    #p = reduce(p)
-    peaks= c(peaks, p)
-  }
-  
-  names(peaks) = design.sel$fileName
-  
-  saveRDS(peaks, file = paste0(RdataDir, '/histMarkers_macs2peaks_H3K4me3.H3K4me1_32samples_pval.', pval.cutoff, '.rds'))
-  save(peaks, design, design.sel, 
-       file = paste0(RdataDir, '/histMarkers_macs2peaks_H3K4me3.H3K4me1_32samples_pval.', pval.cutoff, '.Rdata'))
-  
-  ##########################################
-  #  # try to merge BL time series
-  ##########################################
-  peaks = readRDS(file = paste0(RdataDir, '/histMarkers_macs2peaks_H3K4me3.H3K4me1_32samples_pval.', pval.cutoff, '.rds'))
-  design.sel$condition = droplevels(design.sel$condition)
-  
-  source('functions_chipSeq.R')
-  
-  conds = as.character(unique(design.sel$condition))
-  
-  ##########################################
-  # H3K4me3
-  ##########################################
-  ## H3Kme3 UA
-  n = 1
-  cc = conds[n]
-  kk = which(design.sel$condition == cc)
-  
-  cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
-  
-  
-  ol.peaks <- makeVennDiagram(peaks[kk[c(2, 3,4)]], NameOfPeaks=names(peaks)[kk[c(2, 3, 4)]], connectedPeaks="keepAll", main=cc)
-  v <- venn_cnt2venn(ol.peaks$vennCounts)
-  try(plot(v))
-  
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, '2_p', pval.cutoff, '.pdf'), 
-      height = 10, width = 10)
-  try(plot(v))
-  dev.off()
-  
-  xx1 = intersect(peaks[[kk[1]]], peaks[[kk[2]]])
-  xx2 = intersect(peaks[[kk[1]]], peaks[[kk[3]]])
-  xx3 = intersect(peaks[[kk[1]]], peaks[[kk[4]]])
-  xx4 = intersect(peaks[[kk[2]]], peaks[[kk[3]]])
-  xx5 = intersect(peaks[[kk[2]]], peaks[[kk[4]]])
-  xx6 = intersect(peaks[[kk[3]]], peaks[[kk[4]]])
-  
-  xx = union(xx1, union(xx2, union(xx3, union(xx4, union(xx5, xx6)))))
-  
-  peaks_H3K4me3_mUA = GenomicRanges::reduce(xx)
-  
-  peaks.merged = xx
-  
-  
-  ## H3K4me3_mLA
-  n = 3
-  cc = conds[n]
-  kk = which(design.sel$condition == cc)
-  
-  cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
-  
-  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main=cc)
-  v <- venn_cnt2venn(ol.peaks$vennCounts)
-  try(plot(v))
-  
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, '2_p', pval.cutoff, '.pdf'), 
-      height = 10, width = 10)
-  try(plot(v))
-  dev.off()
-  
-  peaks_H3K4me3_mLA = peaks[[kk[2]]]
-  peaks.merged = GenomicRanges::reduce(union(peaks.merged, peaks_H3K4me3_mLA))
-  
-  ## H3K4me3_mHand
-  n = 4
-  cc = conds[n]
-  kk = which(design.sel$condition == cc)
-  
-  cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
-  
-  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main=cc)
-  v <- venn_cnt2venn(ol.peaks$vennCounts)
-  try(plot(v))
-  
-  
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, '2_p', pval.cutoff, '.pdf'), 
-      height = 10, width = 10)
-  try(plot(v))
-  dev.off()
-  
-  xx = peaks[[kk[2]]]
-  eval(parse(text = paste0('peaks_', cc, ' = xx')))
-  peaks.merged = GenomicRanges::reduce(union(peaks.merged, xx))
-  
-  
-  # H3K4me3_BL5days
-  n = 8
-  cc = conds[n]
-  kk = which(design.sel$condition == cc)
-  
-  cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
-  
-  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main=cc)
-  v <- venn_cnt2venn(ol.peaks$vennCounts)
-  try(plot(v))
-  
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, 'p', pval.cutoff, '.pdf'),  height = 10, width = 10)
-  try(plot(v))
-  dev.off()
-  
-  xx = peaks[[kk[1]]]
-  eval(parse(text = paste0('peaks_', cc, ' = xx')))
-  peaks.merged = GenomicRanges::reduce(union(peaks.merged, xx))
-  cat(length(xx), ' new peaks \n')
-  cat(length(peaks.merged), ' merged peaks \n')
-  
-  # H3K4me3_BL9days
-  n = 10
-  cc = conds[n]
-  kk = which(design.sel$condition == cc)
-  
-  cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
-  
-  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main=cc)
-  v <- venn_cnt2venn(ol.peaks$vennCounts)
-  try(plot(v))
-  
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, 'p', pval.cutoff, '.pdf'),  height = 10, width = 10)
-  try(plot(v))
-  dev.off()
-  
-  xx = intersect(peaks[[kk[1]]], peaks[[kk[2]]])
-  eval(parse(text = paste0('peaks_', cc, ' = xx')))
-  peaks.merged = GenomicRanges::reduce(union(peaks.merged, xx))
-  cat(length(xx), ' new peaks \n')
-  cat(length(peaks.merged), ' merged peaks \n')
-  
-  
-  # H3K4me3_BL13days.prox
-  n = 12
-  cc = conds[n]
-  kk = which(design.sel$condition == cc)
-  
-  cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
-  
-  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main=cc)
-  v <- venn_cnt2venn(ol.peaks$vennCounts)
-  try(plot(v))
-  
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, 'p', pval.cutoff, '.pdf'),  height = 10, width = 10)
-  try(plot(v))
-  dev.off()
-  
-  xx = intersect(peaks[[kk[1]]], peaks[[kk[2]]])
-  eval(parse(text = paste0('peaks_', cc, ' = xx')))
-  peaks.merged = GenomicRanges::reduce(union(peaks.merged, xx))
-  cat(length(xx), ' new peaks \n')
-  cat(length(peaks.merged), ' merged peaks \n')
-  
-  # H3K4me3_BL13days.dist
-  n = 14
-  cc = conds[n]
-  kk = which(design.sel$condition == cc)
-  
-  cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
-  
-  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main=cc)
-  v <- venn_cnt2venn(ol.peaks$vennCounts)
-  try(plot(v))
-  
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, 'p', pval.cutoff, '.pdf'),  height = 10, width = 10)
-  try(plot(v))
-  dev.off()
-  
-  xx = intersect(peaks[[kk[1]]], peaks[[kk[2]]])
-  eval(parse(text = paste0('peaks_', cc, ' = xx')))
-  peaks.merged = GenomicRanges::reduce(union(peaks.merged, xx))
-  cat(length(xx), ' new peaks \n')
-  cat(length(peaks.merged), ' merged peaks \n')
-  
-  
-  peaks.merged.H3K4me3 =  peaks.merged
-  saveRDS(peaks.merged.H3K4me3, file = paste0(RdataDir,  
-                                              '/histMarkers_macs2peaks_H3K4me3_consensusPeaks_pval.', pval.cutoff, '.rds'))
-  
-  ##########################################
-  # H3K4me1 peak consensus
-  ##########################################
-  ## peaks_H3K4me1_mLA
-  n = 2 
-  cc = conds[n]
-  kk = which(design.sel$condition == cc)
-  
-  cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
-  
-  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main=cc)
-  v <- venn_cnt2venn(ol.peaks$vennCounts)
-  try(plot(v))
-  
-  
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, '2_p', pval.cutoff, '.pdf'), 
-      height = 10, width = 10)
-  try(plot(v))
-  dev.off()
-  
-  peaks_H3K4me1_mLA = peaks[[kk[2]]]
-  
-  peaks.merged = peaks_H3K4me1_mLA
-  #peaks.merged = union(peaks.merged, peaks_H3K4me1_mLA)
-  peaks.merged = GenomicRanges::reduce(peaks.merged)
-  
-  # H3K4me1_mUA
-  n = 5
-  cc = conds[n]
-  kk = which(design.sel$condition == cc)
-  
-  cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
-  
-  ol.peaks <- makeVennDiagram(peaks[kk[c(1, 2, 3)]], NameOfPeaks=names(peaks)[kk[c(1, 2, 3)]], connectedPeaks="keepAll", main=cc)
-  v <- venn_cnt2venn(ol.peaks$vennCounts)
-  try(plot(v))
-  
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, '_1_p', pval.cutoff, '.pdf'), 
-      height = 10, width = 10)
-  try(plot(v))
-  dev.off()
-  
-  ol.peaks <- makeVennDiagram(peaks[kk[c(2, 3,4)]], NameOfPeaks=names(peaks)[kk[c(2, 3, 4)]], connectedPeaks="keepAll", main=cc)
-  v <- venn_cnt2venn(ol.peaks$vennCounts)
-  try(plot(v))
-  
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, '_2_p', pval.cutoff, '.pdf'), 
-      height = 10, width = 10)
-  try(plot(v))
-  dev.off()
-  
-  xx1 = intersect(peaks[[kk[2]]], peaks[[kk[3]]])
-  xx2 = intersect(peaks[[kk[2]]], peaks[[kk[4]]])
-  xx3 = intersect(peaks[[kk[3]]], peaks[[kk[4]]])
-  
-  xx = union(xx1, union(xx2, xx3))
-  eval(parse(text = paste0('peaks_', cc, ' = xx')))
-  peaks.merged = GenomicRanges::reduce(union(peaks.merged, xx))
-  
-  # H3K4me1_mHand
-  n = 6
-  cc = conds[n]
-  kk = which(design.sel$condition == cc)
-  
-  cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
-  
-  
-  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main=cc)
-  v <- venn_cnt2venn(ol.peaks$vennCounts)
-  try(plot(v))
-  
-  
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, 'p', pval.cutoff, '.pdf'), 
-      height = 10, width = 10)
-  try(plot(v))
-  dev.off()
-  
-  xx = peaks[[kk[2]]]
-  eval(parse(text = paste0('peaks_', cc, ' = xx')))
-  peaks.merged = GenomicRanges::reduce(union(peaks.merged, xx))
-  
-  # H3K4me1_BL5days
-  n = 7
-  cc = conds[n]
-  kk = which(design.sel$condition == cc)
-  
-  cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
-  
-  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main=cc)
-  v <- venn_cnt2venn(ol.peaks$vennCounts)
-  try(plot(v))
-  
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, 'p', pval.cutoff, '.pdf'),  height = 10, width = 10)
-  try(plot(v))
-  dev.off()
-  
-  xx = peaks[[kk[1]]]
-  eval(parse(text = paste0('peaks_', cc, ' = xx')))
-  peaks.merged = GenomicRanges::reduce(union(peaks.merged, xx))
-  cat(length(xx), ' new peaks \n')
-  cat(length(peaks.merged), ' merged peaks \n')
-  
-  # H3K4me1_BL9days
-  n = 9
-  cc = conds[n]
-  kk = which(design.sel$condition == cc)
-  
-  cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
-  
-  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main=cc)
-  v <- venn_cnt2venn(ol.peaks$vennCounts)
-  try(plot(v))
-  
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, 'p', pval.cutoff, '.pdf'),  height = 10, width = 10)
-  try(plot(v))
-  dev.off()
-  
-  xx = intersect(peaks[[kk[1]]], peaks[[kk[2]]])
-  eval(parse(text = paste0('peaks_', cc, ' = xx')))
-  peaks.merged = GenomicRanges::reduce(union(peaks.merged, xx))
-  cat(length(xx), ' new peaks \n')
-  cat(length(peaks.merged), ' merged peaks \n')
-  
- 
-  # H3K4me1_BL13days.prox
-  n = 11
-  cc = conds[n]
-  kk = which(design.sel$condition == cc)
-  
-  cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
-  
-  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main=cc)
-  v <- venn_cnt2venn(ol.peaks$vennCounts)
-  try(plot(v))
-  
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, 'p', pval.cutoff, '.pdf'),  height = 10, width = 10)
-  try(plot(v))
-  dev.off()
-  
-  xx = intersect(peaks[[kk[1]]], peaks[[kk[2]]])
-  eval(parse(text = paste0('peaks_', cc, ' = xx')))
-  peaks.merged = GenomicRanges::reduce(union(peaks.merged, xx))
-  cat(length(xx), ' new peaks \n')
-  cat(length(peaks.merged), ' merged peaks \n')
-  
-  
-  # H3K4me1_BL13days.dist
-  n = 13
-  cc = conds[n]
-  kk = which(design.sel$condition == cc)
-  
-  cat(n, ' -- ', cc, '--', length(kk), 'replicates\n')
-  
-  ol.peaks <- makeVennDiagram(peaks[kk], NameOfPeaks=names(peaks)[kk], connectedPeaks="keepAll", main=cc)
-  v <- venn_cnt2venn(ol.peaks$vennCounts)
-  try(plot(v))
-  
-  pdf(paste0(resDir, '/manualCheck_peakOverlapping_betweenReplicates_', cc, 'p', pval.cutoff, '.pdf'),  height = 10, width = 10)
-  try(plot(v))
-  dev.off()
-  
-  xx = intersect(peaks[[kk[1]]], peaks[[kk[2]]])
-  eval(parse(text = paste0('peaks_', cc, ' = xx')))
-  peaks.merged = GenomicRanges::reduce(union(peaks.merged, xx))
-  cat(length(xx), ' new peaks \n')
-  cat(length(peaks.merged), ' merged peaks \n')
-  
-  peaks.merged.H3K4me1 =  peaks.merged
-  saveRDS(peaks.merged.H3K4me1, file = paste0(RdataDir,  
-                                              '/histMarkers_macs2peaks_H3K4me1_consensusPeaks_pval.', pval.cutoff, '.rds'))
+  Manually_define_histM_peakConsensus()
   
   ##########################################
   # merge peaks from K4me3 and K4me1
@@ -1375,17 +1006,19 @@ for(n_histM in 1:length(conds_histM))
 atacseq_peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rxxxx_R10723_R11637_R12810_atac/Rdata/',
                                       'ATACseq_peak_consensus_filtered_55k.rds'))
 
-conds_histM = c('H3K4me3', 'H3K27me3',  'H3K4me1', 'H3K27ac')
+conds_histM = c('H3K4me3','H3K27me3', 'H3K4me1', 'H3K27ac')
 
 keep = c()
 DE.locus = c()
 
+fdr.cutoff = 0.05; 
+logfc.cutoff = 1;
+marker.cutoff = 1;
+
 for(n_histM in 1:length(conds_histM))
 {
-  # n_histM = 1
+  # n_histM = 3
   res = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_DBedgeRtest_', conds_histM[n_histM], '_', version.analysis, '.rds'))
-  
-  fdr.cutoff = 0.05; logfc.cutoff = 1;marker.cutoff = 2;
   
   select = which(((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & abs(res$logFC.mLA.vs.mUA) > logfc.cutoff) |
                     (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & abs(res$logFC.mHand.vs.mUA) > logfc.cutoff)|
@@ -1421,23 +1054,70 @@ for(n_histM in 1:length(conds_histM))
   
   cat(length(select), ' DE ', conds_histM[n_histM],  ' overlapping with atac-seq peaks \n')
   xx = res_sel
+  
   colnames(xx) = paste0(colnames(xx), '_', conds_histM[n_histM])
   
-  if(conds_histM[n_histM] != 'H3K27ac') DE.locus = unique(c(DE.locus, rownames(res_sel)[select]))
-      
+  yy = res_sel[select, grep(conds_histM[n_histM], colnames(res_sel))]
+  yy = t(apply(yy, 1, cal_transform_histM, cutoff.min = 0.0, cutoff.max = 6))
+  
+  sds = apply(yy, 1, sd)
+  yy = yy[which(sds>0), ]
+  
+  df = as.data.frame(sapply(colnames(yy), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[2])}))
+  colnames(df) = 'segments'
+  rownames(df) = colnames(yy)
+  sample_colors = c('springgreen4', 'steelblue2', 'gold2')
+  annot_colors = list(segments = sample_colors)
+  
+  pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+            color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8),
+            show_colnames = FALSE,
+            scale = 'row',
+            cluster_cols=FALSE, annotation_col=df,
+            #annotation_colors = annot_colors,
+            width = 6, height = 12,
+            filename = paste0(resDir, '/heatmap_histoneMarker_', conds_histM[n_histM], '_overlappedWithAtacseqPeak.pdf'))
+  
+  pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+            color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8),
+            show_colnames = FALSE,
+            scale = 'none',
+            cluster_cols=FALSE, annotation_col=df,
+            #annotation_colors = annot_colors,
+            width = 6, height = 12,
+            filename = paste0(resDir, '/heatmap_histoneMarker_', conds_histM[n_histM], '_overlappedWithAtacseqPeak_nonscaled.pdf'))
+  
+  
+  
   if(n_histM == 1){
     keep = data.frame(xx, stringsAsFactors = FALSE)
+    test = rep(0, nrow(xx))
+    test[select] = 1
+    names(test) = rownames(xx)
+    DE.locus = data.frame(test, stringsAsFactors = FALSE)
+    
+    colnames(DE.locus)[ncol(DE.locus)] = conds_histM[n_histM]
+    
   }else{
-    keep = data.frame(keep, xx[match(rownames(keep), rownames(xx)), ], stringsAsFactors = FALSE)  
+    keep = data.frame(keep, xx[match(rownames(keep), rownames(xx)), ], stringsAsFactors = FALSE)
+    test = rep(0, nrow(xx))
+    test[select] = 1
+    names(test) = rownames(xx)
+    DE.locus = data.frame(DE.locus, test[match(rownames(DE.locus), names(test))], stringsAsFactors = FALSE)
+    colnames(DE.locus)[ncol(DE.locus)] = conds_histM[n_histM]
   }
-  
 }
 
-save(keep, DE.locus, file = paste0(RdataDir, '/combined_4histMarkers_DE.Rdata'))
+save(keep, DE.locus, file = paste0(RdataDir, '/combined_4histMarkers_overlapped55kATACseq_DE.Rdata'))
 
-### reload the combined markers
-load(file = paste0(RdataDir, '/combined_4histMarkers_DE.Rdata'))
-yy = keep[match(DE.locus, rownames(keep)), c(53:60, 27:34, 1:8)]
+
+##########################################
+# plot all DE histone markers
+##########################################
+load(file = paste0(RdataDir, '/combined_4histMarkers_overlapped55kATACseq_DE.Rdata'))
+ss = apply(DE.locus[, c(1:3)], 1, sum)
+
+yy = keep[match(names(ss[which(ss>0)]), rownames(keep)), c(1:8, 27:34, 53:60)]
 design = readRDS(file = paste0(RdataDir, '/histM_CT_design_info.rds'))
 
 sampleID = sapply(colnames(yy), function(x) unlist(strsplit(as.character(x), '_'))[3])
@@ -1452,19 +1132,13 @@ rownames(df) = colnames(yy)
 sample_colors = c('springgreen4', 'steelblue2', 'gold2')
 annot_colors = list(segments = sample_colors)
 
-cal_centering <- function(x){
-  (x - mean(x, na.rm =TRUE))
-}
-
-cal_z_score <- function(x){
-  (x - mean(x)) / sd(x)
-}
-
 yy1 = yy
+source('Functions_histM.R')
+
 for(n in 1:length(conds_histM))
 {
   jj = grep(conds_histM[n], colnames(yy))
-  yy1[,jj] = t(apply(yy[,jj], 1, cal_centering))
+  yy1[,jj] = t(apply(yy[,jj], 1, cal_z_score))
 }
 
 #yy <- t(apply(yy, 1, cal_z_score))
@@ -1477,8 +1151,26 @@ pheatmap(yy1, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
          gaps_col = gaps_col,
          #annotation_colors = annot_colors,
          width = 6, height = 12, 
-         filename = paste0(figureDir, '/heatmap_histoneMarker_', conds_histM[n_histM], '_DE_allmarkers.pdf'))
+         filename = paste0(figureDir, '/heatmap_histoneMarker_DE_allmarkers.pdf'))
 
+yy1 = yy
+for(n in 1:length(conds_histM))
+{
+  jj = grep(conds_histM[n], colnames(yy))
+  yy1[,jj] = t(apply(yy[,jj], 1, cal_transform_histM, cutoff.min = 0, cutoff.max = 5))
+}
+
+#yy <- t(apply(yy, 1, cal_z_score))
+gaps_col = c(8, 16)
+pheatmap(yy1, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+         color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(12), 
+         show_colnames = FALSE,
+         scale = 'none',
+         cluster_cols=FALSE, annotation_col=df,
+         gaps_col = gaps_col,
+         #annotation_colors = annot_colors,
+         width = 6, height = 12, 
+         filename = paste0(figureDir, '/heatmap_histoneMarker_DE_allmarkers_nonscaled.pdf'))
 
 ##########################################
 # plot histone marker with the same cluster order as atac-seq peaks 
@@ -1492,7 +1184,7 @@ if(Assembly_histMarkers_togetherWith_ATACseq){
   require(pheatmap)
   require(RColorBrewer)
   
-  load(file = paste0(RdataDir, '/combined_4histMarkers_DE.Rdata'))
+  load(file = paste0(RdataDir, '/combined_4histMarkers_overlapped55kATACseq_DE.Rdata'))
   design = readRDS(file = paste0(RdataDir, '/histM_CT_design_info.rds'))
   
   yy = keep[, c(53:60, 27:34, 1:8)]
@@ -1510,13 +1202,6 @@ if(Assembly_histMarkers_togetherWith_ATACseq){
   pp_atac = makeGRangesFromDataFrame(pp_atac, seqnames.field=c("X1"),
                                 start.field="X2", end.field="X3", strand.field="strand")
   
-  # peaks2 = readRDS(file = paste0('~/workspace/imp/positional_memory/results/ATAC_allUsed_20220328/',
-  #                                'position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters_6.rds'))
-  # 
-  # pp2_atac = data.frame(t(sapply(rownames(peaks2), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
-  # pp2_atac$strand = '*'
-  # pp2_atac = makeGRangesFromDataFrame(pp2_atac, seqnames.field=c("X1"),
-  #                                    start.field="X2", end.field="X3", strand.field="strand")
   pp_histM = data.frame(t(sapply(rownames(yy), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
   pp_histM$strand = '*'
   pp_histM = makeGRangesFromDataFrame(pp_histM, seqnames.field=c("X1"),
@@ -1526,19 +1211,13 @@ if(Assembly_histMarkers_togetherWith_ATACseq){
   
   yy1 = yy[mapping@to, ]
   
-  mm = match(rownames(yy1), DE.locus)
-  length(which(!is.na(mm)))
-  
-  cal_centering <- function(x){
-    (x - mean(x, na.rm =TRUE))
-  }
-  
-  cal_z_score <- function(x){
-    (x - mean(x)) / sd(x)
-  }
+  mm = match(rownames(yy1), rownames(DE.locus))
+  DE.peaks = DE.locus[mm, ]
+  ss = apply(DE.peaks, 1, sum)
+  length(which(ss>0))
   
   # yy1 = yy
-  yy1 = yy1 - 1
+  #yy1 = yy1 - 1
   for(n in 1:ncol(yy1))
   {
     jj1 = which(yy1[,n] < (-2))
