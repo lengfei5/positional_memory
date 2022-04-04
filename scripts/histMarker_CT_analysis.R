@@ -1216,21 +1216,12 @@ if(Assembly_histMarkers_togetherWith_ATACseq){
   ss = apply(DE.peaks, 1, sum)
   length(which(ss>0))
   
-  # yy1 = yy
-  #yy1 = yy1 - 1
-  for(n in 1:ncol(yy1))
-  {
-    jj1 = which(yy1[,n] < (-2))
-    yy1[jj1, n] = -2
-    jj2 = which(yy1[,n] > 2)
-    yy1[jj2, n] = 2
-    
-  }
-  
+  source('Functions_histM.R')
   for(n in 1:length(conds_histM))
   {
     jj = grep(conds_histM[n], colnames(yy1))
-    yy1[,jj] = t(apply(yy1[,jj], 1, cal_centering))
+    #yy1[,jj] = t(apply(yy1[,jj], 1, cal_centering))
+    yy1[ ,jj] = t(apply(yy1[,jj], 1, cal_transform_histM, cutoff.min = 0, cutoff.max = 5, centering = FALSE))
     
   }
   
@@ -1251,20 +1242,8 @@ if(Assembly_histMarkers_togetherWith_ATACseq){
            cluster_cols=FALSE, annotation_col=df,
            gaps_col = gaps_col,
            #annotation_colors = annot_colors,
-           width = 6, height = 12, 
-           filename = paste0(figureDir, '/heatmap_histoneMarker_', conds_histM[n_histM], '_postionalPeaks.pdf'))
-  
-  
-  ## quantile normalization for different histone markers
-  Quantile.normalize.histMarker = FALSE
-  if(Quantile.normalize.histMarker){
-    library(preprocessCore)
-    xx = normalize.quantiles(shm)
-    colnames(xx) = colnames(shm)
-    rownames(xx) = rownames(shm)
-    shm = xx
-  }
-  
+           width = 6, height = 8, 
+           filename = paste0(figureDir, '/heatmap_histoneMarker_', conds_histM[n_histM], '_1246.postionalPeaks.pdf'))
   
   #rownames(yy0) = rownames(yy)
   

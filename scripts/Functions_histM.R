@@ -11,11 +11,12 @@
 ##########################################
 # utility functions 
 ##########################################
-cal_transform_histM = function(x, cutoff.min = 1., cutoff.max = 5, toScale = FALSE)
+cal_transform_histM = function(x, cutoff.min = 1., cutoff.max = 5, toScale = FALSE, centering = FALSE)
 {
   # x = keep[,1];cutoff.min = 3.5; cutoff.max = 6
   x[which(x<cutoff.min)] = cutoff.min
   x[which(x>cutoff.max)] = cutoff.max
+  if(centering) x = x - mean(x)
   if(toScale) x = (x - cutoff.min)/(cutoff.max - cutoff.min)
   return(x)
   
@@ -27,6 +28,19 @@ cal_centering <- function(x){
 
 cal_z_score <- function(x){
   (x - mean(x)) / sd(x)
+}
+
+## quantile normalization for different histone markers
+Quantile.normalize.histMarker = function(shm)
+{
+  library(preprocessCore)
+  xx = normalize.quantiles(shm)
+  colnames(xx) = colnames(shm)
+  rownames(xx) = rownames(shm)
+  shm = xx
+  
+  return(shm)
+  
 }
 
 
