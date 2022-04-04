@@ -768,6 +768,14 @@ write.table(SAF, file = paste0(peakDir, '/Peaks_histMarkers_ATACseq_missedTSS.du
 ########################################################
 ########################################################
 # Section III : processing read counts within consensus peaks 
+# First, for all samples together 
+# - filter peaks with low number of reads but keep some background and the one overlapping atac-seq peaks 
+# 
+# Then for each marker: H3K4me3, H3K4me1, H3K27me3, H3K27ac and IgG
+# - normalization,
+# - QC with PCA and pairwise plot, filter bad samples
+# - batch correction with Combat
+# - save the batch-corrected matrix for mature sample comparison and regeneration comparison
 # 
 ########################################################
 ########################################################
@@ -792,15 +800,7 @@ save(design, counts,
      file = paste0(RdataDir, '/histoneMarkers_samplesDesign_readCounts_peaks_histMarkers_ATACseq_missedTSS.dupReduced.Rdata'))
 
 ##########################################
-## First, for all samples together 
-# - filter peaks with low number of reads but keep some background and the one overlapping atac-seq peaks 
-# 
-# Then for each marker: H3K4me3, H3K4me1, H3K27me3, H3K27ac and IgG
-# - normalization,
-# - QC with PCA and pairwise plot, filter bad samples
-# - batch correction with Combat
-# - save the batch-corrected matrix for mature sample comparison and regeneration comparison
-# 
+# reload the save design and counts
 ##########################################
 load(file = paste0(RdataDir, '/histoneMarkers_samplesDesign_readCounts_peaks_histMarkers_ATACseq_missedTSS.dupReduced.Rdata'))
 design$unique.rmdup = as.numeric(design$unique.rmdup)
