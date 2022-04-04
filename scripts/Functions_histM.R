@@ -1,0 +1,228 @@
+##########################################################################
+##########################################################################
+# Project: 
+# Script purpose: functions of histone marker analysis
+# Usage example: 
+# Author: Jingkui Wang (jingkui.wang@imp.ac.at)
+# Date of creation: Mon Apr  4 09:51:22 2022
+##########################################################################
+##########################################################################
+
+##########################################
+# utility functions 
+##########################################
+cal_transform_histM = function(x, cutoff.min = 1., cutoff.max = 5, toScale = FALSE)
+{
+  # x = keep[,1];cutoff.min = 3.5; cutoff.max = 6
+  x[which(x<cutoff.min)] = cutoff.min
+  x[which(x>cutoff.max)] = cutoff.max
+  if(toScale) x = (x - cutoff.min)/(cutoff.max - cutoff.min)
+  return(x)
+  
+}
+
+
+
+
+##########################################
+# try to subtract the input IgG 
+##########################################
+Subtract.IgG.inputs_viaGlobalScaling = function()
+{
+  load(file = paste0(RdataDir, 
+                     '/histoneMarkers_samplesDesign_ddsPeaksMatrix_filtered_incl.atacPeak.missedTSS.bgs_324k.Rdata'))
+  igg = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', 'IgG', '_', version.analysis, '.rds'))
+  
+  conds_histM = unique(design$sample)
+  
+  ctl.means = c()
+  for(ii in 1:length(conds_histM)) 
+  {
+    kk = grep(conds_histM[ii], colnames(igg))
+    if(length(kk)>1) {
+      ctl.means = cbind(ctl.means, apply(igg[, kk], 1, median))
+    }else{
+      ctl.means = cbind(ctl.means, igg[, kk])
+    }
+  }
+  
+  colnames(ctl.means) = conds_histM
+  
+  ### Reason : reduce the ctl.mean with a fixed global factor and then fix the IgG signals
+  ### scale each marker data based on the common IgG background 
+  ctl.means = ctl.means - 3.5
+  igg_peak = 4.5 - 3.5 # cutoff for peaks in IgG
+  #plot.pair.comparison.plot(ctl.means[c(1:20000), ], linear.scale = FALSE)
+  
+  markers = c('H3K4me3', 'H3K4me1', 'H3K27me3', 'H3K27ac')
+  
+  for(n in 1:length(markers))
+  {
+    # n = 1
+    cpm = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', markers[n], '_', version.analysis, '.rds'))
+    design.sel = readRDS(file = paste0(RdataDir, '/design.sels_bc_TMM_combat_', markers[n], '_', version.analysis, '.rds'))
+    cpm0 = cpm
+    
+    inputs = ctl.means[match(rownames(cpm), rownames(ctl.means)), ]
+    
+    ### global cutoff is probably more robust
+    marker.means = c()
+    for(ii in 1:length(conds_histM)) 
+    {
+      kk = grep(conds_histM[ii], colnames(cpm))
+      if(length(kk)>1) {
+        marker.means = cbind(marker.means, apply(cpm[, kk], 1, mean))
+      }else{
+        marker.means = cbind(marker.means, cpm[, kk])
+      }
+    }
+    colnames(marker.means) = conds_histM
+    
+    marker.means = apply(marker.means, 1, mean)
+    inputs.means = apply(inputs, 1, mean)
+    
+    #hist(marker.means, breaks = 100, xlim = range(c(marker.means, inputs.means)), ylim = c(0, 2*10^4))
+    #hist(inputs.means, breaks = 100, col = 'gray', add = TRUE)
+    
+    ## find global scaling factors for between this marker and IgG
+    ## by assuming that only few 100 peaks solely due to IgG background instead of real peaks
+    ratios = inputs.means - marker.means
+    
+    plot(inputs.means, ratios, cex = 0.2)
+    abline(v = c(2.5,  3., 4), col = 'red')
+    
+    igg_cutoff = 3 # global factor for IgG
+    cat(length(which(inputs.means> igg_cutoff)), ' peaks considered solely due to IgG \n')
+    
+    global_scaling = median(ratios[which(inputs.means > igg_cutoff)])
+    cat('global scaling factor -- ', global_scaling, '\n')
+    abline(h = global_scaling, col = 'blue')
+    
+    #bgs = inputs.means - global_scaling
+    #igg_peak_new = igg_peak - median(ratios[which(inputs.means > igg_cutoff)])
+    marker.means_new = marker.means + global_scaling
+    ratios_new = inputs.means - marker.means_new
+    cat('after sacling the markers ratios becomes : ', median(ratios_new[which(inputs.means > igg_cutoff)]), '\n')
+    
+    hist(marker.means_new, breaks = 100)
+    hist(inputs.means, breaks = 100, add = TRUE, col = 'red')
+    abline(v = igg_peak, col = 'blue')
+    
+    cpm = cpm + global_scaling
+    
+    for(m in 1:length(conds_histM))
+    {
+      # m = 1
+      cat('condition -- ', conds_histM[m], '\n')
+      jj = grep(conds_histM[m], colnames(cpm))
+      
+      bgs = inputs[, which(colnames(inputs) == conds_histM[m])]
+      # bgs = bgs - global_scaling
+      ss_mean = apply(cpm[,jj], 1, mean)
+      j_cor = which(bgs > igg_peak & ss_mean > bgs + 1)
+      
+      cat(markers[n], '-',  as.character(conds_histM[m]), '-',
+          length(j_cor), ' peaks will subtract IgG signals  \n')
+      
+      for(j in jj) 
+      {
+        cpm[j_cor, j] = cpm[j_cor, j] - bgs[j_cor]
+      }
+      
+    }
+    
+    saveRDS(cpm, file = paste0(RdataDir, '/fpm_bc_TMM_combat_', markers[n], '_IgG.subtrated_', 
+                               version.analysis, '.rds'))
+    
+  }
+}
+
+plot_individual_histMarker_withinATACpeak = function(res)
+{
+  # res = res[order(-res$log2fc), ]
+  # sample.means = sample.means[match(rownames(res), rownames(sample.means)), ]
+  # xx = res[select, ]
+
+  # ####### focus on the atac-seq peak sets
+  # Keep.only.overlapped.by.atacseq.peaks = TRUE
+  # if(Keep.only.overlapped.by.atacseq.peaks){
+  #   ii_bgs = grep('tss.', rownames(res))
+  #
+  #   rownames(res) = gsub('tss.', '', rownames(res))
+  #
+  #   pp = data.frame(t(sapply(rownames(res), function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
+  #
+  #   rownames(res) = paste0(pp[,1], ':', pp[,2], '-', pp[,3])
+  #   rownames(pp) = rownames(res)
+  #
+  #   pp$strand = '*'
+  #   pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+  #                                 start.field="X2", end.field="X3", strand.field="strand")
+  #   lls = width(pp)
+  #
+  #   #for(n in 1:ncol(keep))
+  #   #{
+  #   #  keep[,n] = keep[,n] + log2(1000/lls)
+  #   #}
+  #   #cpm_bgs = keep[ii_bgs, ]
+  #   #keep = keep[-ii_bgs, ]
+  #   #pp = pp[-ii_bgs]
+  #
+  #   ii_overlap = which(overlapsAny(pp, atacseq_peaks) == TRUE)
+  #   #cpm_nonoverlap = keep[-ii_overlap, ]
+  #   #keep = keep[ii_overlap, ]
+  #   kk = match(rownames(res), names(pp)[ii_overlap])
+  #
+  #   res = res[!is.na(kk), ]
+  #
+  #   sample.means = sample.means[!is.na(kk), ]
+  #
+  #   fdr.cutoff = 0.05; logfc.cutoff = 1;
+  #   marker.cutoff = 2;
+  #   select = which(((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & abs(res$logFC.mLA.vs.mUA) > logfc.cutoff) |
+  #                    (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & abs(res$logFC.mHand.vs.mUA) > logfc.cutoff)|
+  #                    (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & abs(res$logFC.mHand.vs.mLA) > logfc.cutoff)) &
+  #                    res$maxs > marker.cutoff
+  #   )
+  #   cat(length(select), ' DE ', conds_histM[n_histM],  ' \n')
+  #
+  #   xx = res[select, ]
+  #   xx = xx[order(-xx$log2fc), ]
+  #
+  # }
+  #
+  # ii_bgs = grep('tss', rownames(cpm))
+  # hist(cpm[-ii_bgs, 1], breaks = 100)
+  # hist(cpm[ii_bgs, 1], breaks = 50, col = 'red', add = TRUE)
+  #
+  #
+  # yy = res[select, grep(conds_histM[n_histM], colnames(res))]
+  # #yy = t(apply(yy, 1, cal_transform_histM, cutoff.min = 0.0, cutoff.max = 6))
+  #
+  # df = as.data.frame(sapply(colnames(yy), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[2])}))
+  # colnames(df) = 'segments'
+  # rownames(df) = colnames(yy)
+  #
+  # sample_colors = c('springgreen4', 'steelblue2', 'gold2')
+  # annot_colors = list(segments = sample_colors)
+
+  # pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+  #          color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8),
+  #          show_colnames = FALSE,
+  #          scale = 'row',
+  #          cluster_cols=FALSE, annotation_col=df,
+  #          #annotation_colors = annot_colors,
+  #          width = 6, height = 12,
+  #          filename = paste0(figureDir, '/heatmap_histoneMarker_', conds_histM[n_histM], '_overlappedWithAtacseqPeak.pdf'))
+  #
+  # pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+  #          color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8),
+  #          show_colnames = FALSE,
+  #          scale = 'none',
+  #          cluster_cols=FALSE, annotation_col=df,
+  #          #annotation_colors = annot_colors,
+  #          width = 6, height = 12,
+  #          filename = paste0(figureDir, '/heatmap_histoneMarker_', conds_histM[n_histM], '_overlappedWithAtacseqPeak_nonscaled.pdf'))
+
+}
+
