@@ -20,8 +20,9 @@ require(DESeq2)
 require(dplyr)
 require(gridExtra)
 
-version.Data = 'rnaseq_Rxxxx.old_R10724_R161513_mergedTechRep';
-version.analysis = paste0("_", version.Data, "_20211007")
+
+version.Data = 'RNAseq_data_used';
+version.analysis = paste0("_", version.Data, "_20220408")
 
 ## Directories to save results 
 dataDir = "/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/rnaseq_using/"
