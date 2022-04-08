@@ -262,6 +262,9 @@ load(file=paste0(RdataDir, 'Design_stats_readCounts_updatedResequenced', version
 colnames(counts)[-1] = design$fileName
 
 design$batch = as.factor(design$batch)
+
+annot_all = readRDS(file = paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+            'AmexT_v47_transcriptID_transcriptCotig_geneSymbol.nr_geneSymbol.hs_geneID_gtf.geneInfo_gtf.transcriptInfo.rds'))
 annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
                        'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
 
@@ -270,6 +273,7 @@ tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_T
 sps = readRDS(file = '~/workspace/imp/organoid_patterning/results/Rdata/curated_signaling.pathways_gene.list_v2.rds')
 
 all = counts
+
 ##########################################
 # convert gene names to gene symbols
 ##########################################
@@ -311,8 +315,16 @@ dds <- DESeqDataSetFromMatrix(raw, DataFrame(design.matrix), design = ~ conditio
 save(dds, design.matrix, file = paste0(RdataDir, 'dds_design.matrix_all29smartseq2_beforeFiltering.Rdata'))
 
 
+## first filtering of gene with number of reads
 ss = rowMaxs(counts(dds))
+
 hist(log10(ss), breaks = 100)
+abline(v = log10(20), col = 'red', lwd = 2.0)
+
+length(which(ss>0))
+length(which(ss>10))
+length(which(ss>20))
+
 dds = dds[which(ss > 20), ]
 
 dds = estimateSizeFactors(dds)

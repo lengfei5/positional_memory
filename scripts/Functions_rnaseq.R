@@ -31,14 +31,21 @@ Refine.ax.gene.annot = function(annot)
   saveRDS(annot, file = paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
                                'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
   
-
 }
 
 ##########################################
-# find limb-expressed and limb-non-expressed genes in dev, mature and regeneration  
+# find limb fibrobalst-expressed gene and non-expressed genes in dev, mature and regeneration
+# mature and regeneration samples with smart-seq2 data
+# dev samples will use the scRNA-seq data
 ##########################################
 Define_limb_expressed_genes = function()
 {
+  # library('rtracklayer')
+  # library(GenomicRanges)
+  # library('GenomicFeatures')
+  # import full gtf file with hox patch
+  # gtf = import(paste0(annotDir, 'AmexT_v47_Hox.patch.gtf'))
+  
   ## all transcripts and geneID from v47
   annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
   annot = readRDS(paste0(annotDir, 
@@ -53,72 +60,85 @@ Define_limb_expressed_genes = function()
                          'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
   
   
-  ggs = unique(annot$geneID)
-  ggs = data.frame(geneID = ggs, ORF.type = annot$ORF.type_gtf.transcript[match(ggs, annot$geneID)], stringsAsFactors = FALSE)
+  ## define the matrix for the result
+  
+  ## import the feature count output file and extract the gene names in the hox patch and also the gene length information
+  lls = read.table(paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/rnaseq_using/', 
+                                 'featurecounts_Q10/Mature_UA_136149_featureCounts.txt'),
+                   header = TRUE, sep = '\t')
+  
+  ggs = unique(lls$Geneid)
+  ggs = data.frame(geneID = ggs, ORF.type = annot$ORF.type_gtf.transcript[match(ggs, annot$geneID)],
+                   length = lls$Length[match(ggs, lls$Geneid)], stringsAsFactors = FALSE)
   
   ggs$geneSymbol = NA
-  ggs$geneSymbol[match(genes$geneID, ggs$geneID)] = genes$gene.symbol.toUse
-  
-  ## will check smartseq2 regeneration samples and pooled scRNA-seq samples to find limb-expressing genes
-  #Rdata.microarray = "../results/microarray/Rdata/"
-  #load(file = paste0(Rdata.microarray, 'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary.Rdata'))
+  mm = match(ggs$geneID, genes$geneID)
+  ggs$geneSymbol[!is.na(mm)] = genes$gene.symbol.toUse[mm[!is.na(mm)]]
+  ggs$names = NA
+  kk = which(is.na(ggs$geneSymbol))
+  ggs$names[kk] = as.character(ggs$geneID[kk])
+  ggs$names[-kk] = paste0(as.character(ggs$geneSymbol[-kk]), '_', as.character(ggs$geneID[-kk]))
   
   
   ### check first the microarray data for mature samples
-  # load microarray analysis results: log2 signal (res), comparison (fit2), and raw data (raw)
-  load(file = paste0("../results/microarray/Rdata/", 
-                     'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_DEpval.Rdata'))
-  cpm = as.matrix(res[, c(1:9)])
-  
-  conds = c("mUA", 'mLA', 'mHand') 
-  sample.means = c()
-  for(n in 1:length(conds)) 
-  {
-    kk = grep(conds[n], colnames(cpm))
-    #sample.sels = c(sample.sels, kk)
-    #cc = c(cc, rep(conds[n], length(kk)))
-    if(length(kk)>1) {
-      sample.means = cbind(sample.means, apply(cpm[, kk], 1, mean))
-    }else{
-      sample.means = cbind(sample.means, cpm[, kk])
+  Define_limb.expressing.genes_microarray = FALSE
+  if(Define_limb.expressing.genes_microarray){
+    # load microarray analysis results: log2 signal (res), comparison (fit2), and raw data (raw)
+    load(file = paste0("../results/microarray/Rdata/", 
+                       'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_DEpval.Rdata'))
+    cpm = as.matrix(res[, c(1:9)])
+    
+    conds = c("mUA", 'mLA', 'mHand') 
+    sample.means = c()
+    for(n in 1:length(conds)) 
+    {
+      kk = grep(conds[n], colnames(cpm))
+      #sample.sels = c(sample.sels, kk)
+      #cc = c(cc, rep(conds[n], length(kk)))
+      if(length(kk)>1) {
+        sample.means = cbind(sample.means, apply(cpm[, kk], 1, mean))
+      }else{
+        sample.means = cbind(sample.means, cpm[, kk])
+      }
+      
+    }  
+    
+    colnames(sample.means) = conds
+    sample.means[grep('SHH|PAX6|CD68|VIM|FOXA2', rownames(sample.means)), ]
+    
+    ids = sapply(rownames(sample.means), function(x){x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
+    
+    
+    for(n in 1:ncol(sample.means))
+    {
+      x = sample.means[,n]
+      ii.control = which(!is.na(match(ids, ctl)))
+      
+      cutoff =  quantile(x[ii.control], 0.8)
+      cat(n,  ' -- cutoff used ', cutoff, '--', length(which(x>cutoff)),  ' expressed gene \n')
+      
+      sample.means[,n] = sample.means[,n] > cutoff  
+      
     }
+    sample.means[grep('SHH|PAX6|CD68|VIM|FOXA2', rownames(sample.means)), ]
     
-  }  
-  
-  colnames(sample.means) = conds
-  sample.means[grep('SHH|PAX6|CD68|VIM|FOXA2', rownames(sample.means)), ]
-  
-  ids = sapply(rownames(sample.means), function(x){x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
-  
-  
-  for(n in 1:ncol(sample.means))
-  {
-    x = sample.means[,n]
-    ii.control = which(!is.na(match(ids, ctl)))
+    nbs = apply(sample.means, 1, sum)
     
-    cutoff =  quantile(x[ii.control], 0.8)
-    cat(n,  ' -- cutoff used ', cutoff, '--', length(which(x>cutoff)),  ' expressed gene \n')
+    nbs = nbs[which(nbs>0)]
     
-    sample.means[,n] = sample.means[,n] > cutoff  
+    xx = sapply(names(nbs), function(x){x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
+    
+    ggs$expr.mature.microarray = NA
+    ggs$expr.mature.microarray[!is.na(match(ggs$geneID, xx))] = 1
     
   }
-  sample.means[grep('SHH|PAX6|CD68|VIM|FOXA2', rownames(sample.means)), ]
-  
-  nbs = apply(sample.means, 1, sum)
-  
-  nbs = nbs[which(nbs>0)]
-  
-  xx = sapply(names(nbs), function(x){x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
-  
-  ggs$expr.mature.microarray = NA
-  ggs$expr.mature.microarray[!is.na(match(ggs$geneID, xx))] = 1
-  
   
   ###### check the smartseq2 mature samples
   # load dds normalized object and annotations
   Rdata.smartseq2 = "../results/rnaseq_Rxxxx.old_R10724_R161513_mergedTechRep/Rdata/"
-  load(file = paste0(Rdata.smartseq2, 'dds_design.matrix_all29smartseq2_beforeFiltering.Rdata'))
-  
+  #load(file = paste0(Rdata.smartseq2, 'dds_design.matrix_all29smartseq2_beforeFiltering.Rdata'))
+  load(file = paste0(RdataDir, 'dds_design.matrix_all29smartseq2_beforeFiltering.Rdata'))
+
   # select mature samples
   sels = intersect(which(design.matrix$batch == 4), grep('Mature', design.matrix$condition))
   dds = dds[, sels]
