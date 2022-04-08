@@ -85,7 +85,7 @@ design$batch[grep('1063', design$SampleID)] = 2
 design$batch[grep('1361', design$SampleID)] = 3
 design$batch[grep('1615', design$SampleID)] = 4
 
-add.featureCounts.summary = FALSE
+add.featureCounts.summary = TRUE
 if(add.featureCounts.summary){
   design$mapped = NA
   design$mapped.QCs = NA
@@ -277,11 +277,11 @@ mm = match(all$gene, annot$geneID)
 ggs = paste0(annot$gene.symbol.toUse[mm], '_',  annot$geneID[mm])
 all$gene[!is.na(mm)] = ggs[!is.na(mm)]
 
-Select.genes.having.symbols = FALSE
-if(Select.genes.having.symbols){
-  gene.mapping = gene.mapping[which(!is.na(gene.mapping$gene.symbol.nr) | !is.na(gene.mapping$gene.symbol.hs)), ]
-  all = all[!is.na(match(all$gene, gene.mapping$gene.id)), ]
-}
+# Select.genes.having.symbols = FALSE
+# if(Select.genes.having.symbols){
+#   gene.mapping = gene.mapping[which(!is.na(gene.mapping$gene.symbol.nr) | !is.na(gene.mapping$gene.symbol.hs)), ]
+#   all = all[!is.na(match(all$gene, gene.mapping$gene.id)), ]
+# }
 
 ## general QC for RNA-seq
 QC.for.cpm = FALSE
@@ -308,7 +308,8 @@ rm(design)
 
 dds <- DESeqDataSetFromMatrix(raw, DataFrame(design.matrix), design = ~ condition)
 
-#save(dds, design.matrix, file = paste0(RdataDir, 'dds_design.matrix_all29smartseq2_beforeFiltering.Rdata'))
+save(dds, design.matrix, file = paste0(RdataDir, 'dds_design.matrix_all29smartseq2_beforeFiltering.Rdata'))
+
 
 ss = rowMaxs(counts(dds))
 hist(log10(ss), breaks = 100)
