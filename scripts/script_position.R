@@ -349,6 +349,8 @@ if(grouping.position.dependent.peaks){
   load(file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata'))
   conds = c("Mature_UA", "Mature_LA", "Mature_Hand")
   
+  # saveRDS(keep, file = paste0(RdataDir, '/positional_peakSignals.rds'))
+  
   pp = data.frame(t(sapply(rownames(xx), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
   pp$strand = '*'
   

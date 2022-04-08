@@ -43,6 +43,25 @@ Quantile.normalize.histMarker = function(shm)
   
 }
 
+cal_sample_means = function(cpm, conds = c("mUA", "mLA", "mHand") )
+{
+  sample.means = c()
+  for(n in 1:length(conds)) 
+  {
+    kk = grep(conds[n], colnames(cpm))
+    if(length(kk)>1) {
+      sample.means = cbind(sample.means, apply(cpm[, kk], 1, mean))
+    }else{
+      sample.means = cbind(sample.means, cpm[, kk])
+    }
+    
+  }
+  colnames(sample.means) = conds
+  
+  return(sample.means)
+  
+}
+
 
 ##########################################
 # try to subtract the input IgG 

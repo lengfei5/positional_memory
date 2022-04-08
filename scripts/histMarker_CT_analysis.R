@@ -1011,7 +1011,7 @@ conds_histM = c('H3K4me3','H3K27me3', 'H3K4me1', 'H3K27ac')
 keep = c()
 DE.locus = c()
 
-fdr.cutoff = 0.05; 
+fdr.cutoff = 0.01; 
 logfc.cutoff = 1;
 marker.cutoff = 1;
 
@@ -1088,7 +1088,6 @@ for(n_histM in 1:length(conds_histM))
             filename = paste0(resDir, '/heatmap_histoneMarker_', conds_histM[n_histM], '_overlappedWithAtacseqPeak_nonscaled.pdf'))
   
   
-  
   if(n_histM == 1){
     keep = data.frame(xx, stringsAsFactors = FALSE)
     test = rep(0, nrow(xx))
@@ -1115,9 +1114,9 @@ save(keep, DE.locus, file = paste0(RdataDir, '/combined_4histMarkers_overlapped5
 # plot all DE histone markers
 ##########################################
 load(file = paste0(RdataDir, '/combined_4histMarkers_overlapped55kATACseq_DE.Rdata'))
-ss = apply(DE.locus[, c(1:3)], 1, sum)
+ss = apply(DE.locus[, c(1:4)], 1, sum)
 
-yy = keep[match(names(ss[which(ss>0)]), rownames(keep)), c(1:8, 27:34, 53:60)]
+yy = keep[match(names(ss[which(ss>0)]), rownames(keep)), c(1:8, 27:34, 53:60, 79:85)]
 design = readRDS(file = paste0(RdataDir, '/histM_CT_design_info.rds'))
 
 sampleID = sapply(colnames(yy), function(x) unlist(strsplit(as.character(x), '_'))[3])
@@ -1132,6 +1131,7 @@ rownames(df) = colnames(yy)
 sample_colors = c('springgreen4', 'steelblue2', 'gold2')
 annot_colors = list(segments = sample_colors)
 
+### plot histone markers with at least signaifiant one
 yy1 = yy
 source('Functions_histM.R')
 
@@ -1158,6 +1158,7 @@ for(n in 1:length(conds_histM))
 {
   jj = grep(conds_histM[n], colnames(yy))
   yy1[,jj] = t(apply(yy[,jj], 1, cal_transform_histM, cutoff.min = 0, cutoff.max = 5))
+  
 }
 
 #yy <- t(apply(yy, 1, cal_z_score))
@@ -1173,7 +1174,8 @@ pheatmap(yy1, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
          filename = paste0(figureDir, '/heatmap_histoneMarker_DE_allmarkers_nonscaled.pdf'))
 
 ##########################################
-# plot histone marker with the same cluster order as atac-seq peaks 
+# overview of segment-specific chromatin landscape
+# histone marker with the same cluster order as atac-seq peaks 
 ##########################################
 Assembly_histMarkers_togetherWith_ATACseq = FALSE
 if(Assembly_histMarkers_togetherWith_ATACseq){
@@ -1187,7 +1189,8 @@ if(Assembly_histMarkers_togetherWith_ATACseq){
   load(file = paste0(RdataDir, '/combined_4histMarkers_overlapped55kATACseq_DE.Rdata'))
   design = readRDS(file = paste0(RdataDir, '/histM_CT_design_info.rds'))
   
-  yy = keep[, c(53:60, 27:34, 1:8)]
+  
+  yy = keep[, c(53:60, 27:34, 1:8, 79:85)]
   sampleID = sapply(colnames(yy), function(x) unlist(strsplit(as.character(x), '_'))[3])
   mm = match(sampleID, design$sampleID)
   colnames(yy) = paste0(design$condition[mm], '_', design$Batch[mm], '_', design$sampleID[mm])
@@ -1209,12 +1212,28 @@ if(Assembly_histMarkers_togetherWith_ATACseq){
   
   mapping = findOverlaps(pp_atac, pp_histM)
   
+  ## peaks mapped to postional atac-peaks 
   yy1 = yy[mapping@to, ]
+  
+  ## peaks not mapped to positional atac-peaks
+  yy0 = yy[-mapping@to, ]
+  ss = apply(DE.locus[, c(1:3)], 1, sum)
+  mm = match(names(ss[which(ss>0)]), rownames(yy0))
+  length(which(!is.na(mm)))
+  
+  yy0 = yy0[mm[!is.na(mm)], ]
+  
   #plot.pair.comparison.plot(yy1[, grep('H3K4me1_mUA_', colnames(yy1))], linear.scale = FALSE)
   #plot.pair.comparison.plot(yy1[, grep('H3K4me3_mUA_', colnames(yy1))], linear.scale = FALSE)
   #plot.pair.comparison.plot(yy1[, grep('H3K27me3_mUA_', colnames(yy1))], linear.scale = FALSE)
+  saveRDS(yy1, file = paste0(RdataDir, '/peak_signals_atac_4histM_positionalPeaks.rds'))
+  saveRDS(yy0, file = paste0(RdataDir, '/peak_signals_atac_4histM_notOverlapped.positionalPeaks.rds'))
   
   yy1 = yy1[, grep('mRep', colnames(yy1))]
+  yy0 = yy0[, grep('mRep', colnames(yy0))]
+  
+  # not consider H3K27ac in the main figure
+  yy1 = yy1[, grep('H3K27ac', colnames(yy1), invert = TRUE)]
   
   mm = match(rownames(yy1), rownames(DE.locus))
   DE.peaks = DE.locus[mm, ]
@@ -1227,12 +1246,14 @@ if(Assembly_histMarkers_togetherWith_ATACseq){
     jj = grep(conds_histM[n], colnames(yy1))
     #yy1[,jj] = t(apply(yy1[,jj], 1, cal_centering))
     yy1[ ,jj] = t(apply(yy1[,jj], 1, cal_transform_histM, cutoff.min = 0, cutoff.max = 5, centering = FALSE, toScale = TRUE))
-    #yy1[, jj] = t(apply(yy1[,jj]), 1, cal_z_score)
+    
+    jj0 = grep(conds_histM[n], colnames(yy0))
+    yy0[ ,jj0] = t(apply(yy0[,jj0], 1, cal_transform_histM, cutoff.min = 0, cutoff.max = 5, centering = FALSE, toScale = TRUE))
     
   }
   
-  #yy1 = yy1 - 2
   
+  ### peaks overlapped with atac-seq 
   df = as.data.frame(sapply(colnames(yy1), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[2])}))
   colnames(df) = 'segments'
   rownames(df) = colnames(yy1)
@@ -1251,6 +1272,28 @@ if(Assembly_histMarkers_togetherWith_ATACseq){
            #annotation_colors = annot_colors,
            width = 4, height = 8, 
            filename = paste0(figureDir, '/heatmap_histoneMarker_1246.postionalPeaks.pdf'))
+  
+  ## peaks not overlapped with atac
+  df = as.data.frame(sapply(colnames(yy0), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[2])}))
+  colnames(df) = 'segments'
+  rownames(df) = colnames(yy0)
+  
+  sample_colors = c('springgreen4', 'steelblue2', 'gold2')
+  annot_colors = list(segments = sample_colors)
+  
+  gaps_col = c(6, 12, 18)
+  pheatmap(yy0, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+           color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(12), 
+           show_colnames = FALSE,
+           scale = 'none',
+           cluster_cols=FALSE, annotation_col=df,
+           gaps_col = gaps_col,
+           legend = TRUE,
+           #annotation_colors = annot_colors,
+           width = 4, height = 8, 
+           filename = paste0(figureDir, '/heatmap_histoneMarker_DE_notoverlapped.with.atac.postionalPeaks.pdf'))
+  
+  
   
   ##########################################
   #  # reorder the histM according to the atac-seq peak clusters
@@ -1370,6 +1413,167 @@ if(Assembly_histMarkers_togetherWith_ATACseq){
   dev.off()
   
 }
+
+##########################################
+# characterize the correlations between atac-seq changes and histone markers
+##########################################
+library(tidyr)
+library(dplyr)
+require(ggplot2)
+library(gridExtra)
+library(grid)
+library(lattice)
+library(ggpubr)
+library("cowplot")
+source('Functions_histM.R')
+
+signals = readRDS(file = paste0(RdataDir, '/peak_signals_atac_4histM_positionalPeaks.rds'))
+peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rdata/', 
+                              'position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters_6.rds'))
+ps = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rxxxx_R10723_R11637_R12810_atac/Rdata', 
+                           '/positional_peakSignals.rds'))
+segments = c('mUA', 'mLA', 'mHand')
+
+xx1 = cal_sample_means(ps, conds =  c("Mature_UA", "Mature_LA", "Mature_Hand"))
+colnames(xx1) = paste0('atac_', segments)
+xx1 = data.frame(clusters = peaks$clusters, xx1, stringsAsFactors = FALSE)
+
+conds_histM = c('H3K4me3','H3K27me3', 'H3K4me1', 'H3K27ac')
+cc = paste(rep(conds_histM, each = length(segments)), segments, sep = "_")
+xx2 = cal_sample_means(signals, conds = cc)
+rownames(xx2) = rownames(xx1)
+
+xx1 = data.frame(xx1, xx2, stringsAsFactors = FALSE)
+
+# cluster order : 6, 1, 5, 3, 4, 2
+yy = xx1[which(xx1$clusters == 6),]
+p1 = as_tibble(yy) %>% 
+  gather(marker, signal, 2:16) %>%
+  separate(marker, c('markers', 'segment')) %>%
+  ggplot(aes(x = segment, y = signal, fill = factor(markers, levels = c('atac', 'H3K4me3', 'H3K4me1', 'H3K27me3', 'H3K27ac')))) +
+  #geom_bar(stat = "identity") +
+  geom_boxplot() + 
+  scale_fill_brewer(palette="Dark2") +
+  guides(fill=guide_legend(title="")) +
+  theme_classic() +
+  ggtitle('cluster 1')
+
+yy = xx1[which(xx1$clusters == 1),]
+p2 = as_tibble(yy) %>% 
+  gather(marker, signal, 2:16) %>%
+  separate(marker, c('markers', 'segment')) %>%
+  ggplot(aes(x = segment, y = signal, fill = factor(markers, levels = c('atac', 'H3K4me3', 'H3K4me1', 'H3K27me3', 'H3K27ac')))) +
+  #geom_bar(stat = "identity") +
+  geom_boxplot() + 
+  scale_fill_brewer(palette="Dark2") +
+  guides(fill=guide_legend(title="")) +
+  theme_classic() +
+  ggtitle('cluster 2')
+
+
+yy = xx1[which(xx1$clusters == 5| xx1$clusters == 3),]
+p3 = as_tibble(yy) %>% 
+  gather(marker, signal, 2:16) %>%
+  separate(marker, c('markers', 'segment')) %>%
+  ggplot(aes(x = segment, y = signal, fill = factor(markers, levels = c('atac', 'H3K4me3', 'H3K4me1', 'H3K27me3', 'H3K27ac')))) +
+  #geom_bar(stat = "identity") +
+  geom_boxplot() + 
+  scale_fill_brewer(palette="Dark2") +
+  guides(fill=guide_legend(title="")) +
+  theme_classic() +
+  ggtitle('cluster 3,4')
+
+yy = xx1[which(xx1$clusters == 2| xx1$clusters == 4),]
+p4 = as_tibble(yy) %>% 
+  gather(marker, signal, 2:16) %>%
+  separate(marker, c('markers', 'segment')) %>%
+  ggplot(aes(x = segment, y = signal, fill = factor(markers, levels = c('atac', 'H3K4me3', 'H3K4me1', 'H3K27me3', 'H3K27ac')))) +
+  #geom_bar(stat = "identity") +
+  geom_boxplot() + 
+  scale_fill_brewer(palette="Dark2") +
+  guides(fill=guide_legend(title="")) +
+  theme_classic() +
+  ggtitle('cluster 5,6') 
+  #scale_fill_brewer(palette="BuPu")
+  #geom_violin(width = 0.8) +
+  #scale_color_discrete(values=c('darkblue', 'forestgreen',  "red",   'orange', 'black')) + 
+  #geom_jitter(width = 0.2, size = 0.5) + 
+ 
+  #theme(legend.position = "none")  + 
+  # theme(axis.text.x = element_text(angle = 0))
+plot_list=list()
+plot_list[['p1']]=p1[[4]]
+plot_list[['p2']]=p2[[4]]
+plot_list[['p3']]=p3[[4]]
+plot_list[['p4']]=p4[[4]]
+
+pdf(paste0(figureDir, "/atac_histMarkers_boxplot_byClusters.pdf"),
+    width = 10, height = 6) # Open a new pdf file
+
+#layout = matrix(c(1, 2, 3,4 ), nrow = 2)
+#grid.arrange(grobs=plot_list, nrow= 2,
+#             layout_matrix = layout)
+#p1 + p2 /(p3 + p4)
+plot_grid(p1, p2, p3, p4,
+          ncol = 2, nrow = 2)
+
+dev.off()
+
+##########################################
+# group based on the fact if histone markers follow atac-seq changes, only with UA and Hand 
+##########################################
+peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rdata/', 
+                              'position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters_6.rds'))
+signals = readRDS(file = paste0(RdataDir, '/peak_signals_atac_4histM_positionalPeaks.rds'))
+load(file = paste0(RdataDir, '/combined_4histMarkers_overlapped55kATACseq_DE.Rdata'))
+
+mm = match(rownames(signals), rownames(keep))
+missed = which(is.na(mm))
+cat(missed, ' -- ', rownames(signals)[mm_missed], '\n')
+grep('chr9p:41110738-41112452', rownames(signals))
+
+rownames(keep)[mm[174]]
+mm[missed] = mm[174]
+
+keep = keep[mm, ]
+
+res = matrix(0, nrow = nrow(keep), ncol = 5)
+colnames(res) = c('atac', conds_histM)
+rownames(res) = rownames(peaks)
+res = data.frame(res, stringsAsFactors = FALSE)
+
+res$atac = peaks$logFC.mHand.vs.mUA
+
+fdr.cutoff = 0.05;
+logfc.cutoff = 0;
+marker.cutoff = 1;
+
+for(n in 1:length(conds_histM))
+{
+  marker = conds_histM[n]
+  eval(parse(text = paste0('sels = which(abs(keep$logFC.mHand.vs.mUA_', marker, 
+                           ') > logfc.cutoff & keep$adj.P.Val.mHand.vs.mUA_', marker, ' < fdr.cutoff)')))
+  
+  eval(parse(text = paste0('res$', marker, '[sels] = keep$logFC.mHand.vs.mUA_', marker, '[sels]')))
+  #eval(parse(text = paste0('res$', marker, ' = keep$logFC.mHand.vs.mUA_', marker))) 
+  
+}
+
+yy = res
+
+for(n in 1:ncol(yy)){
+  yy[which(yy[,n] > 0),n] = 1
+  yy[which(yy[,n] < 0),n] = -1
+}
+
+yy = t(yy)
+
+yy = yy[c(5:1), ]
+
+pheatmap(yy, cluster_rows = FALSE, cluster_cols = TRUE, show_rownames = TRUE, show_colnames = FALSE,
+         color = c('darkred', 'white', 'darkgreen'), treeheight_row = 0, treeheight_col = 0, 
+         filename = paste0(figureDir, '/check_histMarkers_follow_atacPeak.pdf'), 
+         width = 6, height = 2)
 
 
 
