@@ -769,64 +769,6 @@ if(grouping.position.dependent.peaks){
   
   
   ##########################################
-  # highlight promoter peaks
-  ##########################################
-  load(file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata'))
-  
-  promoter.sels = grep('Promoter', xx$annotation)
-  yy = keep[promoter.sels, rep.sels]
-  xx = xx[promoter.sels, ]
-  
-  xx[grep('HOXA13|MEIS|SHOX|HOXC', xx$transcriptId), ]
-    
-  gg = xx$geneId
-  grep('HOXA13', gg)
-  rownames(yy) = paste0(rownames(yy), '_', gg)
-  #rownames(keep) = gg
-  yy = as.matrix(yy)
-  
-  gg = rownames(yy)
-  gg = sapply(gg, function(x) {x = unlist(strsplit(as.character(x), '_')); return(paste0(x[2:length(x)], collapse = '_'))})
-  gg = sapply(gg, function(x) {
-          xx = unlist(strsplit(as.character(x), '[|]')); 
-          if(xx[1] == 'N/A') 
-          {
-            return(x);
-          }else{
-            xx = xx[-length(xx)]
-            xx = xx[length(xx)]
-            return(xx);
-          }})
-  gg = as.character(gg)
-  gg = gsub("\\[|\\]", "", gg)
-  gg = gsub(' hs', '', gg)
-  gg = gsub(' nr', '', gg)
-  
-  rownames(yy) = gg
-  sample_colors = c('springgreen4', 'steelblue2', 'gold2')
-  names(sample_colors) = c('Mature_UA', 'Mature_LA', 'Mature_Hand')
-  annot_colors = list(segments = sample_colors)
-  
-  pheatmap(yy, 
-           annotation_col = df, show_rownames = TRUE, scale = 'row', 
-           color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdYlGn")))(8), 
-           show_colnames = FALSE,
-           cluster_rows = TRUE, cluster_cols = FALSE, 
-           annotation_colors = annot_colors, 
-           gaps_col = gaps.col, 
-           #gaps_row =  gaps.row, 
-           filename = paste0(figureDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_top.promoters.pdf'), 
-           width = 10, height = 8)
-  
-  if(saveTable){
-    write.csv(data.frame(keep, yy, stringsAsFactors = FALSE), 
-              file = paste0(resDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_top50_promoterPeaks.csv'), 
-              quote = FALSE, row.names = TRUE)
-    
-  }
-  
-  
-  ##########################################
   # compare the ATAC-seq peaks and microarray data
   # integrative analysis of positional peaks and positional mRNAs
   # either from positional peak, check the potentially regulated target is position dependent

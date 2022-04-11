@@ -1644,30 +1644,78 @@ keep = keep[mm, ]
 
 grep('chr9p:41110738-41112452', rownames(keep))
 
+xx = peaks[, c(1:14)]
+colnames(xx) = paste0('atac_', colnames(xx))
+colnames(xx) = gsub('Mature_UA', 'mUA', colnames(xx))
+colnames(xx) = gsub('Mature_LA', 'mLA', colnames(xx))
+colnames(xx) = gsub('Mature_Hand', 'mHand', colnames(xx))
+colnames(xx) = gsub('HEAD', 'mHEAD', colnames(xx))
 
-res = matrix(0, nrow = nrow(keep), ncol = 5)
-colnames(res) = c('atac', conds_histM)
-rownames(res) = rownames(peaks)
-res = data.frame(res, stringsAsFactors = FALSE)
+xx = data.frame(xx, signals, stringsAsFactors = FALSE)
 
-res$atac = peaks$logFC.mHand.vs.mUA
+source('Functions_histM.R')
+segments = c('mUA', 'mLA', 'mHand')
+conds = c('atac', 'H3K4me3','H3K27me3', 'H3K4me1')
+cc = paste(rep(conds, each = length(segments)), segments, sep = "_")
 
-fdr.cutoff = 0.05;
-logfc.cutoff = 0;
-marker.cutoff = 1;
+yy = cal_sample_means(xx, cc)
 
-for(n in 1:length(conds_histM))
-{
-  marker = conds_histM[n]
-  eval(parse(text = paste0('sels = which(abs(keep$logFC.mHand.vs.mUA_', marker, 
-                           ') > logfc.cutoff & keep$adj.P.Val.mHand.vs.mUA_', marker, ' < fdr.cutoff)')))
-  
-  eval(parse(text = paste0('res$', marker, '[sels] = keep$logFC.mHand.vs.mUA_', marker, '[sels]')))
-  #eval(parse(text = paste0('res$', marker, ' = keep$logFC.mHand.vs.mUA_', marker))) 
+##########################################
+# highlight promoter peaks
+##########################################
+load(file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata'))
+
+promoter.sels = grep('Promoter', xx$annotation)
+yy = keep[promoter.sels, rep.sels]
+xx = xx[promoter.sels, ]
+
+xx[grep('HOXA13|MEIS|SHOX|HOXC', xx$transcriptId), ]
+
+gg = xx$geneId
+grep('HOXA13', gg)
+rownames(yy) = paste0(rownames(yy), '_', gg)
+#rownames(keep) = gg
+yy = as.matrix(yy)
+
+gg = rownames(yy)
+gg = sapply(gg, function(x) {x = unlist(strsplit(as.character(x), '_')); return(paste0(x[2:length(x)], collapse = '_'))})
+gg = sapply(gg, function(x) {
+  xx = unlist(strsplit(as.character(x), '[|]')); 
+  if(xx[1] == 'N/A') 
+  {
+    return(x);
+  }else{
+    xx = xx[-length(xx)]
+    xx = xx[length(xx)]
+    return(xx);
+  }})
+gg = as.character(gg)
+gg = gsub("\\[|\\]", "", gg)
+gg = gsub(' hs', '', gg)
+gg = gsub(' nr', '', gg)
+
+rownames(yy) = gg
+sample_colors = c('springgreen4', 'steelblue2', 'gold2')
+names(sample_colors) = c('Mature_UA', 'Mature_LA', 'Mature_Hand')
+annot_colors = list(segments = sample_colors)
+
+pheatmap(yy, 
+         annotation_col = df, show_rownames = TRUE, scale = 'row', 
+         color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdYlGn")))(8), 
+         show_colnames = FALSE,
+         cluster_rows = TRUE, cluster_cols = FALSE, 
+         annotation_colors = annot_colors, 
+         gaps_col = gaps.col, 
+         #gaps_row =  gaps.row, 
+         filename = paste0(figureDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_top.promoters.pdf'), 
+         width = 10, height = 8)
+
+if(saveTable){
+  write.csv(data.frame(keep, yy, stringsAsFactors = FALSE), 
+            file = paste0(resDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_top50_promoterPeaks.csv'), 
+            quote = FALSE, row.names = TRUE)
   
 }
-
-yy = res
 
 
 
