@@ -810,6 +810,9 @@ if(grouping.position.dependent.peaks){
                    rna$adj.P.Val_mHand.vs.mUA < qv.cutoff.rna & abs(rna$logFC_mHand.vs.mUA) > logfc.cutoff.rna |
                    rna$adj.P.Val_mHand.vs.mLA < qv.cutoff.rna & abs(rna$logFC_mHand.vs.mLA) > logfc.cutoff.rna) )
   
+  pos.genes = rna[select, ]
+  saveRDS(pos.genes, file = paste0('../data/positional_genes.716_microarray.rds'))
+  
   ## VennDiagram showing the overlapp between positional peak targets and positional genes
   library(VennDiagram)
   set1 <- unique(peaks$Gene)

@@ -1602,8 +1602,6 @@ ps = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rxxxx_R107
 mm = match(rownames(peaks), rownames(ps))
 peaks = data.frame(ps[mm, ], peaks, stringsAsFactors = FALSE)
 
-# saveRDS(peaks, 
-# file = paste0(RdataDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters6_DEtest_peakSignals.rds'))
 
 pp = data.frame(t(sapply(rownames(peaks), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
 pp$strand = '*'
@@ -1612,6 +1610,15 @@ pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
 # annotation from ucsc browser ambMex60DD_genes_putative
 amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
 pp.annots = annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+
+pp.annots = as.data.frame(pp.annots)
+rownames(pp.annots) = rownames(peaks)
+
+## update the peak annoation using limb-fibroblast expressing genes
+peaks[, c(36:49)] = pp.annots
+
+saveRDS(peaks, file = paste0(RdataDir, 
+        '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters6_DEtest_peakSignals_peakAnnot.updated.rds'))
 
 # amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
 # pp.annots = annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
@@ -1631,7 +1638,7 @@ dev.off()
 signals = readRDS(file = paste0(RdataDir, '/peak_signals_atac_4histM_positionalPeaks.rds'))
 load(file = paste0(RdataDir, '/combined_4histMarkers_overlapped55kATACseq_DE.Rdata'))
 peaks = readRDS(paste0(RdataDir, 
-                       '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters6_DEtest_peakSignals.rds'))
+    '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters6_DEtest_peakSignals_peakAnnot.updated.rds'))
 
 mm = match(rownames(signals), rownames(keep))
 missed = which(is.na(mm))
@@ -1660,55 +1667,51 @@ cc = paste(rep(conds, each = length(segments)), segments, sep = "_")
 
 yy = cal_sample_means(xx, cc)
 
-##########################################
-# highlight promoter peaks
-##########################################
-load(file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata'))
+### highlight promoter peaks
+promoter.sels = grep('Promoter', peaks$annotation)
 
-promoter.sels = grep('Promoter', xx$annotation)
-yy = keep[promoter.sels, rep.sels]
-xx = xx[promoter.sels, ]
+yy.sels = yy[promoter.sels, ]
+peaks.sels = peaks[promoter.sels, ]
 
-xx[grep('HOXA13|MEIS|SHOX|HOXC', xx$transcriptId), ]
+peaks.sels[grep('HOXA13|MEIS|SHOX|HOX', peaks.sels$transcriptId), ]
 
-gg = xx$geneId
-grep('HOXA13', gg)
-rownames(yy) = paste0(rownames(yy), '_', gg)
-#rownames(keep) = gg
-yy = as.matrix(yy)
+## sort the promoters with fdr and takes the top30
+ntop = 30
+o1 = order(-peaks.sels$fdr.mean)
+peaks.sels = peaks.sels[o1[1:ntop], ]
+yy.sels = yy.sels[o1[1:ntop], ]
 
-gg = rownames(yy)
-gg = sapply(gg, function(x) {x = unlist(strsplit(as.character(x), '_')); return(paste0(x[2:length(x)], collapse = '_'))})
-gg = sapply(gg, function(x) {
-  xx = unlist(strsplit(as.character(x), '[|]')); 
-  if(xx[1] == 'N/A') 
-  {
-    return(x);
-  }else{
-    xx = xx[-length(xx)]
-    xx = xx[length(xx)]
-    return(xx);
-  }})
-gg = as.character(gg)
-gg = gsub("\\[|\\]", "", gg)
-gg = gsub(' hs', '', gg)
-gg = gsub(' nr', '', gg)
+geneSymbols = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                       'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
 
-rownames(yy) = gg
+ggs = peaks.sels$geneId
+mm = match(ggs, geneSymbols$geneID)
+ggs[!is.na(mm)] = geneSymbols$gene.symbol.toUse[mm[!is.na(mm)]]
+
+grep('HOX', ggs)
+
+rownames(yy.sels) = ggs
+yy.sels = as.matrix(yy.sels)
+
+df = data.frame(segments = sapply(colnames(yy.sels), function(x) unlist(strsplit(as.character(x), '_'))[2]))
+colnames(df) = c('seg')
+rownames(df) = colnames(yy.sels)
+
 sample_colors = c('springgreen4', 'steelblue2', 'gold2')
-names(sample_colors) = c('Mature_UA', 'Mature_LA', 'Mature_Hand')
+names(sample_colors) = c('mUA', 'mLA', 'mHand')
 annot_colors = list(segments = sample_colors)
 
-pheatmap(yy, 
+gaps.col = c(3, 6, 9)
+pheatmap(yy.sels, 
          annotation_col = df, show_rownames = TRUE, scale = 'row', 
          color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdYlGn")))(8), 
          show_colnames = FALSE,
          cluster_rows = TRUE, cluster_cols = FALSE, 
          annotation_colors = annot_colors, 
-         gaps_col = gaps.col, 
+         gaps_col = gaps.col, fontsize_row = 10,
          #gaps_row =  gaps.row, 
-         filename = paste0(figureDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_top.promoters.pdf'), 
-         width = 10, height = 8)
+         filename = paste0(figureDir, '/heatmap_positionalPeaks_top30.promoters.pdf'), 
+         width = 10, height = 6)
 
 if(saveTable){
   write.csv(data.frame(keep, yy, stringsAsFactors = FALSE), 
@@ -1716,6 +1719,110 @@ if(saveTable){
             quote = FALSE, row.names = TRUE)
   
 }
+
+#### highlight the enhancers
+sels = grep('Intergenic|Intron', peaks$annotation)
+
+yy.sels = yy[sels, ]
+peaks.sels = peaks[sels, ]
+
+peaks.sels[grep('HOXA13|MEIS|SHOX|HOX', peaks.sels$transcriptId), ]
+
+## sort the promoters with fdr and takes the top30
+ntop = 50
+o1 = order(-peaks.sels$fdr.mean)
+peaks.sels = peaks.sels[o1[1:ntop], ]
+yy.sels = yy.sels[o1[1:ntop], ]
+
+geneSymbols = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                             'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
+
+ggs = peaks.sels$geneId
+mm = match(ggs, geneSymbols$geneID)
+ggs[!is.na(mm)] = geneSymbols$gene.symbol.toUse[mm[!is.na(mm)]]
+
+grep('HOX', ggs)
+
+rownames(yy.sels) = ggs
+yy.sels = as.matrix(yy.sels)
+
+df = data.frame(segments = sapply(colnames(yy.sels), function(x) unlist(strsplit(as.character(x), '_'))[2]))
+colnames(df) = c('seg')
+rownames(df) = colnames(yy.sels)
+
+sample_colors = c('springgreen4', 'steelblue2', 'gold2')
+names(sample_colors) = c('mUA', 'mLA', 'mHand')
+annot_colors = list(segments = sample_colors)
+
+gaps.col = c(3, 6, 9)
+pheatmap(yy.sels, 
+         annotation_col = df, show_rownames = TRUE, scale = 'none', 
+         color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdYlGn")))(8), 
+         show_colnames = FALSE,
+         cluster_rows = TRUE, cluster_cols = FALSE, 
+         annotation_colors = annot_colors, 
+         gaps_col = gaps.col, fontsize_row = 10,
+         #gaps_row =  gaps.row, 
+         filename = paste0(figureDir, '/heatmap_positionalPeaks_top50.enhancers.pdf'), 
+         width = 10, height = 12)
+
+
+##########################################
+# distance distribution of between positional peaks and positional genes
+##########################################
+peaks = readRDS(paste0(RdataDir, 
+  '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters6_DEtest_peakSignals_peakAnnot.updated.rds'))
+
+pp = data.frame(t(sapply(rownames(peaks), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+pp$strand = '*'
+pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                              start.field="X2", end.field="X3", strand.field="strand")
+
+gtf.file =  '../data/AmexT_v47_Hox.patch_limb.fibroblast.expressing.23585.genes.dev.mature.regeneration.gtf'
+aa = import(gtf.file)
+
+# load the positional gene list
+genes = readRDS(file = '../data/positional_genes.716_microarray.rds')
+ids = sapply(rownames(genes), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
+kk = unique(c(grep('^HOX', aa$gene_id), which(!is.na(match(aa$gene_id, ids)))))
+
+aa = aa[kk, ]
+
+amex = GenomicFeatures::makeTxDbFromGRanges(aa)
+pp.annots = annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+
+pp.annots = as.data.frame(pp.annots)
+rownames(pp.annots) = rownames(peaks)
+
+dists = data.frame(peak.to.expr = peaks$distanceToTSS, peak.to.positional = pp.annots$distanceToTSS, stringsAsFactors = FALSE)
+
+dists = apply(dists, 2, function(x) {sign(x) * log10(abs(x)+1)})
+
+library(tidyr)
+library(dplyr)
+require(ggplot2)
+library(gridExtra)
+library(grid)
+library(lattice)
+library(ggpubr)
+library("cowplot")
+as_tibble(dists) %>% 
+  gather(geneGroup, dist, 1:2) %>%
+  ggplot(aes(x=dist, color = geneGroup)) + 
+  geom_density(size = 1.) +
+  theme_classic() +
+  scale_color_brewer(palette="Dark2") +
+  labs(x = 'distance to closest TSS (log10 bp)') +
+  geom_vline(xintercept=c(-7, -5.5, 5.5, 7), col='gray', size = 1.) +
+  theme(legend.text = element_text(size=10),
+        legend.title = element_text(size = 10),
+        legend.position=c(0.5, 0.8),
+        plot.margin = margin()
+        #legend.key.size = unit(1, 'cm')
+        #legend.key.width= unit(1, 'cm')
+  )
+
+ggsave(paste0(figureDir, "distance_to_closest_genes_positionalPeaks.pdf"), width=4, height = 3)
 
 
 
