@@ -895,9 +895,12 @@ sps = toupper(unique(sps$gene))
 sps = setdiff(sps, tfs)
 
 ##########################################
+# Be carefull here !!!! 
 # select the R10724 samples without sample 136150 with is names 13615x
+# only keep the sample 136150 from the request R11635
 ##########################################
-load(file = paste0(RdataDir, 'design_dds_all_regeneration.samples_allBatches.Rdata'))
+load(file = paste0('/Users/jiwang/workspace/imp/positional_memory/results/rnaseq_Rxxxx.old_R10724_R161513_mergedTechRep/Rdata/',
+                   'design_dds_all_regeneration.samples_allBatches.Rdata'))
 #design$condition = sapply(design$condition, function(x) )
 design$protocol = gsub(' ', '', design$protocol)
 design$batch = paste0(design$request, '_', design$protocol)
@@ -1512,6 +1515,8 @@ if(Pool.scRNAseq.pseudobulk){
   colnames(pseudo) = paste0(design$condition, '_', design$plates)
   
   dds <- DESeqDataSetFromMatrix(pseudo, DataFrame(design), design = ~ condition)
+  
+  # saveRDS(dds, file = paste0(Rdata.smartseq2, 'Geber_pooledscRNA_muA_regeneration_dev.rds'))
   
   # filtering with stage40/44 samples
   ss = rowMax(counts(dds))

@@ -80,6 +80,228 @@ Define_limb_expressed_genes = function()
   ggs$names[-kk] = paste0(as.character(ggs$geneSymbol[-kk]), '_', as.character(ggs$geneID[-kk]))
   
   
+  ### check the smartseq2 mature samples
+  # load dds normalized object and annotations
+  load(file = paste0( "../results/RNAseq_data_used/Rdata/",  'dds_design.matrix_all29smartseq2_beforeFiltering.Rdata'))
+  
+  sels = intersect(which(design.matrix$batch == 4|design.matrix$batch == 3), 
+                   grep('Mature_LA|Mature_UA|Mature_Hand', design.matrix$condition))
+  dds = dds[, sels]
+  
+  tpm3 <- function(counts,len) {
+    x <- counts/len
+    return(t(t(x)*1e6/colSums(x)))
+  }
+  
+  raw = counts(dds)
+  ids =  sapply(rownames(raw), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
+  ll = ggs$length[match(ids, ggs$geneID)]
+  tpm = tpm3(raw, ll)
+  
+  source('Functions_histM.R')
+  means = cal_sample_means(tpm, conds = c("Mature_UA", 'Mature_LA', 'Mature_Hand') )
+  ss = apply(means, 1, sum)
+  ids =  sapply(rownames(means), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
+  xx = means[which(ss>0), ]
+  log2(range(xx[which(xx>0)]))
+  
+  xx = log2(xx + 2^-12)
+  
+  # VIM is fibroblast marker
+  xx[grep('SHH|PAX6|CD68|VIM|FOXA2|MYH6', rownames(xx)), ]
+  
+  cutoff = 0;
+  ss = apply(xx, 1, function(x) length(which(x>cutoff))>0 )
+  xx0 = xx[ss, ]
+  xx0[grep('SHH|PAX6|CD68|VIM|FOXA2|MYH6', rownames(xx0)), ]
+  dim(xx0)
+  
+  ids =  sapply(rownames(xx0), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
+  
+  ## save the result from mature samples
+  ggs$expr_mature = 0
+  ggs$expr_mature[match(ids, ggs$geneID)] = 1
+  
+  ##########################################
+  # define limb fibroblast expressing genes in regeneration using smartseq2 
+  ##########################################
+  ### check the smartseq2 mature samples
+  # load dds normalized object and annotations
+  load(file = paste0( "../results/RNAseq_data_used/Rdata/",  'dds_design.matrix_all29smartseq2_beforeFiltering.Rdata'))
+  
+  sels = intersect(which(design.matrix$batch == 3|design.matrix$batch == 2), 
+                   grep('BL_', design.matrix$condition))
+  sels = sels[which(design.matrix$SampleID[sels] != '136150')]
+  
+  dds = dds[, sels]
+  
+  tpm3 <- function(counts,len) {
+    x <- counts/len
+    return(t(t(x)*1e6/colSums(x)))
+  }
+  
+  raw = counts(dds)
+  ids =  sapply(rownames(raw), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
+  ll = ggs$length[match(ids, ggs$geneID)]
+  tpm = tpm3(raw, ll)
+  
+  source('Functions_histM.R')
+  means = cal_sample_means(tpm, conds = c("BL_UA_5days", 'BL_UA_9days', 'BL_UA_13days_proximal', 'BL_UA_13days_distal') )
+  ss = apply(means, 1, sum)
+  ids =  sapply(rownames(means), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
+  xx = means[which(ss>0), ]
+  log2(range(xx[which(xx>0)]))
+  
+  xx = log2(xx + 2^-12)
+  hist(xx, breaks = 50)
+  # VIM is fibroblast marker
+  xx[grep('SHH|PAX6|CD68|VIM|FOXA2|MYH6', rownames(xx)), ]
+  
+  cutoff = 0;
+  ss = apply(xx, 1, function(x) length(which(x>cutoff))>0 )
+  xx0 = xx[ss, ]
+  xx0[grep('SHH|PAX6|CD68|VIM|FOXA2|MYH6', rownames(xx0)), ]
+  dim(xx0)
+  
+  ids =  sapply(rownames(xx0), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
+  
+  ## save the result from mature samples
+  ggs$expr_reg = 0
+  ggs$expr_reg[match(ids, ggs$geneID)] = 1
+  
+  yy = as.matrix(ggs[, c(6:7)])
+  length(which(apply(yy, 1, sum)>0))
+  
+  ##########################################
+  # scRNA-seq data to identify limb-fibroblast expressing gene in dev 
+  ##########################################
+  RdataDir.old = '/Users/jiwang/workspace/imp/positional_memory/results/rnaseq_Rxxxx.old_R10724_R161513_mergedTechRep/Rdata/'
+  dds = readRDS(file = paste0(RdataDir.old, 'Geber_pooledscRNA_muA_regeneration_dev.rds'))
+  
+  
+  sels = grep('Stage', colnames(dds))
+  
+  dds = dds[, sels]
+  
+  tpm3 <- function(counts,len) {
+    x <- counts/len
+    return(t(t(x)*1e6/colSums(x)))
+  }
+  
+  raw = counts(dds)
+  ids =  sapply(rownames(raw), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
+  mm = match(ids, ggs$geneID)
+  raw = raw[which(!is.na(mm)), ]
+  ids = ids[which(!is.na(mm))]
+  
+  ll = ggs$length[match(ids, ggs$geneID)]
+  tpm = tpm3(raw, ll)
+  
+  source('Functions_histM.R')
+  means = cal_sample_means(tpm, conds = c('Stage40', 'Stage44'))
+  ss = apply(means, 1, sum)
+  ids =  sapply(rownames(means), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
+  xx = means[which(ss>0), ]
+  log2(range(xx[which(xx>0)]))
+  
+  xx = log2(xx + 2^-12)
+  hist(xx, breaks = 50)
+  # VIM is fibroblast marker
+  xx[grep('SHH|PAX6|CD68|VIM|FOXA2|MYH6', rownames(xx)), ]
+  
+  cutoff = 0;
+  ss = apply(xx, 1, function(x) length(which(x>cutoff))>0 )
+  xx0 = xx[ss, ]
+  xx0[grep('SHH|PAX6|CD68|VIM|FOXA2|MYH6', rownames(xx0)), ]
+  dim(xx0)
+  
+  ids =  sapply(rownames(xx0), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
+  
+  ## save the result from mature samples
+  ggs$expr_dev = 0
+  ggs$expr_dev[match(ids, ggs$geneID)] = 1
+  
+  yy = as.matrix(ggs[, c(6:8)])
+  ss = apply(yy, 1, sum)
+  
+  ggs$expressed = 0
+  ggs$expressed[which(ss>0)] = 1
+  
+  saveRDS(ggs, file = paste0('expressedGenes_list_limb_fibroblast_using_smartseq2.mature.regeneration_pooledscRNAseq.dev.rds')) 
+  
+  ####################################################################################
+  # not used from here
+  ####################################################################################
+  # xx = sample.means
+  # for(n in 1:ncol(sample.means))
+  # {
+  #   # n = 1
+  #   x = sample.means[,n]
+  #   x = x[which(x>0)]
+  #   x = log2(x)
+  #   ids = sapply(names(x), function(x){x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
+  #   ii.control = which(!is.na(match(ids, ctl)))
+  #   cutoff =  quantile(x[ii.control], 0.75)
+  #   
+  #   hist(x, breaks = 100);abline(v = log2(cutoff), lwd = 2.0, col = 'red')
+  #   cat(n,  ' -- cutoff used ', log2(cutoff), '--', length(which(x>log2(cutoff))),  ' expressed gene \n')
+  #   
+  #   xx[,n] = sample.means[,n] > cutoff  
+  #   
+  # }
+  # 
+  # xx[grep('SHH|PAX6|CD68|VIM|FOXA2', rownames(xx)), ]
+  # nbs = apply(xx, 1, sum)
+  # nbs = nbs[which(nbs>0)]
+  # 
+  # geneID.expr = sapply(names(nbs), function(x){x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
+  # 
+  # ggs$expr.mature.smartseq = NA
+  # ggs$expr.mature.smartseq[!is.na(match(ggs$geneID, geneID.expr))] = 1
+  # 
+  
+  
+  # Test.multiple.gaussian = FALSE
+  # if(Test.multiple.gaussian){
+  #   for(n in 1:ncol(cpm)){
+  #     # n = 1
+  #     x = cpm[,n]
+  #     x = x[x>0]
+  #     #x = log2(x)
+  #     #x = x[which(x>-2)]
+  #     cat(length(x), '\n')
+  #     ii.control = which(!is.na(match(ids, ctl)))
+  #     
+  #     gg.expr = unique(c(gg.expr, names(x)))
+  #     
+  #     PLOT.EM = FALSE
+  #     if(PLOT.EM){
+  #       require(mixtools)
+  #       fit <- normalmixEM(x, lambda = c(0.4, 0.6), 
+  #                          mu = c(5, 10), sigma = NULL, 
+  #                          #mean.constr=m.constr, 
+  #                          #sd.constr=sigma.constr, 
+  #                          k=2, maxrestarts=20, maxit = 1500)
+  #       #plot(fit, density=TRUE)
+  #       lambda = fit$lambda;
+  #       par1 = fit$mu
+  #       par2 = fit$sigma
+  #       
+  #       xfit<-seq(min(x),max(x),length=100)
+  #       yfit1<-dnorm(xfit, par1[1],par2[1])*lambda[1]
+  #       yfit2<-dnorm(xfit, par1[2],par2[2])*lambda[2]
+  #       
+  #       #test = c(test, percent*lambda[c(1:2)])
+  #       hist(x, breaks=60,  freq=FALSE)
+  #       lines(xfit, yfit1, col='green', lwd=2.0)
+  #       lines(xfit, yfit2, col='green', lwd=2.)
+  #       abline(v = c(7:9), lwd = 2.0, col = 'red')
+  #       
+  #     }
+  #     
+  #   }
+  # }
+  
   ### check first the microarray data for mature samples
   Define_limb.expressing.genes_microarray = FALSE
   if(Define_limb.expressing.genes_microarray){
@@ -131,111 +353,8 @@ Define_limb_expressed_genes = function()
     ggs$expr.mature.microarray = NA
     ggs$expr.mature.microarray[!is.na(match(ggs$geneID, xx))] = 1
     
-  }
-  
-  ###### check the smartseq2 mature samples
-  # load dds normalized object and annotations
-  Rdata.smartseq2 = "../results/rnaseq_Rxxxx.old_R10724_R161513_mergedTechRep/Rdata/"
-  #load(file = paste0(Rdata.smartseq2, 'dds_design.matrix_all29smartseq2_beforeFiltering.Rdata'))
-  load(file = paste0(RdataDir, 'dds_design.matrix_all29smartseq2_beforeFiltering.Rdata'))
-
-  # select mature samples
-  sels = intersect(which(design.matrix$batch == 4), grep('Mature', design.matrix$condition))
-  dds = dds[, sels]
-  
-  cpm = fpm(dds)
-  cpm = cpm[, grep('HEAD', colnames(cpm), invert = TRUE)]
-  
-  conds = c("Mature_UA", 'Mature_LA', 'Mature_Hand') 
-  sample.means = c()
-  for(n in 1:length(conds)) 
-  {
-    kk = grep(conds[n], colnames(cpm))
-    #sample.sels = c(sample.sels, kk)
-    #cc = c(cc, rep(conds[n], length(kk)))
-    if(length(kk)>1) {
-      sample.means = cbind(sample.means, apply(cpm[, kk], 1, mean))
-    }else{
-      sample.means = cbind(sample.means, cpm[, kk])
-    }
-    
-  }  
-  colnames(sample.means) = conds
-  
-  log2(sample.means[grep('SHH|PAX6|CD68|VIM|FOXA2', rownames(sample.means)), ])
-  
-  xx = sample.means
-  for(n in 1:ncol(sample.means))
-  {
-    # n = 1
-    x = sample.means[,n]
-    x = x[which(x>0)]
-    x = log2(x)
-    ids = sapply(names(x), function(x){x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
-    ii.control = which(!is.na(match(ids, ctl)))
-    cutoff =  quantile(x[ii.control], 0.75)
-    
-    hist(x, breaks = 100);abline(v = log2(cutoff), lwd = 2.0, col = 'red')
-    cat(n,  ' -- cutoff used ', log2(cutoff), '--', length(which(x>log2(cutoff))),  ' expressed gene \n')
-    
-    xx[,n] = sample.means[,n] > cutoff  
     
   }
-  
-  xx[grep('SHH|PAX6|CD68|VIM|FOXA2', rownames(xx)), ]
-  nbs = apply(xx, 1, sum)
-  nbs = nbs[which(nbs>0)]
-  
-  geneID.expr = sapply(names(nbs), function(x){x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
-  
-  ggs$expr.mature.smartseq = NA
-  ggs$expr.mature.smartseq[!is.na(match(ggs$geneID, geneID.expr))] = 1
-  
-  
-  
-  
-  Test.multiple.gaussian = FALSE
-  if(Test.multiple.gaussian){
-    for(n in 1:ncol(cpm)){
-      # n = 1
-      x = cpm[,n]
-      x = x[x>0]
-      #x = log2(x)
-      #x = x[which(x>-2)]
-      cat(length(x), '\n')
-      ii.control = which(!is.na(match(ids, ctl)))
-      
-      gg.expr = unique(c(gg.expr, names(x)))
-      
-      PLOT.EM = FALSE
-      if(PLOT.EM){
-        require(mixtools)
-        fit <- normalmixEM(x, lambda = c(0.4, 0.6), 
-                           mu = c(5, 10), sigma = NULL, 
-                           #mean.constr=m.constr, 
-                           #sd.constr=sigma.constr, 
-                           k=2, maxrestarts=20, maxit = 1500)
-        #plot(fit, density=TRUE)
-        lambda = fit$lambda;
-        par1 = fit$mu
-        par2 = fit$sigma
-        
-        xfit<-seq(min(x),max(x),length=100)
-        yfit1<-dnorm(xfit, par1[1],par2[1])*lambda[1]
-        yfit2<-dnorm(xfit, par1[2],par2[2])*lambda[2]
-        
-        #test = c(test, percent*lambda[c(1:2)])
-        hist(x, breaks=60,  freq=FALSE)
-        lines(xfit, yfit1, col='green', lwd=2.0)
-        lines(xfit, yfit2, col='green', lwd=2.)
-        abline(v = c(7:9), lwd = 2.0, col = 'red')
-        
-      }
-      
-    }
-  }
-  
-  
   
 }
 

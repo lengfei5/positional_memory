@@ -1415,6 +1415,48 @@ if(Assembly_histMarkers_togetherWith_ATACseq){
 }
 
 ##########################################
+# feature distribution of positional atac-seq peaks
+# promoter peaks and top enhancer peaks with atac-seq and histone markers
+##########################################
+library('rtracklayer')
+library(GenomicRanges)
+library('GenomicFeatures')
+
+## save gtf of axolotl limb fibroblast expressing genes
+# annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
+# annot = import(paste0(annotDir, 'AmexT_v47_Hox.patch.gtf'))
+# 
+# gene.expr = readRDS(file = '../data/expressedGenes_list_limb_fibroblast_using_smartseq2.mature.regeneration_pooledscRNAseq.dev.rds')
+# id.expr = gene.expr$geneID[which(gene.expr$expressed>0)]
+# 
+# aa = annot[which(!is.na(match(annot$gene_id, id.expr)))]
+# export(aa, con = paste0('../data/AmexT_v47_Hox.patch_limb.fibroblast.expressing.23585.genes.dev.mature.regeneration.gtf'), 
+#        format = 'gtf')
+gtf.file =  '../data/AmexT_v47_Hox.patch_limb.fibroblast.expressing.23585.genes.dev.mature.regeneration.gtf'
+peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rdata/', 
+                              'position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters_6.rds'))
+pp = data.frame(t(sapply(rownames(peaks), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+pp$strand = '*'
+pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                              start.field="X2", end.field="X3", strand.field="strand")
+# annotation from ucsc browser ambMex60DD_genes_putative
+amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
+pp.annots = annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+
+amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
+pp.annots = annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+
+#plotAnnoBar(pp.annots)
+pdfname = paste0(figureDir, "feature_distribution_positionalPeaks.pdf")
+pdf(pdfname, width = 6, height = 4)
+par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+
+plotPeakAnnot_piechart(pp.annots)
+
+dev.off()
+
+
+##########################################
 # characterize the correlations between atac-seq changes and histone markers
 ##########################################
 library(tidyr)
