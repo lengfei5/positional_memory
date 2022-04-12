@@ -554,6 +554,7 @@ Subtract.IgG.inputs_viaGlobalScaling = function()
   }
 }
 
+
 plot_individual_histMarker_withinATACpeak = function(res)
 {
   # res = res[order(-res$log2fc), ]
@@ -642,4 +643,19 @@ plot_individual_histMarker_withinATACpeak = function(res)
   #          filename = paste0(figureDir, '/heatmap_histoneMarker_', conds_histM[n_histM], '_overlappedWithAtacseqPeak_nonscaled.pdf'))
 
 }
+
+
+##########################################
+# compare MACS2 and SEACR peak caller 
+##########################################
+Compare.MACS2.vs.SEACR = function()
+{
+  # MACS2 differnet thresholds (10^-3, 10^-4, 10^-5, 10^-6)
+  # SEACR relaxed, stringent, top0.01
+  
+  
+  
+  
+}
+
 

@@ -1825,8 +1825,6 @@ as_tibble(dists) %>%
 ggsave(paste0(figureDir, "distance_to_closest_genes_positionalPeaks.pdf"), width=4, height = 3)
 
 
-
-
 ########################################################
 ########################################################
 # Section VI : regeneration-related histone markers
