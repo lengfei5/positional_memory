@@ -1678,7 +1678,6 @@ pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
   #pseudo[, 2] = pseudo[,2] + pseudo[, 3]
   #pseudo = pseudo[, c(1, 2)]
   #colnames(pseudo) = c('mUA', 'stage40.44')
-  
   annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
                          'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
   
