@@ -180,7 +180,6 @@ if(Peaks.Background.selection){
   select.background.for.peaks = TRUE
   
   if(select.peaks.with.readThreshold){
-    
     #ss = rowMax(counts(dds)[, grep('Embryo_', dds$conds)])
     ss = rowMaxs(counts(dds))/ll*500
     hist(log10(ss), breaks = 200, main = 'log2(max of read counts within peaks) ')
@@ -191,25 +190,9 @@ if(Peaks.Background.selection){
     abline(v= log10(cutoff.peak), col = 'red', lwd = 2.0)
     abline(v= log10(cutoff.bg), col = 'blue', lwd = 2.0)
     
-    cat(length(which(ss >= 30)), 'peaks selected with minimum read of the highest peak -- ', cutoff.peak,  '\n')
-    cat(length(which(ss >= 40)), 'peaks selected with minimum read of the highest peak -- ', cutoff.peak,  '\n')
-    cat(length(which(ss >= 50)), 'peaks selected with minimum read of the highest peak -- ', cutoff.peak,  '\n')
-    
-    ii_test = rownames(dds)[which(ss>29.9 & ss<30.1)] 
-    ii_test[sample(1:length(ii_test), 20)]
-    
-    ii_test = rownames(dds)[which(ss>39.9 & ss<40.1)] 
-    ii_test[sample(1:length(ii_test), 20)]
-    
-    cutoff.peak = 40
     nb.above.threshold = apply(counts(dds), 1, function(x) length(which(x>cutoff.peak)))
-    #ii = which(ss >= cutoff.peak)
-    
-    ##########################################
-    # atac-seq peak selection: > 40 cutoff within >= 2 samples
-    ##########################################
-    ii = which(nb.above.threshold>=2)
-    cat(length(ii), ' atac-seq peaks selected \n')
+    ii = which(ss >= cutoff.peak)
+    #ii = which(nb.above.threshold>=2)
     
     if(select.background.for.peaks){
       ii.bg = which(ss < cutoff.bg)
@@ -225,6 +208,60 @@ if(Peaks.Background.selection){
     
   }
   
+  # ##########################################
+  # # filter peaks below certain thrshold of read counts
+  # # And also consider those filtered peaks as background
+  # ##########################################
+  # select.peaks.with.readThreshold = TRUE
+  # select.background.for.peaks = TRUE
+  # 
+  # if(select.peaks.with.readThreshold){
+  #   
+  #   #ss = rowMax(counts(dds)[, grep('Embryo_', dds$conds)])
+  #   ss = rowMaxs(counts(dds))/ll*500
+  #   hist(log10(ss), breaks = 200, main = 'log2(max of read counts within peaks) ')
+  #   cutoff.peak = 50 # 30 as peak cutoff looks good
+  #   cutoff.bg = 20
+  #   cat(length(which(ss >= cutoff.peak)), 'peaks selected with minimum read of the highest peak -- ', cutoff.peak,  '\n')
+  #   cat(length(which(ss < cutoff.bg)), 'peaks selected with minimum read of the highest peak -- ', cutoff.bg,  '\n')
+  #   abline(v= log10(cutoff.peak), col = 'red', lwd = 2.0)
+  #   abline(v= log10(cutoff.bg), col = 'blue', lwd = 2.0)
+  #   
+  #   cat(length(which(ss >= 30)), 'peaks selected with minimum read of the highest peak -- ', cutoff.peak,  '\n')
+  #   cat(length(which(ss >= 40)), 'peaks selected with minimum read of the highest peak -- ', cutoff.peak,  '\n')
+  #   cat(length(which(ss >= 50)), 'peaks selected with minimum read of the highest peak -- ', cutoff.peak,  '\n')
+  #   
+  #   ii_test = rownames(dds)[which(ss>29.9 & ss<30.1)] 
+  #   ii_test[sample(1:length(ii_test), 20)]
+  #   
+  #   ii_test = rownames(dds)[which(ss>39.9 & ss<40.1)] 
+  #   ii_test[sample(1:length(ii_test), 20)]
+  #   
+  #   cutoff.peak = 40
+  #   nb.above.threshold = apply(counts(dds), 1, function(x) length(which(x>cutoff.peak)))
+  #   #ii = which(ss >= cutoff.peak)
+  #   
+  #   
+  #   ##########################################
+  #   # atac-seq peak selection: > 40 cutoff within >= 2 samples
+  #   ##########################################
+  #   ii = which(nb.above.threshold>=2)
+  #   cat(length(ii), ' atac-seq peaks selected \n')
+  #   
+  #   if(select.background.for.peaks){
+  #     ii.bg = which(ss < cutoff.bg)
+  #     ii.bg = sample(ii.bg, size = 1000, replace = FALSE)
+  #     rownames(dds)[ii.bg] = paste0('bg_', rownames(dds)[ii.bg])
+  #     dds = dds[c(ii, ii.bg), ]
+  #     ll.sels = ll[c(ii, ii.bg)]
+  #     
+  #   }else{
+  #     dds <- dds[ii, ]
+  #     ll.sels = ll[ss >= cutoff.peak]
+  #   }
+  #   
+  # }
+  
   dds <- estimateSizeFactors(dds)
   
   plot(sizeFactors(dds), colSums(counts(dds))/median(colSums(counts(dds))), log = 'xy')
@@ -232,7 +269,7 @@ if(Peaks.Background.selection){
   plot(sizeFactors(dds), design$usable, log = 'xy')
   text(sizeFactors(dds), design$usable, labels = design$samples, cex = 0.7)
   
-  save(design, dds, file = paste0(RdataDir, '/ATACseq_selected.63k.peaks_cutoff.40.at.least.2sample.Rdata'))
+  save(design, dds, file = paste0(RdataDir, '/ATACseq_selected.55k.peaks_cutoff.50.at.least.1sample.Rdata'))
   
   save.scalingFactors.for.deeptools = FALSE
   if(save.scalingFactors.for.deeptools){
