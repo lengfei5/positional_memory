@@ -16,7 +16,7 @@ source(RNA.QC.functions)
 source('functions_chipSeq.R')
 source('Functions_atac.R')
 
-version.analysis = 'ATAC_allUsed_20220328'
+version.analysis = 'Rxxxx_R10723_R11637_R12810_atac'
 #peakDir = "Peaks/macs2_broad"
 
 resDir = paste0("../results/", version.analysis)
@@ -32,11 +32,14 @@ gtf.file =  paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf')
 figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
 tableDir = paste0(figureDir, 'tables4plots/')
 
+saveTables = FALSE
+
 require(ggplot2)
 require(DESeq2)
 require(GenomicRanges)
 require(pheatmap)
 library(tictoc)
+
 
 ########################################################
 ########################################################
