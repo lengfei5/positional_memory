@@ -650,12 +650,144 @@ plot_individual_histMarker_withinATACpeak = function(res)
 ##########################################
 Compare.MACS2.vs.SEACR = function()
 {
+  library('rtracklayer')
+  library(GenomicRanges)
+  library('GenomicFeatures')
+  
   # MACS2 differnet thresholds (10^-3, 10^-4, 10^-5, 10^-6)
   # SEACR relaxed, stringent, top0.01
   
+  ## process Akane's CENs and putative enhancers
+  enhancers = read.delim(file = '../data/HoxAD_enhancer_fromAkane.bed.txt', header = FALSE)
+  enhancers = data.frame(enhancers, stringsAsFactors = FALSE)
+  enhancers$score = 100
+  enhancers$strand = '*'
   
+  write.table(enhancers, file = paste0('../data/HoxAD_enhancer_fromAkane.bed'), col.names = FALSE, row.names = FALSE, quote = FALSE,
+              sep = '\t')
+  
+  
+  ## different stringencies of macs2
+  peakDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/histMod_CT_using/calledPeaks/macs2'
+  peak.files = list.files(path = peakDir,
+                          pattern = '*_peaks.xls', full.names = TRUE)
+  peak.files = peak.files[grep('185746', peak.files)]
+  
+  p = readPeakFile(peak.files, as = "GRanges");
+  #eval(parse(text = paste0("p = pp.", k)));
+  with.p.values = "X.log10.pvalue." %in% colnames(mcols(p))
+  
+  for(cutoff in c(3, 4, 5, 6))
+  {
+    cat('pval cutoff -- ', cutoff, '\n')
+    p_sel <- p[mcols(p)[,"X.log10.pvalue."] > cutoff];
+    p_sel = GenomicRanges::reduce(p_sel);
+    
+    export(p_sel, 
+           con = paste0('/Volumes//groups/tanaka/People/current/jiwang/projects/positional_memory/Data/histMod_CT_using/MACS2_vs_SEACR/MACS2/', 
+                        gsub('_macs2_peaks.xls', '', basename(peak.files)),  'macs2_pval_', cutoff, '.bed'), format = 'bed')
+    
+  }
+  
+  p3 = p
+  p6 = p_sel
+  p4 <- p[mcols(p)[,"X.log10.pvalue."] > 4];
+  p5 = p[mcols(p)[,"X.log10.pvalue."] > 5];
+  
+  seacrDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/histMod_CT_using/MACS2_vs_SEACR/SEACR/'
+  
+  stringent = readPeakFile(paste0(seacrDir, 'seacr_H3K4me3_BL5days_rRep1_185746_withIgG_strignet.stringent.bed'))
+  relaxed = readPeakFile(paste0(seacrDir, 'seacr_H3K4me3_BL5days_rRep1_185746_withIgG_relaxed.relaxed.bed'))
+  tops = readPeakFile(paste0(seacrDir, 'seacr_H3K4me3_BL5days_rRep1_185746_nonIgG_top0.01.stringent.bed'))
+  
+  counts = c(length(p3), length(p4), length(p5), length(p6), length(stringent), length(relaxed), length(tops))
+  names(counts) = c('macs2.p3', 'macs2.p4', 'macs2.p5', 'macs2.p6', 'seacr.stringent', 'seacr.relaxed', 'seacr.top0.01')
+  
+  counts = data.frame(counts, names = names(counts), stringsAsFactors = FALSE)
+  ggplot(data=counts, aes(x=names, y=counts)) +
+    geom_bar(stat="identity", fill="steelblue")+
+    geom_text(aes(label=counts), vjust=-0.3, size=3.5)+
+    theme_minimal()
+  ggsave(paste0(resDir, "/peak_numbers_macs2_seacr.pdf"), width=8, height = 6)
+  
+  
+  ol.peaks <- makeVennDiagram(list(p6, stringent, relaxed), 
+                              NameOfPeaks=c('macs_p6', 'seacr_stringent_IgG', 'seacr_relaxed_IgG'), connectedPeaks="keepAll", main=cc)
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  pdf(paste0(resDir, '/peakOverlapping_macs2.p6_seacr.IgG.stringent.relaxed.pdf'), 
+      height = 10, width = 10)
+  try(plot(v))
+  dev.off()
+  
+  
+  ol.peaks <- makeVennDiagram(list(p4, p6, tops), 
+                              NameOfPeaks=c('macs_p4', 'macs_p6', 'seacr_top0.01'), connectedPeaks="keepAll", main=cc)
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  pdf(paste0(resDir, '/peakOverlapping_macs2.p3.p4_seacr.top0.01.pdf'), 
+      height = 10, width = 10)
+  try(plot(v))
+  dev.off()
+  
+  ol.peaks <- makeVennDiagram(list(p6, tops), 
+                              NameOfPeaks=c('macs_p6', 'seacr_top0.01'), connectedPeaks="keepAll", main=cc)
+  v <- venn_cnt2venn(ol.peaks$vennCounts)
+  try(plot(v))
+  
+  pdf(paste0(resDir, '/peakOverlapping_macs2.p6_seacr.top0.01.pdf'), 
+      height = 10, width = 10)
+  try(plot(v))
+  dev.off()
+  
+  ss = tops[!overlapsAny(tops, p6)]
+  ms = p6[!overlapsAny(p6, tops)]
+  
+  xx = data.frame(width = c(width(ms), width(ss)), peakCaller  = c(rep('macs2.p6', length(ms)), rep('seacr.top0.01', length(ss))))
+  xx$width = log10(xx$width)
+  
+  ggplot(xx, aes(x=width, color=peakCaller)) +
+    geom_histogram(fill="white", bins = 100) +
+    scale_color_brewer(palette="Dark2") +
+    labs(x = ' peak width log10 bp')
+  ggsave(paste0(resDir, "/peak_width_distribution_macs2_seacr_specificPeaks.pdf"), width=8, height = 6)
+    
+  gtf.file =  '../data/AmexT_v47_Hox.patch_limb.fibroblast.expressing.23585.genes.dev.mature.regeneration.gtf'
+  amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
+  
+  pdfname = paste0(resDir, "/feature_distribution_MACS2_peaks.pdf")
+  pdf(pdfname, width = 6, height = 4)
+  par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+  
+  pp.annots = annotatePeak(ms, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+  
+  plotPeakAnnot_piechart(pp.annots)
+  
+  dev.off()
+  
+  pdfname = paste0(resDir, "/feature_distribution_SEACR_peaks.pdf")
+  pdf(pdfname, width = 6, height = 4)
+  par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+  
+  #gtf.file =  '../data/AmexT_v47_Hox.patch_limb.fibroblast.expressing.23585.genes.dev.mature.regeneration.gtf'
+  #amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
+  pp.annots = annotatePeak(ss, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+  
+  plotPeakAnnot_piechart(pp.annots)
+  
+  dev.off()
+  
+  
+  export(ms, 
+  con = paste0('/Volumes//groups/tanaka/People/current/jiwang/projects/positional_memory/Data/histMod_CT_using/MACS2_vs_SEACR/',
+               'macs2_p6_detected.peaks.bed'), format = 'bed')
+  
+  export(ss, 
+         con = paste0('/Volumes//groups/tanaka/People/current/jiwang/projects/positional_memory/Data/histMod_CT_using/MACS2_vs_SEACR/',
+                      'seacr_top0.01_detected.peaks.bed'), format = 'bed')
   
   
 }
-
 
