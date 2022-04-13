@@ -52,8 +52,7 @@ library(edgeR)
 require("sva")
 require(limma)
 
-load(file = paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata', 
-                   '/ATACseq_selected.63k.peaks_cutoff.40.at.least.2sample.Rdata'))
+load(file = paste0(RdataDir, '/ATACseq_selected.55k.peaks_cutoff.50.at.least.1sample.Rdata'))
 
 Save.peak.consensus = FALSE
 if(Save.peak.consensus){
@@ -254,7 +253,7 @@ if(grouping.temporal.peaks){
     res = xx
     
     #res = data.frame(cpm, res, stringsAsFactors = FALSE)
-    saveRDS(res, file = paste0(RdataDir, '/res_temporal_dynamicPeaks__mUA_regeneration_dev_2Batches.R10723_R7977_peakAnnot_v8.rds'))
+    saveRDS(res, file = paste0(RdataDir, '/res_temporal_dynamicPeaks__mUA_regeneration_dev_2Batches.R10723_R7977_peakAnnot_v7.rds'))
     
     
   }
@@ -263,7 +262,7 @@ if(grouping.temporal.peaks){
   # reload the test result and select dynamic peaks
   ##########################################
   library(qvalue)
-  res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks__mUA_regeneration_dev_2Batches.R10723_R7977_peakAnnot_v8.rds'))
+  res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks__mUA_regeneration_dev_2Batches.R10723_R7977_v7.rds'))
   
   # select only the dynamic peak results without annotation part
   res = res[, c(1:50)]

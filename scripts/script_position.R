@@ -51,7 +51,7 @@ library(edgeR)
 require("sva")
 require(limma)
 
-load(file = paste0(RdataDir, '/ATACseq_selected.63k.peaks_cutoff.40.at.least.2sample.Rdata'))
+load(file = paste0(RdataDir, '/ATACseq_selected.55k.peaks_cutoff.50.at.least.1sample.Rdata'))
 
 Split.Mature.Regeneration.samples = TRUE
 
