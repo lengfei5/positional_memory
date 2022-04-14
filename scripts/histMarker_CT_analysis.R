@@ -1174,265 +1174,294 @@ pheatmap(yy1, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
          filename = paste0(figureDir, '/heatmap_histoneMarker_DE_allmarkers_nonscaled.pdf'))
 
 
-
-
 ########################################################
 ########################################################
 # Section VI : regeneration-related histone markers
 # 
 ########################################################
 ########################################################
-########################################################
-########################################################
-# Section : Consider the grouping: 
-# inactive promoters, active promoter, house-keeping genes, mature-specific genes,
-# regeneration genes, positional genes
-########################################################
-########################################################
-fpm = readRDS(file = paste0(RdataDir,  '/histoneMarkers_normSignals_axolotlAllTSS.2kb.rds'))
-res = data.frame(log2(fpm + 2^0), stringsAsFactors = FALSE)
-res$gene = sapply(rownames(res), function(x){unlist(strsplit(as.character(x), '_'))[2]})
-res$geneID  = sapply(rownames(res), function(x){unlist(strsplit(as.character(x), '_'))[1]})
+library(edgeR)
+library(qvalue)
+require(corrplot)
+require(pheatmap)
+require(RColorBrewer)
+#atacseq_peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rxxxx_R10723_R11637_R12810_atac/Rdata/',
+#                                      'ATACseq_peak_consensus_filtered_55k.rds'))
 
-##########################################
-# clean TSS, for each gene, only keep the TSS with sigals if there are mulitple ones
-##########################################
-Clean.TSS = TRUE
+conds_histM = c('H3K4me1', 'H3K27me3', 'H3K4me3', 'H3K27ac')
 
-if(Clean.TSS){
-  ggs = unique(res$geneID)
-  sels = c()
-  for(n in 1:length(ggs))
+for(n_histM in 1:length(conds_histM))
+{
+  # n_histM = 1
+  #cpm = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', conds_histM[n_histM], '_IgG.subtrated_', version.analysis, '.rds'))
+  cpm = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', conds_histM[n_histM], '_', version.analysis, '.rds'))
+  design.sel = readRDS(file = paste0(RdataDir, '/design.sels_bc_TMM_combat_', conds_histM[n_histM], '_', version.analysis, '.rds'))
+  
+  ### select the samples and extract sample means
+  conds = c("mUA", "mLA", "mHand")
+  sample.sels = c();  
+  cc = c()
+  sample.means = c()
+  
+  for(n in 1:length(conds)) 
   {
-    # n = 1
-    jj = which(res$geneID == ggs[n])  
-    if(length(jj)>0){
-      ss = apply(as.matrix(res[jj, c(1:6)]), 1, sum)
-      sels = c(sels, jj[which.max(ss)])
-    } 
+    kk = grep(conds[n], colnames(cpm))
+    sample.sels = c(sample.sels, kk)
+    cc = c(cc, rep(conds[n], length(kk)))
+    if(length(kk)>1) {
+      sample.means = cbind(sample.means, apply(cpm[, kk], 1, mean))
+    }else{
+      sample.means = cbind(sample.means, cpm[, kk])
+    }
     
+  }
+  colnames(sample.means) = conds
+  
+  
+  pdfname = paste0(resDir, "/histM_signal_vs_background_", conds_histM[n_histM], ".pdf")
+  pdf(pdfname, width = 10, height = 6)
+  
+  ii_bgs = grep('tss', rownames(cpm))
+  hist(sample.means[-ii_bgs, ], breaks = 100, main = conds_histM[n_histM])
+  hist(sample.means[ii_bgs, ], col = 'darkred', breaks = 60, add = TRUE)
+  abline(v= c(0, 1, 2, 3), col = 'blue', lwd = 2.0)
+  
+  dev.off()
+  
+  
+  cpm = cpm[, sample.sels]
+  design.sel = design.sel[sample.sels, ]
+  
+  logCPM = cpm
+  f = factor(cc, levels= c('mUA', 'mLA', 'mHand'))
+  
+  mod = model.matrix(~ 0 + f)
+  colnames(mod) = c('mUA', 'mLA', 'mHand')
+  
+  #To make all pair-wise comparisons between the three groups one could proceed
+  fit <- lmFit(logCPM, mod)
+  contrast.matrix <- makeContrasts(mLA - mUA, 
+                                   mHand - mUA, 
+                                   mHand - mLA, levels=mod)
+  fit2 <- contrasts.fit(fit, contrast.matrix)
+  fit2 <- eBayes(fit2)
+  
+  res = data.frame(fit2$p.value)
+  colnames(res) = paste0(c('mLA.vs.mUA', 'mHand.vs.mUA', 'mHand.vs.mLA'), '.pval')
+  
+  xx = topTable(fit2, coef = 1, number = nrow(res))
+  xx = xx[, c(1, 4, 5)]
+  colnames(xx) = paste0(colnames(xx), '.mLA.vs.mUA')
+  res = data.frame(res, xx[match(rownames(res), rownames(xx)), ])
+  
+  xx = topTable(fit2, coef = 2, number = nrow(res))
+  xx = xx[, c(1, 4, 5)]
+  colnames(xx) = paste0(colnames(xx), '.mHand.vs.mUA')
+  res = data.frame(res, xx[match(rownames(res), rownames(xx)), ])
+  
+  xx = topTable(fit2, coef = 3, number = nrow(res))
+  xx = xx[, c(1, 4, 5)]
+  colnames(xx) = paste0(colnames(xx), '.mHand.vs.mLA')
+  res = data.frame(res, xx[match(rownames(res), rownames(xx)), ])
+  
+  res$pval.mean = apply(as.matrix(res[, grep('P.Value.', colnames(res))]), 1, function(x) return(mean(-log10(x))))
+  res$fdr.mean = apply(as.matrix(res[, grep('adj.P.Val', colnames(res))]), 1, function(x) return(mean(-log10(x))))
+  res$logFC.mean =  apply(as.matrix(res[, grep('logFC', colnames(res))]), 1, function(x) return(mean(abs(x))))
+  
+  res$log2fc = apply(sample.means, 1, function(x) max(x) - min(x))
+  res$maxs = apply(sample.means, 1, max)
+  res$mins = apply(sample.means, 1, min)
+  
+  xx = data.frame(cpm[match(rownames(res), rownames(cpm)), ],  res, stringsAsFactors = FALSE) 
+  res = xx
+  
+  saveRDS(res, file = paste0(RdataDir, '/fpm_bc_TMM_combat_DBedgeRtest_', conds_histM[n_histM], '_', version.analysis, '.rds'))
+  
+  ## select the significant peaks
+  fdr.cutoff = 0.05; logfc.cutoff = 1
+  select = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & abs(res$logFC.mLA.vs.mUA) > logfc.cutoff) |
+                   (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & abs(res$logFC.mHand.vs.mUA) > logfc.cutoff)|
+                   (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & abs(res$logFC.mHand.vs.mLA) > logfc.cutoff)
+  )
+  cat(length(select), ' DE ', conds_histM[n_histM],  ' \n')
+  
+  # plot_individual_histMarker_withinATACpeak(res)
+  
+}
+
+
+##########################################
+# Combine all four markers  
+##########################################
+atacseq_peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rxxxx_R10723_R11637_R12810_atac/Rdata/',
+                                      'ATACseq_peak_consensus_filtered_55k.rds'))
+
+conds_histM = c('H3K4me3','H3K27me3', 'H3K4me1', 'H3K27ac')
+
+keep = c()
+DE.locus = c()
+
+fdr.cutoff = 0.01; 
+logfc.cutoff = 1;
+marker.cutoff = 1;
+
+for(n_histM in 1:length(conds_histM))
+{
+  # n_histM = 3
+  res = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_DBedgeRtest_', conds_histM[n_histM], '_', version.analysis, '.rds'))
+  
+  select = which(((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & abs(res$logFC.mLA.vs.mUA) > logfc.cutoff) |
+                    (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & abs(res$logFC.mHand.vs.mUA) > logfc.cutoff)|
+                    (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & abs(res$logFC.mHand.vs.mLA) > logfc.cutoff)) &
+                   res$maxs > marker.cutoff
+  )
+  
+  cat(length(select), ' DE ', conds_histM[n_histM],  ' in total \n')
+  
+  ### focus on the atac-seq peak sets
+  ii_bgs = grep('tss.', rownames(res))
+  rownames(res) = gsub('tss.', '', rownames(res))
+  
+  pp = data.frame(t(sapply(rownames(res), function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
+  rownames(res) = paste0(pp[,1], ':', pp[,2], '-', pp[,3])
+  rownames(res)[ii_bgs] = paste0('tss.', rownames(res)[ii_bgs])
+  
+  rownames(pp) = rownames(res)
+  pp$strand = '*'
+  pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
+  # lls = width(pp)
+  #olp = GenomicRanges::findOverlaps(atacseq_peaks, )
+  ii_overlap = which(overlapsAny(pp, atacseq_peaks) == TRUE)
+  
+  res_sel = res[ii_overlap, ]
+  
+  select = which(((res_sel$adj.P.Val.mLA.vs.mUA < fdr.cutoff & abs(res_sel$logFC.mLA.vs.mUA) > logfc.cutoff) |
+                    (res_sel$adj.P.Val.mHand.vs.mUA < fdr.cutoff & abs(res_sel$logFC.mHand.vs.mUA) > logfc.cutoff)|
+                    (res_sel$adj.P.Val.mHand.vs.mLA < fdr.cutoff & abs(res_sel$logFC.mHand.vs.mLA) > logfc.cutoff)) &
+                   res_sel$maxs > marker.cutoff
+  )
+  
+  cat(length(select), ' DE ', conds_histM[n_histM],  ' overlapping with atac-seq peaks \n')
+  xx = res_sel
+  
+  colnames(xx) = paste0(colnames(xx), '_', conds_histM[n_histM])
+  
+  yy = res_sel[select, grep(conds_histM[n_histM], colnames(res_sel))]
+  yy = t(apply(yy, 1, cal_transform_histM, cutoff.min = 0.0, cutoff.max = 6))
+  
+  sds = apply(yy, 1, sd)
+  yy = yy[which(sds>0), ]
+  
+  df = as.data.frame(sapply(colnames(yy), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[2])}))
+  colnames(df) = 'segments'
+  rownames(df) = colnames(yy)
+  sample_colors = c('springgreen4', 'steelblue2', 'gold2')
+  annot_colors = list(segments = sample_colors)
+  
+  pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+           color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8),
+           show_colnames = FALSE,
+           scale = 'row',
+           cluster_cols=FALSE, annotation_col=df,
+           #annotation_colors = annot_colors,
+           width = 6, height = 12,
+           filename = paste0(resDir, '/heatmap_histoneMarker_', conds_histM[n_histM], '_overlappedWithAtacseqPeak.pdf'))
+  
+  pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+           color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8),
+           show_colnames = FALSE,
+           scale = 'none',
+           cluster_cols=FALSE, annotation_col=df,
+           #annotation_colors = annot_colors,
+           width = 6, height = 12,
+           filename = paste0(resDir, '/heatmap_histoneMarker_', conds_histM[n_histM], '_overlappedWithAtacseqPeak_nonscaled.pdf'))
+  
+  
+  if(n_histM == 1){
+    keep = data.frame(xx, stringsAsFactors = FALSE)
+    test = rep(0, nrow(xx))
+    test[select] = 1
+    names(test) = rownames(xx)
+    DE.locus = data.frame(test, stringsAsFactors = FALSE)
+    
+    colnames(DE.locus)[ncol(DE.locus)] = conds_histM[n_histM]
+    
+  }else{
+    keep = data.frame(keep, xx[match(rownames(keep), rownames(xx)), ], stringsAsFactors = FALSE)
+    test = rep(0, nrow(xx))
+    test[select] = 1
+    names(test) = rownames(xx)
+    DE.locus = data.frame(DE.locus, test[match(rownames(DE.locus), names(test))], stringsAsFactors = FALSE)
+    colnames(DE.locus)[ncol(DE.locus)] = conds_histM[n_histM]
   }
 }
 
-res = res[sels, ]
+save(keep, DE.locus, file = paste0(RdataDir, '/combined_4histMarkers_overlapped55kATACseq_DE.Rdata'))
 
-saveRDS(res, file = paste0(RdataDir,  '/histoneMarkers_normSignals_axolotlAllTSS.2kb_TSSfiltered.rds'))
 
 ##########################################
-# first try to define groups 
+# plot all DE histone markers
 ##########################################
-res = readRDS(file = paste0(RdataDir,  '/histoneMarkers_normSignals_axolotlAllTSS.2kb_TSSfiltered.rds'))
+load(file = paste0(RdataDir, '/combined_4histMarkers_overlapped55kATACseq_DE.Rdata'))
+ss = apply(DE.locus[, c(1:4)], 1, sum)
 
-aa = readRDS(file =  "../results/rnaseq_Rxxxx.old_R10724_R161513_mergedTechRep/Rdata/TestStat_regeneration_RNAseq.rds") 
+yy = keep[match(names(ss[which(ss>0)]), rownames(keep)), c(1:8, 27:34, 53:60, 79:85)]
+design = readRDS(file = paste0(RdataDir, '/histM_CT_design_info.rds'))
 
-aa$gene = sapply(rownames(aa), function(x) unlist(strsplit(as.character(x), '_'))[1])
-aa$geneID = sapply(rownames(aa), function(x) {test = unlist(strsplit(as.character(x), '_')); return(test[length(test)])})
+sampleID = sapply(colnames(yy), function(x) unlist(strsplit(as.character(x), '_'))[3])
+mm = match(sampleID, design$sampleID)
+colnames(yy) = paste0(design$condition[mm], '_', design$Batch[mm], '_', design$sampleID[mm])
+#yy = yy[, grep('mRep1|mRep2', colnames(yy))]
 
-aa[grep('DBP|SALL', rownames(aa)), grep('Mature_UA', colnames(aa))]
+df = as.data.frame(sapply(colnames(yy), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[2])}))
+colnames(df) = 'segments'
+rownames(df) = colnames(yy)
 
-aa$expr.mUA = apply(aa[, grep('Mature_UA', colnames(aa))], 1, mean)
-aa$expr.BLday5 = apply(aa[, grep('BL_UA_5days', colnames(aa))], 1, mean)
-aa$expr.BLday9 = apply(aa[, grep('BL_UA_9days', colnames(aa))], 1, mean)
-aa$expr.BLday13 = apply(aa[, grep('BL_UA_13days_proximal', colnames(aa))], 1, mean)
-aa$expr.BLday13.distal = apply(aa[, grep('BL_UA_13days_distal', colnames(aa))], 1, mean)
-aa = aa[, c(5:11, 23:29)]
-aa = aa[match(res$geneID, aa$geneID), ]
-res = data.frame(res, aa, stringsAsFactors = FALSE)
+sample_colors = c('springgreen4', 'steelblue2', 'gold2')
+annot_colors = list(segments = sample_colors)
 
-res$x1 = res$UA_K4me3
-res$x2 = res$UA_K27me3
-res$ratio = res$x1 - res$x2
+### plot histone markers with at least signaifiant one
+yy1 = yy
+source('Functions_histM.R')
 
-examples.sel = c()
-examples.sel = unique(c(examples.sel, grep('HOXA13|HOXA11|HOXA9|HOXD13|HOXD11|HOXD9|MEIS|SALL|DBP', res$gene)))
+for(n in 1:length(conds_histM))
+{
+  jj = grep(conds_histM[n], colnames(yy))
+  yy1[,jj] = t(apply(yy[,jj], 1, cal_z_score))
+}
 
+#yy <- t(apply(yy, 1, cal_z_score))
+gaps_col = c(8, 16)
+pheatmap(yy1, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+         color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(12), 
+         show_colnames = FALSE,
+         scale = 'none',
+         cluster_cols=FALSE, annotation_col=df,
+         gaps_col = gaps_col,
+         #annotation_colors = annot_colors,
+         width = 6, height = 12, 
+         filename = paste0(figureDir, '/heatmap_histoneMarker_DE_allmarkers.pdf'))
 
-ggplot(data=res, aes(x=x1, y=x2, label = gene)) +
-  geom_point(size = 0.25) + 
-  theme(axis.text.x = element_text(size = 12), 
-        axis.text.y = element_text(size = 12)) +
-  geom_text_repel(data= res[examples.sel, ], size = 3.0, color = 'blue') +
-  #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
-  #scale_color_manual(values=c("blue", "black", "red")) +
-  geom_vline(xintercept=4, col='darkgray') +
-  geom_hline(yintercept=4, col="darkgray") +
-  labs(x = "UA_H3K4me3", y= 'UA_H3K27me3')
-
-
-ggplot(data=res, aes(x=ratio, y=expr, label = gene)) +
-  geom_point(size = 0.25) + 
-  theme(axis.text.x = element_text(size = 12), 
-        axis.text.y = element_text(size = 12)) +
-  geom_text_repel(data= res[examples.sel, ], size = 3.0, color = 'blue') +
-  #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
-  #scale_color_manual(values=c("blue", "black", "red")) +
-  geom_vline(xintercept=4, col='darkgray') +
-  geom_hline(yintercept=4, col="darkgray") +
-  labs(x = "UA_H3K4me3/UA_H3K27me3", y= 'Expr')
-
-load(file =  paste0(annotDir, 'axolotl_housekeepingGenes_controls.other.tissues.liver.islet.testis_expressedIn21tissues.Rdata'))
-hkgs = controls.tissue$geneIDs[which(controls.tissue$tissues == 'housekeeping')]
-nonexp = controls.tissue$geneIDs[which(controls.tissue$tissues != 'housekeeping')]
-
-res$groups = 'limb'
-res$groups[!is.na(match(res$geneID, hkgs))] = 'house_keep'
-res$groups[!is.na(match(res$geneID, nonexp))] = 'other_tissues'
-
-xx = res[order(-res$expr), ]
-head(xx[which(xx$groups != 'house_keep'), ])
-
-ggplot(data=res, aes(x=expr.mUA, y=ratio, label = gene, color = groups)) +
-  geom_point(size = 0.25) + 
-  theme(axis.text.x = element_text(size = 12), 
-        axis.text.y = element_text(size = 12)) +
-  geom_text_repel(data= res[examples.sel, ], size = 3.0, color = 'blue') +
-  #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
-  #scale_color_manual(values=c("blue", "black", "red")) +
-  geom_vline(xintercept=4, col='darkgray') +
-  geom_hline(yintercept=4, col="darkgray") +
-  labs(y = "UA_H3K4me3/UA_H3K27me3", x= 'Expr')
-
-res[,c(1, 4, 7:ncol(res))] %>% 
-  pivot_longer(cols = c('UA_K4me3', 'UA_K27me3'), names_to = 'markers') %>%
-  ggplot(aes(x = factor(groups, levels = c('other_tissues', 'house_keep', 'limb')), y=value, fill=markers)) + 
-  geom_boxplot(outlier.alpha = 0.1) + 
-  #geom_jitter(width = 0.1)+
-  #geom_violin(width = 1.2) +
-  theme_classic() +
-  theme(axis.text.x = element_text(angle = 0, size = 14)) +
-  labs(x = "", y= 'normalized data (log2)')
-
-##########################################
-# redefine different groups with RNA-seq data 
-##########################################
-Redefine.gene.groups.with.RNAseq = TRUE
-if(Redefine.gene.groups.with.RNAseq){
-  
-  table(res$groups)
-  kk = which(res$groups == 'limb')
-  
-  ss = apply(res[kk, grep('expr', colnames(res))], 1, max)
-  
-  select = kk[which(ss< -1 | is.na(ss))]
-  res$groups[select] = 'lowlyExpr_limb'
-  table(res$groups)
-  
-  res[,c(1, 4, 7:ncol(res))] %>% 
-    pivot_longer(cols = c('UA_K4me3', 'UA_K27me3'), names_to = 'markers') %>%
-    ggplot(aes(x = factor(groups, levels = c('other_tissues', 'lowlyExpr_limb',
-                                             'house_keep', 'limb')), y=value, fill=markers)) + 
-    geom_boxplot(outlier.alpha = 0.1) + 
-    #geom_jitter(width = 0.1)+
-    #geom_violin(width = 1.2) +
-    theme_classic() +
-    theme(axis.text.x = element_text(angle = 0, size = 14)) +
-    labs(x = "", y= 'normalized data (log2)')
-  
-  #jj = which(res$x1>4 & res$x2 >4)
-  #xx = res[jj, ]
-  
-  kk = which(res$groups == 'limb')
-  
-  diffs = res$expr.BLday5[kk] - res$expr.mUA[kk]
-  select = kk[which(res$expr.mUA[kk] < 0 & diffs >2)]
-  
-  res$groups[select] = 'upregulated.d5'
-  table(res$groups)
-  
-  select = kk[which(res$expr.mUA[kk] > 0 & (res$expr.mUA[kk] - res$expr.BLday5[kk]) >2)]
-  res$groups[select] = 'downregulated.d5'
-  
-  res[,c(1, 4, 7:ncol(res))] %>% 
-    pivot_longer(cols = c('UA_K4me3', 'UA_K27me3'), names_to = 'markers') %>%
-    ggplot(aes(x = factor(groups, levels = c('other_tissues', 'lowlyExpr_limb',
-                                             'house_keep', 'upregulated.d5', 'downregulated.d5', 'limb')), y=value, fill=markers)) + 
-    geom_boxplot(outlier.alpha = 0.1) + 
-    #geom_jitter(width = 0.1)+
-    #geom_violin(width = 1.2) +
-    theme_classic() +
-    theme(axis.text.x = element_text(angle = 0, size = 14)) +
-    labs(x = "", y= 'normalized data (log2)')
-  
-  
-  kk = which(res$groups == 'limb')
-  
-  select = kk[which(res$expr.mUA[kk] < 0 & (res$expr.BLday5[kk] - res$expr.mUA[kk]) < 2 &  (res$expr.BLday9[kk] - res$expr.mUA[kk]) > 2)]
-  res$groups[select] = 'upregulated.d9'
-  
-  select = kk[which(res$expr.mUA[kk] > 0 & (res$expr.mUA[kk] - res$expr.BLday5[kk]) < 2 & (res$expr.mUA[kk] - res$expr.BLday9[kk]) >2)]
-  res$groups[select] = 'downregulated.d9'
-  
-  
-  kk = which(res$groups == 'limb')
-  
-  select = kk[which(res$expr.mUA[kk] < 0 & (res$expr.BLday5[kk] - res$expr.mUA[kk]) < 2 &  (res$expr.BLday9[kk] - res$expr.mUA[kk]) < 2 &
-                      (res$expr.BLday13[kk] - res$expr.mUA[kk]) >2)]
-  res$groups[select] = 'upregulated.d13'
-  
-  select = kk[which(res$expr.mUA[kk] > 0 & (res$expr.mUA[kk] - res$expr.BLday5[kk]) < 2 & (res$expr.mUA[kk] - res$expr.BLday9[kk]) < 2 &
-                      (res$expr.mUA[kk] - res$expr.BLday9[kk]) > 2) ]
-  res$groups[select] = 'downregulated.d13'
-  
-  
-  
-  
-  table(res$groups)
-  
-  res[,c(1, 4, 7:ncol(res))] %>% 
-    pivot_longer(cols = c('UA_K4me3', 'UA_K27me3'), names_to = 'markers') %>%
-    ggplot(aes(x = factor(groups, levels = c('other_tissues', 'lowlyExpr_limb',
-                                             'house_keep', 
-                                             'upregulated.d5', 'upregulated.d9','upregulated.d13', 
-                                             'downregulated.d5',  'downregulated.d9',
-                                             'downregulated.d13',
-                                             'limb')), y=value, fill=markers)) + 
-    geom_boxplot(outlier.alpha = 0.1) + 
-    #geom_jitter(width = 0.1)+
-    #geom_violin(width = 1.2) +
-    theme_classic() +
-    theme(axis.text.x = element_text(angle = 90, size = 14)) +
-    labs(x = "", y= 'normalized data (log2)')
-  
-  
-  ggsave(paste0(figureDir, "histMarker_H3K27me3_H3K4me3_up.downregulatedGenes.UA.BL.days.pdf"), width=12, height = 8)
-  
-  fdr.cutoff = 0.05
-  select = which(aa$padj < fdr.cutoff & aa$log2FC >1 & aa$log2FC.mUA.vs.others >0)
-  res$groups[!is.na(match(res$geneID, aa$geneID[select]))] = 'mature_highlyExp'
-  table(res$groups)
-  
-  select = which(aa$padj < fdr.cutoff & aa$log2FC >1 & aa$log2FC.mUA.vs.others < 0)
-  res$groups[!is.na(match(res$geneID, aa$geneID[select]))] = 'regeneration'
-  table(res$groups)
-  
-  select = which((aa$padj >= fdr.cutoff | aa$log2FC <=1) & log2(aa$baseMean) <4) 
-  res$groups[!is.na(match(res$geneID, aa$geneID[select])) & res$groups == 'limb_static'] = 'limb_lowlyExp'
-  
+yy1 = yy
+for(n in 1:length(conds_histM))
+{
+  jj = grep(conds_histM[n], colnames(yy))
+  yy1[,jj] = t(apply(yy[,jj], 1, cal_transform_histM, cutoff.min = 0, cutoff.max = 5))
   
 }
 
-ggplot(data=res, aes(x=x1, y=x2, label = gene, color = groups)) +
-  geom_point(size = 0.4) + 
-  theme(axis.text.x = element_text(size = 12), 
-        axis.text.y = element_text(size = 12)) +
-  geom_text_repel(data= res[examples.sel, ], size = 3.0, color = 'blue') +
-  #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
-  #scale_color_manual(values=c("blue", "black", "red")) +
-  geom_vline(xintercept=4, col='darkgray') +
-  geom_hline(yintercept=4, col="darkgray") +
-  labs(x = "UA_H3K4me3", y= 'UA_H3K27me3')
+#yy <- t(apply(yy, 1, cal_z_score))
+gaps_col = c(8, 16)
+pheatmap(yy1, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+         color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(12), 
+         show_colnames = FALSE,
+         scale = 'none',
+         cluster_cols=FALSE, annotation_col=df,
+         gaps_col = gaps_col,
+         #annotation_colors = annot_colors,
+         width = 6, height = 12, 
+         filename = paste0(figureDir, '/heatmap_histoneMarker_DE_allmarkers_nonscaled.pdf'))
 
-
-#xx = melt(res[], id.vars = c('UA_K4me3', 'UA_K27me3'), variable_name = 'markers')
-res[,c(1, 4, 7:13)] %>% 
-  pivot_longer(cols = c('UA_K4me3', 'UA_K27me3'), names_to = 'markers') %>%
-  ggplot(aes(x = factor(groups, levels = c('other_tissues', 'house_keep', 'limb_lowlyExp',
-                                           'mature_highlyExp', 'regeneration', 'limb_static')), y=value, fill=markers)) + 
-  geom_boxplot(outlier.alpha = 0.1) + 
-  #geom_jitter(width = 0.1)+
-  #geom_violin(width = 1.2) +
-  theme_classic() +
-  theme(axis.text.x = element_text(angle = 0, size = 14)) +
-  labs(x = "", y= 'normalized data (log2)')
 
 
