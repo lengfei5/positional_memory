@@ -356,7 +356,7 @@ if(grouping.temporal.peaks){
   annot_colors = list(
     condition = sample_colors,
     cluster = cluster_col)
-    
+  
   
   ii.gaps = c(6, 8)
   col = colorRampPalette(c("navy", "white", "red3"))(16)
