@@ -1192,7 +1192,7 @@ conds_histM = c('H3K4me1', 'H3K27me3', 'H3K4me3', 'H3K27ac')
 
 for(n_histM in 1:length(conds_histM))
 {
-  # n_histM = 1
+  # n_histM = 4
   #cpm = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', conds_histM[n_histM], '_IgG.subtrated_', version.analysis, '.rds'))
   cpm = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', conds_histM[n_histM], '_', version.analysis, '.rds'))
   design.sel = readRDS(file = paste0(RdataDir, '/design.sels_bc_TMM_combat_', conds_histM[n_histM], '_', version.analysis, '.rds'))
@@ -1219,8 +1219,10 @@ for(n_histM in 1:length(conds_histM))
     }
   }
   colnames(sample.means) = conds
+  cpm = cpm[, sample.sels]
+  design.sel = design.sel[sample.sels, ]
   
-  
+  ## check the background and signals
   pdfname = paste0(resDir, "/histM_signal_vs_background_", conds_histM[n_histM], ".pdf")
   pdf(pdfname, width = 10, height = 6)
   
@@ -1231,45 +1233,48 @@ for(n_histM in 1:length(conds_histM))
   
   dev.off()
   
-  
-  cpm = cpm[, sample.sels]
-  design.sel = design.sel[sample.sels, ]
-  
+  ## DE test with edgeR 
+  library(edgeR)
   logCPM = cpm
-  f = factor(cc, levels= c('mUA', 'mLA', 'mHand'))
+  
+  clevels = c('mUA', setdiff(unique(conds), 'mUA'))
+  f = factor(cc, levels= clevels)
   
   mod = model.matrix(~ 0 + f)
-  colnames(mod) = c('mUA', 'mLA', 'mHand')
+  colnames(mod) = clevels
   
   #To make all pair-wise comparisons between the three groups one could proceed
   fit <- lmFit(logCPM, mod)
-  contrast.matrix <- makeContrasts(mLA - mUA, 
-                                   mHand - mUA, 
-                                   mHand - mLA, levels=mod)
+  contrast.matrix <- makeContrasts(BL5days - mUA,
+                                   BL9days - mUA,
+                                   BL13days.prox - mUA,
+                                   BL13days.dist - mUA,
+                                   levels=mod)
   fit2 <- contrasts.fit(fit, contrast.matrix)
   fit2 <- eBayes(fit2)
   
-  res = data.frame(fit2$p.value)
-  colnames(res) = paste0(c('mLA.vs.mUA', 'mHand.vs.mUA', 'mHand.vs.mLA'), '.pval')
-  
-  xx = topTable(fit2, coef = 1, number = nrow(res))
+  xx = topTable(fit2, coef = 1, number = nrow(logCPM))
   xx = xx[, c(1, 4, 5)]
-  colnames(xx) = paste0(colnames(xx), '.mLA.vs.mUA')
+  colnames(xx) = paste0(colnames(xx), '_5dpa.vs.mUA')
+  res = data.frame(xx)
+  
+  xx = topTable(fit2, coef = 2, number = nrow(logCPM))
+  xx = xx[, c(1, 4, 5)]
+  colnames(xx) = paste0(colnames(xx), '_9dpa.vs.mUA')
   res = data.frame(res, xx[match(rownames(res), rownames(xx)), ])
   
-  xx = topTable(fit2, coef = 2, number = nrow(res))
+  xx = topTable(fit2, coef = 3, number = nrow(logCPM))
   xx = xx[, c(1, 4, 5)]
-  colnames(xx) = paste0(colnames(xx), '.mHand.vs.mUA')
+  colnames(xx) = paste0(colnames(xx), '_13dpap.vs.mUA')
   res = data.frame(res, xx[match(rownames(res), rownames(xx)), ])
   
-  xx = topTable(fit2, coef = 3, number = nrow(res))
+  xx = topTable(fit2, coef = 4, number = nrow(logCPM))
   xx = xx[, c(1, 4, 5)]
-  colnames(xx) = paste0(colnames(xx), '.mHand.vs.mLA')
+  colnames(xx) = paste0(colnames(xx), '_13dpad.vs.mUA')
   res = data.frame(res, xx[match(rownames(res), rownames(xx)), ])
   
-  res$pval.mean = apply(as.matrix(res[, grep('P.Value.', colnames(res))]), 1, function(x) return(mean(-log10(x))))
-  res$fdr.mean = apply(as.matrix(res[, grep('adj.P.Val', colnames(res))]), 1, function(x) return(mean(-log10(x))))
-  res$logFC.mean =  apply(as.matrix(res[, grep('logFC', colnames(res))]), 1, function(x) return(mean(abs(x))))
+  res$fdr.mean.edgeR = apply(as.matrix(res[, grep('adj.P.Val', colnames(res))]), 1, function(x) return(mean(-log10(x))))
+  res$logFC.mean.edgeR =  apply(as.matrix(res[, grep('logFC', colnames(res))]), 1, function(x) return(mean(abs(x))))
   
   res$log2fc = apply(sample.means, 1, function(x) max(x) - min(x))
   res$maxs = apply(sample.means, 1, max)
@@ -1278,14 +1283,16 @@ for(n_histM in 1:length(conds_histM))
   xx = data.frame(cpm[match(rownames(res), rownames(cpm)), ],  res, stringsAsFactors = FALSE) 
   res = xx
   
-  saveRDS(res, file = paste0(RdataDir, '/fpm_bc_TMM_combat_DBedgeRtest_', conds_histM[n_histM], '_', version.analysis, '.rds'))
+  saveRDS(res, file = paste0(RdataDir, '/fpm_bc_TMM_combat_DBedgeRtest_regeneration_', conds_histM[n_histM], '_', version.analysis, '.rds'))
   
   ## select the significant peaks
   fdr.cutoff = 0.05; logfc.cutoff = 1
-  select = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & abs(res$logFC.mLA.vs.mUA) > logfc.cutoff) |
-                   (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & abs(res$logFC.mHand.vs.mUA) > logfc.cutoff)|
-                   (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & abs(res$logFC.mHand.vs.mLA) > logfc.cutoff)
+  select = which((res$adj.P.Val_5dpa.vs.mUA < fdr.cutoff & abs(res$logFC_5dpa.vs.mUA) > logfc.cutoff) |
+                   (res$adj.P.Val_9dpa.vs.mUA < fdr.cutoff & abs(res$logFC_9dpa.vs.mUA) > logfc.cutoff)|
+                   (res$adj.P.Val_13dpap.vs.mUA < fdr.cutoff & abs(res$logFC_13dpap.vs.mUA) > logfc.cutoff) |
+                   (res$adj.P.Val_13dpad.vs.mUA < fdr.cutoff & abs(res$logFC_13dpad.vs.mUA) > logfc.cutoff)
   )
+  
   cat(length(select), ' DE ', conds_histM[n_histM],  ' \n')
   
   # plot_individual_histMarker_withinATACpeak(res)
