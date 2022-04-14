@@ -27,7 +27,6 @@ if(!dir.exists(RdataDir)) dir.create(RdataDir)
 
 dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/'
 annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
-gtf.file =  paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf')
 
 figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
 tableDir = paste0(figureDir, 'tables4plots/')
@@ -168,13 +167,15 @@ if(grouping.temporal.peaks){
   abline(v = c(1, 2.5, 3), col = 'red', lwd = 2.0)
   quantile(fpm.bg, c(0.95, 0.99))
   
+  gtf.file =  '../data/AmexT_v47_Hox.patch_limb.fibroblast.expressing.23585.genes.dev.mature.regeneration.gtf'
+  
   ##########################################
   ## make Granges and annotate peaks
   ##########################################
   Make.Granges.and.peakAnnotation = TRUE
   if(Make.Granges.and.peakAnnotation){
     
-    pp = data.frame(t(sapply(rownames(fpm), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+    pp = data.frame(t(sapply(rownames(fpm), function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
     pp$strand = '*'
     
     save.peak.bed = FALSE
@@ -196,7 +197,7 @@ if(grouping.temporal.peaks){
     pp.annots = as.data.frame(pp.annots)
     rownames(pp.annots) = rownames(fpm)
     
-    promoters = select.promoters.regions(upstream = 2000, downstream = 2000, ORF.type.gtf = 'Putative', promoter.select = 'all')
+    # promoters = select.promoters.regions(upstream = 2000, downstream = 2000, ORF.type.gtf = 'Putative', promoter.select = 'all')
     
   }
   
@@ -245,15 +246,14 @@ if(grouping.temporal.peaks){
     
     toc()
     
-    
-    saveRDS(res, file = paste0(RdataDir, '/res_temporal_dynamicPeaks_mUA_regeneration_dev_2Batches.R10723_R7977_v8_noPeakAnnot.rds'))
+    # saveRDS(res, file = paste0(RdataDir, '/res_temporal_dynamicPeaks_mUA_regeneration_dev_2Batches.R10723_R7977_v8_noPeakAnnot.rds'))
     
     xx = data.frame(cpm, res, pp.annots[match(rownames(cpm), rownames(pp.annots)), ],  stringsAsFactors = FALSE)
     
     res = xx
     
     #res = data.frame(cpm, res, stringsAsFactors = FALSE)
-    saveRDS(res, file = paste0(RdataDir, '/res_temporal_dynamicPeaks__mUA_regeneration_dev_2Batches.R10723_R7977_peakAnnot_v7.rds'))
+    saveRDS(res, file = paste0(RdataDir, '/res_temporal_dynamicPeaks__mUA_regeneration_dev_2Batches.R10723_R7977_peakAnnot_v8.rds'))
     
     
   }
@@ -262,7 +262,7 @@ if(grouping.temporal.peaks){
   # reload the test result and select dynamic peaks
   ##########################################
   library(qvalue)
-  res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks__mUA_regeneration_dev_2Batches.R10723_R7977_v7.rds'))
+  res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks__mUA_regeneration_dev_2Batches.R10723_R7977_peakAnnot_v8.rds'))
   
   # select only the dynamic peak results without annotation part
   res = res[, c(1:50)]
@@ -286,7 +286,6 @@ if(grouping.temporal.peaks){
                    (res$adj.P.Val_s40.vs.mUA < fdr.cutoff & abs(res$logFC_s40.vs.mUA) > logfc.cutoff ) | 
                    (res$adj.P.Val_s44p.vs.mUA < fdr.cutoff & abs(res$logFC_s44p.vs.mUA) > logfc.cutoff ) |
                    (res$adj.P.Val_s44d.vs.mUA < fdr.cutoff & abs(res$logFC_s44d.vs.mUA) > logfc.cutoff ))
-  
   cat(length(select), 'DE peaks found !\n')
   
   res = res[select, ]
@@ -296,10 +295,14 @@ if(grouping.temporal.peaks){
   # heatmap for all regeneration dynamic peaks
   ##########################################
   res$mins =  apply(sample.means[match(rownames(res), rownames(sample.means)), ], 1, min)
+  res$max = apply(sample.means[match(rownames(res), rownames(sample.means)), ], 1, max)
   # xx = xx[which(xx$min < 4.5), ]
   
-  res = res[which(res$mins < 3), ]
-  cat(nrow(res), 'DE peaks found with at least condition below background !\n')
+  #length(which(res$min<3))
+  length(which(res$max > 3))
+  
+  res = res[which(res$max > 3), ]
+  cat(nrow(res), 'DE peaks found with at least condition above background !\n')
   
   source('Functions_atac.R')
   conds = c("Embryo_Stage40", "Embryo_Stage44_proximal", 'Embryo_Stage44_distal', 
@@ -368,21 +371,8 @@ if(grouping.temporal.peaks){
            annotation_colors = annot_colors, 
            #clustering_callback = callback,
            gaps_col = ii.gaps, 
-           filename = paste0(resDir, '/heatmap_regenerationPeaks_M0prob0.05_log2FC.1_scaled.pdf'), 
-           width = 8, height = 16)
-  
-  pheatmap(keep, 
-           # annotation_row = my_gene_col, 
-           annotation_col = df, show_rownames = FALSE, scale = 'none', 
-           color = col, 
-           show_colnames = FALSE,
-           cluster_rows = TRUE, cluster_cols = FALSE,  
-           #clustering_method = 'complete', cutree_rows = nb_clusters, 
-           #annotation_colors = annot_colors, 
-           #clustering_callback = callback,
-           gaps_col = ii.gaps, 
-           filename = paste0(resDir, '/heatmap_regenerationPeaks_M0prob0.05_log2FC.1.pdf'), 
-           width = 8, height = 12)
+           filename = paste0(figureDir, 'heatmap_regenerationPeaks_scaled.pdf'), 
+           width = 6, height = 12)
   
   ##########################################
   # highligh potential regeneration peaks, not found in mUA and embryo stages only in regeneration process 
