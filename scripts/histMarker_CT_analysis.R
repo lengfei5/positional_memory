@@ -1197,15 +1197,19 @@ for(n_histM in 1:length(conds_histM))
   cpm = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_', conds_histM[n_histM], '_', version.analysis, '.rds'))
   design.sel = readRDS(file = paste0(RdataDir, '/design.sels_bc_TMM_combat_', conds_histM[n_histM], '_', version.analysis, '.rds'))
   
+  sels_regeneration = grep('rRep', colnames(cpm))
+  cpm = cpm[, sels_regeneration]
+  design.sel = design.sel[sels_regeneration, ]
+  
   ### select the samples and extract sample means
-  conds = c("mUA", "mLA", "mHand")
+  conds = c("mUA", "BL5days", "BL9days", 'BL13days.prox', 'BL13days.dist')
   sample.sels = c();  
   cc = c()
   sample.means = c()
-  
   for(n in 1:length(conds)) 
   {
     kk = grep(conds[n], colnames(cpm))
+    cat(n, '--', conds[n],  '--', kk,  '\n')
     sample.sels = c(sample.sels, kk)
     cc = c(cc, rep(conds[n], length(kk)))
     if(length(kk)>1) {
@@ -1213,7 +1217,6 @@ for(n_histM in 1:length(conds_histM))
     }else{
       sample.means = cbind(sample.means, cpm[, kk])
     }
-    
   }
   colnames(sample.means) = conds
   
