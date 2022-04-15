@@ -1301,7 +1301,7 @@ for(n_histM in 1:length(conds_histM))
 
 
 ##########################################
-# Combine all four markers  
+# Combine peaks of all four markers   
 ##########################################
 atacseq_peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rxxxx_R10723_R11637_R12810_atac/Rdata/',
                                       'ATACseq_peak_consensus_filtered_55k.rds'))
@@ -1311,18 +1311,20 @@ conds_histM = c('H3K4me3','H3K27me3', 'H3K4me1', 'H3K27ac')
 keep = c()
 DE.locus = c()
 
-fdr.cutoff = 0.01; 
+fdr.cutoff = 0.05; 
 logfc.cutoff = 1;
 marker.cutoff = 1;
 
 for(n_histM in 1:length(conds_histM))
 {
-  # n_histM = 3
-  res = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_DBedgeRtest_', conds_histM[n_histM], '_', version.analysis, '.rds'))
+  # n_histM = 1
+  res = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_DBedgeRtest_regeneration_', 
+                              conds_histM[n_histM], '_', version.analysis, '.rds'))
   
-  select = which(((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & abs(res$logFC.mLA.vs.mUA) > logfc.cutoff) |
-                    (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & abs(res$logFC.mHand.vs.mUA) > logfc.cutoff)|
-                    (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & abs(res$logFC.mHand.vs.mLA) > logfc.cutoff)) &
+  select = which((res$adj.P.Val_5dpa.vs.mUA < fdr.cutoff & abs(res$logFC_5dpa.vs.mUA) > logfc.cutoff) |
+                   (res$adj.P.Val_9dpa.vs.mUA < fdr.cutoff & abs(res$logFC_9dpa.vs.mUA) > logfc.cutoff)|
+                   (res$adj.P.Val_13dpap.vs.mUA < fdr.cutoff & abs(res$logFC_13dpap.vs.mUA) > logfc.cutoff) |
+                   (res$adj.P.Val_13dpad.vs.mUA < fdr.cutoff & abs(res$logFC_13dpad.vs.mUA) > logfc.cutoff) &
                    res$maxs > marker.cutoff
   )
   
@@ -1346,9 +1348,10 @@ for(n_histM in 1:length(conds_histM))
   
   res_sel = res[ii_overlap, ]
   
-  select = which(((res_sel$adj.P.Val.mLA.vs.mUA < fdr.cutoff & abs(res_sel$logFC.mLA.vs.mUA) > logfc.cutoff) |
-                    (res_sel$adj.P.Val.mHand.vs.mUA < fdr.cutoff & abs(res_sel$logFC.mHand.vs.mUA) > logfc.cutoff)|
-                    (res_sel$adj.P.Val.mHand.vs.mLA < fdr.cutoff & abs(res_sel$logFC.mHand.vs.mLA) > logfc.cutoff)) &
+  select = which((res_sel$adj.P.Val_5dpa.vs.mUA < fdr.cutoff & abs(res_sel$logFC_5dpa.vs.mUA) > logfc.cutoff) |
+                   (res_sel$adj.P.Val_9dpa.vs.mUA < fdr.cutoff & abs(res_sel$logFC_9dpa.vs.mUA) > logfc.cutoff)|
+                   (res_sel$adj.P.Val_13dpap.vs.mUA < fdr.cutoff & abs(res_sel$logFC_13dpap.vs.mUA) > logfc.cutoff) |
+                   (res_sel$adj.P.Val_13dpad.vs.mUA < fdr.cutoff & abs(res_sel$logFC_13dpad.vs.mUA) > logfc.cutoff) &
                    res_sel$maxs > marker.cutoff
   )
   
@@ -1357,6 +1360,7 @@ for(n_histM in 1:length(conds_histM))
   
   colnames(xx) = paste0(colnames(xx), '_', conds_histM[n_histM])
   
+  source('Functions_histM.R')
   yy = res_sel[select, grep(conds_histM[n_histM], colnames(res_sel))]
   yy = t(apply(yy, 1, cal_transform_histM, cutoff.min = 0.0, cutoff.max = 6))
   
@@ -1376,17 +1380,17 @@ for(n_histM in 1:length(conds_histM))
            cluster_cols=FALSE, annotation_col=df,
            #annotation_colors = annot_colors,
            width = 6, height = 12,
-           filename = paste0(resDir, '/heatmap_histoneMarker_', conds_histM[n_histM], '_overlappedWithAtacseqPeak.pdf'))
+           filename = paste0(resDir, '/heatmap_histoneMarker_regeneration', conds_histM[n_histM], '_overlappedWithAtacseqPeak.pdf'))
   
-  pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
-           color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8),
-           show_colnames = FALSE,
-           scale = 'none',
-           cluster_cols=FALSE, annotation_col=df,
-           #annotation_colors = annot_colors,
-           width = 6, height = 12,
-           filename = paste0(resDir, '/heatmap_histoneMarker_', conds_histM[n_histM], '_overlappedWithAtacseqPeak_nonscaled.pdf'))
-  
+  # pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+  #          color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8),
+  #          show_colnames = FALSE,
+  #          scale = 'none',
+  #          cluster_cols=FALSE, annotation_col=df,
+  #          #annotation_colors = annot_colors,
+  #          width = 6, height = 12,
+  #          filename = paste0(resDir, '/heatmap_histoneMarker_', conds_histM[n_histM], '_overlappedWithAtacseqPeak_nonscaled.pdf'))
+  # 
   
   if(n_histM == 1){
     keep = data.frame(xx, stringsAsFactors = FALSE)
@@ -1407,16 +1411,16 @@ for(n_histM in 1:length(conds_histM))
   }
 }
 
-save(keep, DE.locus, file = paste0(RdataDir, '/combined_4histMarkers_overlapped55kATACseq_DE.Rdata'))
+save(keep, DE.locus, file = paste0(RdataDir, '/combined_4histMarkers_overlapped55kATACseq_DE_regeneration.Rdata'))
 
 
 ##########################################
 # plot all DE histone markers
 ##########################################
-load(file = paste0(RdataDir, '/combined_4histMarkers_overlapped55kATACseq_DE.Rdata'))
+load(file = paste0(RdataDir, '/combined_4histMarkers_overlapped55kATACseq_DE_regeneration.Rdata'))
 ss = apply(DE.locus[, c(1:4)], 1, sum)
 
-yy = keep[match(names(ss[which(ss>0)]), rownames(keep)), c(1:8, 27:34, 53:60, 79:85)]
+yy = keep[match(names(ss[which(ss>0)]), rownames(keep)), grep('^H3K4me3|^H3K27me3|^H3K4me1|^H3K27ac', colnames(keep))]
 design = readRDS(file = paste0(RdataDir, '/histM_CT_design_info.rds'))
 
 sampleID = sapply(colnames(yy), function(x) unlist(strsplit(as.character(x), '_'))[3])
@@ -1424,25 +1428,30 @@ mm = match(sampleID, design$sampleID)
 colnames(yy) = paste0(design$condition[mm], '_', design$Batch[mm], '_', design$sampleID[mm])
 #yy = yy[, grep('mRep1|mRep2', colnames(yy))]
 
+source('Functions_histM.R')
+cc = paste(rep(conds_histM, each = length(conds)), conds, sep = "_")
+yy = cal_sample_means(yy, conds = cc)
+
 df = as.data.frame(sapply(colnames(yy), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[2])}))
-colnames(df) = 'segments'
+colnames(df) = 'time'
 rownames(df) = colnames(yy)
 
-sample_colors = c('springgreen4', 'steelblue2', 'gold2')
+sample_colors = c('springgreen', 'springgreen2', 'springgreen3', 'gold2', 'red')
 annot_colors = list(segments = sample_colors)
 
 ### plot histone markers with at least signaifiant one
 yy1 = yy
 source('Functions_histM.R')
 
-for(n in 1:length(conds_histM))
-{
-  jj = grep(conds_histM[n], colnames(yy))
-  yy1[,jj] = t(apply(yy[,jj], 1, cal_z_score))
-}
+# for(n in 1:length(conds_histM))
+# {
+#   jj = grep(conds_histM[n], colnames(yy))
+#   yy1[,jj] = t(apply(yy[,jj], 1, cal_z_score))
+# }
 
-#yy <- t(apply(yy, 1, cal_z_score))
-gaps_col = c(8, 16)
+yy1 <- t(apply(yy1, 1, cal_z_score))
+
+gaps_col = c(5, 10, 15)
 pheatmap(yy1, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
          color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(12), 
          show_colnames = FALSE,
@@ -1451,27 +1460,24 @@ pheatmap(yy1, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
          gaps_col = gaps_col,
          #annotation_colors = annot_colors,
          width = 6, height = 12, 
-         filename = paste0(figureDir, '/heatmap_histoneMarker_DE_allmarkers.pdf'))
+         filename = paste0(resDir, '/heatmap_histoneMarker_regeneration_DE_allmarkers.pdf'))
 
-yy1 = yy
-for(n in 1:length(conds_histM))
-{
-  jj = grep(conds_histM[n], colnames(yy))
-  yy1[,jj] = t(apply(yy[,jj], 1, cal_transform_histM, cutoff.min = 0, cutoff.max = 5))
-  
-}
+# yy1 = yy
+# for(n in 1:length(conds_histM))
+# {
+#   jj = grep(conds_histM[n], colnames(yy))
+#   yy1[,jj] = t(apply(yy[,jj], 1, cal_transform_histM, cutoff.min = 0, cutoff.max = 5))
+#   
+# }
 
 #yy <- t(apply(yy, 1, cal_z_score))
-gaps_col = c(8, 16)
-pheatmap(yy1, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
-         color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(12), 
-         show_colnames = FALSE,
-         scale = 'none',
-         cluster_cols=FALSE, annotation_col=df,
-         gaps_col = gaps_col,
-         #annotation_colors = annot_colors,
-         width = 6, height = 12, 
-         filename = paste0(figureDir, '/heatmap_histoneMarker_DE_allmarkers_nonscaled.pdf'))
-
-
-
+# gaps_col = c(8, 16)
+# pheatmap(yy1, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+#          color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(12), 
+#          show_colnames = FALSE,
+#          scale = 'none',
+#          cluster_cols=FALSE, annotation_col=df,
+#          gaps_col = gaps_col,
+#          #annotation_colors = annot_colors,
+#          width = 6, height = 12, 
+#          filename = paste0(figureDir, '/heatmap_histoneMarker_DE_allmarkers_nonscaled.pdf'))

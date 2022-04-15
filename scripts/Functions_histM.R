@@ -22,6 +22,11 @@ cal_transform_histM = function(x, cutoff.min = 1., cutoff.max = 5, toScale = FAL
   
 }
 
+cal_z_score_dynamic_stable_histM = function(x, index_dynamic = c(1:10), multiplier.stable = 5)
+{
+  return('to do')
+}
+
 cal_centering <- function(x){
   (x - mean(x, na.rm =TRUE))
 }
