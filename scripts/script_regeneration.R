@@ -419,6 +419,34 @@ if(Assembly_histMarkers_togetherWith_ATACseq){
   res_atac = res
   yy_atac = yy
   
+  Save.Matrix.for.DPGP = FALSE
+  if(Save.Matrix.for.DPGP){
+    
+    rownames(yy) = gsub(':', '_', rownames(yy))
+    #yy = rbind(c(1:ncol(yy)), yy)
+    colnames(yy) = c(1:ncol(yy))
+    write.table(yy[c(1:1000), ], 
+    file = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/DPGP_clustering/', 
+                  'atac_peakSignals_1000.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
+    
+    write.table(yy[c(1:2000), ], 
+                file = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/DPGP_clustering/', 
+                              'atac_peakSignals_2000.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
+    
+    write.table(yy[c(1:5000), ], 
+                file = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/DPGP_clustering/', 
+                              'atac_peakSignals_5000.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
+    
+    write.table(yy[c(1:10000), ], 
+                file = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/DPGP_clustering/', 
+                              'atac_peakSignals_10000.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
+    write.table(yy, 
+                file = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/DPGP_clustering/', 
+                              'atac_peakSignals_all.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
+    
+    
+  }
+  
   Test_cluster_order = FALSE
   if(Test_cluster_order){
     test = yy
