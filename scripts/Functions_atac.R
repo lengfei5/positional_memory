@@ -3232,8 +3232,70 @@ process.dynamic.peaks.clustering.GPDP = function(yy, res)
   
   for(n in 1:length(clusters))
   {
-    
+    # n = 1
+    kk = match(dpgp$gene[dpgp$cluster == names(clusters)[n]], rownames(xx))
+    cs[n,] = apply(xx[kk, ], 2, mean)
   }
+  
+  library(corrplot)
+  M = cor(t(cs))
+  corrplot.mixed(M, order = 'hclust', addrect = 10)
+  
+  
+  cor_cutoff = 0.6
+  dxx = dpgp
+  missed = which(is.na(match(rownames(yy), dpgp$gene)))
+  losts = c()
+  for(n in missed)
+  {
+    cat(n, '\n')
+    test = cor(as.numeric(yy[n, ]), as.matrix(t(cs)))
+    ii_max = which.max(test)
+    cluster.assigned = rownames(cs)[ii_max] 
+    if(test[ii_max] >= cor_cutoff){
+      dxx = rbind(dxx, c(cluster.assigned, rownames(yy)[n]))
+    }else{
+      losts = c(losts, n)
+    }
+  }
+  
+  cat(length(losts)/length(missed))
+  
+  saveRDS(dxx, file = paste0(RdataDir, '/DPGP_clusters_extended_allPeaks.rds'))
+  
+  ##########################################
+  # manually merge DPGP clusters to have coarse groups 
+  ##########################################
+  dpgp = readRDS(file = paste0(RdataDir, '/DPGP_clusters_extended_allPeaks.rds'))
+  
+  cs = dpgp[!is.na(match(dpgp$cluster, names(clusters))), ]
+  cs$mc = cs$cluster
+  cs$mc[which(cs$cluster == '5' | 
+                cs$cluster == '7'|
+                cs$cluster == '8' |
+                cs$cluster == '11')] = 'mc1'
+  
+  cs$mc[which(cs$cluster == '9')] = 'mc2'
+  
+  cs$mc[which(cs$cluster == '12' | 
+                cs$cluster == '19'|
+                cs$cluster == '10' |
+                cs$cluster == '2')] = 'mc3'
+  
+  
+  cs$mc[which(cs$cluster == '4')] = 'mc4'
+  cs$mc[which(cs$cluster == '15')] = 'mc5'
+  
+  cs$mc[which(cs$cluster == '18')] = 'mc6'
+  cs$mc[which(cs$cluster == '1')] = 'mc7'
+  cs$mc[which(cs$cluster == '13')] = 'mc8'
+  
+  res$clusters = NA
+  mm = match(cs$gene, rownames(res))
+  
+  res$clusters[mm] = cs$mc
+  
+  saveRDS(res, file = paste0(RdataDir, '/renegeration_dynamicPeaks_GPDPclustering.merged.extended.rds'))
   
 }
 

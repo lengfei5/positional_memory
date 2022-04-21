@@ -349,6 +349,11 @@ sample_colors = c('magenta', 'darkblue', 'springgreen4', 'springgreen', 'springg
                   'red')[c(1:length(conds))]
 
 names(sample_colors) = conds
+col3 <- c("#a6cee3", "#1f78b4", "#b2df8a",
+          "#33a02c", "#fb9a99", "#e31a1c",
+          "#fdbf6f", "#ff7f00", "#cab2d6",
+          "#6a3d9a", "#ffff99", "#b15928")
+
 
 Regeneration.peaks.clustering.DPGP = FALSE
 if(!Regeneration.peaks.clustering.DPGP)
@@ -365,14 +370,12 @@ if(!Regeneration.peaks.clustering.DPGP)
   res$clusters = my_gene_col
 }else{
   
-  res2 = process.dynamic.peaks.clustering.GPDP(yy, res)
+  #res2 = process.dynamic.peaks.clustering.GPDP(yy, res)
   
+  res = readRDS(file = paste0(RdataDir, '/renegeration_dynamicPeaks_GPDPclustering.merged.extended.rds'))
 }
 
-col3 <- c("#a6cee3", "#1f78b4", "#b2df8a",
-          "#33a02c", "#fb9a99", "#e31a1c",
-          "#fdbf6f", "#ff7f00", "#cab2d6",
-          "#6a3d9a", "#ffff99", "#b15928")
+
 cluster_col = col3[1:nb_clusters]
 names(cluster_col) = paste0('cluster_', c(1:nb_clusters))
 annot_colors = list(
