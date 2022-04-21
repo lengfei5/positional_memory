@@ -339,7 +339,6 @@ cal_z_score <- function(x){
   (x - mean(x)) / sd(x)
 }
 
-library(dendextend)
 yy <- t(apply(sample.means, 1, cal_z_score))
 
 df <- data.frame(conds)
@@ -351,14 +350,24 @@ sample_colors = c('magenta', 'darkblue', 'springgreen4', 'springgreen', 'springg
 
 names(sample_colors) = conds
 
-nb_clusters = 8
-my_hclust_gene <- hclust(dist(yy), method = "complete")
-
-my_gene_col <- cutree(tree = as.dendrogram(my_hclust_gene), k = nb_clusters)
-my_gene_col <- data.frame(cluster =  paste0('cluster_', my_gene_col))
-rownames(my_gene_col) = rownames(yy)
-
-res$clusters = my_gene_col
+Regeneration.peaks.clustering.DPGP = FALSE
+if(!Regeneration.peaks.clustering.DPGP)
+{
+  library(dendextend)
+  
+  nb_clusters = 8
+  my_hclust_gene <- hclust(dist(yy), method = "complete")
+  
+  my_gene_col <- cutree(tree = as.dendrogram(my_hclust_gene), k = nb_clusters)
+  my_gene_col <- data.frame(cluster =  paste0('cluster_', my_gene_col))
+  rownames(my_gene_col) = rownames(yy)
+  
+  res$clusters = my_gene_col
+}else{
+  
+  res2 = process.dynamic.peaks.clustering.GPDP(yy, res)
+  
+}
 
 col3 <- c("#a6cee3", "#1f78b4", "#b2df8a",
           "#33a02c", "#fb9a99", "#e31a1c",
@@ -399,6 +408,36 @@ plt = pheatmap(yy,
 
 save(yy, plt, file = paste0(RdataDir, '/dynamic_ATACpeaks_regeneration_data.heatmap.Rdata'))
 
+## save data for DPGP clustering
+## unfornately the result is that there are too many clusters
+Save.Matrix.for.DPGP = FALSE
+if(Save.Matrix.for.DPGP){
+  
+  rownames(yy) = gsub(':', '_', rownames(yy))
+  #yy = rbind(c(1:ncol(yy)), yy)
+  colnames(yy) = c(1:ncol(yy))
+  write.table(yy[c(1:1000), ], 
+              file = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/DPGP_clustering/', 
+                            'atac_peakSignals_1000.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
+  
+  write.table(yy[c(1:2000), ], 
+              file = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/DPGP_clustering/', 
+                            'atac_peakSignals_2000.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
+  
+  write.table(yy[c(1:5000), ], 
+              file = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/DPGP_clustering/', 
+                            'atac_peakSignals_5000.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
+  
+  write.table(yy[c(1:10000), ], 
+              file = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/DPGP_clustering/', 
+                            'atac_peakSignals_10000.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
+  write.table(yy, 
+              file = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/DPGP_clustering/', 
+                            'atac_peakSignals_all.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
+  
+}
+
+
 ##########################################
 # combine atac-seq peaks and histone marker to make heatmap 
 ##########################################
@@ -418,34 +457,6 @@ if(Assembly_histMarkers_togetherWith_ATACseq){
   design_atac = design
   res_atac = res
   yy_atac = yy
-  
-  Save.Matrix.for.DPGP = FALSE
-  if(Save.Matrix.for.DPGP){
-    
-    rownames(yy) = gsub(':', '_', rownames(yy))
-    #yy = rbind(c(1:ncol(yy)), yy)
-    colnames(yy) = c(1:ncol(yy))
-    write.table(yy[c(1:1000), ], 
-    file = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/DPGP_clustering/', 
-                  'atac_peakSignals_1000.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
-    
-    write.table(yy[c(1:2000), ], 
-                file = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/DPGP_clustering/', 
-                              'atac_peakSignals_2000.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
-    
-    write.table(yy[c(1:5000), ], 
-                file = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/DPGP_clustering/', 
-                              'atac_peakSignals_5000.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
-    
-    write.table(yy[c(1:10000), ], 
-                file = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/DPGP_clustering/', 
-                              'atac_peakSignals_10000.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
-    write.table(yy, 
-                file = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/DPGP_clustering/', 
-                              'atac_peakSignals_all.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
-    
-    
-  }
   
   Test_cluster_order = FALSE
   if(Test_cluster_order){

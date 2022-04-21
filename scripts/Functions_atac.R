@@ -3206,8 +3206,36 @@ Identify.LA.Hand.specific.genes.from.atacseq = function(xx)
 }
 
 
-
-
+process.dynamic.peaks.clustering.GPDP = function(yy, res)
+{
+  require(data.table)
+  dpgpDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/DPGP_clustering/out_10k_2d/'
+  
+  dpgp = read.table(file = paste0(dpgpDir, 
+  'dpgp_clusters_optimal_clustering.txt'), sep = '\t', header = TRUE)
+  #$'dpgp_clusters_posterior_similarity_matrix.txt'))
+  dpgp$gene = sapply(dpgp$gene, function(x) {x = unlist(strsplit(as.character(x), '_')); paste0(x[1], ':', x[2], '_', x[3])})
+  
+  clusters = table(dpgp$cluster)
+  print(clusters)
+  clusters = clusters[which(clusters >= 0.02*nrow(dpgp))]
+  
+  # <- fread(input)
+  #dpgp = read.table(file = )
+  mm = match(dpgp$gene, rownames(yy))
+  
+  xx = yy[mm, ]
+  
+  cs = matrix(NA, nrow = length(clusters), ncol = ncol(xx))
+  colnames(cs) = colnames(xx)
+  rownames(cs) = names(clusters)
+  
+  for(n in 1:length(clusters))
+  {
+    
+  }
+  
+}
 
 ########################################################
 ########################################################
