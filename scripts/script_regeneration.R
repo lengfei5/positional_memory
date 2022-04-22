@@ -560,6 +560,27 @@ if(Assembly_histMarkers_togetherWith_ATACseq){
              annotation_colors = annot_colors, 
              #clustering_callback = callback,
              gaps_col = ii.gaps)
+    
+    ## save group bed for deeptools heatmap
+    load(file = paste0(RdataDir, '/dynamic_ATACpeaks_regeneration_data.heatmap_DPGPclusters.Rdata')) 
+    
+    res = res[match(rownames(yy), rownames(res)), ]
+    mcs = unique(res$clusters)
+    for(n in 1:length(mcs)){
+      jj = which(res$clusters == mcs[n])
+      pp_atac = data.frame(t(sapply(rownames(yy)[jj], function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
+      pp_atac$name = rownames(yy)[jj]
+      pp_atac$score = 0
+      pp_atac$strand = '*'
+      
+      peakGroupDir = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/',
+                            'positional_memory/Data/histMod_CT_using/heatmaps_deeptools/peak_groups')
+      write.table(pp_atac, file = paste0(peakGroupDir, '/peak_group_', n, '.bed'), 
+                  sep = '\t', quote = FALSE, row.names = FALSE, col.names = FALSE)
+      
+    }
+    
+    
   }
 
   # import histone marker 
