@@ -888,52 +888,133 @@ if(saveTable){
 }
 
 ##########################################
-# feature distribution of all peaks and dynamic peaks 
+# feature distribution of all peaks and regenration dynamic peaks 
 ##########################################
 Peak.annotation_feature.distribution = FALSE
 if(Peak.annotation_feature.distribution){
   library('rtracklayer')
   library(GenomicRanges)
   library('GenomicFeatures')
+  source('Functions_atac.R')
   
+  # limb fibroblast expressing genes
   gtf.file =  '../data/AmexT_v47_Hox.patch_limb.fibroblast.expressing.23585.genes.dev.mature.regeneration.gtf'
-  peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rdata/', 
-                                'position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters_6.rds'))
-  ps = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rxxxx_R10723_R11637_R12810_atac/Rdata', 
-                             '/positional_peakSignals.rds'))
+  amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
   
-  mm = match(rownames(peaks), rownames(ps))
-  peaks = data.frame(ps[mm, ], peaks, stringsAsFactors = FALSE)
+  # dynamic peaks
+  res = readRDS(file = paste0(RdataDir, '/renegeration_dynamicPeaks_GPDPclustering.merged.extended.rds'))
+  res = res[which(!is.na(res$clusters)), ]
   
-  
-  pp = data.frame(t(sapply(rownames(peaks), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  pp = data.frame(t(sapply(rownames(res), function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
   pp$strand = '*'
   pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
                                 start.field="X2", end.field="X3", strand.field="strand")
-  # annotation from ucsc browser ambMex60DD_genes_putative
-  amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
+  
+  
   pp.annots = annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+  #pp.annots = as.data.frame(pp.annots)
   
-  pp.annots = as.data.frame(pp.annots)
-  rownames(pp.annots) = rownames(peaks)
-  
-  ## update the peak annoation using limb-fibroblast expressing genes
-  peaks[, c(36:49)] = pp.annots
-  
-  saveRDS(peaks, file = paste0(RdataDir, 
-                               '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters6_DEtest_peakSignals_peakAnnot.updated.rds'))
-  
-  # amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
-  # pp.annots = annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
-  
-  #plotAnnoBar(pp.annots)
-  pdfname = paste0(figureDir, "feature_distribution_positionalPeaks.pdf")
-  pdf(pdfname, width = 6, height = 4)
-  par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+  # pdfname = paste0(figureDir, "feature_distribution_positionalPeaks.pdf")
+  # pdf(pdfname, width = 6, height = 4)
+  # par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
   
   plotPeakAnnot_piechart(pp.annots)
   
-  dev.off()
+  # dev.off()
+  
+  # all peaks 
+  peak.all = readRDS(file = paste0(RdataDir, '/ATACseq_peak_consensus_filtered_55k.rds'))
+                        
+  all.annots = annotatePeak(peak.all, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+  plotPeakAnnot_piechart(all.annots)
+  
+  
+  ## compare the features distributions and make test: promoter is more stable in popultion
+  # pdfname = paste0(saveDir, "/feature_distribution_regenerationPeaks.pdf")
+  # pdf(pdfname, width = 8, height = 6)
+  # par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+  # pp.annots = annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+  #dev.off()
+  
+  stats = plotPeakAnnot_piechart(all.annots)
+  
+  colnames(stats)[ncol(stats)] = 'all'
+  stats = data.frame(stats,  plotPeakAnnot_piechart(pp.annots)[, 2])
+  colnames(stats)[ncol(stats)] = 'dynamic'
+  
+  scores = c()
+  test = c()
+  test2 = c()
+  for(i in 1:nrow(stats))
+  {
+    total = length(peak.all); 
+    mm = round(total * stats[i, 2]/100)
+    nn = total - mm
+    qq = round(pp.annots@peakNum * stats[i, ncol(stats)]/100)
+    test = c(test, phyper(qq-1, mm, nn, pp.annots@peakNum, lower.tail = FALSE, log.p = FALSE))
+    test2 = c(test2, phyper(qq+1, mm, nn, pp.annots@peakNum, lower.tail = TRUE, log.p = FALSE))
+  }
+  
+  scores = cbind(scores, test, test2)
+  colnames(scores) = c('enrich.pval', 'depelet.pval')
+  rownames(scores) = rownames(stats)
+  
+  stats = data.frame(stats, scores, stringsAsFactors = FALSE)
+  
+  library(tidyr)
+  library(dplyr)
+  require(ggplot2)
+  
+  features = sapply(stats$Feature, function(x){x = unlist(strsplit(as.character(x), ' ')); x = x[-length(x)]; paste0(x, collapse = ' ')})
+  stats$Feature = features
+  
+  as_tibble(stats) %>%  gather(group, freq,  2:3) %>% 
+    mutate(Feature = factor(Feature, levels=stats$Feature)) %>%
+    ggplot(aes(fill=group, y=freq, x=Feature)) + 
+    geom_bar(position="dodge", stat="identity") +
+    theme_classic() +
+    theme(axis.text.x = element_text(angle = 90, size = 10)) +
+    scale_fill_manual(values=c('#999999','#E69F00')) +
+    labs( x = '', y = 'percentage (%)') 
+  
+  ggsave(paste0(figureDir, "feature_distribution_regenerationPeaks.pdf"),  width = 8, height = 6)
+  
+  # for(m in 1:nb_clusters)
+  # {
+  #   # m = 1
+  #   cat('cluster - ',  m, '\n')
+  #   # pp.annots = annotatePeak(pp[which(xx$cluster == m)], TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+  #   
+  #   # pdfname = paste0(saveDir, "/Fig1E_positional_peak_feature_distribution_cluster_", m, ".pdf")
+  #   # pdf(pdfname, width = 8, height = 6)
+  #   # par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+  #   
+  #   stats = data.frame(stats,  plotPeakAnnot_piechart(pp.annots)[, 2])
+  #   colnames(stats)[ncol(stats)] = paste0('cluster', m, '_', pp.annots@peakNum)
+  #   
+  #   test = c()
+  #   test2 = c()
+  #   for(i in 1:nrow(stats))
+  #   {
+  #     total = length(pp); 
+  #     mm = round(total * stats[i, 2]/100)
+  #     nn = total - mm
+  #     qq = round(pp.annots@peakNum * stats[i, ncol(stats)]/100)
+  #     test = c(test, phyper(qq-1, mm, nn, pp.annots@peakNum, lower.tail = FALSE, log.p = FALSE))
+  #     test2 = c(test2, phyper(qq+1, mm, nn, pp.annots@peakNum, lower.tail = TRUE, log.p = FALSE))
+  #   }
+  #   scores = cbind(scores, test, test2)
+  #   colnames(scores)[c(ncol(scores)-1, ncol(scores))] = c(paste0('enrich.pval.cluster', m), paste0('depelet.pval.cluster', m))
+  #   
+  #   dev.off()
+  # }
+  # rownames(scores) = rownames(scores)
+  # 
+  # stats = data.frame(stats, scores, stringsAsFactors = FALSE)
+  # 
+  # write.csv(stats, file = paste0(saveDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters', 
+  #                                nb_clusters, '_feature.Enrichment.depeletion.csv'), quote = FALSE, row.names = TRUE)
+  
   
 }
 
