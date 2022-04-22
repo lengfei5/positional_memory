@@ -354,12 +354,11 @@ col3 <- c("#a6cee3", "#1f78b4", "#b2df8a",
           "#fdbf6f", "#ff7f00", "#cab2d6",
           "#6a3d9a", "#ffff99", "#b15928")
 
-
 Regeneration.peaks.clustering.DPGP = FALSE
 if(!Regeneration.peaks.clustering.DPGP)
 {
+  # specify the nb of clusters
   library(dendextend)
-  
   nb_clusters = 8
   my_hclust_gene <- hclust(dist(yy), method = "complete")
   
@@ -368,37 +367,18 @@ if(!Regeneration.peaks.clustering.DPGP)
   rownames(my_gene_col) = rownames(yy)
   
   res$clusters = my_gene_col
-}else{
   
-  #res2 = process.dynamic.peaks.clustering.GPDP(yy, res)
+  cluster_col = col3[1:nb_clusters]
+  names(cluster_col) = paste0('cluster_', c(1:nb_clusters))
   
-  res = readRDS(file = paste0(RdataDir, '/renegeration_dynamicPeaks_GPDPclustering.merged.extended.rds'))
-}
-
-
-cluster_col = col3[1:nb_clusters]
-names(cluster_col) = paste0('cluster_', c(1:nb_clusters))
-annot_colors = list(
-  condition = sample_colors,
-  cluster = cluster_col)
-
-ii.gaps = c(3, 4)
-col = colorRampPalette(c("navy", "white", "red3"))(16)
-
-pheatmap(yy, 
-         annotation_row = my_gene_col, 
-         annotation_col = df, show_rownames = FALSE, scale = 'none', 
-         color = col, 
-         show_colnames = FALSE,
-         cluster_rows = TRUE, cluster_cols = FALSE,  
-         clustering_method = 'complete', cutree_rows = nb_clusters, 
-         annotation_colors = annot_colors, 
-         #clustering_callback = callback,
-         gaps_col = ii.gaps, 
-         filename = paste0(figureDir, 'heatmap_regenerationPeaks_scaled.pdf'), 
-         width = 6, height = 12)
-
-plt = pheatmap(yy, 
+  annot_colors = list(
+    condition = sample_colors,
+    cluster = cluster_col)
+  
+  ii.gaps = c(3, 4)
+  col = colorRampPalette(c("navy", "white", "red3"))(16)
+  
+  pheatmap(yy, 
            annotation_row = my_gene_col, 
            annotation_col = df, show_rownames = FALSE, scale = 'none', 
            color = col, 
@@ -407,9 +387,114 @@ plt = pheatmap(yy,
            clustering_method = 'complete', cutree_rows = nb_clusters, 
            annotation_colors = annot_colors, 
            #clustering_callback = callback,
-           gaps_col = ii.gaps)
+           gaps_col = ii.gaps, 
+           filename = paste0(figureDir, 'heatmap_regenerationPeaks_scaled.pdf'), 
+           width = 6, height = 12)
+  
+  plt = pheatmap(yy, 
+                 annotation_row = my_gene_col, 
+                 annotation_col = df, show_rownames = FALSE, scale = 'none', 
+                 color = col, 
+                 show_colnames = FALSE,
+                 cluster_rows = TRUE, cluster_cols = FALSE,  
+                 clustering_method = 'complete', cutree_rows = nb_clusters, 
+                 annotation_colors = annot_colors, 
+                 #clustering_callback = callback,
+                 gaps_col = ii.gaps)
+  
+  save(yy, plt, file = paste0(RdataDir, '/dynamic_ATACpeaks_regeneration_data.heatmap.Rdata'))
+  
+  
+}else{
+  
+  #res2 = process.dynamic.peaks.clustering.GPDP(yy, res)
+  # reload the processed GPDP clusters
+  res = readRDS(file = paste0(RdataDir, '/renegeration_dynamicPeaks_GPDPclustering.merged.extended.rds'))
+  res = res[which(!is.na(res$clusters)), ]
+  yy = yy[match(rownames(res), rownames(yy)), ]
+  
+  ######
+  ### given the order of groups and order the peaks withinin groups using hclust
+  ## find the row gap and order subclusters   
+  
+  #res$clusters = as.character(res$clusters)
+  cluster_order = paste0('mc', c(1:8))
+  
+  gaps.row = c()
+  peakNm = c()
+  library(dendextend)
+  library(ggplot2)
+  
+  for(n in 1:length(cluster_order))
+  {
+    kk = which(res$cluster == cluster_order[n])
+    cat('clsuter ', cluster_order[n], ' -- ', length(kk), ' peaks \n')
+    
+    hm_hclust <- hclust(dist(as.matrix(yy[kk,])), method = "complete")
+    #hm_cluster <- cutree(tree = as.dendrogram(hm_hclust), h = 5)
+    peakNm = c(peakNm, hm_hclust$labels[hm_hclust$order])
+    
+    if(n == 1)  {gaps.row = c(gaps.row, length(which(res$clusters == cluster_order[n])))
+    }else{
+      if(n < length(cluster_order)) {
+        gaps.row = c(gaps.row,  gaps.row[n-1] + length(which(res$clusters == cluster_order[n])))
+      }
+    }
+  }
+  
+  new_order = match(peakNm, rownames(yy))
+  
+  test = yy[new_order, ]
+  
+  my_gene_col <- data.frame(cluster = res$clusters[match(rownames(test), rownames(res))])
+  rownames(my_gene_col) = rownames(test)
+  
+  cluster_col = col3[1:length(cluster_order)]
+  names(cluster_col) = cluster_order
+  
+  annot_colors = list(
+    condition = sample_colors,
+    cluster = cluster_col)
+  
+  ii.gaps = c(3, 4)
+  col = colorRampPalette(c("navy", "white", "red3"))(16)
+  
+  
+  pheatmap(test, 
+           annotation_row = my_gene_col, 
+           annotation_col = df, show_rownames = FALSE, scale = 'none', 
+           color = col, 
+           show_colnames = FALSE,
+           cluster_rows = FALSE, cluster_cols = FALSE,  
+           #clustering_method = 'complete', cutree_rows = nb_clusters, 
+           annotation_colors = annot_colors, 
+           #clustering_callback = callback,
+           gaps_col = ii.gaps, 
+           gaps_row =  gaps.row, 
+           filename = paste0(figureDir, 'heatmap_regenerationPeaks_scaled.pdf'), 
+           width = 6, height = 12)
+  
+  yy = test
+  plt = pheatmap(yy, 
+                 annotation_row = my_gene_col, 
+                 annotation_col = df, show_rownames = FALSE, scale = 'none', 
+                 color = col, 
+                 show_colnames = FALSE,
+                 cluster_rows = FALSE, cluster_cols = FALSE,  
+                 #clustering_method = 'complete', cutree_rows = nb_clusters, 
+                 annotation_colors = annot_colors, 
+                 #clustering_callback = callback,
+                 gaps_col = ii.gaps, 
+                 gaps_row =  gaps.row, 
+                 #filename = paste0(figureDir, 'heatmap_regenerationPeaks_scaled.pdf'), 
+                 #width = 6, height = 12
+                 )
+   
+  save(yy, plt, res, file = paste0(RdataDir, '/dynamic_ATACpeaks_regeneration_data.heatmap_DPGPclusters.Rdata'))
+  
+  
+}
 
-save(yy, plt, file = paste0(RdataDir, '/dynamic_ATACpeaks_regeneration_data.heatmap.Rdata'))
 
 ## save data for DPGP clustering
 ## unfornately the result is that there are too many clusters
@@ -454,10 +539,10 @@ if(Assembly_histMarkers_togetherWith_ATACseq){
   require(RColorBrewer)
   
   # import atac-seq peak
-  res = readRDS(file = paste0(RdataDir, '/dynamic_ATACpeaks_regeneration.rds')) # stat of dynamic peaks
-  load(file = paste0(RdataDir, '/dynamic_ATACpeaks_regeneration_data.heatmap.Rdata')) # z-score of data and heatmap (variable plt, yy)
-  
-  design_atac = design
+  # res = readRDS(file = paste0(RdataDir, '/dynamic_ATACpeaks_regeneration.rds')) # stat of dynamic peaks
+  # z-score of data and heatmap (variable: plt, yy and res)
+  load(file = paste0(RdataDir, '/dynamic_ATACpeaks_regeneration_data.heatmap_DPGPclusters.Rdata')) 
+  #design_atac = design
   res_atac = res
   yy_atac = yy
   
@@ -564,6 +649,7 @@ if(Assembly_histMarkers_togetherWith_ATACseq){
     # #cat(length(kk), '-', conds_histM[n], ' stable \n')
     # yy0[kk0, jj] = yy0[kk0, jj] /stable.multiplier
     yy0[ ,jj0] = t(apply(yy0[,jj0], 1, cal_transform_histM, cutoff.min = 0, cutoff.max = 5, centering = FALSE, toScale = TRUE))
+    
   }
   
   save(yy1, res_atac, yy_atac, file = paste0(RdataDir, '/atac_histM_data_regeneration.Rdata'))
@@ -615,7 +701,8 @@ if(Assembly_histMarkers_togetherWith_ATACseq){
   load(file = paste0(RdataDir, '/atac_histM_data_regeneration.Rdata'))
   peaks = res_atac
   table(peaks$clusters)
-  cluster_order = paste0('cluster_', c(7, 3, 4, 2, 1, 5, 8, 6))
+  cluster_order = paste0('mc', c(1:8))
+  
   conds_histM = c('H3K4me3','H3K27me3', 'H3K4me1', 'H3K27ac')
   conds = c("mUA", "BL5days", "BL9days", 'BL13days.prox', 'BL13days.dist')
   
@@ -765,7 +852,6 @@ if(Assembly_histMarkers_togetherWith_ATACseq){
              width = 6, height = 12)
   }
 
-    
 }
 
 

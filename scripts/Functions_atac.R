@@ -3241,11 +3241,11 @@ process.dynamic.peaks.clustering.GPDP = function(yy, res)
   M = cor(t(cs))
   corrplot.mixed(M, order = 'hclust', addrect = 10)
   
-  
   cor_cutoff = 0.6
   dxx = dpgp
   missed = which(is.na(match(rownames(yy), dpgp$gene)))
   losts = c()
+  
   for(n in missed)
   {
     cat(n, '\n')
@@ -3279,8 +3279,7 @@ process.dynamic.peaks.clustering.GPDP = function(yy, res)
   
   cs$mc[which(cs$cluster == '12' | 
                 cs$cluster == '19'|
-                cs$cluster == '10' |
-                cs$cluster == '2')] = 'mc3'
+                cs$cluster == '10')] = 'mc3'
   
   
   cs$mc[which(cs$cluster == '4')] = 'mc4'
@@ -3288,7 +3287,7 @@ process.dynamic.peaks.clustering.GPDP = function(yy, res)
   
   cs$mc[which(cs$cluster == '18')] = 'mc6'
   cs$mc[which(cs$cluster == '1')] = 'mc7'
-  cs$mc[which(cs$cluster == '13')] = 'mc8'
+  cs$mc[which(cs$cluster == '13'| cs$cluster == '2')] = 'mc8'
   
   res$clusters = NA
   mm = match(cs$gene, rownames(res))
