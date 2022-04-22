@@ -485,7 +485,7 @@ if(!Regeneration.peaks.clustering.DPGP)
                  annotation_colors = annot_colors, 
                  #clustering_callback = callback,
                  gaps_col = ii.gaps, 
-                 gaps_row =  gaps.row, 
+                 gaps_row =  gaps.row
                  #filename = paste0(figureDir, 'heatmap_regenerationPeaks_scaled.pdf'), 
                  #width = 6, height = 12
                  )
@@ -886,6 +886,57 @@ if(saveTable){
             quote = FALSE, row.names = TRUE)
   
 }
+
+##########################################
+# feature distribution of all peaks and dynamic peaks 
+##########################################
+Peak.annotation_feature.distribution = FALSE
+if(Peak.annotation_feature.distribution){
+  library('rtracklayer')
+  library(GenomicRanges)
+  library('GenomicFeatures')
+  
+  gtf.file =  '../data/AmexT_v47_Hox.patch_limb.fibroblast.expressing.23585.genes.dev.mature.regeneration.gtf'
+  peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rdata/', 
+                                'position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters_6.rds'))
+  ps = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rxxxx_R10723_R11637_R12810_atac/Rdata', 
+                             '/positional_peakSignals.rds'))
+  
+  mm = match(rownames(peaks), rownames(ps))
+  peaks = data.frame(ps[mm, ], peaks, stringsAsFactors = FALSE)
+  
+  
+  pp = data.frame(t(sapply(rownames(peaks), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  pp$strand = '*'
+  pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
+  # annotation from ucsc browser ambMex60DD_genes_putative
+  amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
+  pp.annots = annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+  
+  pp.annots = as.data.frame(pp.annots)
+  rownames(pp.annots) = rownames(peaks)
+  
+  ## update the peak annoation using limb-fibroblast expressing genes
+  peaks[, c(36:49)] = pp.annots
+  
+  saveRDS(peaks, file = paste0(RdataDir, 
+                               '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters6_DEtest_peakSignals_peakAnnot.updated.rds'))
+  
+  # amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
+  # pp.annots = annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+  
+  #plotAnnoBar(pp.annots)
+  pdfname = paste0(figureDir, "feature_distribution_positionalPeaks.pdf")
+  pdf(pdfname, width = 6, height = 4)
+  par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+  
+  plotPeakAnnot_piechart(pp.annots)
+  
+  dev.off()
+  
+}
+
 
 ########################################################
 ########################################################
