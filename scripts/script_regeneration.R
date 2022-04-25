@@ -39,6 +39,10 @@ require(GenomicRanges)
 require(pheatmap)
 library(tictoc)
 
+# limb fibroblast expressing genes
+gtf.file =  '../data/AmexT_v47_Hox.patch_limb.fibroblast.expressing.23585.genes.dev.mature.regeneration.gtf'
+amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
+
 
 ########################################################
 ########################################################
@@ -561,7 +565,7 @@ if(Assembly_histMarkers_togetherWith_ATACseq){
              #clustering_callback = callback,
              gaps_col = ii.gaps)
     
-    ## save group bed for deeptools heatmap
+    ## save group bed of each cluster for deeptools heatmap
     load(file = paste0(RdataDir, '/dynamic_ATACpeaks_regeneration_data.heatmap_DPGPclusters.Rdata')) 
     
     res = res[match(rownames(yy), rownames(res)), ]
@@ -580,9 +584,80 @@ if(Assembly_histMarkers_togetherWith_ATACseq){
       
     }
     
+    ## save bed files of promoters, enhancers of up- and down-regulated atac-seq peaks
+    res = readRDS(file = paste0(RdataDir, '/renegeration_dynamicPeaks_GPDPclustering.merged.extended.rds'))
+    res = res[which(!is.na(res$clusters)), ]
+    
+    pp = data.frame(t(sapply(rownames(res), function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
+    pp$strand = '*'
+    pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                  start.field="X2", end.field="X3", strand.field="strand")
+    
+    pp.annots = annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+    pp.annots = as.data.frame(pp.annots)
+    
+    res$atacseq = 'up'
+    res$atacseq[which(res$clusters == 'mc1'| res$clusters == 'mc6')] = 'down'
+    
+    res$annots = NA
+    res$annots[grep('Promoter', pp.annots$annotation)] = 'promoter'
+    res$annots[grep('Intergenic|Intron', pp.annots$annotation)] = 'enhancer'
+    
+    pp_atac = data.frame(t(sapply(rownames(res), function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
+    pp_atac$name = rownames(res)
+    pp_atac$score = 0
+    pp_atac$strand = '*'
+    
+    peakGroupDir = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/',
+                          'positional_memory/Data/histMod_CT_using/heatmaps_deeptools/peak_promoter_enhancer')
+    
+    jj = which(res$atacseq == 'up' & res$annots == 'enhancer')
+    write.table(pp_atac[jj, ], file = paste0(peakGroupDir, '/peak_enhancer_up.bed'), 
+                sep = '\t', quote = FALSE, row.names = FALSE, col.names = FALSE)
+    
+    jj = which(res$atacseq == 'down' & res$annots == 'enhancer')
+    write.table(pp_atac[jj, ], file = paste0(peakGroupDir, '/peak_enhancer_down.bed'), 
+                sep = '\t', quote = FALSE, row.names = FALSE, col.names = FALSE)
+    
+    jj = which(res$atacseq == 'up' & res$annots == 'promoter')
+    xx = pp_atac[jj, ]
+    xx0 =  pp.annots[jj, ]
+    xx$X2 = xx0$geneStart
+    xx$X3 = xx$X2 + 1
+    write.table(xx, file = paste0(peakGroupDir, '/peak_tss_up.bed'), 
+                sep = '\t', quote = FALSE, row.names = FALSE, col.names = FALSE)
+    
+    jj = which(res$atacseq == 'down' & res$annots == 'promoter')
+    xx = pp_atac[jj, ]
+    xx0 =  pp.annots[jj, ]
+    xx$X2 = xx0$geneStart
+    xx$X3 = xx$X2 + 1
+    write.table(xx, file = paste0(peakGroupDir, '/peak_tss_down.bed'), 
+                sep = '\t', quote = FALSE, row.names = FALSE, col.names = FALSE)
+    
+    ## save promoters to test histone markers
+    peakGroupDir = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/',
+                          'positional_memory/Data/histMod_CT_using/heatmaps_deeptools/peak_tss')
+    
+    tss = promoters(amex, upstream=2000, downstream=2000, use.names=TRUE)
+    ggs = genes(amex)
+    ggs = as.data.frame(ggs)
+    
+    tss = ggs
+    jj = which(tss$strand == '-')
+    tss$start[jj] = tss$end[jj]
+    tss$end = tss$start + 1
+    tss$strand = '*'
+    tss$score = 0
+    tss = tss[, c(1, 2, 3, 6, 7, 5)] 
+    
+    write.table(tss, file = paste0(peakGroupDir, '/tss_expressed.genes.bed'), 
+                sep = '\t', quote = FALSE, row.names = FALSE, col.names = FALSE)
+    
     
   }
-
+  
+  
   # import histone marker 
   RdataHistM = '/Users/jiwang/workspace/imp/positional_memory/results/CT_merged_20220328/Rdata'
   load(file = paste0(RdataHistM, '/combined_4histMarkers_overlapped55kATACseq_DE_regeneration.Rdata')) # variables (keep and DE.locus)
