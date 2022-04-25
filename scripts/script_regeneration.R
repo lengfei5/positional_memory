@@ -529,6 +529,13 @@ if(Save.Matrix.for.DPGP){
   
 }
 
+##########################################
+# combine profile plots of histone markers of each cluster  
+##########################################
+Assembly_histMarkers_profilePlots = FALSE
+if(Assembly_histMarkers_profilePlots){
+    
+}
 
 ##########################################
 # combine atac-seq peaks and histone marker to make heatmap 
@@ -619,19 +626,35 @@ if(Assembly_histMarkers_togetherWith_ATACseq){
     write.table(pp_atac[jj, ], file = paste0(peakGroupDir, '/peak_enhancer_down.bed'), 
                 sep = '\t', quote = FALSE, row.names = FALSE, col.names = FALSE)
     
+    
     jj = which(res$atacseq == 'up' & res$annots == 'promoter')
     xx = pp_atac[jj, ]
     xx0 =  pp.annots[jj, ]
-    xx$X2 = xx0$geneStart
-    xx$X3 = xx$X2 + 1
+    xx$strand = xx0$geneStrand # keep tss strand
+    kk = which(xx$strand == '1')
+    xx$X2 = as.numeric(as.character(xx$X2))
+    xx$X3 = as.numeric(as.character(xx$X3))
+    xx$X2[kk] = xx0$geneStart[kk]; xx$X2[-kk] = xx0$geneStart[-kk] - 1 
+    xx$X3[kk] = xx$X2[kk] + 1; xx$X3[-kk] = xx$X2[-kk]
+    xx$strand[kk] = '+'
+    xx$strand[-kk] = '-'
+    
     write.table(xx, file = paste0(peakGroupDir, '/peak_tss_up.bed'), 
                 sep = '\t', quote = FALSE, row.names = FALSE, col.names = FALSE)
     
     jj = which(res$atacseq == 'down' & res$annots == 'promoter')
     xx = pp_atac[jj, ]
     xx0 =  pp.annots[jj, ]
-    xx$X2 = xx0$geneStart
-    xx$X3 = xx$X2 + 1
+    xx$strand = xx0$geneStrand # keep tss strand
+    kk = which(xx$strand == '1')
+    xx$X2 = as.numeric(as.character(xx$X2))
+    xx$X3 = as.numeric(as.character(xx$X3))
+    xx$X2[kk] = xx0$geneStart[kk]; xx$X2[-kk] = xx0$geneStart[-kk] - 1 
+    xx$X3[kk] = xx$X2[kk] + 1; xx$X3[-kk] = xx$X2[-kk]
+    xx$strand[kk] = '+'
+    xx$strand[-kk] = '-'
+    
+    
     write.table(xx, file = paste0(peakGroupDir, '/peak_tss_down.bed'), 
                 sep = '\t', quote = FALSE, row.names = FALSE, col.names = FALSE)
     
@@ -653,7 +676,6 @@ if(Assembly_histMarkers_togetherWith_ATACseq){
     
     write.table(tss, file = paste0(peakGroupDir, '/tss_expressed.genes.bed'), 
                 sep = '\t', quote = FALSE, row.names = FALSE, col.names = FALSE)
-    
     
   }
   
