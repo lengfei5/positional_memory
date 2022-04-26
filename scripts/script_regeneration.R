@@ -534,7 +534,82 @@ if(Save.Matrix.for.DPGP){
 ##########################################
 Assembly_histMarkers_profilePlots = FALSE
 if(Assembly_histMarkers_profilePlots){
+  library(tidyr)
+  library(dplyr)
+  require(ggplot2)
+  library("gridExtra")
+  library("cowplot")
+  require(ggpubr)
+  
+  profileDir = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/',
+                      'positional_memory/Data/histMod_CT_using/heatmaps_deeptools/heatmaps_allHist_8clusters/')
+  
+  # +/-4kb; binSize = 50bp;
+  nb_bins = 8000/50
+  pfs = read.delim(file = paste0(profileDir, 'allHist_8clusters_data4profile.tab'), header = TRUE)
+  pfs = pfs[-1,]
+  pfs = pfs[, !is.na(pfs[1,])] 
+  
+  # select +/-3kb window sizes
+  xx = pfs[, c(3:ncol(pfs))]
+  colnames(xx) = c(1:ncol(xx))
+  xx = xx[, -c(1:20, ((ncol(xx)-19):ncol(xx)))]
+  
+  pfs = data.frame(pfs[, c(1:2)], xx, stringsAsFactors = FALSE)
+  colnames(pfs) = c('marker', 'group',  c(1:ncol(xx)))
+  pfs$group = gsub('peak_group_', '', pfs$group) 
+  pfs$group =  paste0('mc', gsub('.bed', '', pfs$group))  
+  pfs$sample = sapply(pfs$marker, function(x) unlist(strsplit(as.character(x), '_'))[2])
+  pfs$marker = sapply(pfs$marker, function(x) unlist(strsplit(as.character(x), '_'))[1])
+  pfs = pfs[, c(2, 1, ncol(pfs), 3:122)]
+  
+  grps = unique(pfs$group)
+  markers = unique(pfs$marker)
+  markers = markers[grep('H3K', markers)]
+  
+  plot_histM_8groups = function(xx, ylims)
+  {
+    plot = as_tibble(xx) %>%  gather(bins, signals,  4:123) %>% 
+      mutate(bins = factor(bins, levels=c(1:120))) %>%
+      mutate(sample = factor(sample, levels = c('mUA', 'BL5days', 'BL9days', 'BL13days.prox', 'BL13days.dist', 'IgG'))) %>%
+      ggplot(aes(y=signals, x=bins, color = sample, group = sample)) + 
+      geom_line(size = 1.2) +
+      theme_classic() +
+      theme(axis.text.y = element_text(angle = 90, size = 10), legend.position = c(0.2, 0.8),
+            axis.text.x = element_blank(), axis.ticks = element_blank()) +
+      scale_color_manual(values=c('springgreen', 'springgreen2', 'springgreen3', 'gold2','red')) +
+      labs( x = '', y = 'signals (rpkm)') +
+      ylim(0, ylims) 
+    return(plot)
+  }
+  
+  for(m in 1:length(markers))
+  {
+    # m = 3
+    ylims = 5.0
+    cat(markers[m], '\n')
+    for(n in 1:length(grps))
+    {
+      #n = 1
+      cat(n, ' -- ', grps[n], '\n')
+      
+      xx = pfs[which((pfs$marker == markers[m]) & pfs$group == grps[n]), ]
+      xx[, c(4:123)] = xx[, c(4:123)] *1000/50
+      
+      eval(parse(text = paste0('p', n, ' = plot_histM_8groups(xx, ylims = ylims)')))
+    }
     
+    pdf(paste0(figureDir, "dynamics_peaks_averageProfiles_", markers[m], ".pdf"),
+        width = 4, height = 20) # Open a new pdf file
+    
+    grid.arrange(p1, p2 + rremove('legend'), p3 + rremove('legend'), p4+rremove('legend'),
+                p5 + rremove('legend'), p6 + rremove('legend'), p7 +rremove('legend'), p8+rremove('legend'), 
+                 ncol = 1, nrow = 8)
+    #ggsave(paste0(figureDir, "dynamics_peaks_averageProfiles_", markers[m], ".pdf"), width=4, height = 20)
+    dev.off()
+    
+   
+  }
 }
 
 ##########################################
@@ -670,15 +745,14 @@ if(Assembly_histMarkers_togetherWith_ATACseq){
     jj = which(tss$strand == '-')
     tss$start[jj] = tss$end[jj]
     tss$end = tss$start + 1
-    tss$strand = '*'
+    #tss$strand = '*'
     tss$score = 0
     tss = tss[, c(1, 2, 3, 6, 7, 5)] 
     
     write.table(tss, file = paste0(peakGroupDir, '/tss_expressed.genes.bed'), 
                 sep = '\t', quote = FALSE, row.names = FALSE, col.names = FALSE)
-    
+      
   }
-  
   
   # import histone marker 
   RdataHistM = '/Users/jiwang/workspace/imp/positional_memory/results/CT_merged_20220328/Rdata'
