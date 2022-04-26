@@ -776,6 +776,58 @@ if(Peak.annotation_feature.distribution){
   
 }
 
+########################################################
+########################################################
+# Section : chromatin dynamics of position-related CREs and genes
+# focus on the dynamics of Hand-specific CREs in regeneration process
+# 
+########################################################
+########################################################
+## positional peaks in Figure 1
+peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rdata/', 
+                              'position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters_6.rds'))
+table(peaks$clusters)
+cluster_order = c(6, 1, 5, 3, 4, 2)
+peaks$new_clusters = NA
+
+# change the peak names 
+for(n in 1:length(cluster_order))
+{
+  peaks$new_clusters[which(peaks$clusters == cluster_order[n])] = n 
+  #peaks$new_clusters[which(peaks$clusters == '1')] = 2 
+}
+
+## 
+library(qvalue)
+res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks__mUA_regeneration_dev_2Batches.R10723_R7977_peakAnnot_v8.rds'))
+
+# select only the dynamic peak results without annotation part
+res = res[, c(1:50)]
+
+res = res[order(-res$log2FC), ]
+qv = qvalue(res$pval.lrt)
+res$fdr.lrt = qv$qvalues
+
+# select the temporal dynamic peaks
+fdr.cutoff = 0.01; logfc.cutoff = 1
+
+# length(which(res$fdr.lrt < fdr.cutoff))
+# length(which(res$padj_LRT<fdr.cutoff & res$log2fc>1))
+# length(which(res$padj_LRT<fdr.cutoff & res$log2fc>2))
+# length(which(res$padj_LRT<fdr.cutoff & res$log2fc>1.5))
+
+select = which(  (res$adj.P.Val_5dpa.vs.mUA < fdr.cutoff & abs(res$logFC_5dpa.vs.mUA) > logfc.cutoff)| 
+                   (res$adj.P.Val_9dpa.vs.mUA < fdr.cutoff & abs(res$logFC_9dpa.vs.mUA) > logfc.cutoff) |
+                   (res$adj.P.Val_13dpap.vs.mUA < fdr.cutoff & abs(res$logFC_13dpap.vs.mUA) > logfc.cutoff) |
+                   (res$adj.P.Val_13dpad.vs.mUA < fdr.cutoff & abs(res$logFC_13dpad.vs.mUA) > logfc.cutoff) |
+                   (res$adj.P.Val_s40.vs.mUA < fdr.cutoff & abs(res$logFC_s40.vs.mUA) > logfc.cutoff ) | 
+                   (res$adj.P.Val_s44p.vs.mUA < fdr.cutoff & abs(res$logFC_s44p.vs.mUA) > logfc.cutoff ) |
+                   (res$adj.P.Val_s44d.vs.mUA < fdr.cutoff & abs(res$logFC_s44d.vs.mUA) > logfc.cutoff ))
+cat(length(select), 'DE peaks found !\n')
+
+res = res[select, ]
+res = res[order(-res$log2FC), ]
+
 
 
 ########################################################
