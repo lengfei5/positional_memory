@@ -529,6 +529,143 @@ if(Save.Matrix.for.DPGP){
 }
 
 ##########################################
+# save peak list for deeptool heatmap  
+##########################################
+Save_peak.list_for_deeptools = FALSE
+if(Save_peak.list_for_deeptools){
+  # import atac-seq peak
+  # res = readRDS(file = paste0(RdataDir, '/dynamic_ATACpeaks_regeneration.rds')) # stat of dynamic peaks
+  # z-score of data and heatmap (variable: plt, yy and res)
+  load(file = paste0(RdataDir, '/dynamic_ATACpeaks_regeneration_data.heatmap_DPGPclusters.Rdata')) 
+  #design_atac = design
+  res_atac = res
+  yy_atac = yy
+  
+  Test_cluster_order = FALSE
+  if(Test_cluster_order){
+    test = yy
+    test = test[plt$tree_row$order, ]
+    pheatmap(test, 
+             nnotation_row = my_gene_col, 
+             annotation_col = df, show_rownames = FALSE, scale = 'none', 
+             color = col, 
+             show_colnames = FALSE,
+             cluster_rows = TRUE, cluster_cols = FALSE,  
+             #clustering_method = 'complete', cutree_rows = nb_clusters, 
+             annotation_colors = annot_colors, 
+             #clustering_callback = callback,
+             gaps_col = ii.gaps)
+    
+    ## save group bed of each cluster for deeptools heatmap
+    load(file = paste0(RdataDir, '/dynamic_ATACpeaks_regeneration_data.heatmap_DPGPclusters.Rdata')) 
+    
+    res = res[match(rownames(yy), rownames(res)), ]
+    mcs = unique(res$clusters)
+    for(n in 1:length(mcs)){
+      jj = which(res$clusters == mcs[n])
+      pp_atac = data.frame(t(sapply(rownames(yy)[jj], function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
+      pp_atac$name = rownames(yy)[jj]
+      pp_atac$score = 0
+      pp_atac$strand = '*'
+      
+      peakGroupDir = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/',
+                            'positional_memory/Data/histMod_CT_using/heatmaps_deeptools/peak_groups')
+      write.table(pp_atac, file = paste0(peakGroupDir, '/peak_group_', n, '.bed'), 
+                  sep = '\t', quote = FALSE, row.names = FALSE, col.names = FALSE)
+      
+    }
+    
+    ## save bed files of promoters, enhancers of up- and down-regulated atac-seq peaks
+    res = readRDS(file = paste0(RdataDir, '/renegeration_dynamicPeaks_GPDPclustering.merged.extended.rds'))
+    res = res[which(!is.na(res$clusters)), ]
+    
+    pp = data.frame(t(sapply(rownames(res), function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
+    pp$strand = '*'
+    pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                  start.field="X2", end.field="X3", strand.field="strand")
+    
+    pp.annots = annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+    pp.annots = as.data.frame(pp.annots)
+    
+    res$atacseq = 'up'
+    res$atacseq[which(res$clusters == 'mc1'| res$clusters == 'mc6')] = 'down'
+    
+    res$annots = NA
+    res$annots[grep('Promoter', pp.annots$annotation)] = 'promoter'
+    res$annots[grep('Intergenic|Intron', pp.annots$annotation)] = 'enhancer'
+    
+    pp_atac = data.frame(t(sapply(rownames(res), function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
+    pp_atac$name = rownames(res)
+    pp_atac$score = 0
+    pp_atac$strand = '*'
+    
+    peakGroupDir = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/',
+                          'positional_memory/Data/histMod_CT_using/heatmaps_deeptools/peak_promoter_enhancer')
+    
+    jj = which(res$atacseq == 'up' & res$annots == 'enhancer')
+    write.table(pp_atac[jj, ], file = paste0(peakGroupDir, '/peak_enhancer_up.bed'), 
+                sep = '\t', quote = FALSE, row.names = FALSE, col.names = FALSE)
+    
+    jj = which(res$atacseq == 'down' & res$annots == 'enhancer')
+    write.table(pp_atac[jj, ], file = paste0(peakGroupDir, '/peak_enhancer_down.bed'), 
+                sep = '\t', quote = FALSE, row.names = FALSE, col.names = FALSE)
+    
+    
+    jj = which(res$atacseq == 'up' & res$annots == 'promoter')
+    xx = pp_atac[jj, ]
+    xx0 =  pp.annots[jj, ]
+    xx$strand = xx0$geneStrand # keep tss strand
+    kk = which(xx$strand == '1')
+    xx$X2 = as.numeric(as.character(xx$X2))
+    xx$X3 = as.numeric(as.character(xx$X3))
+    xx$X2[kk] = xx0$geneStart[kk]; xx$X2[-kk] = xx0$geneStart[-kk] - 1 
+    xx$X3[kk] = xx$X2[kk] + 1; xx$X3[-kk] = xx$X2[-kk]
+    xx$strand[kk] = '+'
+    xx$strand[-kk] = '-'
+    
+    write.table(xx, file = paste0(peakGroupDir, '/peak_tss_up.bed'), 
+                sep = '\t', quote = FALSE, row.names = FALSE, col.names = FALSE)
+    
+    jj = which(res$atacseq == 'down' & res$annots == 'promoter')
+    xx = pp_atac[jj, ]
+    xx0 =  pp.annots[jj, ]
+    xx$strand = xx0$geneStrand # keep tss strand
+    kk = which(xx$strand == '1')
+    xx$X2 = as.numeric(as.character(xx$X2))
+    xx$X3 = as.numeric(as.character(xx$X3))
+    xx$X2[kk] = xx0$geneStart[kk]; xx$X2[-kk] = xx0$geneStart[-kk] - 1 
+    xx$X3[kk] = xx$X2[kk] + 1; xx$X3[-kk] = xx$X2[-kk]
+    xx$strand[kk] = '+'
+    xx$strand[-kk] = '-'
+    
+    
+    write.table(xx, file = paste0(peakGroupDir, '/peak_tss_down.bed'), 
+                sep = '\t', quote = FALSE, row.names = FALSE, col.names = FALSE)
+    
+    ## save promoters to test histone markers
+    peakGroupDir = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/',
+                          'positional_memory/Data/histMod_CT_using/heatmaps_deeptools/peak_tss')
+    
+    tss = promoters(amex, upstream=2000, downstream=2000, use.names=TRUE)
+    ggs = genes(amex)
+    ggs = as.data.frame(ggs)
+    
+    tss = ggs
+    jj = which(tss$strand == '-')
+    tss$start[jj] = tss$end[jj]
+    tss$end = tss$start + 1
+    #tss$strand = '*'
+    tss$score = 0
+    tss = tss[, c(1, 2, 3, 6, 7, 5)] 
+    
+    write.table(tss, file = paste0(peakGroupDir, '/tss_expressed.genes.bed'), 
+                sep = '\t', quote = FALSE, row.names = FALSE, col.names = FALSE)
+    
+  }
+  
+}
+
+##########################################
 # combine profile plots of histone markers of each cluster  
 ##########################################
 Assembly_histMarkers_profilePlots = FALSE
@@ -611,39 +748,6 @@ if(Assembly_histMarkers_profilePlots){
   }
 }
 
-
-
-##########################################
-# highligh potential regeneration peaks, not found in mUA and embryo stages only in regeneration process 
-##########################################
-means.sel = sample.means[match(rownames(keep), rownames(sample.means)), ]
-
-dev.mature.maxs = apply(means.sel[, grep('Embryo|Mature_UA', colnames(means.sel))] , 1, max)
-bl.maxs = apply(means.sel[ , grep('BL_UA', colnames(means.sel))], 1, max)
-
-kk = which(dev.mature.maxs < 2.5 & bl.maxs > 3)
-
-yy0 = yy[kk, ]
-
-pheatmap(yy0, 
-         #annotation_row = my_gene_col, 
-         annotation_col = df, show_rownames = FALSE, scale = 'none', 
-         color = col, 
-         show_colnames = FALSE,
-         cluster_rows = TRUE, cluster_cols = FALSE,  
-         #clustering_method = 'complete', cutree_rows = nb_clusters, 
-         #annotation_colors = sample_colors,
-         #clustering_callback = callback,
-         gaps_col = ii.gaps, 
-         filename = paste0(resDir, '/heatmap_regenerationPeaks_edgeRtest_fdr0.05_log2FC.1_regeneartion.specific_v2.pdf'), 
-         width = 8, height = 6)
-
-if(saveTable){
-  write.csv(data.frame(yy0, stringsAsFactors = FALSE), 
-            file = paste0(resDir, '/regeneration_peaks_regeneration.specific.csv'), 
-            quote = FALSE, row.names = TRUE)
-  
-}
 
 ##########################################
 # feature distribution of all peaks and regenration dynamic peaks 
@@ -844,12 +948,21 @@ res$positional.clusters = NA
 res$positional.peaks[mm] = 1
 res$positional.clusters[mm] = peaks$new_clusters
 
+## add histone marker analysis
+RdataHistM = '/Users/jiwang/workspace/imp/positional_memory/results/CT_merged_20220328/Rdata'
+load(file = paste0(RdataHistM, '/combined_4histMarkers_overlapped55kATACseq_DE_regeneration_v2.Rdata')) # variable (keep and DE.locus)
+
+colnames(DE.locus) = paste0('DE_', colnames(DE.locus))
+mm = match(rownames(DE.locus), rownames(res))
+
 saveRDS(res, file = paste0(RdataDir, '/allPeaks_regeneraton_positional_analysisRes.rds'))
 
 ##########################################
 # explore the atac-seq peak dyanmic  
 ##########################################
+res = readRDS(file = paste0(RdataDir, '/allPeaks_regeneraton_positional_analysisRes.rds'))
 
+res = res[which(res$positional.peaks == 1), ]
 
 
 ########################################################
@@ -1104,6 +1217,41 @@ res[,c(1, 4, 7:13)] %>%
   theme_classic() +
   theme(axis.text.x = element_text(angle = 0, size = 14)) +
   labs(x = "", y= 'normalized data (log2)')
+
+########################################################
+########################################################
+# Section : regeneration peaks, not found in mUA and embryo stages only in regeneration process 
+# 
+########################################################
+########################################################
+means.sel = sample.means[match(rownames(keep), rownames(sample.means)), ]
+
+dev.mature.maxs = apply(means.sel[, grep('Embryo|Mature_UA', colnames(means.sel))] , 1, max)
+bl.maxs = apply(means.sel[ , grep('BL_UA', colnames(means.sel))], 1, max)
+
+kk = which(dev.mature.maxs < 2.5 & bl.maxs > 3)
+
+yy0 = yy[kk, ]
+
+pheatmap(yy0, 
+         #annotation_row = my_gene_col, 
+         annotation_col = df, show_rownames = FALSE, scale = 'none', 
+         color = col, 
+         show_colnames = FALSE,
+         cluster_rows = TRUE, cluster_cols = FALSE,  
+         #clustering_method = 'complete', cutree_rows = nb_clusters, 
+         #annotation_colors = sample_colors,
+         #clustering_callback = callback,
+         gaps_col = ii.gaps, 
+         filename = paste0(resDir, '/heatmap_regenerationPeaks_edgeRtest_fdr0.05_log2FC.1_regeneartion.specific_v2.pdf'), 
+         width = 8, height = 6)
+
+if(saveTable){
+  write.csv(data.frame(yy0, stringsAsFactors = FALSE), 
+            file = paste0(resDir, '/regeneration_peaks_regeneration.specific.csv'), 
+            quote = FALSE, row.names = TRUE)
+  
+}
 
 
 

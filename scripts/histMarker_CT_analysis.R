@@ -1344,9 +1344,12 @@ for(n_histM in 1:length(conds_histM))
                                 start.field="X2", end.field="X3", strand.field="strand")
   # lls = width(pp)
   #olp = GenomicRanges::findOverlaps(atacseq_peaks, )
-  ii_overlap = which(overlapsAny(pp, atacseq_peaks) == TRUE)
+  # ii_overlap = which(overlapsAny(pp, atacseq_peaks) == TRUE)
+  mapping = GenomicRanges::findOverlaps(atacseq_peaks, pp) # findOverlap from atac-seq peak to histone marker is better, repeating histone
   
-  res_sel = res[ii_overlap, ]
+  res_sel = res[mapping@to, ]
+  res_sel$histM_peak_coord = rownames(res)[mapping@to]
+  res_sel$atac_peak_coord = names(atacseq_peaks)[mapping@from]
   
   select = which((res_sel$adj.P.Val_5dpa.vs.mUA < fdr.cutoff & abs(res_sel$logFC_5dpa.vs.mUA) > logfc.cutoff) |
                    (res_sel$adj.P.Val_9dpa.vs.mUA < fdr.cutoff & abs(res_sel$logFC_9dpa.vs.mUA) > logfc.cutoff)|
@@ -1411,7 +1414,7 @@ for(n_histM in 1:length(conds_histM))
   }
 }
 
-save(keep, DE.locus, file = paste0(RdataDir, '/combined_4histMarkers_overlapped55kATACseq_DE_regeneration.Rdata'))
+save(keep, DE.locus, file = paste0(RdataDir, '/combined_4histMarkers_overlapped55kATACseq_DE_regeneration_v2.Rdata'))
 
 
 ##########################################
