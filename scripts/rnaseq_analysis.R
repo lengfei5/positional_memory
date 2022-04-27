@@ -1061,7 +1061,8 @@ saveRDS(res, file = paste0(RdataDir, 'smartseq2_R10724_R11635_cpm.batchCorrect_D
 # check the test result 
 ##########################################
 source('Functions_atac.R')
-res = readRDS(file = paste0(RdataDir, 'smartseq2_R10724_R11635_cpm.batchCorrect_DESeq2.test.withbatch.log2FC.shrinked.rds'))
+res = readRDS(file = paste0(RdataDir, 'smartseq2_R10724_R11635_cpm.batchCorrect_DESeq2.test.withbatch.log2FC.shrinked',
+                            version.analysis, '.rds'))
 
 cpm = res[, c(1,2, 5:12)]
 res = res[, -c(1:12)]
@@ -1102,7 +1103,7 @@ require(RColorBrewer)
 #rgs$geneID = sapply(rownames(rgs), function(x){x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
 
 
-fdr.cutoff = 0.01
+fdr.cutoff = 0.05
 logfc.cutoff = 1
 
 length(which(res$padj_LRT<fdr.cutoff))
@@ -1110,7 +1111,7 @@ length(which(res$padj_LRT<fdr.cutoff & res$log2fc>1))
 length(which(res$padj_LRT<fdr.cutoff & res$log2fc>2))
 length(which(res$padj_LRT<fdr.cutoff & res$log2fc>1.5))
 
-select = which(res$padj_LRT<fdr.cutoff |
+select = which(
                  (res$padj_dpa5.vs.mUA < fdr.cutoff & abs(res$log2FoldChange_dpa5.vs.mUA) > logfc.cutoff) | 
                  (res$padj_dpa9.vs.mUA < fdr.cutoff & abs(res$log2FoldChange_dpa9.vs.mUA) > logfc.cutoff) |
                  (res$padj_dpa13prox.vs.mUA < fdr.cutoff & abs(res$log2FoldChange_dpa13prox.vs.mUA) > logfc.cutoff) |
@@ -1121,29 +1122,83 @@ cat(length(select), ' DE genes \n')
 #saveRDS(gg.select, file = paste0(RdataDir, 'RRGs_candidates_tempList.rds'))
 
 yy = cpm[select, ]
+
 df = as.data.frame(cc)
 colnames(df) = 'condition'
 rownames(df) = colnames(yy)
+
+cal_z_score <- function(x){
+  (x - mean(x)) / sd(x)
+}
+
+yy <- t(apply(yy, 1, cal_z_score))
+
+library(dendextend)
+nb_clusters = 6
+my_hclust_gene <- hclust(dist(yy), method = "complete")
+
+my_gene_col <- cutree(tree = as.dendrogram(my_hclust_gene), k = nb_clusters)
+
+my_gene_col <- data.frame(cluster =  paste0('G', my_gene_col))
+rownames(my_gene_col) = rownames(yy)
 
 #corrplot(cor(yy), method = 'number', type = 'upper', diag = TRUE)
 #ggsave(filename = paste0(resDir, '/corrplot_smartseq2_regeneration.pdf'),  width = 10, height = 12)
 
 sample_colors = c('springgreen4', 'springgreen', 'springgreen2', 'springgreen3', 'gold2')
 names(sample_colors) = conds
-annot_colors = list(segments = sample_colors)
 
-pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
-         color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
+col3 <- c("#a6cee3", "#1f78b4", "#b2df8a",
+          "#33a02c", "#fb9a99", "#e31a1c",
+          "#fdbf6f", "#ff7f00", "#cab2d6",
+          "#6a3d9a", "#ffff99", "#b15928")
+cluster_col = col3[1:nb_clusters]
+names(cluster_col) = paste0('G', c(1:nb_clusters))
+annot_colors = list(
+  sample = sample_colors,
+  cluster = cluster_col)
+
+
+pheatmap(yy, annotation_row = my_gene_col, 
+         annotation_col = df, show_rownames = FALSE, scale = 'none', 
+         color =  colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(10), 
          show_colnames = FALSE,
-         scale = 'row',
-         cluster_cols=FALSE, annotation_col=df,
-         annotation_colors = annot_colors,
+         cluster_rows = TRUE, cluster_cols = FALSE,  
+         clustering_method = 'complete', cutree_rows = nb_clusters, 
+         annotation_colors = annot_colors, 
          width = 6, height = 12, 
          filename = paste0(figureDir, '/heatmap_DEgenes_regeneration_fdr.0.01_log2fc.1_RNAseq_filtered.R10724.R11635.pdf')) 
+
+
+##########################################
+# save the gene expression clustesrs
+##########################################
+geneClusters = my_gene_col
+geneClusters$groups = NA
+geneClusters$groups[which(geneClusters$cluster == 'G5')] = 'earlyTransient'
+geneClusters$groups[which(geneClusters$cluster == 'G3')] = 'earlyContinue'
+geneClusters$groups[which(geneClusters$cluster == 'G8')] = 'lateResp'
+
+save(geneClusters, file = paste0(RdataDir, 'regeneration_geneClusters.rds'))
+
+#gaps_row =  gaps.row, 
+#filename = paste0(saveDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
+#width = 6, height = 12)
+
+# gaps.col = c(3, 6)
+# pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+#          color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
+#          show_colnames = FALSE,
+#          scale = 'row',
+#          cluster_cols=FALSE, annotation_col=df,
+#          annotation_colors = annot_colors,
+#          width = 6, height = 12, 
+#          filename = paste0(figureDir, '/heatmap_DEgenes_regeneration_fdr.0.01_log2fc.1_RNAseq_filtered.R10724.R11635.pdf')) 
 
 ##########################################
 # highlight TF, eps and other 
 ##########################################
+yy = cpm[select, ]
 ggs = rownames(yy)
 ggs = sapply(ggs, function(x) unlist(strsplit(as.character(x), '_'))[1])
 #rownames(yy) = ggs
