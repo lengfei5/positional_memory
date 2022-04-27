@@ -902,8 +902,12 @@ sps = setdiff(sps, tfs)
 # only keep the sample 136150 from the request R11635
 ##########################################
 load(file = paste0('/Users/jiwang/workspace/imp/positional_memory/results/rnaseq_Rxxxx.old_R10724_R161513_mergedTechRep/Rdata/',
-                   'design_dds_all_regeneration.samples_allBatches.Rdata'))
+                   'design_dds_all_regeneration.samples_allBatches.Rdata')) # import the old sample infos
 #design$condition = sapply(design$condition, function(x) )
+load(file = paste0(RdataDir, 'RNAseq_design_dds.object.Rdata'))
+
+design = design.matrix
+
 design$protocol = gsub(' ', '', design$protocol)
 design$batch = paste0(design$request, '_', design$protocol)
 

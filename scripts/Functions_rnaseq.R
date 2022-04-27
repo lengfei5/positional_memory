@@ -891,7 +891,7 @@ Update.samples.160343.160344 = function()
 # 
 ########################################################
 ########################################################
-Check.R10724.136150.sample.Quality = function()
+Find.regeneration.samples.toUse_Check.R10724.136150.sample.Quality = function()
 {
   
   ##########################################
