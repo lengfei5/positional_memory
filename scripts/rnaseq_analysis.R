@@ -22,7 +22,7 @@ require(gridExtra)
 
 
 version.Data = 'RNAseq_data_used';
-version.analysis = paste0("_", version.Data, "_20220408")
+version.analysis = paste0("_", version.Data, "_20220408") # in the version 20220408, counts were done with update annot with Hox patch
 
 ## Directories to save results 
 dataDir = "/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/rnaseq_using/"
@@ -32,7 +32,7 @@ resDir = paste0("../results/", version.Data)
 #tabDir =  paste0(resDir, "/tables/")
 tfDir = '~/workspace/imp/positional_memory/results/motif_analysis'
 RdataDir = paste0(resDir, "/Rdata/")
-shareDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/AkaneToJingkuiShareFiles/results_rnaseq/positional_genes'
+#shareDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/AkaneToJingkuiShareFiles/results_rnaseq/positional_genes'
 figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
 tableDir = paste0(figureDir, 'tables4plots/')
 
@@ -269,8 +269,8 @@ annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axo
                        'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
 
 
-tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
-sps = readRDS(file = '~/workspace/imp/organoid_patterning/results/Rdata/curated_signaling.pathways_gene.list_v2.rds')
+# tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
+# sps = readRDS(file = '~/workspace/imp/organoid_patterning/results/Rdata/curated_signaling.pathways_gene.list_v2.rds')
 
 all = counts
 
@@ -313,8 +313,9 @@ rm(design)
 
 dds <- DESeqDataSetFromMatrix(raw, DataFrame(design.matrix), design = ~ condition)
 
-save(dds, design.matrix, file = paste0(RdataDir, 'dds_design.matrix_all29smartseq2_beforeFiltering.Rdata'))
 
+# this save was for identifying limb fibroblast expressing genes
+# save(dds, design.matrix, file = paste0(RdataDir, 'dds_design.matrix_all29smartseq2_beforeFiltering.Rdata'))
 
 ## first filtering of gene with number of reads
 ss = rowMaxs(counts(dds))
