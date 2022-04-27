@@ -952,24 +952,40 @@ res$positional.clusters[mm] = peaks$new_clusters
 RdataHistM = '/Users/jiwang/workspace/imp/positional_memory/results/CT_merged_20220328/Rdata'
 load(file = paste0(RdataHistM, '/combined_4histMarkers_overlapped55kATACseq_DE_regeneration_v2.Rdata')) # variable (keep and DE.locus)
 
-colnames(DE.locus) = paste0('DE_', colnames(DE.locus))
-mm = match(rownames(DE.locus), rownames(res))
+mm = match(rownames(keep), rownames(DE.locus))
+DE.locus = DE.locus[mm, ]
 
-saveRDS(res, file = paste0(RdataDir, '/allPeaks_regeneraton_positional_analysisRes.rds'))
+colnames(DE.locus) = paste0('DE_', colnames(DE.locus))
+
+mm = match(rownames(res), keep$atac_peak_coord_H3K4me3)
+res = data.frame(res, DE.locus[mm, ], stringsAsFactors = FALSE)
+
+saveRDS(res, file = paste0(RdataDir, '/allPeaks_regeneraton_positional_histM_analysisRes.rds'))
+saveRDS(keep, file = paste0(RdataDir, '/allPeaks_regeneraton_positional_histM_analysisRes_histMdata.rds'))
 
 ##########################################
 # explore the atac-seq peak dyanmic  
 ##########################################
-res = readRDS(file = paste0(RdataDir, '/allPeaks_regeneraton_positional_analysisRes.rds'))
+res = readRDS(file = paste0(RdataDir, '/allPeaks_regeneraton_positional_histM_analysisRes.rds'))
 
-res = res[which(res$positional.peaks == 1), ]
+res = res[which(res$positional.peaks == 1 & res$positional.clusters != 1 & res$positional.clusters !=2), ]
+
+ss = apply(res[, grep('DE_H3K', colnames(res))], 1, sum)
+length(which(ss>0))
+
+res$DE_histM = 0
+res$DE_histM[which(ss>0)] = 1
+
+table(res$dynamic.peaks)
+table(res$DE_histM)
+
+table(res$dynamic.peaks, res$DE_histM)
+table()
 
 
 ########################################################
 ########################################################
-# Section : Consider the grouping peaks or chromatin states: 
-# inactive promoters, active promoter, house-keeping genes, mature-specific genes,
-# regeneration genes, positional genes
+# Section : regeneration genes and peaks  
 ########################################################
 ########################################################
 fpm = readRDS(file = paste0(RdataDir,  '/histoneMarkers_normSignals_axolotlAllTSS.2kb.rds'))
