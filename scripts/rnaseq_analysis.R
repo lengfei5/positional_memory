@@ -293,6 +293,7 @@ if(QC.for.cpm){
   Run.QC.for.RNA.replicates(design, raw)
 }
 
+
 ##########################################
 # because the gene symbol from nr and hs are not consistent sometimes, so we keep gene.id from AMEXDD60
 # Dimensionality reduction to visulize the difference between time points
