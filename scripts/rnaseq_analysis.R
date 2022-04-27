@@ -879,10 +879,10 @@ for(comp in c('mHand.vs.mUA', 'mHand.vs.mLA', 'mLA.vs.mUA'))
 ########################################################
 ########################################################
 # Section V : dynamic gene and TFs, SPs in regeneration using smart-seq2 data
-
 # first double check the regeneration sample quality
 # because the quick technical replicate merging from different batches did not work well, e.g. dpa5_136150 from two R10724 and R11635  
-# it turned out Akane's early samples were polyA and later samples were smartseq2 
+# it turned out Akane's early samples were polyA and later samples were smartseq2
+# the samples here were reprocessed because samples were not merged replicates.
 ########################################################
 ########################################################
 annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
@@ -901,25 +901,59 @@ sps = setdiff(sps, tfs)
 # select the R10724 samples without sample 136150 with is names 13615x
 # only keep the sample 136150 from the request R11635
 ##########################################
-load(file = paste0('/Users/jiwang/workspace/imp/positional_memory/results/rnaseq_Rxxxx.old_R10724_R161513_mergedTechRep/Rdata/',
-                   'design_dds_all_regeneration.samples_allBatches.Rdata')) # import the old sample infos
+#load(file = paste0('/Users/jiwang/workspace/imp/positional_memory/results/rnaseq_Rxxxx.old_R10724_R161513_mergedTechRep/Rdata/',
+#                   'design_dds_all_regeneration.samples_allBatches.Rdata')) # import the old sample infos
 #design$condition = sapply(design$condition, function(x) )
-load(file = paste0(RdataDir, 'RNAseq_design_dds.object.Rdata'))
+#load(file = paste0(RdataDir, 'RNAseq_design_dds.object.Rdata'))
+#design = design.matrix
 
-design = design.matrix
+dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/rnaseq_using/regeneration_RNAseq/'
+design = read.csv(paste0(dataDir, 'regeneration_samples_toUse.csv'))
 
-design$protocol = gsub(' ', '', design$protocol)
-design$batch = paste0(design$request, '_', design$protocol)
+xlist = list.files(path=paste0(dataDir, 'featurecounts_Q10'),
+                   pattern = "*featureCounts.txt$", full.names = TRUE) ## list of data set to merge
+
+all = cat.countTable(xlist, countsfrom = 'featureCounts')
+
+#colnames(all)[grep('136150s', colnames(all))] = '13615x.txt'
+#colnames(all) =  gsub('[#]', '_', colnames(all))
+colnames(design)[1] = 'SampleID'
+counts = process.countTable(all=all, design = design[, c(1,2)], merge.technicalRep.sameID = FALSE)
+
+
+all = counts
+
+mm = match(all$gene, annot$geneID)
+ggs = paste0(annot$gene.symbol.toUse[mm], '_',  annot$geneID[mm])
+all$gene[!is.na(mm)] = ggs[!is.na(mm)]
+
+raw = as.matrix(all[, -1])
+rownames(raw) = all$gene
+#design$batch = paste0(design$request, '_', design$protocol)
+
+dds <- DESeqDataSetFromMatrix(raw, DataFrame(design), design = ~ condition)
+
+save(design, dds, file = paste0(RdataDir, 'design_dds_all_regeneration_12selectedSamples_v47.hox.patch.Rdata'))
+
+
+##########################################
+# filering and normalization 
+##########################################
+load(file = paste0(RdataDir, 'design_dds_all_regeneration_12selectedSamples_v47.hox.patch.Rdata'))
+
+#design$protocol = gsub(' ', '', design$protocol)
+#design$batch = paste0(design$request, '_', design$protocol)
 
 table(design$condition, design$batch)
 
 #sels = which(design$batch == 'R10724_smartseq2' & design$SampleID != '13615x')
-sels = which(design$batch == 'R11635_smartseq2' | (design$batch == 'R10724_smartseq2' & design$SampleID != '13615x'))
-
-design = design[sels, ]
-dds = dds[ ,sels]
-
-table(design$condition, design$batch)
+#sels = which(design$batch == 'R11635_smartseq2' | (design$batch == 'R10724_smartseq2' & design$SampleID != '13615x'))
+#design = design[sels, ]
+#write.csv(design, 
+#  file = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/rnaseq_using/regeneration_RNAseq/', 
+#                'regeneration_samples_toUse.csv'), row.names = FALSE, quote = FALSE)
+# dds = dds[ ,sels]
+#table(design$condition, design$batch)
 
 #dds = DESeqDataSetFromMatrix(raw, DataFrame(design), design = ~ condition)
 dds$condition = droplevels(dds$condition)
@@ -963,6 +997,7 @@ cpm = log2(cpm + 2^-6)
 plot.pair.comparison.plot(cpm[, c(1:7)], linear.scale = FALSE)
 
 ## batch correction with combat
+require(sva)
 tmm = cpm
 bc = as.factor(design$batch)
 mod = model.matrix(~ as.factor(condition), data = design)
@@ -1018,7 +1053,8 @@ colnames(res.ii) = paste0(colnames(res.ii), "_dpa13dist.vs.mUA")
 res = data.frame(res, res.ii[, c(2, 5, 6)])
 
 res = data.frame(fpm.bc, res, stringsAsFactors = FALSE)
-saveRDS(res, file = paste0(RdataDir, 'smartseq2_R10724_R11635_cpm.batchCorrect_DESeq2.test.withbatch.log2FC.shrinked.rds'))
+saveRDS(res, file = paste0(RdataDir, 'smartseq2_R10724_R11635_cpm.batchCorrect_DESeq2.test.withbatch.log2FC.shrinked',
+                           version.analysis, '.rds'))
 
 
 ##########################################
