@@ -882,112 +882,12 @@ if(Peak.annotation_feature.distribution){
 
 ########################################################
 ########################################################
-# Section : chromatin dynamics of position-related CREs and genes
-# focus on the dynamics of Hand-specific CREs in regeneration process
-# 
+# Section : Regeneration genes and associated CREs
+# specific questions: chromatin states of regeneration genes in mature sample
+# is it bivalent ?? or not 
 ########################################################
 ########################################################
 
-##########################################
-# process the positional result and regeneration analysis and combine them 
-##########################################
-
-## import positional peaks in Figure 1
-peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rdata/', 
-                              'position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters_6.rds'))
-table(peaks$clusters)
-cluster_order = c(6, 1, 5, 3, 4, 2)
-peaks$new_clusters = NA
-
-# change the peak names 
-for(n in 1:length(cluster_order))
-{
-  peaks$new_clusters[which(peaks$clusters == cluster_order[n])] = n 
-  #peaks$new_clusters[which(peaks$clusters == '1')] = 2 
-}
-
-## import regeneration peaks 
-library(qvalue)
-res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks__mUA_regeneration_dev_2Batches.R10723_R7977_peakAnnot_v8.rds'))
-
-# ignore the current annotation
-res = res[, c(1:50)]
-
-res = res[order(-res$log2FC), ]
-qv = qvalue(res$pval.lrt)
-res$fdr.lrt = qv$qvalues
-
-# select the temporal dynamic peaks
-fdr.cutoff = 0.01; logfc.cutoff = 1
-
-select = which(  (res$adj.P.Val_5dpa.vs.mUA < fdr.cutoff & abs(res$logFC_5dpa.vs.mUA) > logfc.cutoff)| 
-                   (res$adj.P.Val_9dpa.vs.mUA < fdr.cutoff & abs(res$logFC_9dpa.vs.mUA) > logfc.cutoff) |
-                   (res$adj.P.Val_13dpap.vs.mUA < fdr.cutoff & abs(res$logFC_13dpap.vs.mUA) > logfc.cutoff) |
-                   (res$adj.P.Val_13dpad.vs.mUA < fdr.cutoff & abs(res$logFC_13dpad.vs.mUA) > logfc.cutoff) |
-                   (res$adj.P.Val_s40.vs.mUA < fdr.cutoff & abs(res$logFC_s40.vs.mUA) > logfc.cutoff ) | 
-                   (res$adj.P.Val_s44p.vs.mUA < fdr.cutoff & abs(res$logFC_s44p.vs.mUA) > logfc.cutoff ) |
-                   (res$adj.P.Val_s44d.vs.mUA < fdr.cutoff & abs(res$logFC_s44d.vs.mUA) > logfc.cutoff ))
-cat(length(select), 'DE peaks found !\n')
-
-res$dynamic.peaks = 0
-res$dynamic.peaks[select] = 1
-
-res = res[order(-res$log2FC), ]
-
-## add dpgp cluster result
-xx = readRDS(file = paste0(RdataDir, '/renegeration_dynamicPeaks_GPDPclustering.merged.extended.rds'))
-res$dpgp.clusters = NA
-res$dpgp.clusters[match(rownames(xx), rownames(res))] = xx$clusters
-
-## transfer the positional peak info into the regeneration analysis
-rownames(res) = gsub('_', '-', rownames(res))
-mm = match(rownames(peaks), rownames(res))
-
-res$positional.peaks = 0
-res$positional.clusters = NA
-res$positional.peaks[mm] = 1
-res$positional.clusters[mm] = peaks$new_clusters
-
-## add histone marker analysis
-RdataHistM = '/Users/jiwang/workspace/imp/positional_memory/results/CT_merged_20220328/Rdata'
-load(file = paste0(RdataHistM, '/combined_4histMarkers_overlapped55kATACseq_DE_regeneration_v2.Rdata')) # variable (keep and DE.locus)
-
-mm = match(rownames(keep), rownames(DE.locus))
-DE.locus = DE.locus[mm, ]
-
-colnames(DE.locus) = paste0('DE_', colnames(DE.locus))
-
-mm = match(rownames(res), keep$atac_peak_coord_H3K4me3)
-res = data.frame(res, DE.locus[mm, ], stringsAsFactors = FALSE)
-
-saveRDS(res, file = paste0(RdataDir, '/allPeaks_regeneraton_positional_histM_analysisRes.rds'))
-saveRDS(keep, file = paste0(RdataDir, '/allPeaks_regeneraton_positional_histM_analysisRes_histMdata.rds'))
-
-##########################################
-# explore the atac-seq peak dyanmic  
-##########################################
-res = readRDS(file = paste0(RdataDir, '/allPeaks_regeneraton_positional_histM_analysisRes.rds'))
-
-res = res[which(res$positional.peaks == 1 & res$positional.clusters != 1 & res$positional.clusters !=2), ]
-
-ss = apply(res[, grep('DE_H3K', colnames(res))], 1, sum)
-length(which(ss>0))
-
-res$DE_histM = 0
-res$DE_histM[which(ss>0)] = 1
-
-table(res$dynamic.peaks)
-table(res$DE_histM)
-
-table(res$dynamic.peaks, res$DE_histM)
-table()
-
-
-########################################################
-########################################################
-# Section : regeneration genes and peaks  
-########################################################
-########################################################
 fpm = readRDS(file = paste0(RdataDir,  '/histoneMarkers_normSignals_axolotlAllTSS.2kb.rds'))
 res = data.frame(log2(fpm + 2^0), stringsAsFactors = FALSE)
 res$gene = sapply(rownames(res), function(x){unlist(strsplit(as.character(x), '_'))[2]})
@@ -1009,7 +909,7 @@ if(Clean.TSS){
       ss = apply(as.matrix(res[jj, c(1:6)]), 1, sum)
       sels = c(sels, jj[which.max(ss)])
     } 
-    
+        
   }
 }
 
@@ -1329,6 +1229,113 @@ if(Select.dynamic.peaks.for.MARA){
 }
 
 xx = run.MARA.atac.temporal(keep, cc)
+
+
+
+
+
+
+########################################################
+########################################################
+# Section : chromatin dynamics of position-related CREs and genes
+# focus on the dynamics of Hand-specific CREs in regeneration process
+# 
+########################################################
+########################################################
+
+##########################################
+# process the positional result and regeneration analysis and combine them 
+##########################################
+
+## import positional peaks in Figure 1
+peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rdata/', 
+                              'position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters_6.rds'))
+table(peaks$clusters)
+cluster_order = c(6, 1, 5, 3, 4, 2)
+peaks$new_clusters = NA
+
+# change the peak names 
+for(n in 1:length(cluster_order))
+{
+  peaks$new_clusters[which(peaks$clusters == cluster_order[n])] = n 
+  #peaks$new_clusters[which(peaks$clusters == '1')] = 2 
+}
+
+## import regeneration peaks 
+library(qvalue)
+res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks__mUA_regeneration_dev_2Batches.R10723_R7977_peakAnnot_v8.rds'))
+
+# ignore the current annotation
+res = res[, c(1:50)]
+
+res = res[order(-res$log2FC), ]
+qv = qvalue(res$pval.lrt)
+res$fdr.lrt = qv$qvalues
+
+# select the temporal dynamic peaks
+fdr.cutoff = 0.01; logfc.cutoff = 1
+
+select = which(  (res$adj.P.Val_5dpa.vs.mUA < fdr.cutoff & abs(res$logFC_5dpa.vs.mUA) > logfc.cutoff)| 
+                   (res$adj.P.Val_9dpa.vs.mUA < fdr.cutoff & abs(res$logFC_9dpa.vs.mUA) > logfc.cutoff) |
+                   (res$adj.P.Val_13dpap.vs.mUA < fdr.cutoff & abs(res$logFC_13dpap.vs.mUA) > logfc.cutoff) |
+                   (res$adj.P.Val_13dpad.vs.mUA < fdr.cutoff & abs(res$logFC_13dpad.vs.mUA) > logfc.cutoff) |
+                   (res$adj.P.Val_s40.vs.mUA < fdr.cutoff & abs(res$logFC_s40.vs.mUA) > logfc.cutoff ) | 
+                   (res$adj.P.Val_s44p.vs.mUA < fdr.cutoff & abs(res$logFC_s44p.vs.mUA) > logfc.cutoff ) |
+                   (res$adj.P.Val_s44d.vs.mUA < fdr.cutoff & abs(res$logFC_s44d.vs.mUA) > logfc.cutoff ))
+cat(length(select), 'DE peaks found !\n')
+
+res$dynamic.peaks = 0
+res$dynamic.peaks[select] = 1
+
+res = res[order(-res$log2FC), ]
+
+## add dpgp cluster result
+xx = readRDS(file = paste0(RdataDir, '/renegeration_dynamicPeaks_GPDPclustering.merged.extended.rds'))
+res$dpgp.clusters = NA
+res$dpgp.clusters[match(rownames(xx), rownames(res))] = xx$clusters
+
+## transfer the positional peak info into the regeneration analysis
+rownames(res) = gsub('_', '-', rownames(res))
+mm = match(rownames(peaks), rownames(res))
+
+res$positional.peaks = 0
+res$positional.clusters = NA
+res$positional.peaks[mm] = 1
+res$positional.clusters[mm] = peaks$new_clusters
+
+## add histone marker analysis
+RdataHistM = '/Users/jiwang/workspace/imp/positional_memory/results/CT_merged_20220328/Rdata'
+load(file = paste0(RdataHistM, '/combined_4histMarkers_overlapped55kATACseq_DE_regeneration_v2.Rdata')) # variable (keep and DE.locus)
+
+mm = match(rownames(keep), rownames(DE.locus))
+DE.locus = DE.locus[mm, ]
+
+colnames(DE.locus) = paste0('DE_', colnames(DE.locus))
+
+mm = match(rownames(res), keep$atac_peak_coord_H3K4me3)
+res = data.frame(res, DE.locus[mm, ], stringsAsFactors = FALSE)
+
+saveRDS(res, file = paste0(RdataDir, '/allPeaks_regeneraton_positional_histM_analysisRes.rds'))
+saveRDS(keep, file = paste0(RdataDir, '/allPeaks_regeneraton_positional_histM_analysisRes_histMdata.rds'))
+
+##########################################
+# explore the atac-seq peak dyanmic  
+##########################################
+res = readRDS(file = paste0(RdataDir, '/allPeaks_regeneraton_positional_histM_analysisRes.rds'))
+
+res = res[which(res$positional.peaks == 1 & res$positional.clusters != 1 & res$positional.clusters !=2), ]
+
+ss = apply(res[, grep('DE_H3K', colnames(res))], 1, sum)
+length(which(ss>0))
+
+res$DE_histM = 0
+res$DE_histM[which(ss>0)] = 1
+
+table(res$dynamic.peaks)
+table(res$DE_histM)
+
+table(res$dynamic.peaks, res$DE_histM)
+table()
 
 
 
