@@ -912,35 +912,13 @@ write.table(SAF, file = paste0('/Volumes/groups/tanaka/People/current/jiwang/pro
 
 ## load processed tss atac and histMarker signals
 #genes = GenomicFeatures::genes(amex.all, columns="gene_id")
+res = readRDS(file = paste0(RdataDir,  '/atac_histoneMarkers_normSignals_axolotlAllTSS.2kb_TSS_genelevel.rds'))
+res = data.frame(res)
+res$geneID = rownames(res)
 
-fpm = readRDS(file = paste0(RdataDir,  '/histoneMarkers_normSignals_axolotlAllTSS.2kb.rds'))
-res = data.frame(log2(fpm + 2^0), stringsAsFactors = FALSE)
 res$gene = sapply(rownames(res), function(x){unlist(strsplit(as.character(x), '_'))[2]})
 res$geneID  = sapply(rownames(res), function(x){unlist(strsplit(as.character(x), '_'))[1]})
 
-##########################################
-# clean TSS, for each gene, only keep the TSS with sigals if there are mulitple ones
-##########################################
-Clean.TSS = TRUE
-
-if(Clean.TSS){
-  ggs = unique(res$geneID)
-  sels = c()
-  for(n in 1:length(ggs))
-  {
-    # n = 1
-    jj = which(res$geneID == ggs[n])  
-    if(length(jj)>0){
-      ss = apply(as.matrix(res[jj, c(1:6)]), 1, sum)
-      sels = c(sels, jj[which.max(ss)])
-    } 
-        
-  }
-}
-
-res = res[sels, ]
-
-saveRDS(res, file = paste0(RdataDir,  '/histoneMarkers_normSignals_axolotlAllTSS.2kb_TSSfiltered.rds'))
 
 ##########################################
 # first try to define groups 
@@ -1159,6 +1137,7 @@ res[,c(1, 4, 7:13)] %>%
   theme(axis.text.x = element_text(angle = 0, size = 14)) +
   labs(x = "", y= 'normalized data (log2)')
 
+
 ########################################################
 ########################################################
 # Section : regeneration peaks, not found in mUA and embryo stages only in regeneration process 
@@ -1252,6 +1231,7 @@ if(Select.dynamic.peaks.for.MARA){
 }
 
 xx = run.MARA.atac.temporal(keep, cc)
+
 
 
 ########################################################

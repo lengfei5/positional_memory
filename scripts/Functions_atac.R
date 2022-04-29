@@ -3509,6 +3509,180 @@ plotPeakAnnot_piechart = function(peakAnnots, ndigit = 2)
 
 ########################################################
 ########################################################
+# Section : analysis of regeneration genes
+# associate regeneration genes with chromatin features: atac, histone markers
+########################################################
+########################################################
+process.normalize.atac.histM.allTSS = function()
+{
+  RNA.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functions/RNAseq_functions.R'
+  RNA.QC.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functions/RNAseq_QCs.R'
+  source(RNA.functions)
+  source(RNA.QC.functions)
+  
+  ## import sample infos
+  design = readRDS(file = paste0('../results/CT_merged_20220328/Rdata/histM_CT_design_info.rds'))
+  #design = read.csv(file = paste0(dataDir, "R11876_R12810_R12965_CT_analysis_20220217_QCs_AK.csv"))
+  #design = design[!is.na(design$sampleID), ]
+  design$fileName = paste0(design$condition, '_', design$sampleID)
+  design = design[, c(1:3, 15, 5, 16, 4, 6:14)]
+  colnames(design)[5] = 'batch'
+  
+  design.histM = design[, c(1:5)]
+  design.histM = design.histM[grep('rRep', design.histM$batch), ]
+  
+  design = readRDS(file = paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata', 
+                                 '/design_sels_bc_TMM_combat_mUA_regeneration_dev_2Batches.R10723_R7977',
+                                          'Rxxxx_R10723_R11637_R12810_atac', '.rds'))
+  design = design[, c(1, 2, 6)]
+  design$sample = design$condition
+  design$marks = 'atac'
+  design = design[, c(1, 4,5, 2:3)]
+  
+  colnames(design.histM) = colnames(design)
+  
+  design = rbind(design, design.histM)
+  design$sample = gsub('BL_UA_13days_distal', 'BL13days.dist', design$sample)
+  design$sample = gsub('BL_UA_13days_proximal', 'BL13days.prox', design$sample)
+  design$sample = gsub('BL_UA_9days', 'BL9days', design$sample)
+  design$sample = gsub('BL_UA_5days', 'BL5days', design$sample)
+  design$sample = gsub('Mature_UA', 'mUA', design$sample)
+  
+  design = design[grep('Embryo', design$sample, invert = TRUE), ]
+  design = design[grep('IgG', design$marks, invert = TRUE), ]
+  design$condition = paste0(design$marks, '_', design$sample)
+  
+  dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_histM_both/'
+  xlist = list.files(path=paste0(dataDir, 'featurecounts_peaks.Q30'), pattern = 'featureCounts.txt.summary', 
+                     full.names = TRUE)
+  
+  design$total.reads = NA
+  for(n in 1:nrow(design))
+  {
+    kk = grep(design$SampleID[n], xlist)
+    cat(length(kk), '\n')
+    test = read.table(file = xlist[kk], sep = '\t', header = TRUE)
+    design$total.reads[n] = sum(as.numeric(as.character(test[,2])))
+    
+  }
+  
+  saveRDS(design, file = paste0(RdataDir, '/atac_histM_sample_design_regeneration.rds'))
+  
+  ## process the counts
+  design = readRDS(file = paste0(RdataDir, '/atac_histM_sample_design_regeneration.rds'))
+    
+  xlist<-list.files(path=paste0(dataDir, 'featurecounts_peaks.Q30'),
+                    pattern = "*_featureCounts.txt$", full.names = TRUE) ## list of data set to merge
+  
+  sels = c()
+  for(n in 1:nrow(design)) sels = c(sels, grep(design$SampleID[n], xlist))
+  xlist = xlist[sels]
+  all = cat.countTable(xlist, countsfrom = 'featureCounts')
+  
+  colnames(design)[1] = 'SampleID'
+  
+  counts = process.countTable(all=all, design = design[, c(1,4)])
+  
+  save(design, counts, file = paste0(RdataDir, '/atac_histM_sample_design_regeneration_counts.Rdata'))
+  
+  
+  # normalization
+  load(file = paste0(RdataDir, '/atac_histM_sample_design_regeneration_counts.Rdata'))
+  rownames(counts) = counts$gene
+  
+  cpm = as.matrix(counts[, -1])
+  for(n in 1:ncol(cpm))
+  {
+    cpm[,n] = (cpm[,n]+0.5)/design$total.reads[n]*10^6
+  }
+  
+  
+  cpm = log2(cpm)
+  
+  ## sample means regardless of batches
+  source('Functions_histM.R')
+  cpmm = cal_sample_means(cpm, conds = unique(design$condition))
+  
+  ##########################################
+  # clean TSS, for each gene, only keep the TSS with sigals if there are mulitple ones
+  # ## select or merge multiple tss of the same gene
+  ##########################################
+  annot = readRDS(paste0(annotDir, 
+                         'AmexT_v47_transcriptID_transcriptCotig_geneSymbol.nr_geneSymbol.hs_geneID_gtf.geneInfo_gtf.transcriptInfo.rds'))
+  
+  mapping = data.frame(transcript = rownames(cpmm), stringsAsFactors = FALSE)
+  mapping$gene = annot$geneID[match(rownames(cpmm), annot$transcriptID)]
+  mapping$gene[which(is.na(mapping$gene))] = mapping$transcript[which(is.na(mapping$gene))]
+  
+  test = table(mapping$gene)
+  test = test[which(test<=10)]
+  
+  gg.unique = unique(mapping$gene)
+  index_tss = rep(NA, length(gg.unique))
+  
+  for(n in 1:length(gg.unique))
+  {
+    # n = 3
+    kk = which(mapping$gene == gg.unique[n])
+    
+    if(length(kk) == 1) {
+      index_tss[n] = kk
+    }else{
+      cat(n, '\n')
+      #stop()
+      pmarkers = apply(cpmm[kk, grep('H3K4me3', colnames(cpmm))], 1, median)
+      index_tss[n] = kk[which.max(pmarkers)]
+    }
+  }
+  
+  cpm = cpmm[index_tss, ]
+  rownames(cpm) = gg.unique
+  
+  saveRDS(cpm, file = paste0(RdataDir,  '/atac_histoneMarkers_normSignals_axolotlAllTSS.2kb_TSS_genelevel.rds'))
+  
+  #design$sampleID = design$SampleID
+  #design$usable = as.numeric(design$usable)
+  #design$usable[c(31:32)] = design$usable[c(31:32)]/10^6
+  
+  #design$batch = 'old'
+  #design$batch[grep('1775', design$sampleID)] = '2022'
+  #sels = grep('HEAD|Mature', design$condition)
+  #design = design[sels, ]
+  #counts = counts[, c(1, sels + 1)]
+  
+  # ss = apply(as.matrix(counts[, -1]), 1, mean)
+  # 
+  # par(mfrow=c(1,2))
+  # hist(log10(as.matrix(counts[, -1])), breaks = 100, xlab = 'log10(nb of reads within peaks)', main = 'distribution')
+  # plot(ecdf(log10(as.matrix(counts[, -1]) + 0.1)), xlab = 'log10(nb of reads within peaks)', main = 'cumulative distribution')
+  # 
+  # ss = apply(as.matrix(counts[, -1]), 2, sum)
+  # design$usable.reads.withinPeaks = ss
+  # 
+  # design$pct.reads.in.peaks = design$usable.reads.withinPeaks/10^6/as.numeric(as.character(design$usable))
+  # 
+  # par(mfrow=c(1,1))
+  # 
+  # hist(design$pct.reads.in.peaks, main = 'distribution of pct of usable reads within merged peaks', xlab = 'pct', breaks = 10)
+  # 
+  #norms = as.numeric(as.character(unlist(design$unique.rmdup)))
+  #norms = apply(counts[, -1], 2, sum)
+  #norms = norms/median(norms)
+  
+  # ss = apply(as.matrix(counts[, -1]), 1, max)
+  # 
+  # cutoff = 50
+  # hist(log10(ss), breaks = 200)
+  # abline(v = log10(cutoff), col = 'red')
+  # kk = which(ss>cutoff)
+  # length(which(ss>cutoff))
+  # 
+  
+  
+}
+
+########################################################
+########################################################
 # Section : old functions not Used 
 # 
 ########################################################
@@ -4408,4 +4582,3 @@ Assembly_histMarkers_togetherWith_ATACseq = function()
   }
   
 }
-
