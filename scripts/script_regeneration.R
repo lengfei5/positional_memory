@@ -888,6 +888,31 @@ if(Peak.annotation_feature.distribution){
 ########################################################
 ########################################################
 
+# prepare all tss to quantify the read counts within those tss 
+gtf.all = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/AmexT_v47_Hox.patch.gtf'
+amex.all = GenomicFeatures::makeTxDbFromGFF(file = gtf.all)
+tss = GenomicFeatures::promoters(amex.all, upstream = 2000, downstream = 2000, use.names = TRUE)
+
+tss = as.data.frame(tss)
+tss$tx_name = sapply(tss$tx_name, function(x){x = unlist(strsplit(as.character(x), '[|]')); x[length(x)]})
+tss$start[which(tss$start<=1)] = 1
+
+SAF = data.frame(GeneID=tss$tx_name, 
+                 Chr=tss$seqnames, 
+                 Start=tss$start, 
+                 End=tss$end, 
+                 Strand=tss$strand, 
+                 stringsAsFactors = FALSE)
+
+write.table(SAF, file = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_histM_both/',
+                               'amex6_TSS_all_56670genes.saf'), 
+            sep = '\t', row.names = FALSE, 
+            col.names = TRUE, quote = FALSE) 
+
+
+## load processed tss atac and histMarker signals
+#genes = GenomicFeatures::genes(amex.all, columns="gene_id")
+
 fpm = readRDS(file = paste0(RdataDir,  '/histoneMarkers_normSignals_axolotlAllTSS.2kb.rds'))
 res = data.frame(log2(fpm + 2^0), stringsAsFactors = FALSE)
 res$gene = sapply(rownames(res), function(x){unlist(strsplit(as.character(x), '_'))[2]})
@@ -1169,8 +1194,6 @@ if(saveTable){
   
 }
 
-
-
 ########################################################
 ########################################################
 # Section III : motif analysis
@@ -1229,10 +1252,6 @@ if(Select.dynamic.peaks.for.MARA){
 }
 
 xx = run.MARA.atac.temporal(keep, cc)
-
-
-
-
 
 
 ########################################################
