@@ -3640,44 +3640,6 @@ process.normalize.atac.histM.allTSS = function()
   
   saveRDS(cpm, file = paste0(RdataDir,  '/atac_histoneMarkers_normSignals_axolotlAllTSS.2kb_TSS_genelevel.rds'))
   
-  #design$sampleID = design$SampleID
-  #design$usable = as.numeric(design$usable)
-  #design$usable[c(31:32)] = design$usable[c(31:32)]/10^6
-  
-  #design$batch = 'old'
-  #design$batch[grep('1775', design$sampleID)] = '2022'
-  #sels = grep('HEAD|Mature', design$condition)
-  #design = design[sels, ]
-  #counts = counts[, c(1, sels + 1)]
-  
-  # ss = apply(as.matrix(counts[, -1]), 1, mean)
-  # 
-  # par(mfrow=c(1,2))
-  # hist(log10(as.matrix(counts[, -1])), breaks = 100, xlab = 'log10(nb of reads within peaks)', main = 'distribution')
-  # plot(ecdf(log10(as.matrix(counts[, -1]) + 0.1)), xlab = 'log10(nb of reads within peaks)', main = 'cumulative distribution')
-  # 
-  # ss = apply(as.matrix(counts[, -1]), 2, sum)
-  # design$usable.reads.withinPeaks = ss
-  # 
-  # design$pct.reads.in.peaks = design$usable.reads.withinPeaks/10^6/as.numeric(as.character(design$usable))
-  # 
-  # par(mfrow=c(1,1))
-  # 
-  # hist(design$pct.reads.in.peaks, main = 'distribution of pct of usable reads within merged peaks', xlab = 'pct', breaks = 10)
-  # 
-  #norms = as.numeric(as.character(unlist(design$unique.rmdup)))
-  #norms = apply(counts[, -1], 2, sum)
-  #norms = norms/median(norms)
-  
-  # ss = apply(as.matrix(counts[, -1]), 1, max)
-  # 
-  # cutoff = 50
-  # hist(log10(ss), breaks = 200)
-  # abline(v = log10(cutoff), col = 'red')
-  # kk = which(ss>cutoff)
-  # length(which(ss>cutoff))
-  # 
-  
   
 }
 
