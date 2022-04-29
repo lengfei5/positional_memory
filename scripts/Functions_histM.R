@@ -67,6 +67,17 @@ cal_sample_means = function(cpm, conds = c("mUA", "mLA", "mHand") )
   
 }
 
+get_geneName = function(xx)
+{
+  return(sapply(xx, function(x) unlist(strsplit(as.character(x), '_'))[1]))
+}
+
+get_geneID = function(xx)
+{
+  return(sapply(xx, function(x) {test = unlist(strsplit(as.character(x), '_')); return(test[length(test)])}))
+  
+}
+
 
 ##########################################
 # try to subtract the input IgG 

@@ -910,26 +910,131 @@ write.table(SAF, file = paste0('/Volumes/groups/tanaka/People/current/jiwang/pro
             col.names = TRUE, quote = FALSE) 
 
 
+##########################################
 ## load processed tss atac and histMarker signals
-#genes = GenomicFeatures::genes(amex.all, columns="gene_id")
+# Gene groups defined by regeneration RNAseq data, house keeping, 
+# limb fibrobalst expressing gene, non-expressing control genes
+##########################################
 res = readRDS(file = paste0(RdataDir,  '/atac_histoneMarkers_normSignals_axolotlAllTSS.2kb_TSS_genelevel.rds'))
 res = data.frame(res)
 res$geneID = rownames(res)
 
-res$gene = sapply(rownames(res), function(x){unlist(strsplit(as.character(x), '_'))[2]})
-res$geneID  = sapply(rownames(res), function(x){unlist(strsplit(as.character(x), '_'))[1]})
+geneClusters = readRDS(file = paste0("../results/RNAseq_data_used/Rdata/", 'regeneration_geneClusters.rds'))
+geneClusters$gene = rownames(geneClusters)
+geneClusters$geneID = sapply(rownames(geneClusters), function(x) {test = unlist(strsplit(as.character(x), '_')); return(test[length(test)])})
 
+mm = match(res$geneID, geneClusters$geneID)
+res = data.frame(res, geneClusters[mm, c(1:2, 26, 3:7)], stringsAsFactors = FALSE)
 
-##########################################
-# first try to define groups 
-##########################################
-res = readRDS(file = paste0(RdataDir,  '/histoneMarkers_normSignals_axolotlAllTSS.2kb_TSSfiltered.rds'))
+res$groups[which(!is.na(res$groups))] = 'reg_up'
+res$groups[which(res$cluster == 'G1'|res$cluster == 'G2'|res$cluster == 'G3')] = 'reg_down'
 
-aa = readRDS(file =  "../results/rnaseq_Rxxxx.old_R10724_R161513_mergedTechRep/Rdata/TestStat_regeneration_RNAseq.rds") 
+# limb fibroblast expressing genes
+expressed = readRDS(file = '../data/expressedGenes_list_limb_fibroblast_using_smartseq2.mature.regeneration_pooledscRNAseq.dev.rds')
+res$fibroblast.expressed = expressed$expressed[match(res$geneID, expressed$geneID)]
 
-aa$gene = sapply(rownames(aa), function(x) unlist(strsplit(as.character(x), '_'))[1])
-aa$geneID = sapply(rownames(aa), function(x) {test = unlist(strsplit(as.character(x), '_')); return(test[length(test)])})
+res$groups[which(is.na(res$groups) & res$fibroblast.expressed == '1')] = 'expressed.stable'
 
+# house keeping and other non-expressing genes
+load(file =  paste0(annotDir, 'axolotl_housekeepingGenes_controls.other.tissues.liver.islet.testis_expressedIn21tissues.Rdata'))
+hkgs = controls.tissue$geneIDs[which(controls.tissue$tissues == 'housekeeping')]
+nonexp = controls.tissue$geneIDs[which(controls.tissue$tissues != 'housekeeping')]
+
+mm = match(res$geneID, hkgs)
+res$groups[which(res$groups == 'expressed.stable' & !is.na(mm))] = 'house_keep'
+
+mm = match(res$geneID, nonexp)
+res$groups[which(is.na(res$groups) & !is.na(mm))] = 'non_expr'
+
+# random select 1000 non-expressed genes
+jj = which(is.na(res$groups))
+jj = sample(jj, size = 1000, replace = FALSE)
+res$groups[jj] = 'non_expr'
+
+res = res[which(!is.na(res$groups)), ]
+
+source('Functions_histM.R')
+res$gene = get_geneName(res$gene)
+
+library(ggrepel)
+library(dplyr)
+library(tibble)
+library("cowplot")
+require(gridExtra)
+library(tidyr)
+
+require(ggr)
+dev.example = c('HOXA13', 'HOXA11', 'HOXA9', 'HOXD13','HOXD11', 'HOXD9',
+                'SHH', 'FGF8', 'FGF10', 'HAND2', 'BMP4', 'ALX1',
+                'ALX4', 'PRRX1', 'GREM1', 'LHX2', 'LHX9', 
+                'TBX2', 'TBX4', 'TBX5', 'LMX1', 'MEIS1', 'MEIS2', 'SALL4', 'IRX3', 'IRX5')
+examples.sel = unique(grep(paste0(dev.example, collapse = '|') ,res$gene))
+
+ggplot(data=res, aes(x=H3K4me3_mUA, y=H3K27me3_mUA, label = gene, color = groups)) +
+  geom_point(size = 0.2) + 
+  theme(axis.text.x = element_text(size = 12), 
+        axis.text.y = element_text(size = 12)) +
+  scale_color_manual(values=c('black', "orange", 'darkgray',  "red",   'green')) + 
+  geom_point(data=res[res$groups == 'reg_up', ], aes(x=H3K4me3_mUA, y=H3K27me3_mUA),  size=1) +
+  geom_point(data=res[res$groups == 'reg_down', ], aes(x=H3K4me3_mUA, y=H3K27me3_mUA),  size=1) +
+  geom_text_repel(data= res[examples.sel, ], size = 3.0, color = 'blue') +
+  #geom_text_repel(data= fpm[examples.sel, ], size = 4.0, color = 'darkblue') + 
+  #geom_hline(yintercept=2.0, colour = "darkgray") + 
+  #geom_vline(xintercept = 2.0, colour = "darkgray")
+  #geom_abline(slope = 1,  intercept = 0, colour = 'cyan3') +
+  theme_classic() +
+  theme(legend.text = element_text(size=12),
+        legend.title = element_text(size = 14),
+        legend.position=c(0.1, 0.8),
+        plot.margin = margin()
+        #legend.key.size = unit(1, 'cm')
+        #legend.key.width= unit(1, 'cm')
+  ) + 
+  geom_vline(xintercept=1, col='darkgray') +
+  geom_hline(yintercept=1, col="darkgray") +
+  labs(x = "UA_H3K4me3", y= 'UA_H3K27me3') +
+  guides(colour = guide_legend(override.aes = list(size=2)))
+  
+  #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
+  #scale_color_manual(values=c("blue", "black", "red")) +
+
+res[,c(7,8, 28,29)] %>% 
+  pivot_longer(cols = c('H3K4me3_mUA', 'H3K27me3_mUA'), names_to = 'markers') %>%
+  ggplot(aes(x = groups, 
+             y=value, fill=markers)) + 
+  geom_boxplot(outlier.alpha = 0.1) + 
+  #geom_jitter(width = 0.1)+
+  #geom_violin(width = 1.2) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 0, size = 14)) +
+  labs(x = "", y= 'normalized data (log2)')
+  
+# p2 = ggplot(data=res, aes(x=H3K4me1_mUA, y=H3K27me3_mUA, label = gene, color = groups)) +
+#   geom_point(size = 0.4) + 
+#   theme(axis.text.x = element_text(size = 12), 
+#         axis.text.y = element_text(size = 12)) +
+#   scale_color_manual(values=c('black', "orange", 'darkgray',  "red",   'green')) + 
+#   geom_text_repel(data= res[examples.sel, ], size = 3.0, color = 'blue') +
+#   #geom_text_repel(data= fpm[examples.sel, ], size = 4.0, color = 'darkblue') + 
+#   #geom_hline(yintercept=2.0, colour = "darkgray") + 
+#   #geom_vline(xintercept = 2.0, colour = "darkgray")
+#   #geom_abline(slope = 1,  intercept = 0, colour = 'cyan3') +
+#   theme_classic() +
+#   theme(legend.text = element_text(size=12),
+#         legend.title = element_text(size = 14),
+#         legend.position=c(0.1, 0.8),
+#         plot.margin = margin()
+#         #legend.key.size = unit(1, 'cm')
+#         #legend.key.width= unit(1, 'cm')
+#   ) + 
+#   geom_vline(xintercept=1, col='darkgray') +
+#   geom_hline(yintercept=1, col="darkgray") +
+#   labs(x = "UA_H3K4me3", y= 'UA_H3K27me3') +
+#   guides(colour = guide_legend(override.aes = list(size=2)))
+
+#p1 + p2
+
+#aa = readRDS(file =  "../results/rnaseq_Rxxxx.old_R10724_R161513_mergedTechRep/Rdata/TestStat_regeneration_RNAseq.rds") 
 aa[grep('DBP|SALL', rownames(aa)), grep('Mature_UA', colnames(aa))]
 
 aa$expr.mUA = apply(aa[, grep('Mature_UA', colnames(aa))], 1, mean)
