@@ -67,7 +67,7 @@ if(Save.peak.consensus){
   
   pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
                               start.field="X2", end.field="X3", strand.field="strand")
-  saveRDS(pp, file = paste0(RdataDir, '/ATACseq_peak_consensus_filtered_64k.rds'))
+  # saveRDS(pp, file = paste0(RdataDir, '/ATACseq_peak_consensus_filtered_64k.rds'))
   
 }
 
@@ -102,6 +102,8 @@ if(Batch.Correct.regeneration.embryoStage){
   ddx = dds[, sels]
   ddx$conds = droplevels(ddx$conds)
   ss = rowSums(counts(ddx))
+  
+  # save(ddx, design.sel, file = paste0(RdataDir, '/regeneration_samples_beforeBatchCorrection.Rdata'))
   # remove low count genes, otherwise combat returns error 
   # 'Error in while (change > conv) { : missing value where TRUE/FALSE needed'
   #ddx = ddx[which(ss>5), ] 

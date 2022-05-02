@@ -3511,10 +3511,14 @@ plotPeakAnnot_piechart = function(peakAnnots, ndigit = 2)
 ########################################################
 # Section : analysis of regeneration genes
 # associate regeneration genes with chromatin features: atac, histone markers
+# 
 ########################################################
 ########################################################
 process.normalize.atac.histM.allTSS = function()
 {
+  ##########################################
+  # process the sample info and count table
+  ##########################################
   RNA.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functions/RNAseq_functions.R'
   RNA.QC.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functions/RNAseq_QCs.R'
   source(RNA.functions)
@@ -3568,6 +3572,7 @@ process.normalize.atac.histM.allTSS = function()
   
   saveRDS(design, file = paste0(RdataDir, '/atac_histM_sample_design_regeneration.rds'))
   
+  
   ## process the counts
   design = readRDS(file = paste0(RdataDir, '/atac_histM_sample_design_regeneration.rds'))
     
@@ -3585,24 +3590,22 @@ process.normalize.atac.histM.allTSS = function()
   
   save(design, counts, file = paste0(RdataDir, '/atac_histM_sample_design_regeneration_counts.Rdata'))
   
-  
   ##########################################
-  # clean TSS, for each gene, only keep the TSS with sigals if there are mulitple ones
-  # ## select or merge multiple tss of the same gene
+  # clean TSS, for each gene, only keep one TSS if there are mulitple ones
+  # the TSS with highest H3K4me3 were chosen
   ##########################################
-  # normalization
   load(file = paste0(RdataDir, '/atac_histM_sample_design_regeneration_counts.Rdata'))
-  
   rownames(counts) = counts$gene
   
+  # quick and temporal cpm normalization
   cpm = as.matrix(counts[, -1])
   for(n in 1:ncol(cpm))
   {
     cpm[,n] = (cpm[,n]+0.5)/design$total.reads[n]*10^6
   }
-  
   cpmm = log2(cpm)
   
+  ## use geneID 
   annot = readRDS(paste0(annotDir, 
                          'AmexT_v47_transcriptID_transcriptCotig_geneSymbol.nr_geneSymbol.hs_geneID_gtf.geneInfo_gtf.transcriptInfo.rds'))
   
@@ -3631,99 +3634,223 @@ process.normalize.atac.histM.allTSS = function()
     }
   }
   
-  raw = counts[index_tss, ]
-  rownames(raw) = gg.unique
-  #raw = data.frame(raw, transcript = rownames(counts)[index_tss])
+  tss = counts[index_tss, ]
+  tss = data.frame(tss[,-1], geneID = gg.unique, transcript = tss[,1], stringsAsFactors = FALSE)
+  rownames(tss) = gg.unique
   
-  saveRDS(cpm, file = paste0(RdataDir,  '/atac_histoneMarkers_normSignals_axolotlAllTSS.2kb_TSS_genelevel_beforeBatchCorrection.rds'))
-  save(raw, design, 
-       file = paste0(RdataDir,  '/atac_histoneMarkers_normSignals_axolotlAllTSS.2kb_TSS_genelevel_beforeBatchCorrection.Rdata'))
+  ## add coordinates of tss
+  saf = read.table(file = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_histM_both/',
+                'amex6_TSS_all_56670genes.saf'), sep = '\t',  header = TRUE)
+  mm = match(tss$transcript, saf$GeneID)
+  tss$coords = paste0(saf$Chr[mm], ':', saf$Start[mm], '-', saf$End[mm])
+  
+  save(tss, design, file = paste0(RdataDir, '/tss_perGene_atac_histM_sample_design_regeneration_counts.Rdata'))
   
   ##########################################
-  # batch correction
+  # here we will consider the list of gene/tss to keep 
   ##########################################
-  require(edgeR)
-  require(sva)
-  source('Functions_atac.R')
+  load(file = paste0(RdataDir, '/tss_perGene_atac_histM_sample_design_regeneration_counts.Rdata'))
   
-  load(file = paste0(RdataDir,  '/atac_histoneMarkers_normSignals_axolotlAllTSS.2kb_TSS_genelevel_beforeBatchCorrection.Rdata'))
-  raw = data.frame(raw[,-1], transcript = raw[, 1], stringsAsFactors = FALSE)
+  #res = readRDS(file = paste0(RdataDir,  '/atac_histoneMarkers_normSignals_axolotlAllTSS.2kb_TSS_genelevel.rds'))
+  #res = data.frame(res)
+  #res$geneID = rownames(res)
   
-  conds = c('atac','H3K4me3', 'H3K4me1', 'H3K27me3', 'H3K27ac')
-  samples = c('mUA', 'BL5days', 'BL9days', 'BL13days.prox', 'BL13days.dist')
+  geneClusters = readRDS(file = paste0("../results/RNAseq_data_used/Rdata/", 'regeneration_geneClusters.rds'))
+  geneClusters$gene = rownames(geneClusters)
+  geneClusters$geneID = sapply(rownames(geneClusters), function(x) {test = unlist(strsplit(as.character(x), '_')); return(test[length(test)])})
   
-  tss_list = readRDS(file = paste0(RdataDir, '/list_TSS_considered.rds'))
-  raw = raw[which(!is.na(match(rownames(raw), tss_list$geneID))), ]
+  mm = match(tss$geneID, geneClusters$geneID)
+  tss = data.frame(tss, geneClusters[mm, c(1:2, 26, 3:7)], stringsAsFactors = FALSE)
   
-  aa = c()
+  tss$groups[which(!is.na(tss$groups))] = 'reg_up'
+  tss$groups[which(tss$cluster == 'G1'|tss$cluster == 'G2'|tss$cluster == 'G3')] = 'reg_down'
   
-  for(n in 1:length(conds))
-  {
-    # n = 4
-    sels = c()
-    for(s in samples)
-    {
-      sels = c(sels, which(design$condition == paste0(conds[n], '_', s)))
-    }
+  # limb fibroblast expressing genes
+  expressed = readRDS(file = '../data/expressedGenes_list_limb_fibroblast_using_smartseq2.mature.regeneration_pooledscRNAseq.dev.rds')
+  tss$fibroblast.expressed = expressed$expressed[match(tss$geneID, expressed$geneID)]
+  
+  tss$groups[which(is.na(tss$groups) & tss$fibroblast.expressed == '1')] = 'expressed.stable'
+  
+  # house keeping and other non-expressing genes
+  load(file =  paste0(annotDir, 'axolotl_housekeepingGenes_controls.other.tissues.liver.islet.testis_expressedIn21tissues.Rdata'))
+  hkgs = controls.tissue$geneIDs[which(controls.tissue$tissues == 'housekeeping')]
+  nonexp = controls.tissue$geneIDs[which(controls.tissue$tissues != 'housekeeping')]
+  
+  mm = match(tss$geneID, hkgs)
+  tss$groups[which(tss$groups == 'expressed.stable' & !is.na(mm))] = 'house_keep'
+  
+  mm = match(tss$geneID, nonexp)
+  tss$groups[which(is.na(tss$groups) & !is.na(mm))] = 'non_expr'
+  
+  # random select 1000 non-expressed genes
+  jj = which(is.na(tss$groups))
+  jj = sample(jj, size = 2000, replace = FALSE)
+  tss$groups[jj] = 'non_expr'
+  
+  tss = tss[which(!is.na(tss$groups)), ]
+  
+  save(tss, design, file = paste0(RdataDir, '/tss_perGene_atac_histM_sample_design_regeneration_counts_expressedGenes_controls.Rdata'))
+  
+  #saveRDS(cpm, file = paste0(RdataDir,  '/atac_histoneMarkers_normSignals_axolotlAllTSS.2kb_TSS_genelevel_beforeBatchCorrection.rds'))
+  #save(tss, design, 
+  #     file = paste0(RdataDir,  '/atac_histoneMarkers_normSignals_axolotlAllTSS.2kb_TSS_genelevel_beforeBatchCorrection.Rdata'))
+  
+  ##########################################
+  # compare the tss and histM 
+  ##########################################
+  Check.overlaps.between.tss.with.histM = FALSE
+  if(Check.overlaps.between.tss.with.histM){
+    load(file = paste0(RdataDir, '/tss_perGene_atac_histM_sample_design_regeneration_counts_expressedGenes_controls.Rdata'))
     
-    cat(n, ' --', conds[n], '--', samples, '--', length(sels), 'samples\n')
+    tp = data.frame(t(sapply(tss$coords, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+    tp$strand = '*'
+    tp = makeGRangesFromDataFrame(tp, seqnames.field=c("X1"),
+                                  start.field="X2", end.field="X3", strand.field="strand")
     
-    counts = raw[, sels]
-    design.sel = design[sels, ]
+    load(file = paste0('../results/CT_merged_20220328/Rdata', 
+                       '/histoneMarkers_samplesDesign_ddsPeaksMatrix_filtered_incl.atacPeak140k.missedTSS.bgs_345k.Rdata'))
     
-    #ss = apply(counts, 1, sum)
-    #ii_missed = which(ss<10)
+    peakNames = rownames(dds)
+    peakNames = gsub('tss.', '', peakNames)
+    pp = data.frame(t(sapply(peakNames, function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
     
-    # normalization
-    d <- DGEList(counts=counts, group=design.sel$condition)
+    pp$strand = '*'
+    pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                  start.field="X2", end.field="X3", strand.field="strand")
     
-    if(conds[n] == 'H3K27ac' | conds[n] == 'IgG'){
-      tmm <- calcNormFactors(d, method='TMMwsp') # TMMwsp used for H3K27ac
-    }else{
-      tmm <- calcNormFactors(d, method='TMM')
-    }
+    mapping = findOverlaps(tp, pp, ignore.strand=TRUE,  minoverlap=100L)
+    jj = (unique(mapping@from))
+    missed = setdiff(c(1:nrow(tss)), jj)
     
-    tmm = cpm(tmm, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 0.5)
-    
-    ## batch correction
-    #design.sel$condition = droplevels(design.sel$condition)
-    #design.sel$batch = droplevels(design.sel$batch)
-    bc = as.factor(design.sel$batch)
-    mod = model.matrix(~ as.factor(condition), data = design.sel)
-    
-    make.pca.plots(tmm, ntop = 3000, conds.sel = as.character(unique(design.sel$condition)))
-    ggsave(paste0(resDir, "/", conds[n], "_beforeBatchCorrect_",  version.analysis, ".pdf"), width = 16, height = 14)
-    
-    #tmm = as.matrix(tmm)
-    #vars = apply(tmm, 1, var)
-    #tmm = tmm[which(vars>0.5), ]
-    # if specify ref.batch, the parameters will be estimated from the ref, inapprioate here, 
-    # because there is no better batche other others 
-    #ref.batch = '2021S'# 2021S as reference is better for some reasons (NOT USED here)
-    
-    fpm.bc = ComBat(dat=as.matrix(tmm), batch=bc, mod=mod, par.prior=TRUE, ref.batch = NULL) 
-    
-    make.pca.plots(fpm.bc, ntop = 3000, conds.sel = as.character(unique(design.sel$condition)))
-    ggsave(paste0(resDir, "/", conds[n], "_afterBatchCorrect_",  version.analysis, ".pdf"), width = 10, height = 6)
-    
-    aa = cbind(aa, fpm.bc)
-    
-    rm(fpm.bc)
-    
-    #saveRDS(fpm, file = paste0(RdataDir, '/fpm_bc_TMM_combat_', conds[n], '_', version.analysis, '.rds'))
-    #saveRDS(design.sel, file = paste0(RdataDir, '/design.sels_bc_TMM_combat_', conds[n], '_', version.analysis, '.rds'))
-    
+    ## we won't touch it, because most of tss were already there
   }
   
-  aa = data.frame(aa, raw$transcript, stringsAsFactors = FALSE)
+  Check.overlaps.between.tss.with.atacseq = FALSE
+  if(Check.overlaps.between.tss.with.atacseq){
+    load(file = paste0(RdataDir, '/tss_perGene_atac_histM_sample_design_regeneration_counts_expressedGenes_controls.Rdata'))
+    
+    tp = data.frame(t(sapply(tss$coords, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+    tp$strand = '*'
+    tp = makeGRangesFromDataFrame(tp, seqnames.field=c("X1"),
+                                  start.field="X2", end.field="X3", strand.field="strand")
+    
+    load(file = paste0(RdataDir, '/regeneration_samples_beforeBatchCorrection.Rdata'))
+    
+    pp = data.frame(t(sapply(rownames(ddx), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+    pp$strand = '*'
+    pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                  start.field="X2", end.field="X3", strand.field="strand")
+    
+    
+    mapping = findOverlaps(tp, pp, ignore.strand=TRUE,  minoverlap=100L)
+    jj = (unique(mapping@from))
+    missed = setdiff(c(1:nrow(tss)), jj)
+    
+    ## add missing tss to regeneration atac data
+    
+      
+  }
   
-  ## sample means regardless of batches
-  #source('Functions_histM.R')
-  #cpmm = cal_sample_means(cpm, conds = unique(design$condition))
-  saveRDS(aa, file = paste0(RdataDir,  '/atac_histoneMarkers_normSignals_axolotlAllTSS.2kb_TSS_genelevel_batchCorrected.rds'))
-  
+  ##########################################
+  # batch correction separately for TSS
+  ##########################################
+  Batch.correction.TSS = FALSE
+  if(Batch.correction.TSS){
+    require(edgeR)
+    require(sva)
+    source('Functions_atac.R')
+    
+    load(file = paste0(RdataDir,  '/atac_histoneMarkers_normSignals_axolotlAllTSS.2kb_TSS_genelevel_beforeBatchCorrection.Rdata'))
+    raw = data.frame(raw[,-1], transcript = raw[, 1], stringsAsFactors = FALSE)
+    
+    conds = c('atac','H3K4me3', 'H3K4me1', 'H3K27me3', 'H3K27ac')
+    samples = c('mUA', 'BL5days', 'BL9days', 'BL13days.prox', 'BL13days.dist')
+    
+    
+    tss_list = readRDS(file = paste0(RdataDir, '/list_TSS_considered.rds'))
+    raw = raw[which(!is.na(match(rownames(raw), tss_list$geneID))), ]
+    
+    aa = c()
+    
+    for(n in 1:length(conds))
+    {
+      # n = 4
+      sels = c()
+      for(s in samples)
+      {
+        sels = c(sels, which(design$condition == paste0(conds[n], '_', s)))
+      }
+      
+      cat(n, ' --', conds[n], '--', samples, '--', length(sels), 'samples\n')
+      
+      counts = raw[, sels]
+      design.sel = design[sels, ]
+      
+      #ss = apply(counts, 1, sum)
+      #ii_missed = which(ss<10)
+      
+      # normalization
+      d <- DGEList(counts=counts, group=design.sel$condition)
+      
+      if(conds[n] == 'H3K27ac' | conds[n] == 'IgG'){
+        tmm <- calcNormFactors(d, method='TMMwsp') # TMMwsp used for H3K27ac
+      }else{
+        tmm <- calcNormFactors(d, method='TMM')
+      }
+      
+      tmm = cpm(tmm, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 0.5)
+      
+      ## batch correction
+      #design.sel$condition = droplevels(design.sel$condition)
+      #design.sel$batch = droplevels(design.sel$batch)
+      bc = as.factor(design.sel$batch)
+      mod = model.matrix(~ as.factor(condition), data = design.sel)
+      
+      make.pca.plots(tmm, ntop = 3000, conds.sel = as.character(unique(design.sel$condition)))
+      ggsave(paste0(resDir, "/", conds[n], "_beforeBatchCorrect_",  version.analysis, ".pdf"), width = 16, height = 14)
+      
+      #tmm = as.matrix(tmm)
+      #vars = apply(tmm, 1, var)
+      #tmm = tmm[which(vars>0.5), ]
+      # if specify ref.batch, the parameters will be estimated from the ref, inapprioate here, 
+      # because there is no better batche other others 
+      #ref.batch = '2021S'# 2021S as reference is better for some reasons (NOT USED here)
+      
+      fpm.bc = ComBat(dat=as.matrix(tmm), batch=bc, mod=mod, par.prior=TRUE, ref.batch = NULL) 
+      
+      make.pca.plots(fpm.bc, ntop = 3000, conds.sel = as.character(unique(design.sel$condition)))
+      ggsave(paste0(resDir, "/", conds[n], "_afterBatchCorrect_",  version.analysis, ".pdf"), width = 10, height = 6)
+      
+      aa = cbind(aa, fpm.bc)
+      
+      rm(fpm.bc)
+      
+      #saveRDS(fpm, file = paste0(RdataDir, '/fpm_bc_TMM_combat_', conds[n], '_', version.analysis, '.rds'))
+      #saveRDS(design.sel, file = paste0(RdataDir, '/design.sels_bc_TMM_combat_', conds[n], '_', version.analysis, '.rds'))
+      
+    }
+    
+    aa = data.frame(aa, raw$transcript, stringsAsFactors = FALSE)
+    
+    ## sample means regardless of batches
+    #source('Functions_histM.R')
+    #cpmm = cal_sample_means(cpm, conds = unique(design$condition))
+    saveRDS(aa, file = paste0(RdataDir,  '/atac_histoneMarkers_normSignals_axolotlAllTSS.2kb_TSS_genelevel_batchCorrected.rds'))
+  }
   
 }
+
+##########################################
+# finally realize that it is better to do batch correction altogether for each chromatin features
+# instead of doing it for tss and enhancer
+# so we are going to do:
+# add missing tss of interest by checking if all tss to considered are already included in the 
+# atac and all 4 histone markers
+##########################################
+
+
+
+
 
 ########################################################
 ########################################################
