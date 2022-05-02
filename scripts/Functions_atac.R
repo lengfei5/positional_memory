@@ -4544,3 +4544,138 @@ Assembly_histMarkers_togetherWith_ATACseq = function()
   }
   
 }
+
+##########################################
+# test the comparisons of histmarker across group which are redefined RNA-seq data 
+##########################################
+Redefine.gene.groups.with.RNAseq = function()
+{
+  table(res$groups)
+  kk = which(res$groups == 'limb')
+  
+  ss = apply(res[kk, grep('expr', colnames(res))], 1, max)
+  
+  select = kk[which(ss< -1 | is.na(ss))]
+  res$groups[select] = 'lowlyExpr_limb'
+  table(res$groups)
+  
+  res[,c(1, 4, 7:ncol(res))] %>% 
+    pivot_longer(cols = c('UA_K4me3', 'UA_K27me3'), names_to = 'markers') %>%
+    ggplot(aes(x = factor(groups, levels = c('other_tissues', 'lowlyExpr_limb',
+                                             'house_keep', 'limb')), y=value, fill=markers)) + 
+    geom_boxplot(outlier.alpha = 0.1) + 
+    #geom_jitter(width = 0.1)+
+    #geom_violin(width = 1.2) +
+    theme_classic() +
+    theme(axis.text.x = element_text(angle = 0, size = 14)) +
+    labs(x = "", y= 'normalized data (log2)')
+  
+  #jj = which(res$x1>4 & res$x2 >4)
+  #xx = res[jj, ]
+  
+  kk = which(res$groups == 'limb')
+  
+  diffs = res$expr.BLday5[kk] - res$expr.mUA[kk]
+  select = kk[which(res$expr.mUA[kk] < 0 & diffs >2)]
+  
+  res$groups[select] = 'upregulated.d5'
+  table(res$groups)
+  
+  select = kk[which(res$expr.mUA[kk] > 0 & (res$expr.mUA[kk] - res$expr.BLday5[kk]) >2)]
+  res$groups[select] = 'downregulated.d5'
+  
+  res[,c(1, 4, 7:ncol(res))] %>% 
+    pivot_longer(cols = c('UA_K4me3', 'UA_K27me3'), names_to = 'markers') %>%
+    ggplot(aes(x = factor(groups, levels = c('other_tissues', 'lowlyExpr_limb',
+                                             'house_keep', 'upregulated.d5', 'downregulated.d5', 'limb')), y=value, fill=markers)) + 
+    geom_boxplot(outlier.alpha = 0.1) + 
+    #geom_jitter(width = 0.1)+
+    #geom_violin(width = 1.2) +
+    theme_classic() +
+    theme(axis.text.x = element_text(angle = 0, size = 14)) +
+    labs(x = "", y= 'normalized data (log2)')
+  
+  
+  kk = which(res$groups == 'limb')
+  
+  select = kk[which(res$expr.mUA[kk] < 0 & (res$expr.BLday5[kk] - res$expr.mUA[kk]) < 2 &  (res$expr.BLday9[kk] - res$expr.mUA[kk]) > 2)]
+  res$groups[select] = 'upregulated.d9'
+  
+  select = kk[which(res$expr.mUA[kk] > 0 & (res$expr.mUA[kk] - res$expr.BLday5[kk]) < 2 & (res$expr.mUA[kk] - res$expr.BLday9[kk]) >2)]
+  res$groups[select] = 'downregulated.d9'
+  
+  
+  kk = which(res$groups == 'limb')
+  
+  select = kk[which(res$expr.mUA[kk] < 0 & (res$expr.BLday5[kk] - res$expr.mUA[kk]) < 2 &  (res$expr.BLday9[kk] - res$expr.mUA[kk]) < 2 &
+                      (res$expr.BLday13[kk] - res$expr.mUA[kk]) >2)]
+  res$groups[select] = 'upregulated.d13'
+  
+  select = kk[which(res$expr.mUA[kk] > 0 & (res$expr.mUA[kk] - res$expr.BLday5[kk]) < 2 & (res$expr.mUA[kk] - res$expr.BLday9[kk]) < 2 &
+                      (res$expr.mUA[kk] - res$expr.BLday9[kk]) > 2) ]
+  res$groups[select] = 'downregulated.d13'
+  
+  
+  
+  
+  table(res$groups)
+  
+  res[,c(1, 4, 7:ncol(res))] %>% 
+    pivot_longer(cols = c('UA_K4me3', 'UA_K27me3'), names_to = 'markers') %>%
+    ggplot(aes(x = factor(groups, levels = c('other_tissues', 'lowlyExpr_limb',
+                                             'house_keep', 
+                                             'upregulated.d5', 'upregulated.d9','upregulated.d13', 
+                                             'downregulated.d5',  'downregulated.d9',
+                                             'downregulated.d13',
+                                             'limb')), y=value, fill=markers)) + 
+    geom_boxplot(outlier.alpha = 0.1) + 
+    #geom_jitter(width = 0.1)+
+    #geom_violin(width = 1.2) +
+    theme_classic() +
+    theme(axis.text.x = element_text(angle = 90, size = 14)) +
+    labs(x = "", y= 'normalized data (log2)')
+  
+  
+  ggsave(paste0(figureDir, "histMarker_H3K27me3_H3K4me3_up.downregulatedGenes.UA.BL.days.pdf"), width=12, height = 8)
+  
+  fdr.cutoff = 0.05
+  select = which(aa$padj < fdr.cutoff & aa$log2FC >1 & aa$log2FC.mUA.vs.others >0)
+  res$groups[!is.na(match(res$geneID, aa$geneID[select]))] = 'mature_highlyExp'
+  table(res$groups)
+  
+  select = which(aa$padj < fdr.cutoff & aa$log2FC >1 & aa$log2FC.mUA.vs.others < 0)
+  res$groups[!is.na(match(res$geneID, aa$geneID[select]))] = 'regeneration'
+  table(res$groups)
+  
+  select = which((aa$padj >= fdr.cutoff | aa$log2FC <=1) & log2(aa$baseMean) <4) 
+  res$groups[!is.na(match(res$geneID, aa$geneID[select])) & res$groups == 'limb_static'] = 'limb_lowlyExp'
+  
+  
+  ggplot(data=res, aes(x=x1, y=x2, label = gene, color = groups)) +
+    geom_point(size = 0.4) + 
+    theme(axis.text.x = element_text(size = 12), 
+          axis.text.y = element_text(size = 12)) +
+    geom_text_repel(data= res[examples.sel, ], size = 3.0, color = 'blue') +
+    #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
+    #scale_color_manual(values=c("blue", "black", "red")) +
+    geom_vline(xintercept=4, col='darkgray') +
+    geom_hline(yintercept=4, col="darkgray") +
+    labs(x = "UA_H3K4me3", y= 'UA_H3K27me3')
+  
+  
+  #xx = melt(res[], id.vars = c('UA_K4me3', 'UA_K27me3'), variable_name = 'markers')
+  res[,c(1, 4, 7:13)] %>% 
+    pivot_longer(cols = c('UA_K4me3', 'UA_K27me3'), names_to = 'markers') %>%
+    ggplot(aes(x = factor(groups, levels = c('other_tissues', 'house_keep', 'limb_lowlyExp',
+                                             'mature_highlyExp', 'regeneration', 'limb_static')), y=value, fill=markers)) + 
+    geom_boxplot(outlier.alpha = 0.1) + 
+    #geom_jitter(width = 0.1)+
+    #geom_violin(width = 1.2) +
+    theme_classic() +
+    theme(axis.text.x = element_text(angle = 0, size = 14)) +
+    labs(x = "", y= 'normalized data (log2)')
+  
+  
+  
+}
+

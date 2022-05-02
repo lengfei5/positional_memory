@@ -948,7 +948,7 @@ res$groups[which(is.na(res$groups) & !is.na(mm))] = 'non_expr'
 
 # random select 1000 non-expressed genes
 jj = which(is.na(res$groups))
-jj = sample(jj, size = 1000, replace = FALSE)
+jj = sample(jj, size = 3000, replace = FALSE)
 res$groups[jj] = 'non_expr'
 
 res = res[which(!is.na(res$groups)), ]
@@ -962,22 +962,39 @@ library(tibble)
 library("cowplot")
 require(gridExtra)
 library(tidyr)
+require(patchwork)
 
-require(ggr)
 dev.example = c('HOXA13', 'HOXA11', 'HOXA9', 'HOXD13','HOXD11', 'HOXD9',
                 'SHH', 'FGF8', 'FGF10', 'HAND2', 'BMP4', 'ALX1',
                 'ALX4', 'PRRX1', 'GREM1', 'LHX2', 'LHX9', 
                 'TBX2', 'TBX4', 'TBX5', 'LMX1', 'MEIS1', 'MEIS2', 'SALL4', 'IRX3', 'IRX5')
-examples.sel = unique(grep(paste0(dev.example, collapse = '|') ,res$gene))
+mature.example = c('PTX3', 'IGFBP3',  'TNMD', 'TWIST2', 'COL3A1', 'CCNB1', 'NREP', 
+                   'DPT', 'COL8A2', 'PTGDS', 'RARRES1', 'COL4A2', 'KLF5', 'F13A1', 'PRDX2')
 
-ggplot(data=res, aes(x=H3K4me3_mUA, y=H3K27me3_mUA, label = gene, color = groups)) +
-  geom_point(size = 0.2) + 
+tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
+tfs = unique(tfs$`HGNC symbol`)
+tfs = setdiff(tfs, dev.example)
+examples.sel = unique(grep(paste0(dev.example, collapse = '|'), res$gene))
+matures.sel = unique(grep(paste0(mature.example, collapse = '|'), res$gene))
+
+jj = which(res$H3K4me3_mUA>1 & res$H3K27me3_mUA >0)
+length(jj)
+tfs.sel = unique(grep(paste0(tfs, collapse = '|'), res$gene))
+tfs.sel = tfs.sel[!is.na(match(tfs.sel, jj))]
+
+
+ggplot(data=res, aes(x=H3K4me3_mUA, y=H3K27me3_mUA, label = gene)) +
+  geom_point(size = 0.1, color = 'darkgray') + 
   theme(axis.text.x = element_text(size = 12), 
         axis.text.y = element_text(size = 12)) +
-  scale_color_manual(values=c('black', "orange", 'darkgray',  "red",   'green')) + 
-  geom_point(data=res[res$groups == 'reg_up', ], aes(x=H3K4me3_mUA, y=H3K27me3_mUA),  size=1) +
-  geom_point(data=res[res$groups == 'reg_down', ], aes(x=H3K4me3_mUA, y=H3K27me3_mUA),  size=1) +
-  geom_text_repel(data= res[examples.sel, ], size = 3.0, color = 'blue') +
+  #scale_color_manual(values=c('black', "orange", 'darkgray',  "red",   'green')) + 
+  #geom_point(data=res[res$groups == 'reg_up', ], aes(x=H3K4me3_mUA, y=H3K27me3_mUA),  size=0.7) +
+  #geom_point(data=res[res$groups == 'reg_down', ], aes(x=H3K4me3_mUA, y=H3K27me3_mUA),  size=0.7) +
+  geom_point(data=res[examples.sel, ], aes(x=H3K4me3_mUA, y=H3K27me3_mUA),  size=1.5, color = 'blue') +
+  geom_text_repel(data= res[examples.sel, ], size = 4.0, color = 'blue') +
+  geom_point(data=res[matures.sel, ], aes(x=H3K4me3_mUA, y=H3K27me3_mUA),  size=1.5, color = 'darkred') +
+  geom_text_repel(data= res[matures.sel, ], size = 4.0, color = 'darkred') +
+  
   #geom_text_repel(data= fpm[examples.sel, ], size = 4.0, color = 'darkblue') + 
   #geom_hline(yintercept=2.0, colour = "darkgray") + 
   #geom_vline(xintercept = 2.0, colour = "darkgray")
@@ -990,16 +1007,169 @@ ggplot(data=res, aes(x=H3K4me3_mUA, y=H3K27me3_mUA, label = gene, color = groups
         #legend.key.size = unit(1, 'cm')
         #legend.key.width= unit(1, 'cm')
   ) + 
-  geom_vline(xintercept=1, col='darkgray') +
-  geom_hline(yintercept=1, col="darkgray") +
+  geom_vline(xintercept=1, col='orange') +
+  geom_hline(yintercept=0, col="orange") +
   labs(x = "UA_H3K4me3", y= 'UA_H3K27me3') +
   guides(colour = guide_legend(override.aes = list(size=2)))
-  
-  #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
-  #scale_color_manual(values=c("blue", "black", "red")) +
 
-res[,c(7,8, 28,29)] %>% 
-  pivot_longer(cols = c('H3K4me3_mUA', 'H3K27me3_mUA'), names_to = 'markers') %>%
+ggsave(paste0(figureDir, "Bivalent_TSS_mUA_scatterplot.pdf"),  width = 8, height = 6)
+
+##########################################
+# check the gene expression of those bivalent promoters 
+##########################################
+rna = readRDS(file = paste0('../results/RNAseq_data_used/Rdata/',
+                            'smartseq2_R10724_R11635_cpm.batchCorrect_DESeq2.test.withbatch.log2FC.shrinked_RNAseq_data_used_20220408.rds'))
+rna = rna[, grep('Mature_UA', colnames(rna))]
+rna = data.frame(rna, mUA.mean = apply(rna, 1, median))
+rna$gene = rownames(rna)
+rna$geneID = get_geneID(rna$gene)
+
+cutoff_active = 1
+cutoff_repress = 0
+jj = which(res$H3K4me3_mUA > cutoff_active & res$H3K27me3_mUA > cutoff_repress)
+length(jj)
+
+jj1 = which(res$H3K4me3_mUA > cutoff_active & res$H3K27me3_mUA <= cutoff_repress)
+jj2 = which(res$H3K4me3_mUA < cutoff_active & res$H3K27me3_mUA > cutoff_repress)
+
+
+rna$groups = 'others'
+rna$groups[!is.na(match(rna$geneID, res$geneID[jj]))] = 'bivalent'
+rna$groups[!is.na(match(rna$geneID, res$geneID[jj1]))] = 'active'
+rna$groups[!is.na(match(rna$geneID, res$geneID[jj2]))] = 'rest'
+
+ggplot(data = rna, aes(x = groups, y=mUA.mean, fill=groups)) + 
+  geom_boxplot(outlier.alpha = 0.1) + 
+  #geom_jitter(width = 0.1)+
+  #geom_violin(width = 0.8) +
+  #scale_fill_discrete(values=c('green', "blue", 'red',  'black')) + 
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 0, size = 14), 
+        legend.text = element_text(size=12),
+        legend.title = element_text(size = 14),
+        legend.position=c(0.9, 0.8)) +
+  labs(x = "", y= 'normalized gene expression (log2 cpm)')
+
+ggsave(paste0(figureDir, "Bivalent_TSS_mUA_geneExpression.pdf"),  width = 8, height = 6)
+
+##########################################
+# test other markers
+##########################################
+res$x = res$H3K27me3_mUA
+res$y = res$H3K4me1_mUA
+ggplot(data=res, aes(x=x, y=y, label = gene)) +
+  geom_point(size = 0.1, color = 'darkgray') + 
+  theme(axis.text.x = element_text(size = 12), 
+        axis.text.y = element_text(size = 12)) +
+  #scale_color_manual(values=c('black', "orange", 'darkgray',  "red",   'green')) + 
+  #geom_point(data=res[res$groups == 'reg_up', ], aes(x=H3K4me3_mUA, y=H3K27me3_mUA),  size=0.7) +
+  #geom_point(data=res[res$groups == 'reg_down', ], aes(x=H3K4me3_mUA, y=H3K27me3_mUA),  size=0.7) +
+  geom_point(data=res[examples.sel, ], aes(x=x, y=y),  size=1.5, color = 'blue') +
+  geom_text_repel(data= res[examples.sel, ], size = 4.0, color = 'blue') +
+  geom_point(data=res[matures.sel, ], aes(x=x, y=y),  size=1.5, color = 'darkred') +
+  geom_text_repel(data= res[matures.sel, ], size = 4.0, color = 'darkred') +
+  
+  #geom_text_repel(data= fpm[examples.sel, ], size = 4.0, color = 'darkblue') + 
+  #geom_hline(yintercept=2.0, colour = "darkgray") + 
+  #geom_vline(xintercept = 2.0, colour = "darkgray")
+  #geom_abline(slope = 1,  intercept = 0, colour = 'cyan3') +
+  theme_classic() +
+  theme(legend.text = element_text(size=12),
+        legend.title = element_text(size = 14),
+        legend.position=c(0.1, 0.8),
+        plot.margin = margin()
+        #legend.key.size = unit(1, 'cm')
+        #legend.key.width= unit(1, 'cm')
+  ) + 
+  geom_vline(xintercept=1, col='orange') +
+  geom_hline(yintercept=0, col="orange") +
+  labs(x = "UA_H3K27me3", y= 'UA_H3K4me1') +
+  guides(colour = guide_legend(override.aes = list(size=2)))
+
+
+##########################################
+# go term enrichment for bivalent promoters 
+##########################################
+library(enrichplot)
+library(clusterProfiler)
+library(openxlsx)
+library(ggplot2)
+library(stringr)
+library(org.Hs.eg.db)
+library(org.Mm.eg.db)
+
+firstup <- function(x) {
+  substr(x, 1, 1) <- toupper(substr(x, 1, 1))
+  x
+}
+
+jj = which(res$H3K4me3_mUA>1 & res$H3K27me3_mUA >0)
+length(jj)
+
+# background
+gg.expressed = unique(res$gene[jj])
+gg.expressed = gg.expressed[which(gg.expressed != '' & gg.expressed != 'N/A' & !is.na(gg.expressed))]
+
+xx0 = res$gene
+xx0 = xx0[which(xx0 != '' & xx0 != 'N/A' & !is.na(xx0))]
+bgs = unique(xx0)
+
+gg.expressed = firstup(tolower(gg.expressed))
+bgs = firstup(tolower(bgs))
+#bgs0 = firstup(tolower(bgs0))
+
+gene.df <- bitr(gg.expressed, fromType = "SYMBOL",
+                toType = c("ENSEMBL", "ENTREZID"),
+                OrgDb = org.Mm.eg.db)
+head(gene.df)
+
+bgs.df <- bitr(bgs, fromType = "SYMBOL",
+               toType = c("ENSEMBL", "ENTREZID"),
+               OrgDb = org.Mm.eg.db)
+
+head(bgs.df)
+
+ego <-  enrichGO(gene         = gene.df$ENSEMBL,
+                 universe     = bgs.df$ENSEMBL,
+                 #OrgDb         = org.Hs.eg.db,
+                 OrgDb         = org.Mm.eg.db,
+                 keyType       = 'ENSEMBL',
+                 ont           = "MF",
+                 pAdjustMethod = "BH",
+                 pvalueCutoff  = 0.01,
+                 qvalueCutoff  = 0.05)
+
+barplot(ego, showCategory=20) + ggtitle("GO enrichment of bivalent TSS")
+
+#edox <- setReadable(ego, 'org.Mm.eg.db', 'ENSEMBL')
+pdfname = paste0(figureDir, 'GoEnrichment_bivalent_TSS_mUA.pdf')
+pdf(pdfname, width = 8, height = 6)
+par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+
+barplot(ego, showCategory=20) + ggtitle("bivalent_TSS_mUA")
+
+dev.off()
+
+
+##########################################
+# check the chromatin features for gene groups defined by RNA-seq data
+##########################################
+#geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
+#scale_color_manual(values=c("blue", "black", "red")) +
+
+p1 = res[,c(5, 6, 7,8,9, 28,29)] %>% 
+  pivot_longer(cols = c('atac_mUA', 'H3K4me3_mUA', 'H3K27me3_mUA','H3K4me1_mUA',  'H3K27ac_mUA'), names_to = 'markers') %>%
+  mutate(markers = factor(markers, levels = c('H3K27me3_mUA', 'H3K4me3_mUA', 'atac_mUA', 'H3K27ac_mUA', 'H3K4me1_mUA'))) %>%
+  ggplot(aes(x = groups, y=value, fill=markers)) + 
+  geom_boxplot(outlier.alpha = 0.1) + 
+  #geom_jitter(width = 0.1)+
+  #geom_violin(width = 0.8) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 0, size = 14)) +
+  labs(x = "", y= 'normalized data (log2)')
+  
+p2 = res[,c(19,20, 28,29)] %>% 
+  pivot_longer(cols = c('H3K4me3_BL13days.prox', 'H3K27me3_BL13days.prox'), names_to = 'markers') %>%
   ggplot(aes(x = groups, 
              y=value, fill=markers)) + 
   geom_boxplot(outlier.alpha = 0.1) + 
@@ -1008,7 +1178,10 @@ res[,c(7,8, 28,29)] %>%
   theme_classic() +
   theme(axis.text.x = element_text(angle = 0, size = 14)) +
   labs(x = "", y= 'normalized data (log2)')
-  
+
+
+
+
 # p2 = ggplot(data=res, aes(x=H3K4me1_mUA, y=H3K27me3_mUA, label = gene, color = groups)) +
 #   geom_point(size = 0.4) + 
 #   theme(axis.text.x = element_text(size = 12), 
@@ -1102,139 +1275,6 @@ ggplot(data=res, aes(x=expr.mUA, y=ratio, label = gene, color = groups)) +
 res[,c(1, 4, 7:ncol(res))] %>% 
   pivot_longer(cols = c('UA_K4me3', 'UA_K27me3'), names_to = 'markers') %>%
   ggplot(aes(x = factor(groups, levels = c('other_tissues', 'house_keep', 'limb')), y=value, fill=markers)) + 
-  geom_boxplot(outlier.alpha = 0.1) + 
-  #geom_jitter(width = 0.1)+
-  #geom_violin(width = 1.2) +
-  theme_classic() +
-  theme(axis.text.x = element_text(angle = 0, size = 14)) +
-  labs(x = "", y= 'normalized data (log2)')
-
-##########################################
-# redefine different groups with RNA-seq data 
-##########################################
-Redefine.gene.groups.with.RNAseq = TRUE
-if(Redefine.gene.groups.with.RNAseq){
-  
-  table(res$groups)
-  kk = which(res$groups == 'limb')
-  
-  ss = apply(res[kk, grep('expr', colnames(res))], 1, max)
-  
-  select = kk[which(ss< -1 | is.na(ss))]
-  res$groups[select] = 'lowlyExpr_limb'
-  table(res$groups)
-  
-  res[,c(1, 4, 7:ncol(res))] %>% 
-    pivot_longer(cols = c('UA_K4me3', 'UA_K27me3'), names_to = 'markers') %>%
-    ggplot(aes(x = factor(groups, levels = c('other_tissues', 'lowlyExpr_limb',
-                                             'house_keep', 'limb')), y=value, fill=markers)) + 
-    geom_boxplot(outlier.alpha = 0.1) + 
-    #geom_jitter(width = 0.1)+
-    #geom_violin(width = 1.2) +
-    theme_classic() +
-    theme(axis.text.x = element_text(angle = 0, size = 14)) +
-    labs(x = "", y= 'normalized data (log2)')
-  
-  #jj = which(res$x1>4 & res$x2 >4)
-  #xx = res[jj, ]
-  
-  kk = which(res$groups == 'limb')
-  
-  diffs = res$expr.BLday5[kk] - res$expr.mUA[kk]
-  select = kk[which(res$expr.mUA[kk] < 0 & diffs >2)]
-  
-  res$groups[select] = 'upregulated.d5'
-  table(res$groups)
-  
-  select = kk[which(res$expr.mUA[kk] > 0 & (res$expr.mUA[kk] - res$expr.BLday5[kk]) >2)]
-  res$groups[select] = 'downregulated.d5'
-  
-  res[,c(1, 4, 7:ncol(res))] %>% 
-    pivot_longer(cols = c('UA_K4me3', 'UA_K27me3'), names_to = 'markers') %>%
-    ggplot(aes(x = factor(groups, levels = c('other_tissues', 'lowlyExpr_limb',
-                                             'house_keep', 'upregulated.d5', 'downregulated.d5', 'limb')), y=value, fill=markers)) + 
-    geom_boxplot(outlier.alpha = 0.1) + 
-    #geom_jitter(width = 0.1)+
-    #geom_violin(width = 1.2) +
-    theme_classic() +
-    theme(axis.text.x = element_text(angle = 0, size = 14)) +
-    labs(x = "", y= 'normalized data (log2)')
-  
-  
-  kk = which(res$groups == 'limb')
-  
-  select = kk[which(res$expr.mUA[kk] < 0 & (res$expr.BLday5[kk] - res$expr.mUA[kk]) < 2 &  (res$expr.BLday9[kk] - res$expr.mUA[kk]) > 2)]
-  res$groups[select] = 'upregulated.d9'
-  
-  select = kk[which(res$expr.mUA[kk] > 0 & (res$expr.mUA[kk] - res$expr.BLday5[kk]) < 2 & (res$expr.mUA[kk] - res$expr.BLday9[kk]) >2)]
-  res$groups[select] = 'downregulated.d9'
-  
-  
-  kk = which(res$groups == 'limb')
-  
-  select = kk[which(res$expr.mUA[kk] < 0 & (res$expr.BLday5[kk] - res$expr.mUA[kk]) < 2 &  (res$expr.BLday9[kk] - res$expr.mUA[kk]) < 2 &
-                      (res$expr.BLday13[kk] - res$expr.mUA[kk]) >2)]
-  res$groups[select] = 'upregulated.d13'
-  
-  select = kk[which(res$expr.mUA[kk] > 0 & (res$expr.mUA[kk] - res$expr.BLday5[kk]) < 2 & (res$expr.mUA[kk] - res$expr.BLday9[kk]) < 2 &
-                      (res$expr.mUA[kk] - res$expr.BLday9[kk]) > 2) ]
-  res$groups[select] = 'downregulated.d13'
-  
-  
-  
-  
-  table(res$groups)
-  
-  res[,c(1, 4, 7:ncol(res))] %>% 
-    pivot_longer(cols = c('UA_K4me3', 'UA_K27me3'), names_to = 'markers') %>%
-    ggplot(aes(x = factor(groups, levels = c('other_tissues', 'lowlyExpr_limb',
-                                             'house_keep', 
-                                             'upregulated.d5', 'upregulated.d9','upregulated.d13', 
-                                             'downregulated.d5',  'downregulated.d9',
-                                             'downregulated.d13',
-                                             'limb')), y=value, fill=markers)) + 
-    geom_boxplot(outlier.alpha = 0.1) + 
-    #geom_jitter(width = 0.1)+
-    #geom_violin(width = 1.2) +
-    theme_classic() +
-    theme(axis.text.x = element_text(angle = 90, size = 14)) +
-    labs(x = "", y= 'normalized data (log2)')
-  
-  
-  ggsave(paste0(figureDir, "histMarker_H3K27me3_H3K4me3_up.downregulatedGenes.UA.BL.days.pdf"), width=12, height = 8)
-  
-  fdr.cutoff = 0.05
-  select = which(aa$padj < fdr.cutoff & aa$log2FC >1 & aa$log2FC.mUA.vs.others >0)
-  res$groups[!is.na(match(res$geneID, aa$geneID[select]))] = 'mature_highlyExp'
-  table(res$groups)
-  
-  select = which(aa$padj < fdr.cutoff & aa$log2FC >1 & aa$log2FC.mUA.vs.others < 0)
-  res$groups[!is.na(match(res$geneID, aa$geneID[select]))] = 'regeneration'
-  table(res$groups)
-  
-  select = which((aa$padj >= fdr.cutoff | aa$log2FC <=1) & log2(aa$baseMean) <4) 
-  res$groups[!is.na(match(res$geneID, aa$geneID[select])) & res$groups == 'limb_static'] = 'limb_lowlyExp'
-  
-  
-}
-
-ggplot(data=res, aes(x=x1, y=x2, label = gene, color = groups)) +
-  geom_point(size = 0.4) + 
-  theme(axis.text.x = element_text(size = 12), 
-        axis.text.y = element_text(size = 12)) +
-  geom_text_repel(data= res[examples.sel, ], size = 3.0, color = 'blue') +
-  #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
-  #scale_color_manual(values=c("blue", "black", "red")) +
-  geom_vline(xintercept=4, col='darkgray') +
-  geom_hline(yintercept=4, col="darkgray") +
-  labs(x = "UA_H3K4me3", y= 'UA_H3K27me3')
-
-
-#xx = melt(res[], id.vars = c('UA_K4me3', 'UA_K27me3'), variable_name = 'markers')
-res[,c(1, 4, 7:13)] %>% 
-  pivot_longer(cols = c('UA_K4me3', 'UA_K27me3'), names_to = 'markers') %>%
-  ggplot(aes(x = factor(groups, levels = c('other_tissues', 'house_keep', 'limb_lowlyExp',
-                                           'mature_highlyExp', 'regeneration', 'limb_static')), y=value, fill=markers)) + 
   geom_boxplot(outlier.alpha = 0.1) + 
   #geom_jitter(width = 0.1)+
   #geom_violin(width = 1.2) +
