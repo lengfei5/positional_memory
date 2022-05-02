@@ -911,6 +911,8 @@ write.table(SAF, file = paste0('/Volumes/groups/tanaka/People/current/jiwang/pro
 
 
 ##########################################
+# the first analysis is start from the bivalent chromatin/promoters
+# 
 ## load processed tss atac and histMarker signals
 # Gene groups defined by regeneration RNAseq data, house keeping, 
 # limb fibrobalst expressing gene, non-expressing control genes
@@ -1207,80 +1209,8 @@ p2 = res[,c(19,20, 28,29)] %>%
 
 #p1 + p2
 
-#aa = readRDS(file =  "../results/rnaseq_Rxxxx.old_R10724_R161513_mergedTechRep/Rdata/TestStat_regeneration_RNAseq.rds") 
-aa[grep('DBP|SALL', rownames(aa)), grep('Mature_UA', colnames(aa))]
-
-aa$expr.mUA = apply(aa[, grep('Mature_UA', colnames(aa))], 1, mean)
-aa$expr.BLday5 = apply(aa[, grep('BL_UA_5days', colnames(aa))], 1, mean)
-aa$expr.BLday9 = apply(aa[, grep('BL_UA_9days', colnames(aa))], 1, mean)
-aa$expr.BLday13 = apply(aa[, grep('BL_UA_13days_proximal', colnames(aa))], 1, mean)
-aa$expr.BLday13.distal = apply(aa[, grep('BL_UA_13days_distal', colnames(aa))], 1, mean)
-aa = aa[, c(5:11, 23:29)]
-aa = aa[match(res$geneID, aa$geneID), ]
-res = data.frame(res, aa, stringsAsFactors = FALSE)
-
-res$x1 = res$UA_K4me3
-res$x2 = res$UA_K27me3
-res$ratio = res$x1 - res$x2
-
-examples.sel = c()
-examples.sel = unique(c(examples.sel, grep('HOXA13|HOXA11|HOXA9|HOXD13|HOXD11|HOXD9|MEIS|SALL|DBP', res$gene)))
 
 
-ggplot(data=res, aes(x=x1, y=x2, label = gene)) +
-  geom_point(size = 0.25) + 
-  theme(axis.text.x = element_text(size = 12), 
-        axis.text.y = element_text(size = 12)) +
-  geom_text_repel(data= res[examples.sel, ], size = 3.0, color = 'blue') +
-  #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
-  #scale_color_manual(values=c("blue", "black", "red")) +
-  geom_vline(xintercept=4, col='darkgray') +
-  geom_hline(yintercept=4, col="darkgray") +
-  labs(x = "UA_H3K4me3", y= 'UA_H3K27me3')
-
-
-ggplot(data=res, aes(x=ratio, y=expr, label = gene)) +
-  geom_point(size = 0.25) + 
-  theme(axis.text.x = element_text(size = 12), 
-        axis.text.y = element_text(size = 12)) +
-  geom_text_repel(data= res[examples.sel, ], size = 3.0, color = 'blue') +
-  #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
-  #scale_color_manual(values=c("blue", "black", "red")) +
-  geom_vline(xintercept=4, col='darkgray') +
-  geom_hline(yintercept=4, col="darkgray") +
-  labs(x = "UA_H3K4me3/UA_H3K27me3", y= 'Expr')
-
-load(file =  paste0(annotDir, 'axolotl_housekeepingGenes_controls.other.tissues.liver.islet.testis_expressedIn21tissues.Rdata'))
-hkgs = controls.tissue$geneIDs[which(controls.tissue$tissues == 'housekeeping')]
-nonexp = controls.tissue$geneIDs[which(controls.tissue$tissues != 'housekeeping')]
-
-res$groups = 'limb'
-res$groups[!is.na(match(res$geneID, hkgs))] = 'house_keep'
-res$groups[!is.na(match(res$geneID, nonexp))] = 'other_tissues'
-
-xx = res[order(-res$expr), ]
-head(xx[which(xx$groups != 'house_keep'), ])
-
-ggplot(data=res, aes(x=expr.mUA, y=ratio, label = gene, color = groups)) +
-  geom_point(size = 0.25) + 
-  theme(axis.text.x = element_text(size = 12), 
-        axis.text.y = element_text(size = 12)) +
-  geom_text_repel(data= res[examples.sel, ], size = 3.0, color = 'blue') +
-  #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
-  #scale_color_manual(values=c("blue", "black", "red")) +
-  geom_vline(xintercept=4, col='darkgray') +
-  geom_hline(yintercept=4, col="darkgray") +
-  labs(y = "UA_H3K4me3/UA_H3K27me3", x= 'Expr')
-
-res[,c(1, 4, 7:ncol(res))] %>% 
-  pivot_longer(cols = c('UA_K4me3', 'UA_K27me3'), names_to = 'markers') %>%
-  ggplot(aes(x = factor(groups, levels = c('other_tissues', 'house_keep', 'limb')), y=value, fill=markers)) + 
-  geom_boxplot(outlier.alpha = 0.1) + 
-  #geom_jitter(width = 0.1)+
-  #geom_violin(width = 1.2) +
-  theme_classic() +
-  theme(axis.text.x = element_text(angle = 0, size = 14)) +
-  labs(x = "", y= 'normalized data (log2)')
 
 
 ########################################################
