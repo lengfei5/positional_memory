@@ -4542,8 +4542,8 @@ Assembly_histMarkers_togetherWith_ATACseq = function()
              filename = paste0(figureDir, 'heatmap_regenerationPeaks_scaled.pdf'), 
              width = 6, height = 12)
   }
-  
 }
+
 
 ##########################################
 # test the comparisons of histmarker across group which are redefined RNA-seq data 
