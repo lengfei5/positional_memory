@@ -925,6 +925,7 @@ geneClusters = readRDS(file = paste0("../results/RNAseq_data_used/Rdata/", 'rege
 geneClusters$gene = rownames(geneClusters)
 geneClusters$geneID = sapply(rownames(geneClusters), function(x) {test = unlist(strsplit(as.character(x), '_')); return(test[length(test)])})
 
+
 mm = match(res$geneID, geneClusters$geneID)
 res = data.frame(res, geneClusters[mm, c(1:2, 26, 3:7)], stringsAsFactors = FALSE)
 
@@ -1170,6 +1171,10 @@ p1 = res[,c(5, 6, 7,8,9, 28,29)] %>%
   theme(axis.text.x = element_text(angle = 0, size = 14)) +
   labs(x = "", y= 'normalized data (log2)')
   
+p1 
+ggsave(paste0(figureDir, "all_TSS_mUA_chromatinFeatures.pdf"),  width = 8, height = 4)
+
+
 p2 = res[,c(19,20, 28,29)] %>% 
   pivot_longer(cols = c('H3K4me3_BL13days.prox', 'H3K27me3_BL13days.prox'), names_to = 'markers') %>%
   ggplot(aes(x = groups, 
@@ -1180,6 +1185,7 @@ p2 = res[,c(19,20, 28,29)] %>%
   theme_classic() +
   theme(axis.text.x = element_text(angle = 0, size = 14)) +
   labs(x = "", y= 'normalized data (log2)')
+
 
 
 
