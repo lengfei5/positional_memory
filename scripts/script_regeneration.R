@@ -925,7 +925,6 @@ geneClusters = readRDS(file = paste0("../results/RNAseq_data_used/Rdata/", 'rege
 geneClusters$gene = rownames(geneClusters)
 geneClusters$geneID = sapply(rownames(geneClusters), function(x) {test = unlist(strsplit(as.character(x), '_')); return(test[length(test)])})
 
-
 mm = match(res$geneID, geneClusters$geneID)
 res = data.frame(res, geneClusters[mm, c(1:2, 26, 3:7)], stringsAsFactors = FALSE)
 
@@ -955,6 +954,8 @@ jj = sample(jj, size = 3000, replace = FALSE)
 res$groups[jj] = 'non_expr'
 
 res = res[which(!is.na(res$groups)), ]
+
+# saveRDS(res, file = paste0(RdataDir, '/list_TSS_considered.rds'))
 
 source('Functions_histM.R')
 res$gene = get_geneName(res$gene)
