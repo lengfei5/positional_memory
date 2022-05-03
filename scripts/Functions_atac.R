@@ -4192,7 +4192,10 @@ Smartseq2.mature.vs.dev = function()
   
 }
 
-
+##########################################
+# segment-specific chromatin 
+# and subclustering atac-peak clusters
+##########################################
 aggregate_atacPeaks_histMpeaks = function()
 {
   ### collect the four markers with means 
@@ -4418,7 +4421,7 @@ aggregate_atacPeaks_histMpeaks = function()
 # the initial clusters were done based on the atac-seq peaks 
 # subclusters were done with histone makrers
 ##########################################
-Assembly_histMarkers_togetherWith_ATACseq = function()
+Assembly_histMarkers_togetherWith_ATACseq_regeneration = function()
 {
   library(gridExtra)
   library(grid)

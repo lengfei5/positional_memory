@@ -498,12 +498,9 @@ if(!Regeneration.peaks.clustering.DPGP)
    
   save(yy, plt, res, file = paste0(RdataDir, '/dynamic_ATACpeaks_regeneration_data.heatmap_DPGPclusters.Rdata'))
   
-  
 }
 
-
 ## save data for DPGP clustering
-## unfornately the result is that there are too many clusters
 Save.Matrix.for.DPGP = FALSE
 if(Save.Matrix.for.DPGP){
   
@@ -528,6 +525,119 @@ if(Save.Matrix.for.DPGP){
   write.table(yy, 
               file = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/DPGP_clustering/', 
                             'atac_peakSignals_all.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
+  
+}
+
+##########################################
+# characterize the histone markers dynamics around the dynamic atac-seq peaks 
+##########################################
+PLOT.global.dynamic.parameters.for.histM = FALSE
+if(PLOT.global.dynamic.parameters.for.histM){
+  library(gridExtra)
+  library(grid)
+  library(ggplot2)
+  library(lattice)
+  require(pheatmap)
+  require(RColorBrewer)
+  
+  # import atac-seq peak
+  # z-score of data and heatmap (variable: plt, yy and res)
+  # # saved variables: yy (data of atac-seq peaks), res (DE test result) and plt (saved the heatmap of dynamic atac-seq peaks)
+  load(file = paste0(RdataDir, '/dynamic_ATACpeaks_regeneration_data.heatmap_DPGPclusters.Rdata')) 
+  #design_atac = design
+  res_atac = res
+  yy_atac = yy
+  res_atac = res_atac[match(rownames(yy_atac), rownames(res_atac)), ]
+  
+  # import histone marker 
+  RdataHistM = '/Users/jiwang/workspace/imp/positional_memory/results/CT_merged_20220328/Rdata'
+  load(file = paste0(RdataHistM, '/combined_4histMarkers_overlapped55kATACseq_DE_regeneration_v2.Rdata')) # variable (keep and DE.locus)
+  design = readRDS(file = paste0(RdataHistM, '/histM_CT_design_info.rds'))
+  
+  yy = keep[, grep('^H3K4me3|^H3K27me3|^H3K4me1|^H3K27ac', colnames(keep))]
+  
+  sampleID = sapply(colnames(yy), function(x) unlist(strsplit(as.character(x), '_'))[3])
+  mm = match(sampleID, design$sampleID)
+  colnames(yy) = paste0(design$condition[mm], '_', design$Batch[mm], '_', design$sampleID[mm])
+  
+  source('Functions_histM.R')
+  conds_histM = c('H3K4me3','H3K27me3', 'H3K4me1', 'H3K27ac')
+  conds = c("mUA", "BL5days", "BL9days", 'BL13days.prox', 'BL13days.dist')
+  cc = paste(rep(conds_histM, each = length(conds)), conds, sep = "_")
+  yy = cal_sample_means(yy, conds = cc)
+  
+  ## select the regions overlapping with atac-seq
+  pp_atac = data.frame(t(sapply(rownames(yy_atac), function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
+  pp_atac$strand = '*'
+  pp_atac = makeGRangesFromDataFrame(pp_atac, seqnames.field=c("X1"),
+                                     start.field="X2", end.field="X3", strand.field="strand")
+  
+  pp_histM = data.frame(t(sapply(rownames(keep), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  pp_histM$strand = '*'
+  pp_histM = makeGRangesFromDataFrame(pp_histM, seqnames.field=c("X1"),
+                                      start.field="X2", end.field="X3", strand.field="strand")
+  
+  mapping = findOverlaps(pp_atac, pp_histM, ignore.strand=TRUE, minoverlap = 100L)
+  mapping = data.frame(mapping)
+  mapping = mapping[match(unique(mapping$queryHits), mapping$queryHits), ]
+  
+  yy1 = yy[mapping$subjectHits, ]
+  keep1 = keep[mapping$subjectHits, ]
+  hde = DE.locus[mapping$subjectHits, ]
+  
+  yy_atac = yy_atac[mapping$queryHits,]
+  res_atac = res_atac[mapping$queryHits, ]
+  
+  ## specify row gaps as atac-seq peaks
+  cluster_order = paste0('mc', c(1:8))
+  gaps.row = c()
+  gaps.row = c()
+  for(n in 1:(length(cluster_order)-1))
+  {
+    if(n == 1)  {gaps.row = c(gaps.row, length(which(res_atac$clusters == cluster_order[n])))
+    }else{
+      gaps.row = c(gaps.row,  gaps.row[n-1] + length(which(res_atac$clusters == cluster_order[n])))
+    }
+  }
+  
+  conds_histM = c('H3K4me3','H3K27me3', 'H3K4me1', 'H3K27ac')
+  conds = c("mUA", "BL5days", "BL9days", 'BL13days.prox', 'BL13days.dist')
+  
+  pheatmap(hde, cluster_rows = FALSE, cluster_cols = FALSE, show_rownames = FALSE, show_colnames = FALSE,
+           color = c('darkgray', 'red'), 
+           gaps_row = gaps.row,
+           filename = paste0(figureDir, '/regeneration_histM_dynamics_for_dynamicATACpeaks.pdf'), 
+           width = 3, height = 12)
+  
+  fcs = hde
+  range <- 2.5
+  for(n in 1:ncol(fcs))
+  {
+    # n = 1
+    ii.test = intersect(grep('logFC_', colnames(keep1)), grep(colnames(fcs)[n], colnames(keep1)))
+    test = keep1[, ii.test]
+    test = apply(test, 1, mean)
+    test[which(test>= range)] = range
+    test[which(test<= (-range))] = -range
+    fcs[,n]  = test
+  }
+  
+  #fcs[which(fcs > 2.5)] = 2.5
+  #fcs[which(fcs<-2.5)] = -2.5
+  nb_breaks = 9
+  sunset <- colour("sunset")
+  #highcontrast <- colour("high contrast")
+  cols = rev(sunset(nb_breaks))
+  #cols =  colorRampPalette(colour("high contrast"))(nb_breaks)
+  
+  pheatmap(fcs, cluster_rows = FALSE, cluster_cols = FALSE, show_rownames = FALSE, show_colnames = FALSE,
+           #color = c('darkgray', 'blue'), 
+           #color = colorRampPalette((brewer.pal(n = 7, name ="PRGn")))(nb_breaks),
+           color = cols, 
+           breaks = seq(-range, range, length.out = nb_breaks), 
+           gaps_row = gaps.row,
+           filename = paste0(figureDir, '/regeneration_histM_dynamics_log2fc.average_for_dynamicATACpeaks.pdf'), 
+           width = 3, height = 12)
   
 }
 
@@ -641,7 +751,6 @@ if(Save_peak.list_for_deeptools){
     xx$strand[kk] = '+'
     xx$strand[-kk] = '-'
     
-    
     write.table(xx, file = paste0(peakGroupDir, '/peak_tss_down.bed'), 
                 sep = '\t', quote = FALSE, row.names = FALSE, col.names = FALSE)
     
@@ -698,6 +807,7 @@ if(Assembly_histMarkers_profilePlots){
   colnames(pfs) = c('marker', 'group',  c(1:ncol(xx)))
   pfs$group = gsub('peak_group_', '', pfs$group) 
   pfs$group =  paste0('mc', gsub('.bed', '', pfs$group))  
+  
   pfs$sample = sapply(pfs$marker, function(x) unlist(strsplit(as.character(x), '_'))[2])
   pfs$marker = sapply(pfs$marker, function(x) unlist(strsplit(as.character(x), '_'))[1])
   pfs = pfs[, c(2, 1, ncol(pfs), 3:122)]
@@ -710,26 +820,31 @@ if(Assembly_histMarkers_profilePlots){
   {
     plot = as_tibble(xx) %>%  gather(bins, signals,  4:123) %>% 
       mutate(bins = factor(bins, levels=c(1:120))) %>%
-      mutate(sample = factor(sample, levels = c('mUA', 'BL5days', 'BL9days', 'BL13days.prox', 'BL13days.dist', 'IgG'))) %>%
+      mutate(sample = factor(sample, levels = c('mUA', 'BL5days', 'BL9days', 'BL13days.prox', 'BL13days.dist'))) %>%
       ggplot(aes(y=signals, x=bins, color = sample, group = sample)) + 
-      geom_line(size = 1.2) +
+      geom_line(aes(linetype=sample, color=sample), size = 0.7) +
       theme_classic() +
       theme(axis.text.y = element_text(angle = 90, size = 10), legend.position = c(0.2, 0.8),
             axis.text.x = element_blank(), axis.ticks = element_blank()) +
-      scale_color_manual(values=c('springgreen', 'springgreen2', 'springgreen3', 'gold2','red')) +
+      scale_color_manual(values=c('springgreen', 'gold2', 'blue', 'red','red')) +
+      scale_linetype_manual(values=c("solid", "longdash", "longdash", "solid", "longdash")) + 
       labs( x = '', y = 'signals (rpkm)') +
       ylim(0, ylims) 
+    
+    # scale_color_manual(values=c('springgreen', 'gold2', 'blue', 'red','red')) +
+    #  scale_linetype_manual(values=c('solid', 'longdashed', 'dotted', "solid", "dotted")) + 
     return(plot)
   }
   
+  
   for(m in 1:length(markers))
   {
-    # m = 3
-    ylims = 5.0
+    # m = 2
+    ylims = max(pfs[which(pfs$marker == markers[m]), c(4:123)])*1000/50
     cat(markers[m], '\n')
     for(n in 1:length(grps))
     {
-      #n = 1
+      # n = 1
       cat(n, ' -- ', grps[n], '\n')
       
       xx = pfs[which((pfs$marker == markers[m]) & pfs$group == grps[n]), ]
@@ -746,11 +861,9 @@ if(Assembly_histMarkers_profilePlots){
                  ncol = 1, nrow = 8)
     #ggsave(paste0(figureDir, "dynamics_peaks_averageProfiles_", markers[m], ".pdf"), width=4, height = 20)
     dev.off()
-    
-   
   }
+  
 }
-
 
 ##########################################
 # feature distribution of all peaks and regenration dynamic peaks 
