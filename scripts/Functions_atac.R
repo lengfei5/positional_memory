@@ -3763,6 +3763,8 @@ process.normalize.atac.histM.allTSS = function()
     raw = tss[missed, kk2]
     design.atac = design[kk2, ]
     
+    rownames(raw) = tss$coords[missed]
+    
     mm = match(design.sels$sampleID, design.atac$SampleID)
     design.atac = design.atac[mm, ]
     raw = raw[ ,mm]

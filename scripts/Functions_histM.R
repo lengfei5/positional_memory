@@ -807,3 +807,127 @@ Compare.MACS2.vs.SEACR = function()
   
 }
 
+########################################################
+########################################################
+# Section : combine all 4 hisone markers in regeneration
+# without considering atac-peak overlapping
+# 
+########################################################
+########################################################
+Combine.regeneration.peaks.all.four.markers = function()   
+{
+  atacseq_peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rxxxx_R10723_R11637_R12810_atac/Rdata/',
+                                        'ATACseq_peak_consensus_filtered_55k.rds'))
+  
+  conds_histM = c('H3K4me3','H3K27me3', 'H3K4me1', 'H3K27ac')
+  
+  keep = c()
+  DE.locus = c()
+  
+  fdr.cutoff = 0.05; 
+  logfc.cutoff = 1;
+  marker.cutoff = 1;
+  
+  for(n_histM in 1:length(conds_histM))
+  {
+    # n_histM = 1
+    res = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_DBedgeRtest_regeneration_', 
+                                conds_histM[n_histM], '_', version.analysis, '.rds'))
+    
+    select = which((res$adj.P.Val_5dpa.vs.mUA < fdr.cutoff & abs(res$logFC_5dpa.vs.mUA) > logfc.cutoff) |
+                     (res$adj.P.Val_9dpa.vs.mUA < fdr.cutoff & abs(res$logFC_9dpa.vs.mUA) > logfc.cutoff)|
+                     (res$adj.P.Val_13dpap.vs.mUA < fdr.cutoff & abs(res$logFC_13dpap.vs.mUA) > logfc.cutoff) |
+                     (res$adj.P.Val_13dpad.vs.mUA < fdr.cutoff & abs(res$logFC_13dpad.vs.mUA) > logfc.cutoff) &
+                     res$maxs > marker.cutoff
+    )
+    
+    cat(length(select), ' DE ', conds_histM[n_histM],  ' in total \n')
+    
+    ### focus on the atac-seq peak sets
+    ii_bgs = grep('tss.', rownames(res))
+    rownames(res) = gsub('tss.', '', rownames(res))
+    
+    pp = data.frame(t(sapply(rownames(res), function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
+    rownames(res) = paste0(pp[,1], ':', pp[,2], '-', pp[,3])
+    rownames(res)[ii_bgs] = paste0('tss.', rownames(res)[ii_bgs])
+    
+    rownames(pp) = rownames(res)
+    pp$strand = '*'
+    pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                  start.field="X2", end.field="X3", strand.field="strand")
+    # lls = width(pp)
+    #olp = GenomicRanges::findOverlaps(atacseq_peaks, )
+    # ii_overlap = which(overlapsAny(pp, atacseq_peaks) == TRUE)
+    mapping = GenomicRanges::findOverlaps(atacseq_peaks, pp) # findOverlap from atac-seq peak to histone marker is better, repeating histone
+    
+    res_sel = res[mapping@to, ]
+    res_sel$histM_peak_coord = rownames(res)[mapping@to]
+    res_sel$atac_peak_coord = names(atacseq_peaks)[mapping@from]
+    
+    select = which((res_sel$adj.P.Val_5dpa.vs.mUA < fdr.cutoff & abs(res_sel$logFC_5dpa.vs.mUA) > logfc.cutoff) |
+                     (res_sel$adj.P.Val_9dpa.vs.mUA < fdr.cutoff & abs(res_sel$logFC_9dpa.vs.mUA) > logfc.cutoff)|
+                     (res_sel$adj.P.Val_13dpap.vs.mUA < fdr.cutoff & abs(res_sel$logFC_13dpap.vs.mUA) > logfc.cutoff) |
+                     (res_sel$adj.P.Val_13dpad.vs.mUA < fdr.cutoff & abs(res_sel$logFC_13dpad.vs.mUA) > logfc.cutoff) &
+                     res_sel$maxs > marker.cutoff
+    )
+    
+    cat(length(select), ' DE ', conds_histM[n_histM],  ' overlapping with atac-seq peaks \n')
+    xx = res_sel
+    
+    colnames(xx) = paste0(colnames(xx), '_', conds_histM[n_histM])
+    
+    source('Functions_histM.R')
+    yy = res_sel[select, grep(conds_histM[n_histM], colnames(res_sel))]
+    yy = t(apply(yy, 1, cal_transform_histM, cutoff.min = 0.0, cutoff.max = 6))
+    
+    sds = apply(yy, 1, sd)
+    yy = yy[which(sds>0), ]
+    
+    df = as.data.frame(sapply(colnames(yy), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[2])}))
+    colnames(df) = 'segments'
+    rownames(df) = colnames(yy)
+    sample_colors = c('springgreen4', 'steelblue2', 'gold2')
+    annot_colors = list(segments = sample_colors)
+    
+    pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+             color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8),
+             show_colnames = FALSE,
+             scale = 'row',
+             cluster_cols=FALSE, annotation_col=df,
+             #annotation_colors = annot_colors,
+             width = 6, height = 12,
+             filename = paste0(resDir, '/heatmap_histoneMarker_regeneration', conds_histM[n_histM], '_overlappedWithAtacseqPeak.pdf'))
+    
+    # pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+    #          color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8),
+    #          show_colnames = FALSE,
+    #          scale = 'none',
+    #          cluster_cols=FALSE, annotation_col=df,
+    #          #annotation_colors = annot_colors,
+    #          width = 6, height = 12,
+    #          filename = paste0(resDir, '/heatmap_histoneMarker_', conds_histM[n_histM], '_overlappedWithAtacseqPeak_nonscaled.pdf'))
+    # 
+    
+    if(n_histM == 1){
+      keep = data.frame(xx, stringsAsFactors = FALSE)
+      test = rep(0, nrow(xx))
+      test[select] = 1
+      names(test) = rownames(xx)
+      DE.locus = data.frame(test, stringsAsFactors = FALSE)
+      
+      colnames(DE.locus)[ncol(DE.locus)] = conds_histM[n_histM]
+      
+    }else{
+      keep = data.frame(keep, xx[match(rownames(keep), rownames(xx)), ], stringsAsFactors = FALSE)
+      test = rep(0, nrow(xx))
+      test[select] = 1
+      names(test) = rownames(xx)
+      DE.locus = data.frame(DE.locus, test[match(rownames(DE.locus), names(test))], stringsAsFactors = FALSE)
+      colnames(DE.locus)[ncol(DE.locus)] = conds_histM[n_histM]
+    }
+  }
+  
+  save(keep, DE.locus, file = paste0(RdataDir, '/combined_4histMarkers_overlapped55kATACseq_DE_regeneration_v2.Rdata'))
+  
+}
+

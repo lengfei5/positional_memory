@@ -1206,6 +1206,16 @@ geneClusters = geneClusters[order(-geneClusters$log2fc), ]
 
 saveRDS(geneClusters, file = paste0(RdataDir, 'regeneration_geneClusters.rds'))
 
+mm = match(rownames(sample.means), rownames(res))
+colnames(sample.means) = newcc
+
+xx = data.frame(sample.means, res[mm, ], stringsAsFactors = FALSE)
+
+xx$cluster = NA
+mm = match(rownames(xx), rownames(geneClusters))
+xx$cluster[which(!is.na(mm))] = geneClusters$cluster[mm[!is.na(mm)]]
+
+saveRDS(xx, file = paste0(RdataDir, 'regeneration_dynamicGeneClusters_allGenes.rds'))
 
 geneClusters = readRDS(file = paste0(RdataDir, 'regeneration_geneClusters.rds'))
 

@@ -998,12 +998,12 @@ if(Peak.annotation_feature.distribution){
 
 ########################################################
 ########################################################
-# Section : Regeneration genes and associated CREs
+# Section :
+# Regeneration genes and associated CREs
 # specific questions: chromatin states of regeneration genes in mature sample
-# is it bivalent ?? or not 
+# Bivalency ?? or not 
 ########################################################
 ########################################################
-
 # prepare all tss to quantify the read counts within those tss 
 gtf.all = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/AmexT_v47_Hox.patch.gtf'
 amex.all = GenomicFeatures::makeTxDbFromGFF(file = gtf.all)
@@ -1027,49 +1027,136 @@ write.table(SAF, file = paste0('/Volumes/groups/tanaka/People/current/jiwang/pro
 
 
 ##########################################
-# the first analysis is start from the bivalent chromatin/promoters
+# start with the dynamic genes from RNA-seq data, together with expressed genes and some controls
+# the collect all chromatin features, atac, histone markers
+# bivalent chromatin/promoters
 # 
 ## load processed tss atac and histMarker signals
 # Gene groups defined by regeneration RNAseq data, house keeping, 
 # limb fibrobalst expressing gene, non-expressing control genes
 ##########################################
-res = readRDS(file = paste0(RdataDir,  '/atac_histoneMarkers_normSignals_axolotlAllTSS.2kb_TSS_genelevel.rds'))
-res = data.frame(res)
-res$geneID = rownames(res)
-
-geneClusters = readRDS(file = paste0("../results/RNAseq_data_used/Rdata/", 'regeneration_geneClusters.rds'))
-geneClusters$gene = rownames(geneClusters)
-geneClusters$geneID = sapply(rownames(geneClusters), function(x) {test = unlist(strsplit(as.character(x), '_')); return(test[length(test)])})
-
-mm = match(res$geneID, geneClusters$geneID)
-res = data.frame(res, geneClusters[mm, c(1:2, 26, 3:7)], stringsAsFactors = FALSE)
-
-res$groups[which(!is.na(res$groups))] = 'reg_up'
-res$groups[which(res$cluster == 'G1'|res$cluster == 'G2'|res$cluster == 'G3')] = 'reg_down'
-
+source('Functions_histM.R')
+#load(file = paste0(RdataDir, '/tss_perGene_atac_histM_sample_design_regeneration.embryo_counts_expressedGenes_controls.Rdata'))
+tss = readRDS(file = paste0(RdataDir, '/tss_perGene_atac_histM_sample_design_regeneration.embryo_counts_expressedGenes_controls.rds'))
+tss = tss[,61:72]
+tss = tss[, c(1, 6, 2:4, 12, 5, 7:11)]
 # limb fibroblast expressing genes
-expressed = readRDS(file = '../data/expressedGenes_list_limb_fibroblast_using_smartseq2.mature.regeneration_pooledscRNAseq.dev.rds')
-res$fibroblast.expressed = expressed$expressed[match(res$geneID, expressed$geneID)]
+#expressed = readRDS(file = '../data/expressedGenes_list_limb_fibroblast_using_smartseq2.mature.regeneration_pooledscRNAseq.dev.rds')
+#expressed = as.character(expressed$geneID[which(expressed$expressed == 1)])
+#cat(length(expressed), ' gene expressed to consider \n')
 
-res$groups[which(is.na(res$groups) & res$fibroblast.expressed == '1')] = 'expressed.stable'
+## add rna analysis results
+rna = readRDS(file = paste0("../results/RNAseq_data_used/Rdata/", 
+                                     'regeneration_dynamicGeneClusters_allGenes.rds'))
+rna$geneID = get_geneID(rownames(rna))
 
-# house keeping and other non-expressing genes
-load(file =  paste0(annotDir, 'axolotl_housekeepingGenes_controls.other.tissues.liver.islet.testis_expressedIn21tissues.Rdata'))
-hkgs = controls.tissue$geneIDs[which(controls.tissue$tissues == 'housekeeping')]
-nonexp = controls.tissue$geneIDs[which(controls.tissue$tissues != 'housekeeping')]
+tss[, c(8:12)] = rna[match(tss$geneID, rna$geneID), c(1:5)]
+colnames(tss)[8:12] = paste0('smartseq2_', colnames(tss)[8:12])
+annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                       'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
 
-mm = match(res$geneID, hkgs)
-res$groups[which(res$groups == 'expressed.stable' & !is.na(mm))] = 'house_keep'
+tss$gene = annot$gene.symbol.toUse[match(tss$geneID, annot$geneID)]
 
-mm = match(res$geneID, nonexp)
-res$groups[which(is.na(res$groups) & !is.na(mm))] = 'non_expr'
+tp = data.frame(t(sapply(tss$coords, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+tp$strand = '*'
+tp = makeGRangesFromDataFrame(tp, seqnames.field=c("X1"),
+                              start.field="X2", end.field="X3", strand.field="strand")
 
-# random select 1000 non-expressed genes
-jj = which(is.na(res$groups))
-jj = sample(jj, size = 3000, replace = FALSE)
-res$groups[jj] = 'non_expr'
 
-res = res[which(!is.na(res$groups)), ]
+## start to add atac peaks overlapping tss
+aa = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks_regeneration.dev.TSS_2Batches.R10723_R7977_peakAnnot_v1.rds'))
+names = rownames(aa)
+names = gsub('bg_', '', names)
+jj = grep('^chr', names, invert = TRUE)
+names[jj] = tss$coords[match(names[jj], tss$geneID)]
+names.uniq = unique(names)
+aa = aa[match(names.uniq, names), ]
+rownames(aa) = names.uniq
+
+mat = aa[, c(1:20)]
+aa = aa[, -c(1:20)]
+mat = mat[, grep('Embryo_', colnames(mat), invert = TRUE)]
+mat = cal_sample_means(mat, conds = c('Mature_UA', 'BL_UA_5days', 'BL_UA_9days', 'BL_UA_13days_proximal', 'BL_UA_13days_distal'))
+newcc = c('mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d')
+colnames(mat) = newcc
+
+pp = data.frame(t(sapply(rownames(aa), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+pp$strand = '*'
+pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                              start.field="X2", end.field="X3", strand.field="strand")
+
+
+mapping = findOverlaps(tp, pp, ignore.strand=TRUE,  minoverlap=100L)
+jj = (unique(mapping@from))
+missed = setdiff(c(1:nrow(tss)), jj)
+mapping = data.frame(mapping)
+
+jj_sel = mapping$subjectHits[match(c(1:nrow(tss)), mapping$queryHits)]
+
+res = data.frame(mat[jj_sel, ], aa[jj_sel, ], stringsAsFactors = FALSE)
+
+fdr.cutoff = 0.01; logfc.cutoff = 1
+select = which(  (res$adj.P.Val_5dpa.vs.mUA < fdr.cutoff & abs(res$logFC_5dpa.vs.mUA) > logfc.cutoff)| 
+                   (res$adj.P.Val_9dpa.vs.mUA < fdr.cutoff & abs(res$logFC_9dpa.vs.mUA) > logfc.cutoff) |
+                   (res$adj.P.Val_13dpap.vs.mUA < fdr.cutoff & abs(res$logFC_13dpap.vs.mUA) > logfc.cutoff) |
+                   (res$adj.P.Val_13dpad.vs.mUA < fdr.cutoff & abs(res$logFC_13dpad.vs.mUA) > logfc.cutoff) |
+                   (res$adj.P.Val_s40.vs.mUA < fdr.cutoff & abs(res$logFC_s40.vs.mUA) > logfc.cutoff ) | 
+                   (res$adj.P.Val_s44p.vs.mUA < fdr.cutoff & abs(res$logFC_s44p.vs.mUA) > logfc.cutoff ) |
+                   (res$adj.P.Val_s44d.vs.mUA < fdr.cutoff & abs(res$logFC_s44d.vs.mUA) > logfc.cutoff ))
+cat(length(select), 'DE peaks found !\n')
+res$dynamic = NA
+res$dynamic[select] = 1
+
+colnames(res) = paste0('atac_', colnames(res))
+
+tss =  data.frame(tss, res, stringsAsFactors = FALSE)
+
+## add histM analysis results
+load(file = paste0('../results/CT_merged_20220328/Rdata', 
+                   '/histoneMarkers_samplesDesign_ddsPeaksMatrix_filtered_incl.atacPeak140k.missedTSS.bgs_345k.Rdata'))
+
+peakNames = rownames(dds)
+peakNames = gsub('tss.', '', peakNames)
+pp = data.frame(t(sapply(peakNames, function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
+pp$strand = '*'
+pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                              start.field="X2", end.field="X3", strand.field="strand")
+
+mapping = findOverlaps(tp, pp, ignore.strand=TRUE,  minoverlap=100L)
+jj = (unique(mapping@from))
+missed = setdiff(c(1:nrow(tss)), jj)
+
+
+#res = readRDS(file = paste0(RdataDir,  '/atac_histoneMarkers_normSignals_axolotlAllTSS.2kb_TSS_genelevel.rds'))
+#res = data.frame(res)
+#res$geneID = rownames(res)
+#mm = match(res$geneID, geneClusters$geneID)
+# res = data.frame(res, geneClusters[mm, c(1:2, 26, 3:7)], stringsAsFactors = FALSE)
+
+# res$groups[which(!is.na(res$groups))] = 'reg_up'
+# res$groups[which(res$cluster == 'G1'|res$cluster == 'G2'|res$cluster == 'G3')] = 'reg_down'
+# 
+# 
+# res$fibroblast.expressed = expressed$expressed[match(res$geneID, expressed$geneID)]
+# 
+# res$groups[which(is.na(res$groups) & res$fibroblast.expressed == '1')] = 'expressed.stable'
+# 
+# # house keeping and other non-expressing genes
+# load(file =  paste0(annotDir, 'axolotl_housekeepingGenes_controls.other.tissues.liver.islet.testis_expressedIn21tissues.Rdata'))
+# hkgs = controls.tissue$geneIDs[which(controls.tissue$tissues == 'housekeeping')]
+# nonexp = controls.tissue$geneIDs[which(controls.tissue$tissues != 'housekeeping')]
+# 
+# mm = match(res$geneID, hkgs)
+# res$groups[which(res$groups == 'expressed.stable' & !is.na(mm))] = 'house_keep'
+# 
+# mm = match(res$geneID, nonexp)
+# res$groups[which(is.na(res$groups) & !is.na(mm))] = 'non_expr'
+
+# # random select 1000 non-expressed genes
+# jj = which(is.na(res$groups))
+# jj = sample(jj, size = 3000, replace = FALSE)
+# res$groups[jj] = 'non_expr'
+# res = res[which(!is.na(res$groups)), ]
 
 # saveRDS(res, file = paste0(RdataDir, '/list_TSS_considered.rds'))
 
@@ -1088,8 +1175,13 @@ dev.example = c('HOXA13', 'HOXA11', 'HOXA9', 'HOXD13','HOXD11', 'HOXD9',
                 'SHH', 'FGF8', 'FGF10', 'HAND2', 'BMP4', 'ALX1',
                 'ALX4', 'PRRX1', 'GREM1', 'LHX2', 'LHX9', 
                 'TBX2', 'TBX4', 'TBX5', 'LMX1', 'MEIS1', 'MEIS2', 'SALL4', 'IRX3', 'IRX5')
+
+# gene list from Akane
+Creb5, Bmp2, Efna1, Stmn2, Gja3, Cpa2, Cbfa2t3, Cdh3, Lmo2, Tfap2b, Jag1, Hey1, shox2, shox1,PRRX1
+
 mature.example = c('PTX3', 'IGFBP3',  'TNMD', 'TWIST2', 'COL3A1', 'CCNB1', 'NREP', 
                    'DPT', 'COL8A2', 'PTGDS', 'RARRES1', 'COL4A2', 'KLF5', 'F13A1', 'PRDX2')
+
 
 tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
 tfs = unique(tfs$`HGNC symbol`)
