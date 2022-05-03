@@ -3552,7 +3552,7 @@ process.normalize.atac.histM.allTSS = function()
   design$sample = gsub('BL_UA_5days', 'BL5days', design$sample)
   design$sample = gsub('Mature_UA', 'mUA', design$sample)
   
-  design = design[grep('Embryo', design$sample, invert = TRUE), ]
+  #design = design[grep('Embryo', design$sample, invert = TRUE), ]
   design = design[grep('IgG', design$marks, invert = TRUE), ]
   design$condition = paste0(design$marks, '_', design$sample)
   
@@ -3582,19 +3582,20 @@ process.normalize.atac.histM.allTSS = function()
   sels = c()
   for(n in 1:nrow(design)) sels = c(sels, grep(design$SampleID[n], xlist))
   xlist = xlist[sels]
+  
   all = cat.countTable(xlist, countsfrom = 'featureCounts')
   
   colnames(design)[1] = 'SampleID'
   
   counts = process.countTable(all=all, design = design[, c(1,4)])
   
-  save(design, counts, file = paste0(RdataDir, '/atac_histM_sample_design_regeneration_counts.Rdata'))
+  save(design, counts, file = paste0(RdataDir, '/atac_histM_sample_design_regeneration_counts_withEmbryo.Rdata'))
   
   ##########################################
   # clean TSS, for each gene, only keep one TSS if there are mulitple ones
   # the TSS with highest H3K4me3 were chosen
   ##########################################
-  load(file = paste0(RdataDir, '/atac_histM_sample_design_regeneration_counts.Rdata'))
+  load(file = paste0(RdataDir, '/atac_histM_sample_design_regeneration_counts_withEmbryo.Rdata'))
   rownames(counts) = counts$gene
   
   # quick and temporal cpm normalization
@@ -3644,12 +3645,12 @@ process.normalize.atac.histM.allTSS = function()
   mm = match(tss$transcript, saf$GeneID)
   tss$coords = paste0(saf$Chr[mm], ':', saf$Start[mm], '-', saf$End[mm])
   
-  save(tss, design, file = paste0(RdataDir, '/tss_perGene_atac_histM_sample_design_regeneration_counts.Rdata'))
+  save(tss, design, file = paste0(RdataDir, '/tss_perGene_atac_histM_sample_design_regeneration_counts_withEmbryo.Rdata'))
   
   ##########################################
   # here we will consider the list of gene/tss to keep 
   ##########################################
-  load(file = paste0(RdataDir, '/tss_perGene_atac_histM_sample_design_regeneration_counts.Rdata'))
+  load(file = paste0(RdataDir, '/tss_perGene_atac_histM_sample_design_regeneration_counts_withEmbryo.Rdata'))
   
   #res = readRDS(file = paste0(RdataDir,  '/atac_histoneMarkers_normSignals_axolotlAllTSS.2kb_TSS_genelevel.rds'))
   #res = data.frame(res)
@@ -3689,7 +3690,8 @@ process.normalize.atac.histM.allTSS = function()
   
   tss = tss[which(!is.na(tss$groups)), ]
   
-  save(tss, design, file = paste0(RdataDir, '/tss_perGene_atac_histM_sample_design_regeneration_counts_expressedGenes_controls.Rdata'))
+  save(tss, design, 
+       file = paste0(RdataDir, '/tss_perGene_atac_histM_sample_design_regeneration.embryo_counts_expressedGenes_controls.Rdata'))
   
   #saveRDS(cpm, file = paste0(RdataDir,  '/atac_histoneMarkers_normSignals_axolotlAllTSS.2kb_TSS_genelevel_beforeBatchCorrection.rds'))
   #save(tss, design, 
@@ -3700,7 +3702,7 @@ process.normalize.atac.histM.allTSS = function()
   ##########################################
   Check.overlaps.between.tss.with.histM = FALSE
   if(Check.overlaps.between.tss.with.histM){
-    load(file = paste0(RdataDir, '/tss_perGene_atac_histM_sample_design_regeneration_counts_expressedGenes_controls.Rdata'))
+    load(file = paste0(RdataDir, '/tss_perGene_atac_histM_sample_design_regeneration.embryo_counts_expressedGenes_controls.Rdata'))
     
     tp = data.frame(t(sapply(tss$coords, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
     tp$strand = '*'
@@ -3727,7 +3729,7 @@ process.normalize.atac.histM.allTSS = function()
   
   Check.overlaps.between.tss.with.atacseq = FALSE
   if(Check.overlaps.between.tss.with.atacseq){
-    load(file = paste0(RdataDir, '/tss_perGene_atac_histM_sample_design_regeneration_counts_expressedGenes_controls.Rdata'))
+    load(file = paste0(RdataDir, '/tss_perGene_atac_histM_sample_design_regeneration.embryo_counts_expressedGenes_controls.Rdata'))
     
     tp = data.frame(t(sapply(tss$coords, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
     tp$strand = '*'
@@ -3746,9 +3748,102 @@ process.normalize.atac.histM.allTSS = function()
     jj = (unique(mapping@from))
     missed = setdiff(c(1:nrow(tss)), jj)
     
-    ## add missing tss to regeneration atac data
+    cat(length(missed), ' tss missed \n')
     
-      
+    ## add missing tss to regeneration atac data
+    load(file = paste0(RdataDir, '/tss_perGene_atac_histM_sample_design_regeneration.embryo_counts_expressedGenes_controls.Rdata'))
+    load(file = paste0(RdataDir, '/regeneration_samples_beforeBatchCorrection.Rdata'))
+    
+    counts = counts(ddx)
+    #kk = grep('Embryo_', design.sels$condition, invert = TRUE)
+    #design.sels = design.sels[kk, ]
+    #counts = counts[, kk]
+    
+    kk2 = grep('atac', design$marks)
+    raw = tss[missed, kk2]
+    design.atac = design[kk2, ]
+    
+    mm = match(design.sels$sampleID, design.atac$SampleID)
+    design.atac = design.atac[mm, ]
+    raw = raw[ ,mm]
+    
+    colnames(raw) = colnames(counts)
+    counts = rbind(counts, raw)
+    
+    ## batch correction for those 69k loci 
+    table(design.sels$conds, design.sels$batch)
+    
+    d <- DGEList(counts=counts, group=design.sels$conds)
+    tmm <- calcNormFactors(d, method='TMM')
+    tmm = cpm(tmm, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 1)
+    
+    bc = as.factor(design.sels$batch)
+    mod = model.matrix(~ as.factor(conds), data = design.sels)
+    
+    # if specify ref.batch, the parameters will be estimated from the ref, inapprioate here, 
+    # because there is no better batche other others 
+    #ref.batch = '2021S'# 2021S as reference is better for some reasons (NOT USED here)    
+    fpm.bc = ComBat(dat=as.matrix(tmm), batch=bc, mod=mod, par.prior=TRUE, ref.batch = NULL) 
+    
+    #design.tokeep<-model.matrix(~ 0 + conds,  data = design.sels)
+    #cpm.bc = limma::removeBatchEffect(tmm, batch = bc, design = design.tokeep)
+    # plot(fpm.bc[,1], tmm[, 1]);abline(0, 1, lwd = 2.0, col = 'red')
+    
+    make.pca.plots(tmm, ntop = 3000, conds.plot = 'all')
+    ggsave(paste0(resDir, "/regeneration_embryo_TSS_Samples_batchCorrect_before_",  version.analysis, ".pdf"), width = 16, height = 14)
+    
+    make.pca.plots(fpm.bc, ntop = 3000, conds.plot = 'all')
+    ggsave(paste0(resDir, "/regeneration_embryo_TSS_Samples_batchCorrect_after_",  version.analysis, ".pdf"), width = 16, height = 14)
+    
+    fpm = fpm.bc
+    
+    rm(fpm.bc)
+    
+    saveRDS(fpm, file = paste0(RdataDir, '/fpm.bc_TMM_combat_mUA_regeneration.dev.TSS_2Batches.R10723_R7977_', version.analysis, '.rds'))
+    saveRDS(design.sels, 
+            file = paste0(RdataDir, '/design_sels_bc_TMM_combat_mUA_regeneration.dev.TSS_2Batches.R10723_R7977',
+                                       version.analysis, '.rds'))
+    
+    ## dynamic peak analysis
+    fpm = readRDS(file = paste0(RdataDir, '/fpm.bc_TMM_combat_mUA_regeneration.dev.TSS_2Batches.R10723_R7977_', version.analysis, '.rds'))
+    design = readRDS(file = paste0(RdataDir, '/design_sels_bc_TMM_combat_mUA_regeneration.dev.TSS_2Batches.R10723_R7977',
+                                   version.analysis, '.rds'))
+    
+    # prepare the background distribution
+    fpm.bg = fpm[grep('bg_', rownames(fpm), invert = FALSE), ]
+    fpm = fpm[grep('bg_', rownames(fpm), invert = TRUE), ]
+    # rownames(fpm) = gsub('_', '-', rownames(fpm))
+    
+    
+    conds = c("Embryo_Stage40", "Embryo_Stage44_proximal", 'Embryo_Stage44_distal', 
+              "Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal", 'BL_UA_13days_distal')
+    
+    sample.sels = c(); cc = c()
+    sample.means = c()
+    for(n in 1:length(conds)) {
+      kk = which(design$conds == conds[n])
+      sample.sels = c(sample.sels, kk)
+      cc = c(cc, rep(conds[n], length(kk)))
+      sample.means = cbind(sample.means, apply(fpm[, kk], 1, mean))
+    }
+    colnames(sample.means) = conds
+    
+    source('Functions_atac.R')
+    cpm = fpm[, sample.sels]
+    
+    source('Functions_atac.R')
+    tic()
+    ## define the dynamic enhancers with mature UA and BL.UA and check them if embryo samples
+    #sels = grep('Embryo', cc, invert = TRUE) 
+    res = temporal.peaks.test(cpm, c = cc)
+    
+    toc()
+    
+    res = data.frame(fpm, res, stringsAsFactors = FALSE)
+    
+    saveRDS(res, file = paste0(RdataDir, '/res_temporal_dynamicPeaks_regeneration.dev.TSS_2Batches.R10723_R7977_peakAnnot_v1.rds'))
+    
+    
   }
   
   ##########################################

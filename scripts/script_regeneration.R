@@ -103,7 +103,7 @@ if(Batch.Correct.regeneration.embryoStage){
   ddx$conds = droplevels(ddx$conds)
   ss = rowSums(counts(ddx))
   
-  # save(ddx, design.sel, file = paste0(RdataDir, '/regeneration_samples_beforeBatchCorrection.Rdata'))
+  # save(ddx, design.sels, file = paste0(RdataDir, '/regeneration_samples_beforeBatchCorrection.Rdata'))
   # remove low count genes, otherwise combat returns error 
   # 'Error in while (change > conv) { : missing value where TRUE/FALSE needed'
   #ddx = ddx[which(ss>5), ] 
@@ -143,6 +143,7 @@ if(Batch.Correct.regeneration.embryoStage){
   saveRDS(fpm, file = paste0(RdataDir, '/fpm.bc_TMM_combat_mUA_regeneration_dev_2Batches.R10723_R7977_', version.analysis, '.rds'))
   saveRDS(design.sels, file = paste0(RdataDir, '/design_sels_bc_TMM_combat_mUA_regeneration_dev_2Batches.R10723_R7977',
                                      version.analysis, '.rds'))
+  
   
   
 }
