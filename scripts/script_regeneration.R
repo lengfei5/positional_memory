@@ -1112,10 +1112,9 @@ colnames(res) = paste0('atac_', colnames(res))
 tss =  data.frame(tss, res, stringsAsFactors = FALSE)
 
 ## add histM analysis results
-load(file = paste0('../results/CT_merged_20220328/Rdata', 
-                   '/histoneMarkers_samplesDesign_ddsPeaksMatrix_filtered_incl.atacPeak140k.missedTSS.bgs_345k.Rdata'))
+keep = readRDS(file = paste0('../results/CT_merged_20220328/Rdata/regeneration_combined_4histMarkers_DE_345k.rds'))
 
-peakNames = rownames(dds)
+peakNames = rownames(keep)
 peakNames = gsub('tss.', '', peakNames)
 pp = data.frame(t(sapply(peakNames, function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
 pp$strand = '*'
@@ -1126,6 +1125,65 @@ mapping = findOverlaps(tp, pp, ignore.strand=TRUE,  minoverlap=100L)
 jj = (unique(mapping@from))
 missed = setdiff(c(1:nrow(tss)), jj)
 
+mapping = data.frame(mapping)
+jj_sel = mapping$subjectHits[match(c(1:nrow(tss)), mapping$queryHits)]
+
+res = keep[jj_sel,]
+
+tss =  data.frame(tss, res, stringsAsFactors = FALSE)
+
+saveRDS(tss, file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM.rds'))
+
+tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM.rds'))
+
+# original code from https://github.com/const-ae/ggupset
+library(ggplot2)
+library(tidyverse, warn.conflicts = FALSE)
+library(ggupset)
+
+DEs = tss[, grep('cluster|dynamic', colnames(tss))]
+DEs = DEs[which(!is.na(DEs$cluster)), ]
+DEs = DEs[,-1]
+
+DEs[!is.na(DEs)] = TRUE
+DEs[is.na(DEs)] = FALSE
+DEs = DEs > 0.5
+
+tidy_de <- t(DEs) %>%
+  as_tibble(rownames = "features") %>%
+  gather(tss, Member, -features) %>%
+  filter(Member) %>%
+  dplyr::select(- Member)
+
+tidy_de %>%
+  group_by(tss) %>%
+  summarize(features_all = list(features)) %>%
+  ggplot(aes(x = features_all)) +
+  geom_bar() +
+  scale_x_upset()
+
+ggsave(paste0(figureDir, "chromatinFeatures_relatedTo_dynamicGenes_2000genes.pdf"),  width = 8, height = 6)
+
+# tidy_pathway_member <- gene_pathway_membership %>%
+#   as_tibble(rownames = "Pathway") %>%
+#   gather(Gene, Member, -Pathway) %>%
+#   filter(Member) %>%
+#   dplyr::select(- Member)
+# 
+# tidy_pathway_member %>%
+#   group_by(Gene) %>%
+#   summarize(Pathways = list(Pathway))
+# tidy_pathway_member %>%
+#   group_by(Gene) %>%
+#   summarize(Pathways = list(Pathway)) %>%
+#   ggplot(aes(x = Pathways)) +
+#   geom_bar() +
+#   scale_x_upset()
+# as_tibble(DEs) %>%
+#   #distinct(cluster, .keep_all=TRUE) %>%
+#   ggplot(aes(x=cluster)) +
+#   geom_bar() +
+#   scale_x_upset(n_intersections = 20)
 
 #res = readRDS(file = paste0(RdataDir,  '/atac_histoneMarkers_normSignals_axolotlAllTSS.2kb_TSS_genelevel.rds'))
 #res = data.frame(res)
