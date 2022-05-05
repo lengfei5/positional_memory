@@ -1253,28 +1253,37 @@ require(patchwork)
 
 tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM.rds'))
 
-#tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
-#tfs = unique(tfs$`HGNC symbol`)
-#tfs = setdiff(tfs, dev.example)
+res = tss
+res$x = apply(res[, grep('H3K4me3_mUA', colnames(res))], 1, mean)
+res$y = apply(res[, grep('H3K27me3_mUA', colnames(res))], 1, mean)
+
+dev.example = c('HOXA13', 'HOXA11', 'HOXA9', 'HOXD13','HOXD11', 'HOXD9',
+                'SHH', 'FGF8', 'FGF10', 'HAND2', 'BMP4', 'ALX1',
+                'ALX4', 'PRRX1', 'GREM1', 'LHX2', 'LHX9', 
+                'TBX2', 'TBX4', 'TBX5', 'LMX1', 'MEIS1', 'MEIS2', 'SALL4', 'IRX3', 'IRX5', 'PRRX1',
+                'SHOX1', 'SHOX2')
+mature.example = c('COL1A1', 'COL4A1', 'COL4A2', 'COL6A', 'LAMA4', 'TNXB', 
+                   'MATN2', 'FBN1', 'FBLN2', 'FBLN5', 'PRELP', 'ELN', 'RSPO1', 
+                   'DPT', 'IGFBP3',  'TNMD', 'TWIST2', 'COL3A1', 'COL8A2', 'RARRES1', 'KLF5')
+
 examples.sel = unique(grep(paste0(dev.example, collapse = '|'), res$gene))
 matures.sel = unique(grep(paste0(mature.example, collapse = '|'), res$gene))
 
-jj = which(res$H3K4me3_mUA>1 & res$H3K27me3_mUA >0)
+jj = which(res$x>1 & res$y >0)
 length(jj)
-tfs.sel = unique(grep(paste0(tfs, collapse = '|'), res$gene))
-tfs.sel = tfs.sel[!is.na(match(tfs.sel, jj))]
+#tfs.sel = unique(grep(paste0(tfs, collapse = '|'), res$gene))
+#tfs.sel = tfs.sel[!is.na(match(tfs.sel, jj))]
 
-
-ggplot(data=res, aes(x=H3K4me3_mUA, y=H3K27me3_mUA, label = gene)) +
+ggplot(data=res, aes(x=x, y=y, label = gene)) +
   geom_point(size = 0.1, color = 'darkgray') + 
   theme(axis.text.x = element_text(size = 12), 
         axis.text.y = element_text(size = 12)) +
   #scale_color_manual(values=c('black', "orange", 'darkgray',  "red",   'green')) + 
   #geom_point(data=res[res$groups == 'reg_up', ], aes(x=H3K4me3_mUA, y=H3K27me3_mUA),  size=0.7) +
   #geom_point(data=res[res$groups == 'reg_down', ], aes(x=H3K4me3_mUA, y=H3K27me3_mUA),  size=0.7) +
-  geom_point(data=res[examples.sel, ], aes(x=H3K4me3_mUA, y=H3K27me3_mUA),  size=1.5, color = 'blue') +
+  geom_point(data=res[examples.sel, ], aes(x=x, y=y),  size=1.5, color = 'blue') +
   geom_text_repel(data= res[examples.sel, ], size = 4.0, color = 'blue') +
-  geom_point(data=res[matures.sel, ], aes(x=H3K4me3_mUA, y=H3K27me3_mUA),  size=1.5, color = 'darkred') +
+  geom_point(data=res[matures.sel, ], aes(x=x, y=y),  size=1.5, color = 'darkred') +
   geom_text_repel(data= res[matures.sel, ], size = 4.0, color = 'darkred') +
   
   #geom_text_repel(data= fpm[examples.sel, ], size = 4.0, color = 'darkblue') + 
