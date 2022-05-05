@@ -1134,93 +1134,115 @@ tss =  data.frame(tss, res, stringsAsFactors = FALSE)
 
 saveRDS(tss, file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM.rds'))
 
+##########################################
+# analysis around tss of regeneration-response genes
+# start with which chromatin features or combinations are related to regeneration-response genes
+##########################################
+source('Functions_histM.R')
 tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM.rds'))
+geneClusters = readRDS(file = paste0('../results/RNAseq_data_used/Rdata/', 'regeneration_geneClusters.rds'))
+
+geneClusters$gene = get_geneName(rownames(geneClusters)) 
+
+dev.example = c('HOXA13', 'HOXA11', 'HOXA9', 'HOXD13','HOXD11', 'HOXD9',
+                'SHH', 'FGF8', 'FGF10', 'HAND2', 'BMP4', 'ALX1',
+                'ALX4', 'PRRX1', 'GREM1', 'LHX2', 'LHX9', 
+                'TBX2', 'TBX4', 'TBX5', 'LMX1', 'MEIS1', 'MEIS2', 'SALL4', 'IRX3', 'IRX5', 'PRRX1',
+                'SHOX1', 'SHOX2')
+# gene list from Akane
+# Creb5, Bmp2, Efna1, Stmn2, Gja3, Cpa2, Cbfa2t3, Cdh3, Lmo2, Tfap2b, Jag1, Hey1, shox2, shox1,PRRX1
+mature.example = c('COL1A1', 'COL4A1', 'COL4A2', 'COL6A', 'LAMA4', 'TNXB', 
+                   'MATN2', 'FBN1', 'FBLN2', 'FBLN5', 'PRELP', 'ELN', 'RSPO1', 
+                   'DPT', 'IGFBP3',  'TNMD', 'TWIST2', 'COL3A1', 'COL8A2', 'RARRES1', 'KLF5')
+
 
 # original code from https://github.com/const-ae/ggupset
 library(ggplot2)
 library(tidyverse, warn.conflicts = FALSE)
 library(ggupset)
+require(UpSetR)
 
-DEs = tss[, grep('cluster|dynamic', colnames(tss))]
+DEs = tss[which(!is.na(tss$cluster)),  c(2, grep('cluster|dynamic', colnames(tss)))]
+examples.sel = unique(grep(paste0(dev.example, collapse = '|'), DEs$gene))
+matures.sel = unique(grep(paste0(mature.example, collapse = '|'), DEs$gene))
+
+
+## upregulated genes 
+DEs = tss[which(tss$groups == 'reg_up'), c(2, grep('cluster|dynamic', colnames(tss)))]
+#DEs = tss[which(tss$groups == 'reg_down'), c(2, grep('cluster|dynamic', colnames(tss)))]
 DEs = DEs[which(!is.na(DEs$cluster)), ]
-DEs = DEs[,-1]
 
-DEs[!is.na(DEs)] = TRUE
-DEs[is.na(DEs)] = FALSE
-DEs = DEs > 0.5
+DEs = DEs[,-c(1:2)]
+DEs[is.na(DEs)] = 0
+colnames(DEs) = gsub('_dynamic|dynamic_', '', colnames(DEs))
 
-tidy_de <- t(DEs) %>%
-  as_tibble(rownames = "features") %>%
-  gather(tss, Member, -features) %>%
-  filter(Member) %>%
-  dplyr::select(- Member)
+pdfname = paste0(figureDir, 'chromatinFeatures_relatedTo_dynamicGenes_upregulated.pdf')
+pdf(pdfname, width = 8, height = 5)
+par(cex = 1.0, las = 1, mgp = c(2,2,0), mar = c(3,2,2,0.2), tcl = -0.3)
 
-tidy_de %>%
-  group_by(tss) %>%
-  summarize(features_all = list(features)) %>%
-  ggplot(aes(x = features_all)) +
-  geom_bar() +
-  scale_x_upset()
+upset(DEs, sets = c("H3K4me3", "H3K27ac","atac","H3K4me1", "H3K27me3"), 
+      mb.ratio = c(0.65, 0.35), order.by = "freq", keep.order =TRUE, decreasing = TRUE, show.numbers = FALSE,
+      point.size = 3., line.size = 1.5, mainbar.y.label = "gene counts", sets.x.label = "gene counts", 
+      text.scale = 1.6, 
+      main.bar.color = 'blue')
 
-ggsave(paste0(figureDir, "chromatinFeatures_relatedTo_dynamicGenes_2000genes.pdf"),  width = 8, height = 6)
+dev.off()
 
-# tidy_pathway_member <- gene_pathway_membership %>%
-#   as_tibble(rownames = "Pathway") %>%
-#   gather(Gene, Member, -Pathway) %>%
+## downregulated genes
+DEs = tss[which(tss$groups == 'reg_up'), c(2, grep('cluster|dynamic', colnames(tss)))]
+
+DEs = tss[which(tss$groups == 'reg_down'), c(2, grep('cluster|dynamic', colnames(tss)))]
+
+DEs = DEs[which(!is.na(DEs$cluster)), ]
+examples.sel = unique(grep(paste0(dev.example, collapse = '|'), DEs$gene))
+matures.sel = unique(grep(paste0(mature.example, collapse = '|'), DEs$gene))
+
+DEs = DEs[,-c(1:2)]
+DEs[is.na(DEs)] = 0
+colnames(DEs) = gsub('_dynamic|dynamic_', '', colnames(DEs))
+
+pdfname = paste0(figureDir, 'chromatinFeatures_relatedTo_dynamicGenes_downregulated.pdf')
+pdf(pdfname, width = 8, height = 5)
+par(cex = 1.0, las = 1, mgp = c(2,2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+
+upset(DEs, sets = c("H3K4me3", "H3K27ac","atac","H3K4me1", "H3K27me3"), 
+          mb.ratio = c(0.65, 0.35), order.by = "freq", keep.order =TRUE, decreasing = TRUE, show.numbers = FALSE,
+      point.size = 3., line.size = 1.5, mainbar.y.label = "gene counts", sets.x.label = "gene counts", 
+      text.scale = 1.6,
+      main.bar.color = 'red')
+
+dev.off()
+
+# upset(movies, sets = c("Action", "Adventure", "Comedy", "Drama", "Mystery", 
+#                        "Thriller", "Romance", "War", "Western"), mb.ratio = c(0.65, 0.35), order.by = "freq")
+# 
+# # prepare for ggupset
+# DEs[!is.na(DEs)] = TRUE
+# DEs[is.na(DEs)] = FALSE
+# DEs = DEs > 0.5
+# tidy_de <- t(DEs) %>%
+#   as_tibble(rownames = "features") %>%
+#   gather(tss, Member, -features) %>%
 #   filter(Member) %>%
 #   dplyr::select(- Member)
 # 
-# tidy_pathway_member %>%
-#   group_by(Gene) %>%
-#   summarize(Pathways = list(Pathway))
-# tidy_pathway_member %>%
-#   group_by(Gene) %>%
-#   summarize(Pathways = list(Pathway)) %>%
-#   ggplot(aes(x = Pathways)) +
+# p1 = tidy_de %>%
+#   group_by(tss) %>%
+#   summarize(features_all = list(features)) %>%
+#   ggplot(aes(x = features_all)) +
 #   geom_bar() +
 #   scale_x_upset()
-# as_tibble(DEs) %>%
-#   #distinct(cluster, .keep_all=TRUE) %>%
-#   ggplot(aes(x=cluster)) +
-#   geom_bar() +
-#   scale_x_upset(n_intersections = 20)
+# 
+# ggsave(filename = paste0(figureDir, "chromatinFeatures_relatedTo_dynamicGenes_2000genes.pdf"), 
+#        plot = p1,  
+#        width = 8, height = 6)
 
-#res = readRDS(file = paste0(RdataDir,  '/atac_histoneMarkers_normSignals_axolotlAllTSS.2kb_TSS_genelevel.rds'))
-#res = data.frame(res)
-#res$geneID = rownames(res)
-#mm = match(res$geneID, geneClusters$geneID)
-# res = data.frame(res, geneClusters[mm, c(1:2, 26, 3:7)], stringsAsFactors = FALSE)
 
-# res$groups[which(!is.na(res$groups))] = 'reg_up'
-# res$groups[which(res$cluster == 'G1'|res$cluster == 'G2'|res$cluster == 'G3')] = 'reg_down'
-# 
-# 
-# res$fibroblast.expressed = expressed$expressed[match(res$geneID, expressed$geneID)]
-# 
-# res$groups[which(is.na(res$groups) & res$fibroblast.expressed == '1')] = 'expressed.stable'
-# 
-# # house keeping and other non-expressing genes
-# load(file =  paste0(annotDir, 'axolotl_housekeepingGenes_controls.other.tissues.liver.islet.testis_expressedIn21tissues.Rdata'))
-# hkgs = controls.tissue$geneIDs[which(controls.tissue$tissues == 'housekeeping')]
-# nonexp = controls.tissue$geneIDs[which(controls.tissue$tissues != 'housekeeping')]
-# 
-# mm = match(res$geneID, hkgs)
-# res$groups[which(res$groups == 'expressed.stable' & !is.na(mm))] = 'house_keep'
-# 
-# mm = match(res$geneID, nonexp)
-# res$groups[which(is.na(res$groups) & !is.na(mm))] = 'non_expr'
-
-# # random select 1000 non-expressed genes
-# jj = which(is.na(res$groups))
-# jj = sample(jj, size = 3000, replace = FALSE)
-# res$groups[jj] = 'non_expr'
-# res = res[which(!is.na(res$groups)), ]
-
-# saveRDS(res, file = paste0(RdataDir, '/list_TSS_considered.rds'))
-
+##########################################
+# co-localization of H3K27me3 and H3K4me3
+# probably together with other chromatin states
+##########################################
 source('Functions_histM.R')
-res$gene = get_geneName(res$gene)
-
 library(ggrepel)
 library(dplyr)
 library(tibble)
@@ -1229,21 +1251,11 @@ require(gridExtra)
 library(tidyr)
 require(patchwork)
 
-dev.example = c('HOXA13', 'HOXA11', 'HOXA9', 'HOXD13','HOXD11', 'HOXD9',
-                'SHH', 'FGF8', 'FGF10', 'HAND2', 'BMP4', 'ALX1',
-                'ALX4', 'PRRX1', 'GREM1', 'LHX2', 'LHX9', 
-                'TBX2', 'TBX4', 'TBX5', 'LMX1', 'MEIS1', 'MEIS2', 'SALL4', 'IRX3', 'IRX5')
+tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM.rds'))
 
-# gene list from Akane
-Creb5, Bmp2, Efna1, Stmn2, Gja3, Cpa2, Cbfa2t3, Cdh3, Lmo2, Tfap2b, Jag1, Hey1, shox2, shox1,PRRX1
-
-mature.example = c('PTX3', 'IGFBP3',  'TNMD', 'TWIST2', 'COL3A1', 'CCNB1', 'NREP', 
-                   'DPT', 'COL8A2', 'PTGDS', 'RARRES1', 'COL4A2', 'KLF5', 'F13A1', 'PRDX2')
-
-
-tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
-tfs = unique(tfs$`HGNC symbol`)
-tfs = setdiff(tfs, dev.example)
+#tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
+#tfs = unique(tfs$`HGNC symbol`)
+#tfs = setdiff(tfs, dev.example)
 examples.sel = unique(grep(paste0(dev.example, collapse = '|'), res$gene))
 matures.sel = unique(grep(paste0(mature.example, collapse = '|'), res$gene))
 
