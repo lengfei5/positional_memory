@@ -61,6 +61,7 @@ cal_sample_means = function(cpm, conds = c("mUA", "mLA", "mHand") )
     }
     
   }
+  
   colnames(sample.means) = conds
   
   return(sample.means)
