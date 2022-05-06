@@ -1062,8 +1062,10 @@ tp$strand = '*'
 tp = makeGRangesFromDataFrame(tp, seqnames.field=c("X1"),
                               start.field="X2", end.field="X3", strand.field="strand")
 
-
+########
 ## start to add atac peaks overlapping tss
+## and the histM overlapping the tss
+########
 aa = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks_regeneration.dev.TSS_2Batches.R10723_R7977_peakAnnot_v1.rds'))
 names = rownames(aa)
 names = gsub('bg_', '', names)
@@ -1089,11 +1091,27 @@ pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
 mapping = findOverlaps(tp, pp, ignore.strand=TRUE,  minoverlap=100L)
 jj = (unique(mapping@from))
 missed = setdiff(c(1:nrow(tss)), jj)
-mapping = data.frame(mapping)
+mapping = data.frame(mapping) # mapping from gene to 
 
-jj_sel = mapping$subjectHits[match(c(1:nrow(tss)), mapping$queryHits)]
+# jj_sel = mapping$subjectHits[match(c(1:nrow(tss)), mapping$queryHits)] # randomly select one atac-seq peaks
+jj_sels = c() # if multiple atac peaks overlapping with the tss considered, the one with max signals will be picked up
+for(n in 1:nrow(tss))
+{
+  kk = mapping$subjectHits[which(mapping$queryHits == n)]
+  if(length(kk) == 0){
+    cat(n, '-- missing \n')
+    jj_sels = c(jj_sels, NA)
+  }else{
+    if(length(kk) == 1){
+      jj_sels = c(jj_sels, kk)
+    }else{
+      ss = apply(mat[kk, ], 1, mean)
+      jj_sels = c(jj_sels, kk[which.max(ss)])
+    }
+  }
+}
 
-res = data.frame(mat[jj_sel, ], aa[jj_sel, ], stringsAsFactors = FALSE)
+res = data.frame(mat[jj_sels, ], aa[jj_sels, ], stringsAsFactors = FALSE)
 
 fdr.cutoff = 0.01; logfc.cutoff = 1
 select = which(  (res$adj.P.Val_5dpa.vs.mUA < fdr.cutoff & abs(res$logFC_5dpa.vs.mUA) > logfc.cutoff)| 
@@ -1111,6 +1129,7 @@ colnames(res) = paste0('atac_', colnames(res))
 
 tss =  data.frame(tss, res, stringsAsFactors = FALSE)
 
+
 ## add histM analysis results
 keep = readRDS(file = paste0('../results/CT_merged_20220328/Rdata/regeneration_combined_4histMarkers_DE_345k.rds'))
 
@@ -1124,11 +1143,27 @@ pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
 mapping = findOverlaps(tp, pp, ignore.strand=TRUE,  minoverlap=100L)
 jj = (unique(mapping@from))
 missed = setdiff(c(1:nrow(tss)), jj)
-
 mapping = data.frame(mapping)
-jj_sel = mapping$subjectHits[match(c(1:nrow(tss)), mapping$queryHits)]
 
-res = keep[jj_sel,]
+#jj_sel = mapping$subjectHits[match(c(1:nrow(tss)), mapping$queryHits)]
+jj_sels = c() # if multiple atac peaks overlapping with the tss considered, the one with max H3K4me3 signals will be picked up
+for(n in 1:nrow(tss))
+{
+  kk = mapping$subjectHits[which(mapping$queryHits == n)]
+  if(length(kk) == 0){
+    cat(n, '-- missing \n')
+    jj_sels = c(jj_sels, NA)
+  }else{
+    if(length(kk) == 1){
+      jj_sels = c(jj_sels, kk)
+    }else{
+      ss = apply(keep[kk, grep('H3K4me3_mUA|H3K4me3_BL', colnames(keep))], 1, mean)
+      jj_sels = c(jj_sels, kk[which.max(ss)])
+    }
+  }
+}
+
+res = keep[jj_sels,]
 
 tss =  data.frame(tss, res, stringsAsFactors = FALSE)
 
@@ -1252,6 +1287,11 @@ library(tidyr)
 require(patchwork)
 
 tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM.rds'))
+tss$gene[which(tss$geneID == 'AMEX60DD018448'|tss$geneID == 'AMEX60DD018449')] = NA
+tss$gene[which(tss$geneID == 'AMEX60DD002780')] = NA
+tss$gene[which(tss$geneID == 'AMEX60DD003752'|tss$geneID=='AMEX60DD024053')] = NA
+
+saveRDS(tss, file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM_geneCorrection.rds'))
 
 res = tss
 res$x = apply(res[, grep('H3K4me3_mUA', colnames(res))], 1, mean)
@@ -1260,9 +1300,9 @@ res$y = apply(res[, grep('H3K27me3_mUA', colnames(res))], 1, mean)
 dev.example = c('HOXA13', 'HOXA11', 'HOXA9', 'HOXD13','HOXD11', 'HOXD9',
                 'SHH', 'FGF8', 'FGF10', 'HAND2', 'BMP4', 'ALX1',
                 'ALX4', 'PRRX1', 'GREM1', 'LHX2', 'LHX9', 
-                'TBX2', 'TBX4', 'TBX5', 'LMX1', 'MEIS1', 'MEIS2', 'SALL4', 'IRX3', 'IRX5', 'PRRX1',
+                'TBX2', 'TBX4', 'LMX1B', 'MEIS1', 'MEIS2', 'SALL4', 'IRX3', 'IRX5', 'PRRX1',
                 'SHOX1', 'SHOX2')
-mature.example = c('COL1A1', 'COL4A1', 'COL4A2', 'COL6A', 'LAMA4', 'TNXB', 
+mature.example = c('COL1A1', 'COL4A1', 'COL4A2', 'COL6A1', 'LAMA4', 'TNXB', 
                    'MATN2', 'FBN1', 'FBLN2', 'FBLN5', 'PRELP', 'ELN', 'RSPO1', 
                    'DPT', 'IGFBP3',  'TNMD', 'TWIST2', 'COL3A1', 'COL8A2', 'RARRES1', 'KLF5')
 
@@ -1303,8 +1343,8 @@ ggplot(data=res, aes(x=x, y=y, label = gene)) +
   labs(x = "UA_H3K4me3", y= 'UA_H3K27me3') +
   guides(colour = guide_legend(override.aes = list(size=2)))
 
-ggsave(paste0(figureDir, "Bivalent_TSS_mUA_scatterplot.pdf"),  width = 8, height = 6)
 
+ggsave(paste0(figureDir, "Bivalent_TSS_mUA_scatterplot.pdf"),  width = 8, height = 6)
 ##########################################
 # check the gene expression of those bivalent promoters 
 ##########################################
