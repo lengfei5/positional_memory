@@ -5060,7 +5060,43 @@ Redefine.gene.groups.with.RNAseq = function()
     theme(axis.text.x = element_text(angle = 0, size = 14)) +
     labs(x = "", y= 'normalized data (log2)')
   
-  
+}
+
+Test.other.mark.combinations.besides.bivalency = function()
+{
+  ##########################################
+  # test other markers
+  ##########################################
+  res$x = res$H3K27me3_mUA
+  res$y = res$H3K4me1_mUA
+  ggplot(data=res, aes(x=x, y=y, label = gene)) +
+    geom_point(size = 0.1, color = 'darkgray') + 
+    theme(axis.text.x = element_text(size = 12), 
+          axis.text.y = element_text(size = 12)) +
+    #scale_color_manual(values=c('black', "orange", 'darkgray',  "red",   'green')) + 
+    #geom_point(data=res[res$groups == 'reg_up', ], aes(x=H3K4me3_mUA, y=H3K27me3_mUA),  size=0.7) +
+    #geom_point(data=res[res$groups == 'reg_down', ], aes(x=H3K4me3_mUA, y=H3K27me3_mUA),  size=0.7) +
+    geom_point(data=res[examples.sel, ], aes(x=x, y=y),  size=1.5, color = 'blue') +
+    geom_text_repel(data= res[examples.sel, ], size = 4.0, color = 'blue') +
+    geom_point(data=res[matures.sel, ], aes(x=x, y=y),  size=1.5, color = 'darkred') +
+    geom_text_repel(data= res[matures.sel, ], size = 4.0, color = 'darkred') +
+    
+    #geom_text_repel(data= fpm[examples.sel, ], size = 4.0, color = 'darkblue') + 
+    #geom_hline(yintercept=2.0, colour = "darkgray") + 
+    #geom_vline(xintercept = 2.0, colour = "darkgray")
+    #geom_abline(slope = 1,  intercept = 0, colour = 'cyan3') +
+    theme_classic() +
+    theme(legend.text = element_text(size=12),
+          legend.title = element_text(size = 14),
+          legend.position=c(0.1, 0.8),
+          plot.margin = margin()
+          #legend.key.size = unit(1, 'cm')
+          #legend.key.width= unit(1, 'cm')
+    ) + 
+    geom_vline(xintercept=1, col='orange') +
+    geom_hline(yintercept=0, col="orange") +
+    labs(x = "UA_H3K27me3", y= 'UA_H3K4me1') +
+    guides(colour = guide_legend(override.aes = list(size=2)))
   
 }
 

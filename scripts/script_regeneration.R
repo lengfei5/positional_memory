@@ -1291,40 +1291,89 @@ tss$gene[which(tss$geneID == 'AMEX60DD018448'|tss$geneID == 'AMEX60DD018449')] =
 tss$gene[which(tss$geneID == 'AMEX60DD002780')] = NA
 tss$gene[which(tss$geneID == 'AMEX60DD003752'|tss$geneID=='AMEX60DD024053')] = NA
 
+tss$groups1 = tss$groups
+tss$groups = NA
+## import the smart-seq2 data to further refine the gene groups
+load(file=paste0('../results/RNAseq_data_used/Rdata/', # design and dds for smartseq2 REGENERATION data
+                 'design_dds_all_regeneration_12selectedSamples_v47.hox.patch.Rdata')) 
+rm(design); 
+dds$condition = droplevels(dds$condition)
+ss = rowSums(counts(dds))
+ids = get_geneID(rownames(dds))
+
+# double check the non-expressed genes
+ggs = tss$geneID[which(tss$groups == 'non_expr')]
+length(intersect(ggs, ids[which(ss==0)]))
+#tss$groups[which(tss$groups == 'non_expr')] = NA
+tss$groups[which(!is.na(match(tss$geneID, ids[which(ss==0)])))] = 'non_expr'
+
+tss$groups[which(!is.na(match(tss$geneID, ids[which(ss>0 & ss<100)])))] = 'lowlyExpr_stable'
+tss$groups[which(!is.na(match(tss$geneID, ids[which(ss>100)])))] = 'highlyExpr_stable'
+tss$groups[which(!is.na(tss$groups) & tss$groups1 == 'house_keep')] = 'house_keep'
+
+jj = which(tss$groups1 == 'reg_down' & (tss$groups == "lowlyExpr_stable"|tss$groups == 'highlyExpr_stable'))
+tss$groups[jj] = 'DE_down'
+
+jj = which(tss$groups1 == 'reg_up' & (tss$groups == "lowlyExpr_stable"|tss$groups == 'highlyExpr_stable'))
+tss$groups[jj] = 'DE_up'
+
+
 saveRDS(tss, file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM_geneCorrection.rds'))
 
-res = tss
+## bivalent analysis here
+tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM_geneCorrection.rds'))
+res = tss[which(!is.na(tss$groups)), ]
 res$x = apply(res[, grep('H3K4me3_mUA', colnames(res))], 1, mean)
 res$y = apply(res[, grep('H3K27me3_mUA', colnames(res))], 1, mean)
+#res$groups[which(res$groups != 'house_keep'& res$groups!= 'non_expr')] = NA
+res = res[which(res$x<7 & res$y <7),]
 
 dev.example = c('HOXA13', 'HOXA11', 'HOXA9', 'HOXD13','HOXD11', 'HOXD9',
                 'SHH', 'FGF8', 'FGF10', 'HAND2', 'BMP4', 'ALX1',
-                'ALX4', 'PRRX1', 'GREM1', 'LHX2', 'LHX9', 
-                'TBX2', 'TBX4', 'LMX1B', 'MEIS1', 'MEIS2', 'SALL4', 'IRX3', 'IRX5', 'PRRX1',
-                'SHOX1', 'SHOX2')
+                'ALX4', 'GREM1', 'LHX2', 'LHX9', 
+                'TBX2', 'TBX4', 'LMX1B', 'MEIS1', 'MEIS2', 'SALL4', 'IRX3', 'IRX5')
+
 mature.example = c('COL1A1', 'COL4A1', 'COL4A2', 'COL6A1', 'LAMA4', 'TNXB', 
                    'MATN2', 'FBN1', 'FBLN2', 'FBLN5', 'PRELP', 'ELN', 'RSPO1', 
-                   'DPT', 'IGFBP3',  'TNMD', 'TWIST2', 'COL3A1', 'COL8A2', 'RARRES1', 'KLF5')
+                   'DPT')
 
 examples.sel = unique(grep(paste0(dev.example, collapse = '|'), res$gene))
 matures.sel = unique(grep(paste0(mature.example, collapse = '|'), res$gene))
 
-jj = which(res$x>1 & res$y >0)
+jj = which(res$x>1 & res$y > 0)
 length(jj)
 #tfs.sel = unique(grep(paste0(tfs, collapse = '|'), res$gene))
 #tfs.sel = tfs.sel[!is.na(match(tfs.sel, jj))]
 
 ggplot(data=res, aes(x=x, y=y, label = gene)) +
   geom_point(size = 0.1, color = 'darkgray') + 
+  #geom_point(size = 0.1 ) +
   theme(axis.text.x = element_text(size = 12), 
         axis.text.y = element_text(size = 12)) +
-  #scale_color_manual(values=c('black', "orange", 'darkgray',  "red",   'green')) + 
+  #scale_color_manual(values=c("darkred", 'darkorange')) + 
   #geom_point(data=res[res$groups == 'reg_up', ], aes(x=H3K4me3_mUA, y=H3K27me3_mUA),  size=0.7) +
   #geom_point(data=res[res$groups == 'reg_down', ], aes(x=H3K4me3_mUA, y=H3K27me3_mUA),  size=0.7) +
-  geom_point(data=res[examples.sel, ], aes(x=x, y=y),  size=1.5, color = 'blue') +
-  geom_text_repel(data= res[examples.sel, ], size = 4.0, color = 'blue') +
-  geom_point(data=res[matures.sel, ], aes(x=x, y=y),  size=1.5, color = 'darkred') +
-  geom_text_repel(data= res[matures.sel, ], size = 4.0, color = 'darkred') +
+  geom_point(data=res[res$groups == 'house_keep', ], aes(x=x, y=y),  size=0.3, color = 'red') +
+  geom_point(data=res[res$groups == 'non_expr', ], aes(x=x, y=y),  size=0.3, color = 'darkorange') +
+  geom_point(data=res[examples.sel, ], aes(x=x, y=y),  size=1.5, color = 'black') +
+  #geom_text_repel(data= res[examples.sel, ], size = 4.0, color = 'blue') +
+  #geom_point(data=res[matures.sel, ], aes(x=x, y=y),  size=1.5, color = 'black') +
+  geom_text_repel(data= res[c(examples.sel), ], 
+                  aes(
+                    x, y
+                    #color = factor(groups)
+                    #label = res$gene[c(matures.sel, examples.sel)]
+                    # Cars with 4 cylinders are rotated 90 degrees.
+                    #angle = ifelse(mtcars$cyl == 4, 90, 0)
+                  ),
+                  size = 5,
+                  color = "blue",
+                  #family = 'Times',
+                  fontface = 'bold',
+                  # Add extra padding around each text label.
+                  box.padding = unit(0.3, 'lines'),
+                  # Add extra padding around each data point.
+                  point.padding = unit(1.6, 'lines')) +
   
   #geom_text_repel(data= fpm[examples.sel, ], size = 4.0, color = 'darkblue') + 
   #geom_hline(yintercept=2.0, colour = "darkgray") + 
@@ -1333,47 +1382,53 @@ ggplot(data=res, aes(x=x, y=y, label = gene)) +
   theme_classic() +
   theme(legend.text = element_text(size=12),
         legend.title = element_text(size = 14),
-        legend.position=c(0.1, 0.8),
+        legend.position=c(0.2, 0.8),
         plot.margin = margin()
         #legend.key.size = unit(1, 'cm')
         #legend.key.width= unit(1, 'cm')
   ) + 
-  geom_vline(xintercept=1, col='orange') +
-  geom_hline(yintercept=0, col="orange") +
+  geom_vline(xintercept=c(1), col='black') +
+  geom_hline(yintercept=c(0), col="black") +
   labs(x = "UA_H3K4me3", y= 'UA_H3K27me3') +
   guides(colour = guide_legend(override.aes = list(size=2)))
 
 
 ggsave(paste0(figureDir, "Bivalent_TSS_mUA_scatterplot.pdf"),  width = 8, height = 6)
+
 ##########################################
 # check the gene expression of those bivalent promoters 
 ##########################################
-rna = readRDS(file = paste0('../results/RNAseq_data_used/Rdata/',
-                            'smartseq2_R10724_R11635_cpm.batchCorrect_DESeq2.test.withbatch.log2FC.shrinked_RNAseq_data_used_20220408.rds'))
-rna = rna[, grep('Mature_UA', colnames(rna))]
-rna = data.frame(rna, mUA.mean = apply(rna, 1, median))
-rna$gene = rownames(rna)
-rna$geneID = get_geneID(rna$gene)
-
+# rna = readRDS(file = paste0('../results/RNAseq_data_used/Rdata/',
+#                             'smartseq2_R10724_R11635_cpm.batchCorrect_DESeq2.test.withbatch.log2FC.shrinked_RNAseq_data_used_20220408.rds'))
+# rna = rna[, grep('Mature_UA', colnames(rna))]
+# rna = data.frame(rna, mUA.mean = apply(rna, 1, median))
+# rna$gene = rownames(rna)
+# rna$geneID = get_geneID(rna$gene)
 cutoff_active = 1
 cutoff_repress = 0
-jj = which(res$H3K4me3_mUA > cutoff_active & res$H3K27me3_mUA > cutoff_repress)
+jj = which(res$x > cutoff_active & res$y > cutoff_repress)
 length(jj)
+jj1 = which(res$x > cutoff_active & res$y <= cutoff_repress)
+jj2 = which(res$x < cutoff_active & res$y > cutoff_repress)
 
-jj1 = which(res$H3K4me3_mUA > cutoff_active & res$H3K27me3_mUA <= cutoff_repress)
-jj2 = which(res$H3K4me3_mUA < cutoff_active & res$H3K27me3_mUA > cutoff_repress)
+rna = res[, c(1:2, 7:8)] 
+rna$groups = 'absent'
+rna$groups[jj] = 'both'
+rna$groups[jj1] = 'active'
+rna$groups[jj2] = 'repressive'
+colnames(rna)[ncol(rna)] = 'mUA'
+rna$mUA[which(is.na(rna$mUA))] = -6
 
-
-rna$groups = 'others'
-rna$groups[!is.na(match(rna$geneID, res$geneID[jj]))] = 'bivalent'
-rna$groups[!is.na(match(rna$geneID, res$geneID[jj1]))] = 'active'
-rna$groups[!is.na(match(rna$geneID, res$geneID[jj2]))] = 'rest'
-
-ggplot(data = rna, aes(x = groups, y=mUA.mean, fill=groups)) + 
+library(khroma)
+rna = data.frame(rna)
+rna%>%
+  mutate(groups = factor(groups, levels = c('active', 'both', 'absent', 'repressive'))) %>%
+  ggplot(aes(x = groups, y=mUA, fill= groups)) + 
   geom_boxplot(outlier.alpha = 0.1) + 
   #geom_jitter(width = 0.1)+
   #geom_violin(width = 0.8) +
-  #scale_fill_discrete(values=c('green', "blue", 'red',  'black')) + 
+  #scale_fill_discrete(values=c('black', "orange", 'darkgray',  "red",   'green')) + 
+  scale_fill_manual(values=c("#117733",  "blue", 'cyan',  'magenta')) + 
   theme_classic() +
   theme(axis.text.x = element_text(angle = 0, size = 14), 
         legend.text = element_text(size=12),
@@ -1382,40 +1437,6 @@ ggplot(data = rna, aes(x = groups, y=mUA.mean, fill=groups)) +
   labs(x = "", y= 'normalized gene expression (log2 cpm)')
 
 ggsave(paste0(figureDir, "Bivalent_TSS_mUA_geneExpression.pdf"),  width = 8, height = 6)
-
-##########################################
-# test other markers
-##########################################
-res$x = res$H3K27me3_mUA
-res$y = res$H3K4me1_mUA
-ggplot(data=res, aes(x=x, y=y, label = gene)) +
-  geom_point(size = 0.1, color = 'darkgray') + 
-  theme(axis.text.x = element_text(size = 12), 
-        axis.text.y = element_text(size = 12)) +
-  #scale_color_manual(values=c('black', "orange", 'darkgray',  "red",   'green')) + 
-  #geom_point(data=res[res$groups == 'reg_up', ], aes(x=H3K4me3_mUA, y=H3K27me3_mUA),  size=0.7) +
-  #geom_point(data=res[res$groups == 'reg_down', ], aes(x=H3K4me3_mUA, y=H3K27me3_mUA),  size=0.7) +
-  geom_point(data=res[examples.sel, ], aes(x=x, y=y),  size=1.5, color = 'blue') +
-  geom_text_repel(data= res[examples.sel, ], size = 4.0, color = 'blue') +
-  geom_point(data=res[matures.sel, ], aes(x=x, y=y),  size=1.5, color = 'darkred') +
-  geom_text_repel(data= res[matures.sel, ], size = 4.0, color = 'darkred') +
-  
-  #geom_text_repel(data= fpm[examples.sel, ], size = 4.0, color = 'darkblue') + 
-  #geom_hline(yintercept=2.0, colour = "darkgray") + 
-  #geom_vline(xintercept = 2.0, colour = "darkgray")
-  #geom_abline(slope = 1,  intercept = 0, colour = 'cyan3') +
-  theme_classic() +
-  theme(legend.text = element_text(size=12),
-        legend.title = element_text(size = 14),
-        legend.position=c(0.1, 0.8),
-        plot.margin = margin()
-        #legend.key.size = unit(1, 'cm')
-        #legend.key.width= unit(1, 'cm')
-  ) + 
-  geom_vline(xintercept=1, col='orange') +
-  geom_hline(yintercept=0, col="orange") +
-  labs(x = "UA_H3K27me3", y= 'UA_H3K4me1') +
-  guides(colour = guide_legend(override.aes = list(size=2)))
 
 
 ##########################################
