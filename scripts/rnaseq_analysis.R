@@ -1172,7 +1172,6 @@ callback = function(hc, mat){
   as.hclust(dend)
 }
 
-
 pheatmap(yy, annotation_row = my_gene_col, 
          annotation_col = df, show_rownames = FALSE, scale = 'none', 
          color =  colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(10), 

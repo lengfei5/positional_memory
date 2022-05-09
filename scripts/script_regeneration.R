@@ -1309,7 +1309,9 @@ tss$groups[which(!is.na(match(tss$geneID, ids[which(ss==0)])))] = 'non_expr'
 
 tss$groups[which(!is.na(match(tss$geneID, ids[which(ss>0 & ss<100)])))] = 'lowlyExpr_stable'
 tss$groups[which(!is.na(match(tss$geneID, ids[which(ss>100)])))] = 'highlyExpr_stable'
-tss$groups[which(!is.na(tss$groups) & tss$groups1 == 'house_keep')] = 'house_keep'
+
+ss = apply(tss[, grep('smartseq2_', colnames(tss))], 1, mean) # define house-keeping genes
+tss$groups[which(tss$groups == 'highlyExpr_stable' & ss>2.5 & tss$groups1 == 'house_keep')] = 'house_keep'
 
 jj = which(tss$groups1 == 'reg_down' & (tss$groups == "lowlyExpr_stable"|tss$groups == 'highlyExpr_stable'))
 tss$groups[jj] = 'DE_down'
@@ -1318,10 +1320,11 @@ jj = which(tss$groups1 == 'reg_up' & (tss$groups == "lowlyExpr_stable"|tss$group
 tss$groups[jj] = 'DE_up'
 
 
-saveRDS(tss, file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM_geneCorrection.rds'))
+saveRDS(tss, file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM_geneCorrection_v2.rds'))
 
 ## bivalent analysis here
-tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM_geneCorrection.rds'))
+tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM_geneCorrection_v2.rds'))
+
 res = tss[which(!is.na(tss$groups)), ]
 res$x = apply(res[, grep('H3K4me3_mUA', colnames(res))], 1, mean)
 res$y = apply(res[, grep('H3K27me3_mUA', colnames(res))], 1, mean)
@@ -1389,7 +1392,7 @@ ggplot(data=res, aes(x=x, y=y, label = gene)) +
   ) + 
   geom_vline(xintercept=c(1), col='black') +
   geom_hline(yintercept=c(0), col="black") +
-  labs(x = "UA_H3K4me3", y= 'UA_H3K27me3') +
+  labs(x = "UA_H3K4me3 (log2 normalized counts)", y= 'UA_H3K27me3 (log2 normalized counts)') +
   guides(colour = guide_legend(override.aes = list(size=2)))
 
 
@@ -1438,7 +1441,6 @@ rna%>%
 
 ggsave(paste0(figureDir, "Bivalent_TSS_mUA_geneExpression.pdf"),  width = 8, height = 6)
 
-
 ##########################################
 # go term enrichment for bivalent promoters 
 ##########################################
@@ -1449,59 +1451,154 @@ library(ggplot2)
 library(stringr)
 library(org.Hs.eg.db)
 library(org.Mm.eg.db)
+library(tidyr)
+library(dplyr)
+require(ggplot2)
+library("gridExtra")
+library("cowplot")
+require(ggpubr)
+
 
 firstup <- function(x) {
   substr(x, 1, 1) <- toupper(substr(x, 1, 1))
   x
 }
 
-jj = which(res$H3K4me3_mUA>1 & res$H3K27me3_mUA >0)
-length(jj)
 
-# background
-gg.expressed = unique(res$gene[jj])
-gg.expressed = gg.expressed[which(gg.expressed != '' & gg.expressed != 'N/A' & !is.na(gg.expressed))]
+grps = c('active', 'both', 'absent', 'repressive')
 
-xx0 = res$gene
-xx0 = xx0[which(xx0 != '' & xx0 != 'N/A' & !is.na(xx0))]
-bgs = unique(xx0)
+for(n in 1:length(grs))
+{
+  # n = 1
+  jj = which(rna$groups == grps[n])
+  gg.expressed = unique(rna$gene[jj]) # gene set 
+  xx0 = rna$gene # background
+  
+  gg.expressed = gg.expressed[which(gg.expressed != '' & gg.expressed != 'N/A' & !is.na(gg.expressed))]
+  bgs = unique(xx0[which(xx0 != '' & xx0 != 'N/A' & !is.na(xx0))])
+  
+  gg.expressed = firstup(tolower(gg.expressed))
+  bgs = firstup(tolower(bgs))
+  
+  gene.df <- bitr(gg.expressed, fromType = "SYMBOL", toType = c("ENSEMBL", "ENTREZID"),
+                  OrgDb = org.Mm.eg.db)
+  bgs.df <- bitr(bgs, fromType = "SYMBOL", toType = c("ENSEMBL", "ENTREZID"),
+                 OrgDb = org.Mm.eg.db)
+  
+  ego <-  enrichGO(gene         = gene.df$ENSEMBL,
+                   universe     = bgs.df$ENSEMBL,
+                   #OrgDb         = org.Hs.eg.db,
+                   OrgDb         = org.Mm.eg.db,
+                   keyType       = 'ENSEMBL',
+                   ont           = "MF",
+                   pAdjustMethod = "BH",
+                   pvalueCutoff  = 0.05,
+                   qvalueCutoff  = 0.1)
+  
+  kk = grep('deoxyribonucleic', ego@result$Description)
+  ego@result$Description[kk] = 'endonuclease activity'
+  kk = grep('transferase activity',  ego@result$Description)
+  ego@result$Description[kk] = 'transferase activity'
+  
+  kk = grep('binding transcription factor activity', ego@result$Description)
+  ego@result$Description[kk] = 'DNA-binding transcription factor activity'
+  
+  eval(parse(text = paste0('p', n, '= barplot(ego, showCategory=20) + ggtitle("GO enrichment of ', grps[n], ' genes")')))
+  
+}
 
-gg.expressed = firstup(tolower(gg.expressed))
-bgs = firstup(tolower(bgs))
-#bgs0 = firstup(tolower(bgs0))
-
-gene.df <- bitr(gg.expressed, fromType = "SYMBOL",
-                toType = c("ENSEMBL", "ENTREZID"),
-                OrgDb = org.Mm.eg.db)
-head(gene.df)
-
-bgs.df <- bitr(bgs, fromType = "SYMBOL",
-               toType = c("ENSEMBL", "ENTREZID"),
-               OrgDb = org.Mm.eg.db)
-
-head(bgs.df)
-
-ego <-  enrichGO(gene         = gene.df$ENSEMBL,
-                 universe     = bgs.df$ENSEMBL,
-                 #OrgDb         = org.Hs.eg.db,
-                 OrgDb         = org.Mm.eg.db,
-                 keyType       = 'ENSEMBL',
-                 ont           = "MF",
-                 pAdjustMethod = "BH",
-                 pvalueCutoff  = 0.01,
-                 qvalueCutoff  = 0.05)
-
-barplot(ego, showCategory=20) + ggtitle("GO enrichment of bivalent TSS")
-
-#edox <- setReadable(ego, 'org.Mm.eg.db', 'ENSEMBL')
 pdfname = paste0(figureDir, 'GoEnrichment_bivalent_TSS_mUA.pdf')
-pdf(pdfname, width = 8, height = 6)
+pdf(pdfname, width = 30, height = 6)
 par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
 
-barplot(ego, showCategory=20) + ggtitle("bivalent_TSS_mUA")
-
+grid.arrange(p1, p2, p3, p4,
+             ncol = 4, nrow = 1)
+#ggsave(paste0(figureDir, "dynamics_peaks_averageProfiles_", markers[m], ".pdf"), width=4, height = 20)
 dev.off()
 
+
+##########################################
+# check if bivalent genes keep their bivalent state or transit into active or repressive states during regeneration 
+##########################################
+conds_histM = c('H3K4me3','H3K27me3')
+conds = c("mUA", "BL5days", "BL9days", 'BL13days.prox', 'BL13days.dist')
+
+cutoff_active = 1
+cutoff_repress = 0
+
+res_sel = res[which(res$groups == 'DE_down'|res$groups == 'DE_up'|res$groups == 'house_keep'|res$groups == 'non_expr'), ]
+
+namesx = paste0('H3K4me3_', conds)
+x = cal_sample_means(as.matrix(res_sel[, grep(paste0(namesx, collapse = '|'), colnames(res_sel))]), conds = namesx)
+namesy = paste0('H3K27me3_', conds)
+y = cal_sample_means(as.matrix(res_sel[, grep(paste0(namesy, collapse = '|'), colnames(res_sel))]), conds = namesy)
+
+states = data.frame(matrix(NA, nrow = nrow(res_sel), ncol = length(conds)))
+colnames(states) = conds
+rownames(states) = rownames(res_sel)
+
+for(n in 1:ncol(states))
+{
+  # n = 1
+  states[ ,n] = 0
+  states[which(x[,n] < cutoff_active & y[,n] >= cutoff_repress) ,n] = 1
+  states[which(x[,n] >=cutoff_active & y[,n] >= cutoff_repress) ,n] = 2
+  states[which(x[,n] >=cutoff_active & y[,n] < cutoff_repress) ,n] = 3
+  # jj = which(res_sel$x > cutoff_active & res_sel$y > cutoff_repress)
+  # length(jj)
+  # jj1 = which(res_sel$x > cutoff_active & res_sel$y <= cutoff_repress)
+  # jj2 = which(res_sel$x < cutoff_active & res_sel$y > cutoff_repress)
+}
+
+states = data.frame(states)
+
+library(khroma)
+muted <- colour("muted")
+sunset <- colour("sunset")
+pale <- colour("pale")
+# prepare the sample info and also the gene groups
+df <- data.frame(conds)
+rownames(df) = colnames(states)
+colnames(df) = 'sample'
+
+sample_colors = c('magenta', 'darkblue', 'springgreen4', 'springgreen', 'springgreen2', 'springgreen3', 'gold2',
+                  'red')[c(1:length(conds))]
+names(sample_colors) = conds
+
+grps = res_sel$groups
+grps[which(grps == 'house_keep')] = 'highlyExpr_stable'
+my_gene_col <- data.frame(groups =  grps)
+rownames(my_gene_col) = rownames(states)
+cluster_col = c('black', 'red', 'darkgray', '#009988', "#F99858")
+names(cluster_col) = unique(grps)
+
+annot_colors = list(
+  condition = sample_colors,
+  groups = cluster_col)
+
+#sunset <- colour("sunset")
+#highcontrast <- colour("high contrast")
+cols = rev(c("#117733",  "blue", 'cyan',  'magenta'))
+#cols =  colorRampPalette(colour("high contrast"))(nb_breaks)
+
+pheatmap(as.matrix(states), 
+         annotation_row = my_gene_col, 
+         annotation_col = df,
+         cluster_rows = TRUE, 
+         cluster_cols = FALSE, show_rownames = FALSE, show_colnames = FALSE,
+         scale = 'none',
+         treeheight_row = 10,
+         #color = c('darkgray', 'blue'), 
+         #color = colorRampPalette((brewer.pal(n = 7, name ="PRGn")))(nb_breaks),
+         color = cols,
+         annotation_colors = annot_colors,
+         fontsize_row = 20,
+         breaks = seq(0, 3, length.out = 5),
+         #gaps_row = gaps.row,
+         filename = paste0(figureDir, '/chromatinStates_bivalency_regenerations.pdf'), 
+         width = 4, height = 10)
+
+# ggsave(paste0(figureDir, "Bivalent_TSS_mUA_geneExpression.pdf"),  width = 8, height = 6)
 
 ##########################################
 # check the chromatin features for gene groups defined by RNA-seq data
