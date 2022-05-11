@@ -539,7 +539,7 @@ if(PLOT.global.dynamic.parameters.for.histM){
   library(lattice)
   require(pheatmap)
   require(RColorBrewer)
-  
+  library(khroma)
   # import atac-seq peak
   # z-score of data and heatmap (variable: plt, yy and res)
   # # saved variables: yy (data of atac-seq peaks), res (DE test result) and plt (saved the heatmap of dynamic atac-seq peaks)
@@ -548,6 +548,8 @@ if(PLOT.global.dynamic.parameters.for.histM){
   res_atac = res
   yy_atac = yy
   res_atac = res_atac[match(rownames(yy_atac), rownames(res_atac)), ]
+  rm(yy)
+  rm(res)
   
   # import histone marker 
   RdataHistM = '/Users/jiwang/workspace/imp/positional_memory/results/CT_merged_20220328/Rdata'
@@ -603,41 +605,49 @@ if(PLOT.global.dynamic.parameters.for.histM){
   conds_histM = c('H3K4me3','H3K27me3', 'H3K4me1', 'H3K27ac')
   conds = c("mUA", "BL5days", "BL9days", 'BL13days.prox', 'BL13days.dist')
   
+  ## heatmap of test significance for 4 histone marks
   pheatmap(hde, cluster_rows = FALSE, cluster_cols = FALSE, show_rownames = FALSE, show_colnames = FALSE,
            color = c('darkgray', 'red'), 
            gaps_row = gaps.row,
            filename = paste0(figureDir, '/regeneration_histM_dynamics_for_dynamicATACpeaks.pdf'), 
-           width = 3, height = 12)
+           width = 4, height = 12)
   
-  fcs = hde
-  range <- 2.5
-  for(n in 1:ncol(fcs))
+  ## heatmaps of log2FC, time point vs mUA for each histone marks 
+  for(n in 1:conds_histM)
   {
-    # n = 1
-    ii.test = intersect(grep('logFC_', colnames(keep1)), grep(colnames(fcs)[n], colnames(keep1)))
+    # n = 3
+    ii.test = intersect(grep('logFC_', colnames(keep1)), grep(conds_histM[n], colnames(keep1)))
     test = keep1[, ii.test]
-    test = apply(test, 1, mean)
-    test[which(test>= range)] = range
-    test[which(test<= (-range))] = -range
-    fcs[,n]  = test
+    fc_sels = c('5dpa.vs.mUA', '9dpa.vs.mUA', '13dpap.vs.mUA', '13dpad')
+    
+    jj.test = c()
+    for(fc in fc_sels) jj.test = c(jj.test, grep(fc, colnames(test)))
+    test = test[, jj.test]
+    colnames(test) = fc_sels
+    
+    range <- 3
+    test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
+    
+    nb_breaks = 7
+    sunset <- colour("sunset")
+    PRGn <- colour("PRGn")
+    #highcontrast <- colour("high contrast")
+    if(n == 1) cols = (sunset(nb_breaks))
+    if(n == 2) cols = rev(PRGn(nb_breaks-1))
+    if(n == 3)   cols = colorRampPalette(rev((brewer.pal(n = 8, name ="BrBG"))))(6)
+    #cols =  colorRampPalette(colour("high contrast"))(nb_breaks)
+    #cols = rev(terrain.colors(10))
+    
+    pheatmap(test, cluster_rows = FALSE, cluster_cols = FALSE, show_rownames = FALSE, show_colnames = FALSE,
+             #color = c('darkgray', 'blue'), 
+             #color = colorRampPalette((brewer.pal(n = 7, name ="PRGn")))(nb_breaks),
+             color = cols, 
+             breaks = seq(-range, range, length.out = nb_breaks), 
+             gaps_row = gaps.row,
+             filename = paste0(figureDir, '/regeneration_histM_dynamics_log2fc.vs.mUA_dynamicATACpeaks_', conds_histM[n], '.pdf'), 
+             width = 3, height = 12)
+    
   }
-  
-  #fcs[which(fcs > 2.5)] = 2.5
-  #fcs[which(fcs<-2.5)] = -2.5
-  nb_breaks = 9
-  sunset <- colour("sunset")
-  #highcontrast <- colour("high contrast")
-  cols = rev(sunset(nb_breaks))
-  #cols =  colorRampPalette(colour("high contrast"))(nb_breaks)
-  
-  pheatmap(fcs, cluster_rows = FALSE, cluster_cols = FALSE, show_rownames = FALSE, show_colnames = FALSE,
-           #color = c('darkgray', 'blue'), 
-           #color = colorRampPalette((brewer.pal(n = 7, name ="PRGn")))(nb_breaks),
-           color = cols, 
-           breaks = seq(-range, range, length.out = nb_breaks), 
-           gaps_row = gaps.row,
-           filename = paste0(figureDir, '/regeneration_histM_dynamics_log2fc.average_for_dynamicATACpeaks.pdf'), 
-           width = 3, height = 12)
   
 }
 
@@ -1025,7 +1035,6 @@ write.table(SAF, file = paste0('/Volumes/groups/tanaka/People/current/jiwang/pro
             sep = '\t', row.names = FALSE, 
             col.names = TRUE, quote = FALSE) 
 
-
 ##########################################
 # start with the dynamic genes from RNA-seq data, together with expressed genes and some controls
 # the collect all chromatin features, atac, histone markers
@@ -1293,6 +1302,7 @@ tss$gene[which(tss$geneID == 'AMEX60DD003752'|tss$geneID=='AMEX60DD024053')] = N
 
 tss$groups1 = tss$groups
 tss$groups = NA
+
 ## import the smart-seq2 data to further refine the gene groups
 load(file=paste0('../results/RNAseq_data_used/Rdata/', # design and dds for smartseq2 REGENERATION data
                  'design_dds_all_regeneration_12selectedSamples_v47.hox.patch.Rdata')) 
@@ -1313,10 +1323,10 @@ tss$groups[which(!is.na(match(tss$geneID, ids[which(ss>100)])))] = 'highlyExpr_s
 ss = apply(tss[, grep('smartseq2_', colnames(tss))], 1, mean) # define house-keeping genes
 tss$groups[which(tss$groups == 'highlyExpr_stable' & ss>2.5 & tss$groups1 == 'house_keep')] = 'house_keep'
 
-jj = which(tss$groups1 == 'reg_down' & (tss$groups == "lowlyExpr_stable"|tss$groups == 'highlyExpr_stable'))
+jj = which(tss$groups1 == 'reg_down' & (tss$groups == "lowlyExpr_stable"|tss$groups == 'highlyExpr_stable'|tss$groups == 'house_keep'))
 tss$groups[jj] = 'DE_down'
 
-jj = which(tss$groups1 == 'reg_up' & (tss$groups == "lowlyExpr_stable"|tss$groups == 'highlyExpr_stable'))
+jj = which(tss$groups1 == 'reg_up' & (tss$groups == "lowlyExpr_stable"|tss$groups == 'highlyExpr_stable'|tss$groups == 'house_keep'))
 tss$groups[jj] = 'DE_up'
 
 
@@ -1552,6 +1562,37 @@ for(n in 1:ncol(states))
 
 states = data.frame(states)
 
+grps = res_sel$groups
+#grps[which(grps == 'house_keep')] = 'highlyExpr_stable'
+
+cluster_order = c('house_keep', 'DE_up', 'DE_down', 'non_expr')
+gaps.row = c()
+peakNm = c()
+library(dendextend)
+library(ggplot2)
+
+for(n in 1:length(cluster_order))
+{
+  kk = which(grps == cluster_order[n])
+  cat('clsuter ', cluster_order[n], ' -- ', length(kk), ' peaks \n')
+  
+  hm_hclust <- hclust(dist(as.matrix(states[kk,])), method = "complete")
+  #hm_cluster <- cutree(tree = as.dendrogram(hm_hclust), h = 5)
+  peakNm = c(peakNm, hm_hclust$labels[hm_hclust$order])
+  
+  if(n == 1)  {gaps.row = c(gaps.row, length(kk))
+  }else{
+    if(n < length(cluster_order)) {
+      gaps.row = c(gaps.row,  gaps.row[n-1] + length(kk))
+    }
+  }
+}
+
+new_order = match(peakNm, rownames(states))
+states = states[new_order, ]
+grps = grps[new_order]
+
+
 library(khroma)
 muted <- colour("muted")
 sunset <- colour("sunset")
@@ -1565,11 +1606,9 @@ sample_colors = c('magenta', 'darkblue', 'springgreen4', 'springgreen', 'springg
                   'red')[c(1:length(conds))]
 names(sample_colors) = conds
 
-grps = res_sel$groups
-grps[which(grps == 'house_keep')] = 'highlyExpr_stable'
 my_gene_col <- data.frame(groups =  grps)
 rownames(my_gene_col) = rownames(states)
-cluster_col = c('black', 'red', 'darkgray', '#009988', "#F99858")
+cluster_col = c('red', '#009988', 'black',  "#F99858")
 names(cluster_col) = unique(grps)
 
 annot_colors = list(
@@ -1584,85 +1623,86 @@ cols = rev(c("#117733",  "blue", 'cyan',  'magenta'))
 pheatmap(as.matrix(states), 
          annotation_row = my_gene_col, 
          annotation_col = df,
-         cluster_rows = TRUE, 
+         cluster_rows = FALSE, 
          cluster_cols = FALSE, show_rownames = FALSE, show_colnames = FALSE,
          scale = 'none',
-         treeheight_row = 10,
+         #treeheight_row = 10,
          #color = c('darkgray', 'blue'), 
          #color = colorRampPalette((brewer.pal(n = 7, name ="PRGn")))(nb_breaks),
          color = cols,
          annotation_colors = annot_colors,
          fontsize_row = 20,
          breaks = seq(0, 3, length.out = 5),
-         #gaps_row = gaps.row,
+         gaps_row = gaps.row,
          filename = paste0(figureDir, '/chromatinStates_bivalency_regenerations.pdf'), 
          width = 4, height = 10)
 
-# ggsave(paste0(figureDir, "Bivalent_TSS_mUA_geneExpression.pdf"),  width = 8, height = 6)
+##########################################
+# check the chromatin features that are relevant to predict gene expression patterns (gene groups defined by smartseq2)
+##########################################
+## collect features
+yy = res[, grep('_mUA_', colnames(res))]
+yy = cal_sample_means(yy, conds = c('H3K4me3_mUA', 'H3K27me3_mUA', 'H3K4me1_mUA', 'H3K27ac_mUA'))
+yy = data.frame(groups = res$groups, 
+                gene = res$gene,
+                promoters = res$coords, 
+                rna_mUA = res$smartseq2_mUA, 
+                atac_mUA = res$atac_mUA, 
+                yy, 
+                stringsAsFactors = FALSE)
 
-##########################################
-# check the chromatin features for gene groups defined by RNA-seq data
-##########################################
+#yy = add_CpG_features(yy)
+imps = readRDS(file = paste0(RdataDir, '/RF_featuresImportance.rds'))
+
+ggplot(data = imps, aes(x = scores, y = rank, label = names)) +   
+  geom_point(size = 3.0, color = 'blue') +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 14), 
+        axis.text.y = element_text(size = 14),
+        axis.title = element_text(size = 15)) + 
+  #geom_text_repel(data=subset(yy, pvalue_pos > 2), size = 4)
+  geom_text_repel(size = 4, box.padding = 0.3) +
+  labs(x = "feature importance (RF)", y= 'rank')
+
+ggsave(paste0(figureDir, "promoter_chromatinFeatures_Importance_RF_forUpDownRegulated.pdf"),  width = 6, height = 4)
+
+yy = readRDS(file = paste0(RdataDir, '/chromatin_promoter_features_geneGroups.rds'))
 #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
 #scale_color_manual(values=c("blue", "black", "red")) +
+library(wesanderson)
 
-p1 = res[,c(5, 6, 7,8,9, 28,29)] %>% 
-  pivot_longer(cols = c('atac_mUA', 'H3K4me3_mUA', 'H3K27me3_mUA','H3K4me1_mUA',  'H3K27ac_mUA'), names_to = 'markers') %>%
-  mutate(markers = factor(markers, levels = c('H3K27me3_mUA', 'H3K4me3_mUA', 'atac_mUA', 'H3K27ac_mUA', 'H3K4me1_mUA'))) %>%
-  ggplot(aes(x = groups, y=value, fill=markers)) + 
+fts = c('rna_mUA', 'H3K27me3_mUA', 'H3K4me3_mUA', 'H3K27ac_mUA','atac_mUA',  'H3K4me1_mUA')
+yy$rna_mUA[is.na(yy$rna_mUA)] = -6
+yy %>% 
+  pivot_longer(cols = fts, names_to = 'features') %>%
+  mutate(features = factor(features, levels = fts)) %>%
+  mutate(groups = factor(groups, levels = c('DE_up', 'DE_down', 'house_keep', 'highlyExpr_stable', 'lowlyExpr_stable',  'non_expr'))) %>% 
+  ggplot(aes(x = features, y=value, fill= groups)) + 
   geom_boxplot(outlier.alpha = 0.1) + 
   #geom_jitter(width = 0.1)+
   #geom_violin(width = 0.8) +
   theme_classic() +
-  theme(axis.text.x = element_text(angle = 0, size = 14)) +
-  labs(x = "", y= 'normalized data (log2)')
-  
-p1 
-ggsave(paste0(figureDir, "all_TSS_mUA_chromatinFeatures.pdf"),  width = 8, height = 4)
+  theme(axis.text.x = element_text(angle = 0, size = 10)) +
+  labs(x = "", y= 'normalized data (log2)') + 
+  scale_fill_brewer(palette = "Dark2")
 
+ggsave(paste0(figureDir, "promoter_chromatinFeatures_geneGroups.pdf"),  width = 10, height = 4)
 
-p2 = res[,c(19,20, 28,29)] %>% 
-  pivot_longer(cols = c('H3K4me3_BL13days.prox', 'H3K27me3_BL13days.prox'), names_to = 'markers') %>%
-  ggplot(aes(x = groups, 
-             y=value, fill=markers)) + 
+fts = c('cpg.oe')
+yy %>% 
+  pivot_longer(cols = fts, names_to = 'features') %>%
+  mutate(features = factor(features, levels = fts)) %>%
+  mutate(groups = factor(groups, levels = c('DE_up', 'DE_down', 'house_keep', 'highlyExpr_stable', 'lowlyExpr_stable',  'non_expr'))) %>%
+  ggplot(aes(x = features, y=value, fill= groups)) + 
   geom_boxplot(outlier.alpha = 0.1) + 
   #geom_jitter(width = 0.1)+
-  #geom_violin(width = 1.2) +
+  #geom_violin(width = 0.8) +
   theme_classic() +
-  theme(axis.text.x = element_text(angle = 0, size = 14)) +
-  labs(x = "", y= 'normalized data (log2)')
+  theme(axis.text.x = element_text(angle = 0, size = 10)) +
+  labs(x = "", y= 'CpG scores') +
+  scale_fill_brewer(palette = "Dark2")
 
-
-
-
-
-# p2 = ggplot(data=res, aes(x=H3K4me1_mUA, y=H3K27me3_mUA, label = gene, color = groups)) +
-#   geom_point(size = 0.4) + 
-#   theme(axis.text.x = element_text(size = 12), 
-#         axis.text.y = element_text(size = 12)) +
-#   scale_color_manual(values=c('black', "orange", 'darkgray',  "red",   'green')) + 
-#   geom_text_repel(data= res[examples.sel, ], size = 3.0, color = 'blue') +
-#   #geom_text_repel(data= fpm[examples.sel, ], size = 4.0, color = 'darkblue') + 
-#   #geom_hline(yintercept=2.0, colour = "darkgray") + 
-#   #geom_vline(xintercept = 2.0, colour = "darkgray")
-#   #geom_abline(slope = 1,  intercept = 0, colour = 'cyan3') +
-#   theme_classic() +
-#   theme(legend.text = element_text(size=12),
-#         legend.title = element_text(size = 14),
-#         legend.position=c(0.1, 0.8),
-#         plot.margin = margin()
-#         #legend.key.size = unit(1, 'cm')
-#         #legend.key.width= unit(1, 'cm')
-#   ) + 
-#   geom_vline(xintercept=1, col='darkgray') +
-#   geom_hline(yintercept=1, col="darkgray") +
-#   labs(x = "UA_H3K4me3", y= 'UA_H3K27me3') +
-#   guides(colour = guide_legend(override.aes = list(size=2)))
-
-#p1 + p2
-
-
-
+ggsave(paste0(figureDir, "CpGscores_geneGroups.pdf"),  width = 6, height = 4)
 
 
 ########################################################

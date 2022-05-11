@@ -4853,6 +4853,223 @@ Assembly_histMarkers_togetherWith_ATACseq_regeneration = function()
   }
 }
 
+##########################################
+# add features for TSS to predict gene groups defined by RNA-seq data 
+##########################################
+prepare_for_promoterScanning = function()
+{
+  annot = data.frame(annot)
+  
+  yy$CpG = NA
+  
+  outDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/motif_analysis/FIMO_promoters/'
+  
+  ## file for TF motif analysis
+  tp = data.frame(t(sapply(yy$promoters, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  tp$X3 = as.numeric(as.character(tp$X3)) - 1700
+  rownames(tp) = rownames(yy)
+  tp$strand = '*'
+  tp = makeGRangesFromDataFrame(tp, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
+  export(tp, format = 'bed', con = paste0(outDir, 'promoters_2kb.300bp_TFmotifs.bed'))
+  
+  ## file for TATA box searching
+  tp = data.frame(t(sapply(yy$promoters, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  
+  #tp$X2 = as.numeric(as.character(tp$X2)) + 1900
+  tp$X3 = as.numeric(as.character(tp$X3)) - 2000 - 20
+  tp$X2 = tp$X3 - 30
+  rownames(tp) = rownames(yy)
+  tp$strand = annot$strand[match(rownames(tp), annot$gene_id)]
+  tp = makeGRangesFromDataFrame(tp, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
+  
+  export(tp, format = 'bed', con = paste0(outDir, 'promoters_50.20bp_TATAbox.bed'))
+  
+  ## file for CpG enrichment
+  tp = data.frame(t(sapply(yy$promoters, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  tp$X3 = as.numeric(as.character(tp$X3)) - 2000 + 100
+  tp$X2 = tp$X3 - 500
+  
+  rownames(tp) = rownames(yy)
+  tp$strand = annot$strand[match(rownames(tp), annot$gene_id)]
+  tp = makeGRangesFromDataFrame(tp, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
+  
+  export(tp, format = 'bed', con = paste0(outDir, 'promoters_400.100bp_CpG.bed'))
+  
+}
+
+add_CpG_features = function(yy)
+{
+  library('rtracklayer')
+  library(GenomicRanges)
+  library('GenomicFeatures')
+  require(Biostrings)
+  annot = import(paste0(annotDir, 'AmexT_v47_Hox.patch.gtf'))
+  
+  annot = data.frame(annot)
+  
+  yy$CpG = NA
+  
+  seqs = read.table(paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/motif_analysis/FIMO_promoters/seq_CpG', 
+                           '/seqs_CpG.txt'), sep = '\t', header = FALSE)
+  seqs$geneID = gsub("\\s*\\([^\\)]+\\)","",as.character(seqs$V1))
+  seqs = seqs[match(rownames(yy), seqs$geneID),]
+  
+  #test = DNAString(as.character(seqs$V2[1]))
+  #countPattern("CG", test)
+  test = DNAStringSet(seqs$V2)
+  
+  ## gc content and CpG observation/expectation (https://www.biostars.org/p/355876/)
+  ## example code from https://web.stanford.edu/class/bios221/labs/biostrings/lab_1_biostrings.html
+  gc = (letterFrequency(test, letters="G", OR=0) + letterFrequency(test, letters="C", OR=0))/width(test)
+  oe = vcountPattern("CG", test)*width(test)/(letterFrequency(test, letters="G", OR=0)*letterFrequency(test, letters="C", OR=0))
+  
+  yy$gc_percent = gc
+  yy$cpg_oe = oe
+  
+  yy = data.frame(yy, stringsAsFactors = FALSE)
+  
+  saveRDS(yy, file = paste0(RdataDir, '/chromatin_promoter_features_geneGroups.rds'))
+  
+  # similar example from 
+  # https://github.com/mbh038/HDDA/blob/master/7x/DNA%20Methylation/1.%20Introduction/Introduction%20to%20DNA%20methylation.Rmd
+  # res = alphabetFrequency(cgiseq)
+  # L = rowSums(res)
+  # cprop = res[,"C"]/L
+  # gprop = res[,"G"]/L
+  # expected=L*cprop*gprop
+  # observed=vcountPattern("CG",cgiseq)
+  # cpgoe=observed/expected
+  
+  # ggplot(data = yy, aes(x = groups, y = gc.percent, fill = groups)) +
+  #   #geom_point(size = 0.1) +
+  #   geom_boxplot(outlier.alpha = 0.1)
+  # 
+  ggplot(data = yy, aes(x = groups, y = cpg.oe, fill = groups)) +
+    #geom_point(size = 0.1) +
+    geom_boxplot(outlier.alpha = 0.1)
+  
+  #tp = data.frame(t(sapply(yy$promoters, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  
+  # cpg = read.table(file = paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/CpG/cpg.bed6'),
+  #                   sep = '\t', header = FALSE)
+  # cpg$strand = '*'
+  # cpg = makeGRangesFromDataFrame(cpg, seqnames.field=c("V1"),
+  #                                start.field="V2", end.field="V3", strand.field="strand")
+  # 
+  # # export(cpg, format = 'bed', con = paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/CpG/cpg_island.bed'))
+  # mapping = findOverlaps(tp, cpg, ignore.strand=TRUE)
+  test.Make.BSgenome = FALSE
+  if(test.Make.BSgenome){
+    cat('give up\n')
+  }
+   
+}
+
+FeatureImportance.RF = function()
+{
+  library(randomForest)
+  library("iml")
+  require(ggplot2)
+  require(ggrepel)
+  
+  yy = readRDS(file = paste0(RdataDir, '/chromatin_promoter_features_geneGroups.rds'))
+  
+  X = yy[which(yy$groups == 'DE_up'|yy$groups == 'DE_down'), ]
+  X$groups = gsub('DE_', 'DE', X$groups)
+  
+  examples.sel = unique(grep(paste0(dev.example, collapse = '|'), X$gene))
+  
+  ggplot(data = X, aes(x = rna_mUA, y = H3K27me3_mUA, color = groups, label = gene)) +   
+    geom_point(size = 0.4) +
+    theme(axis.text.x = element_text(size = 12), 
+          axis.text.y = element_text(size = 12)) + 
+    #geom_text_repel(data=subset(yy, pvalue_pos > 2), size = 4)
+    geom_text_repel(data= X[c(examples.sel), ], size =5)
+    
+  
+  ggplot(data = X, aes(x = H3K4me3_mUA, y = H3K27me3_mUA, color = groups, label = gene)) +   
+    geom_point(size = 0.4) +
+    theme(axis.text.x = element_text(size = 12), 
+          axis.text.y = element_text(size = 12)) +
+    geom_text_repel(data= X[c(examples.sel), ], size =5)
+  
+  ggplot(data = X, aes(x = H3K4me3_mUA, y = cpg.oe, color = groups, label = gene)) +   
+    geom_point(size = 0.4) +
+    theme(axis.text.x = element_text(size = 12), 
+          axis.text.y = element_text(size = 12)) +
+    geom_text_repel(data= X[c(examples.sel), ], size =5)
+  
+  ggplot(data = X, aes(x = H3K27me3_mUA, y = cpg.oe, color = groups)) +   
+    geom_point(size = 0.4) +
+    theme(axis.text.x = element_text(size = 12), 
+          axis.text.y = element_text(size = 12))
+  
+  ggplot(data = X, aes(x = rna_mUA, y = cpg.oe, color = groups)) +   
+    geom_point(size = 0.4) +
+    theme(axis.text.x = element_text(size = 12), 
+          axis.text.y = element_text(size = 12))
+    #geom_text_repel(data=subset(yy, pvalue_pos > 2), size = 4)
+    #geom_text_repel(size = 4)
+  
+  
+  
+  ## test some interactions
+  y = as.factor(X$groups)
+  x = data.frame(X[, c(4:9, 11:12)])
+  #x$K27me3.K4me3 = x
+  
+  
+  
+  tic()
+  set.seed(42)
+  rf <- randomForest::randomForest(x = x, y = y, ntree = 200, keep.forest = TRUE, 
+                                   importance = TRUE)
+  toc()
+  
+  varImpPlot(rf, type = 1)
+  
+  
+  # plot the feature importance to distinguish 
+  imps = importance(rf, type = 1)
+  imps = data.frame(imps)
+  imps$names = rownames(imps)
+  colnames(imps)[1] = 'scores'
+  imps$rank = rank(imps$scores)
+  
+  saveRDS(imps, file = paste0(RdataDir, '/RF_featuresImportance.rds'))
+  
+  ggplot(data = imps, aes(x = scores, y = rank, label = names)) +   
+    geom_point(size = 3.0, color = 'blue') +
+    theme(axis.text.x = element_text(size = 12), 
+          axis.text.y = element_text(size = 12)) + 
+    #geom_text_repel(data=subset(yy, pvalue_pos > 2), size = 4)
+    geom_text_repel(size = 4)
+  
+  
+  gp = ggplot(data = yy, aes(x = scores, y = rank, label = names)) +   
+    geom_point(size = 2.0, color = 'blue') +
+    theme(axis.text.x = element_text(size = 12), 
+          axis.text.y = element_text(size = 12)) + 
+    geom_text_repel(size = 4) + ggtitle('Importance score from Random Forest MARA')
+  
+  
+  
+  # predictor <- Predictor$new(rf, data = x, y = y)
+  # imp <- FeatureImp$new(predictor, loss = "mae")
+  # plot(imp)
+  # 
+  # interact <- Interaction$new(predictor)
+  # plot(interact)
+  # 
+  # interact <- Interaction$new(predictor, feature = "crim")
+  # plot(interact)
+  # 
+  
+  
+}
 
 ##########################################
 # test the comparisons of histmarker across group which are redefined RNA-seq data 
