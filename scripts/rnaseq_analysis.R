@@ -1119,8 +1119,19 @@ cat(length(select), ' DE genes \n')
 #gg.select = rownames(res)[select]
 #saveRDS(gg.select, file = paste0(RdataDir, 'RRGs_candidates_tempList.rds'))
 
+# double check the developmental gene examples 
+dev.example = c('HOXA13', 'HOXA11', 'HOXA9', 'HOXD13','HOXD11', 'HOXD9',
+                'SHH', 'FGF8', 'FGF10', 'HAND2', 'BMP4', 'ALX1',
+                'ALX4', 'PRRX1', 'GREM1', 'LHX2', 'LHX9', 
+                'TBX2', 'TBX4', 'TBX5', 'LMX1B', 'MEIS1', 'MEIS2', 'SALL4')
+
+examples.sel = unique(grep(paste0(dev.example, collapse = '|'), rownames(sample.means)))
+test = data.frame(sample.means, DEs = !is.na(match(c(1:nrow(sample.means)), select)))
+
+
 # yy = cpm[select, ]
 yy = sample.means[select, ]
+
 newcc = c('mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d')
 df = as.data.frame(newcc)
 colnames(df) = 'condition'
@@ -1131,6 +1142,7 @@ cal_z_score <- function(x){
 }
 
 yy <- t(apply(yy, 1, cal_z_score))
+
 
 library(dendextend)
 nb_clusters = 6
@@ -1220,10 +1232,7 @@ geneClusters = readRDS(file = paste0(RdataDir, 'regeneration_geneClusters.rds'))
 
 xx = geneClusters[!is.na(geneClusters$groups), ]
 
-dev.example = c('HOXA13', 'HOXA11', 'HOXA9', 'HOXD13','HOXD11', 'HOXD9',
-                'SHH', 'FGF8', 'FGF10', 'HAND2', 'BMP4', 'ALX1',
-                'ALX4', 'PRRX1', 'GREM1', 'LHX2', 'LHX9', 
-                'TBX2', 'TBX4', 'TBX5', 'LMX1', 'MEIS1', 'MEIS2', 'SALL4', 'IRX3', 'IRX5')
+
 
 #gaps_row =  gaps.row, 
 #filename = paste0(saveDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
