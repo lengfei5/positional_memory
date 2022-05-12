@@ -4861,6 +4861,7 @@ Assembly_histMarkers_togetherWith_ATACseq_regeneration = function()
 ########################################################
 Update.TSS.for.regenerationData = function()
 {
+  ## first update: modifying gene names; define the lowly expressed genes
   tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM.rds'))
   tss$gene[which(tss$geneID == 'AMEX60DD018448'|tss$geneID == 'AMEX60DD018449')] = NA
   tss$gene[which(tss$geneID == 'AMEX60DD002780')] = NA
@@ -4883,7 +4884,7 @@ Update.TSS.for.regenerationData = function()
   #tss$groups[which(tss$groups == 'non_expr')] = NA
   tss$groups[which(!is.na(match(tss$geneID, ids[which(ss==0)])))] = 'non_expr'
   
-  tss$groups[which(!is.na(match(tss$geneID, ids[which(ss>0 & ss<100)])))] = 'lowlyExpr_stable'
+  tss$groups[which(!is.na(match(tss$geneID, ids[which(ss>0 & ss<100)])))] = 'lowlyExpr_stable' # by read counts
   tss$groups[which(!is.na(match(tss$geneID, ids[which(ss>100)])))] = 'highlyExpr_stable'
   
   ss = apply(tss[, grep('smartseq2_', colnames(tss))], 1, mean) # define house-keeping genes
@@ -4897,6 +4898,49 @@ Update.TSS.for.regenerationData = function()
   
   
   saveRDS(tss, file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM_geneCorrection_v2.rds'))
+  
+  ## second update: refine lowly expressed genes and DE_up and DE_down using log2FC
+  tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM_geneCorrection_v2.rds'))
+  
+  tss$groups2 = tss$groups # save the old groups
+  
+  ss = apply(tss[, grep('smartseq2_', colnames(tss))], 1, mean)
+  jj = which(tss$groups == 'highlyExpr_stable')
+  tss$groups[jj[which(ss[jj]<0)]] = 'lowlyExpr_stable'
+  
+  jj = which(tss$groups == 'non_expr')
+  
+  
+  saveRDS(tss, file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM_geneCorrection_v3.rds'))
+  
+  Test.redefine.Up.down.groups = FALSE # it turn out to be not easy !!
+  if(Test.redefine.Up.down.groups){
+    rna = readRDS(file = paste0('../results/RNAseq_data_used/Rdata/', 
+                                'smartseq2_R10724_R11635_cpm.batchCorrect_DESeq2.test.withbatch.log2FC.shrinked',
+                                '_RNAseq_data_used_20220408', '.rds'))
+    rna$geneID = get_geneID(rownames(rna))
+    rna = rna[match(tss$geneID, rna$geneID), ]
+    rna = rna[, grep('log2FoldChange_dpa', colnames(rna))]
+    
+    jj = which(tss$groups == 'DE_up')
+    tss$time_max = NA
+    for(j in jj)
+    {
+      # j = 70
+      test = max(rna[j,])
+      if(test > 0.5){
+        
+        tt = colnames(rna)[which.max(rna[j, ])]
+        tt = gsub('log2FoldChange_', '', tt)
+        tt = gsub('.vs.mUA', '', tt)
+        tss$time_max[j] = tt
+        
+      }else{
+        cat('Error --', j, '\n')
+        stop()
+      }
+    }
+  }
   
 }
 

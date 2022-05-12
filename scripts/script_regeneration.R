@@ -1185,7 +1185,10 @@ saveRDS(tss, file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_h
 ##########################################
 source('Functions_histM.R')
 #tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM.rds'))
-tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM_geneCorrection_v2.rds'))
+tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM_geneCorrection_v3.rds'))
+
+kk = which(!is.na(tss$gene))
+rownames(tss)[kk] = paste0(tss$gene[kk], '_', rownames(tss)[kk])
 
 dev.example = c('HOXA13', 'HOXA11', 'HOXA9', 'HOXD13','HOXD11', 'HOXD9',
                 'SHH', 'FGF8', 'FGF10', 'HAND2', 'BMP4', 'ALX1',
@@ -1198,6 +1201,8 @@ mature.example = c('COL1A1', 'COL4A1', 'COL4A2', 'COL6A', 'LAMA4', 'TNXB',
                    'MATN2', 'FBN1', 'FBLN2', 'FBLN5', 'PRELP', 'ELN', 'RSPO1', 
                    'DPT', 'IGFBP3',  'TNMD', 'TWIST2', 'COL3A1', 'COL8A2', 'RARRES1', 'KLF5')
 
+examples.sel = unique(grep(paste0(dev.example, collapse = '|'), rownames(tss)))
+tss[examples.sel, c(2,7:12)]
 
 # original code from https://github.com/const-ae/ggupset
 library(ggplot2)
@@ -1206,7 +1211,7 @@ library(ggupset)
 require(UpSetR)
 
 ## upregulated genes 
-DEs = tss[which(tss$groups == 'reg_up'), c(2, grep('cluster|dynamic', colnames(tss)))]
+DEs = tss[which(tss$groups == 'DE_up'), c(2, grep('cluster|dynamic', colnames(tss)))]
 DEs = DEs[which(!is.na(DEs$cluster)), ]
 
 kk = which(!is.na(DEs$gene))
@@ -1228,6 +1233,9 @@ upset(DEs, sets = c("H3K4me3", "H3K27ac","atac","H3K4me1", "H3K27me3"),
 
 dev.off()
 
+examples.sel = unique(grep(paste0(dev.example, collapse = '|'), rownames(DEs)))
+DEs[examples.sel, ]
+
 ## heatmap of tss with H3K27me3 changed
 ss = apply(DEs, 1, sum)
 jj = which(ss==1 & DEs$H3K27me3 == 1)
@@ -1244,11 +1252,53 @@ sunset <- colour("sunset")
 PRGn <- colour("PRGn")
 cols = rev(PRGn(nb_breaks-1))
 
+callback = function(hc, mat){
+  sv = svd(t(mat))$v[,1]
+  dend = reorder(as.dendrogram(hc), wts = sv)
+  as.hclust(dend)
+}
+
 pheatmap(test, 
          #scale = 'row',
          cluster_rows = TRUE, 
          cluster_cols = FALSE, 
-         show_rownames = TRUE, 
+         show_rownames = FALSE, 
+         show_colnames = FALSE,
+         treeheight_row = 20,
+         #color = c('darkgray', 'blue'), 
+         #color = colorRampPalette((brewer.pal(n = 7, name ="PRGn")))(nb_breaks),
+         color = cols,
+         fontsize_row = 8,
+         #breaks = seq(-range, range, length.out = nb_breaks), 
+         #gaps_row = gaps.row,
+         clustering_callback = callback,
+         filename = paste0(figureDir, '/regeneration_H3K27me3_dynamics_log2fc.vs.mUA_upregulatedGenes.pdf'), 
+         width = 3, height = 12)
+
+plt = pheatmap(test, 
+               #scale = 'row',
+               cluster_rows = TRUE, 
+               cluster_cols = FALSE, 
+               show_rownames = TRUE, 
+               show_colnames = FALSE,
+               treeheight_row = 20,
+               color = cols,
+               clustering_callback = callback)
+
+## check  the H3K4me3
+test = tss[match(ids, rownames(tss)), grep('H3K4me3_logFC_', colnames(tss))]
+range <- 3
+test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
+rownames(test) = rownames(DEs)[jj]
+
+nb_breaks = 7
+cols = (sunset(nb_breaks))
+
+pheatmap(test[plt$tree_row$order, ], 
+         #scale = 'row',
+         cluster_rows = FALSE, 
+         cluster_cols = FALSE, 
+         show_rownames = FALSE, 
          show_colnames = FALSE,
          treeheight_row = 20,
          #color = c('darkgray', 'blue'), 
@@ -1256,11 +1306,13 @@ pheatmap(test,
          color = cols,
          #breaks = seq(-range, range, length.out = nb_breaks), 
          #gaps_row = gaps.row,
-         filename = paste0(figureDir, '/TEST_regeneration_H3K27me3_dynamics_log2fc.vs.mUA_upregulatedGenes.pdf'), 
-         width = 6, height = 24)
+         clustering_callback = callback,
+         filename = paste0(figureDir, '/regeneration_H3K4me3_dynamics_log2fc.vs.mUA_upregulatedGenes.pdf'), 
+         width = 3, height = 12)
+
 
 ## downregulated genes
-DEs = tss[which(tss$groups == 'reg_down'), c(2, grep('cluster|dynamic', colnames(tss)))]
+DEs = tss[which(tss$groups == 'DE_down'), c(2, grep('cluster|dynamic', colnames(tss)))]
 DEs = DEs[which(!is.na(DEs$cluster)), ]
 kk = which(!is.na(DEs$gene))
 rownames(DEs)[kk] = paste0(DEs$gene[kk], '_', rownames(DEs)[kk])
@@ -1310,6 +1362,7 @@ pheatmap(test,
          width = 3, height = 12)
 
 
+
 ##########################################
 # co-localization of H3K27me3 and H3K4me3
 # probably together with other chromatin states
@@ -1324,7 +1377,10 @@ library(tidyr)
 require(patchwork)
 
 ## bivalent analysis here
-tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM_geneCorrection_v2.rds'))
+tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM_geneCorrection_v3.rds'))
+kk = which(!is.na(tss$gene))
+rownames(tss)[kk] = paste0(tss$gene[kk], '_', rownames(tss)[kk])
+tss$gene[-kk] = rownames(tss)[-kk]
 
 res = tss[which(!is.na(tss$groups)), ]
 res$x = apply(res[, grep('H3K4me3_mUA', colnames(res))], 1, mean)
@@ -1334,15 +1390,18 @@ res = res[which(res$x<7 & res$y <7),]
 
 dev.example = c('HOXA13', 'HOXA11', 'HOXA9', 'HOXD13','HOXD11', 'HOXD9',
                 'SHH', 'FGF8', 'FGF10', 'HAND2', 'BMP4', 'ALX1',
-                'ALX4', 'GREM1', 'LHX2', 'LHX9', 
-                'TBX2', 'TBX4', 'LMX1B', 'MEIS1', 'MEIS2', 'SALL4', 'IRX3', 'IRX5')
+                'ALX4', 'PRRX1', 'GREM1', 'LHX2', 'LHX9', 
+                'TBX2_', 'TBX4', 'MEIS1', 'MEIS2', 'SALL4')
 
 mature.example = c('COL1A1', 'COL4A1', 'COL4A2', 'COL6A1', 'LAMA4', 'TNXB', 
                    'MATN2', 'FBN1', 'FBLN2', 'FBLN5', 'PRELP', 'ELN', 'RSPO1', 
                    'DPT')
 
-examples.sel = unique(grep(paste0(dev.example, collapse = '|'), res$gene))
-matures.sel = unique(grep(paste0(mature.example, collapse = '|'), res$gene))
+examples.sel = unique(grep(paste0(dev.example, collapse = '|'), rownames(res)))
+examples.sel = examples.sel[which(rownames(res)[examples.sel] != 'HAND2_AMEX60DD030069')]
+examples.sel = examples.sel[which(rownames(res)[examples.sel] != 'MEIS1_AMEX60DD024424')]
+
+matures.sel = unique(grep(paste0(mature.example, collapse = '|'), rownames(res)))
 
 jj = which(res$x>1 & res$y > 0)
 length(jj)
@@ -1363,13 +1422,7 @@ ggplot(data=res, aes(x=x, y=y, label = gene)) +
   #geom_text_repel(data= res[examples.sel, ], size = 4.0, color = 'blue') +
   #geom_point(data=res[matures.sel, ], aes(x=x, y=y),  size=1.5, color = 'black') +
   geom_text_repel(data= res[c(examples.sel), ], 
-                  aes(
-                    x, y
-                    #color = factor(groups)
-                    #label = res$gene[c(matures.sel, examples.sel)]
-                    # Cars with 4 cylinders are rotated 90 degrees.
-                    #angle = ifelse(mtcars$cyl == 4, 90, 0)
-                  ),
+                  aes(x, y),
                   size = 5,
                   color = "blue",
                   #family = 'Times',
@@ -1378,11 +1431,6 @@ ggplot(data=res, aes(x=x, y=y, label = gene)) +
                   box.padding = unit(0.3, 'lines'),
                   # Add extra padding around each data point.
                   point.padding = unit(1.6, 'lines')) +
-  
-  #geom_text_repel(data= fpm[examples.sel, ], size = 4.0, color = 'darkblue') + 
-  #geom_hline(yintercept=2.0, colour = "darkgray") + 
-  #geom_vline(xintercept = 2.0, colour = "darkgray")
-  #geom_abline(slope = 1,  intercept = 0, colour = 'cyan3') +
   theme_classic() +
   theme(legend.text = element_text(size=12),
         legend.title = element_text(size = 14),
@@ -1393,7 +1441,7 @@ ggplot(data=res, aes(x=x, y=y, label = gene)) +
   ) + 
   geom_vline(xintercept=c(1), col='black') +
   geom_hline(yintercept=c(0), col="black") +
-  labs(x = "UA_H3K4me3 (log2 normalized counts)", y= 'UA_H3K27me3 (log2 normalized counts)') +
+  labs(x = "UA_H3K4me3 (log2 cpm)", y= 'UA_H3K27me3 (log2 cpm)') +
   guides(colour = guide_legend(override.aes = list(size=2)))
 
 
