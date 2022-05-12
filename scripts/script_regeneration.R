@@ -1571,12 +1571,11 @@ for(n in 1:length(grps))
 }
 
 pdfname = paste0(figureDir, 'GoEnrichment_bivalent_TSS_mUA.pdf')
-pdf(pdfname, width = 30, height = 6)
+pdf(pdfname, width = 12, height = 8)
 par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
 
-grid.arrange(p1, p2, p3, p4,
-             ncol = 4, nrow = 1)
-#ggsave(paste0(figureDir, "dynamics_peaks_averageProfiles_", markers[m], ".pdf"), width=4, height = 20)
+grid.arrange(p1, p2, p3, p4, ncol = 2, nrow = 2)
+
 dev.off()
 
 
@@ -1687,7 +1686,7 @@ pheatmap(as.matrix(states),
          fontsize_row = 20,
          breaks = seq(0, 3, length.out = 5),
          gaps_row = gaps.row,
-         filename = paste0(figureDir, '/chromatinStates_bivalency_regenerations.pdf'), 
+         filename = paste0(figureDir, 'chromatinStates_bivalency_regenerations.pdf'), 
          width = 4, height = 10)
 
 ##########################################
