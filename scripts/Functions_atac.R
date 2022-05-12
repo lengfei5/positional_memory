@@ -4853,6 +4853,53 @@ Assembly_histMarkers_togetherWith_ATACseq_regeneration = function()
   }
 }
 
+########################################################
+########################################################
+# Section : analyze TSS of regeneration response genes
+# 
+########################################################
+########################################################
+Update.TSS.for.regenerationData = function()
+{
+  tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM.rds'))
+  tss$gene[which(tss$geneID == 'AMEX60DD018448'|tss$geneID == 'AMEX60DD018449')] = NA
+  tss$gene[which(tss$geneID == 'AMEX60DD002780')] = NA
+  tss$gene[which(tss$geneID == 'AMEX60DD003752'|tss$geneID=='AMEX60DD024053')] = NA
+  
+  tss$groups1 = tss$groups
+  tss$groups = NA
+  
+  ## import the smart-seq2 data to further refine the gene groups
+  load(file=paste0('../results/RNAseq_data_used/Rdata/', # design and dds for smartseq2 REGENERATION data
+                   'design_dds_all_regeneration_12selectedSamples_v47.hox.patch.Rdata')) 
+  rm(design); 
+  dds$condition = droplevels(dds$condition)
+  ss = rowSums(counts(dds))
+  ids = get_geneID(rownames(dds))
+  
+  # double check the non-expressed genes
+  ggs = tss$geneID[which(tss$groups == 'non_expr')]
+  length(intersect(ggs, ids[which(ss==0)]))
+  #tss$groups[which(tss$groups == 'non_expr')] = NA
+  tss$groups[which(!is.na(match(tss$geneID, ids[which(ss==0)])))] = 'non_expr'
+  
+  tss$groups[which(!is.na(match(tss$geneID, ids[which(ss>0 & ss<100)])))] = 'lowlyExpr_stable'
+  tss$groups[which(!is.na(match(tss$geneID, ids[which(ss>100)])))] = 'highlyExpr_stable'
+  
+  ss = apply(tss[, grep('smartseq2_', colnames(tss))], 1, mean) # define house-keeping genes
+  tss$groups[which(tss$groups == 'highlyExpr_stable' & ss>2.5 & tss$groups1 == 'house_keep')] = 'house_keep'
+  
+  jj = which(tss$groups1 == 'reg_down' & (tss$groups == "lowlyExpr_stable"|tss$groups == 'highlyExpr_stable'|tss$groups == 'house_keep'))
+  tss$groups[jj] = 'DE_down'
+  
+  jj = which(tss$groups1 == 'reg_up' & (tss$groups == "lowlyExpr_stable"|tss$groups == 'highlyExpr_stable'|tss$groups == 'house_keep'))
+  tss$groups[jj] = 'DE_up'
+  
+  
+  saveRDS(tss, file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM_geneCorrection_v2.rds'))
+  
+}
+
 ##########################################
 # add features for TSS to predict gene groups defined by RNA-seq data 
 ##########################################

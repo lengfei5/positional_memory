@@ -1181,18 +1181,17 @@ saveRDS(tss, file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_h
 ##########################################
 # analysis around tss of regeneration-response genes
 # start with which chromatin features or combinations are related to regeneration-response genes
+# reminder: use the updataed tss with gene annotations
 ##########################################
 source('Functions_histM.R')
-tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM.rds'))
-geneClusters = readRDS(file = paste0('../results/RNAseq_data_used/Rdata/', 'regeneration_geneClusters.rds'))
-
-geneClusters$gene = get_geneName(rownames(geneClusters)) 
+#tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM.rds'))
+tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM_geneCorrection_v2.rds'))
 
 dev.example = c('HOXA13', 'HOXA11', 'HOXA9', 'HOXD13','HOXD11', 'HOXD9',
                 'SHH', 'FGF8', 'FGF10', 'HAND2', 'BMP4', 'ALX1',
                 'ALX4', 'PRRX1', 'GREM1', 'LHX2', 'LHX9', 
-                'TBX2', 'TBX4', 'TBX5', 'LMX1', 'MEIS1', 'MEIS2', 'SALL4', 'IRX3', 'IRX5', 'PRRX1',
-                'SHOX1', 'SHOX2')
+                'TBX2', 'TBX4', 'LMX1', 'MEIS1', 'MEIS2', 'SALL4')
+
 # gene list from Akane
 # Creb5, Bmp2, Efna1, Stmn2, Gja3, Cpa2, Cbfa2t3, Cdh3, Lmo2, Tfap2b, Jag1, Hey1, shox2, shox1,PRRX1
 mature.example = c('COL1A1', 'COL4A1', 'COL4A2', 'COL6A', 'LAMA4', 'TNXB', 
@@ -1206,15 +1205,12 @@ library(tidyverse, warn.conflicts = FALSE)
 library(ggupset)
 require(UpSetR)
 
-DEs = tss[which(!is.na(tss$cluster)),  c(2, grep('cluster|dynamic', colnames(tss)))]
-examples.sel = unique(grep(paste0(dev.example, collapse = '|'), DEs$gene))
-matures.sel = unique(grep(paste0(mature.example, collapse = '|'), DEs$gene))
-
-
 ## upregulated genes 
 DEs = tss[which(tss$groups == 'reg_up'), c(2, grep('cluster|dynamic', colnames(tss)))]
-#DEs = tss[which(tss$groups == 'reg_down'), c(2, grep('cluster|dynamic', colnames(tss)))]
 DEs = DEs[which(!is.na(DEs$cluster)), ]
+
+kk = which(!is.na(DEs$gene))
+rownames(DEs)[kk] = paste0(DEs$gene[kk], '_', rownames(DEs)[kk])
 
 DEs = DEs[,-c(1:2)]
 DEs[is.na(DEs)] = 0
@@ -1232,14 +1228,42 @@ upset(DEs, sets = c("H3K4me3", "H3K27ac","atac","H3K4me1", "H3K27me3"),
 
 dev.off()
 
+## heatmap of tss with H3K27me3 changed
+ss = apply(DEs, 1, sum)
+jj = which(ss==1 & DEs$H3K27me3 == 1)
+ids = get_geneID(rownames(DEs)[jj])
+
+test = tss[match(ids, rownames(tss)), grep('H3K27me3_logFC_', colnames(tss))]
+range <- 3
+test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
+rownames(test) = rownames(DEs)[jj]
+
+library(khroma)
+nb_breaks = 7
+sunset <- colour("sunset")
+PRGn <- colour("PRGn")
+cols = rev(PRGn(nb_breaks-1))
+
+pheatmap(test, 
+         #scale = 'row',
+         cluster_rows = TRUE, 
+         cluster_cols = FALSE, 
+         show_rownames = TRUE, 
+         show_colnames = FALSE,
+         treeheight_row = 20,
+         #color = c('darkgray', 'blue'), 
+         #color = colorRampPalette((brewer.pal(n = 7, name ="PRGn")))(nb_breaks),
+         color = cols,
+         #breaks = seq(-range, range, length.out = nb_breaks), 
+         #gaps_row = gaps.row,
+         filename = paste0(figureDir, '/TEST_regeneration_H3K27me3_dynamics_log2fc.vs.mUA_upregulatedGenes.pdf'), 
+         width = 6, height = 24)
+
 ## downregulated genes
-DEs = tss[which(tss$groups == 'reg_up'), c(2, grep('cluster|dynamic', colnames(tss)))]
-
 DEs = tss[which(tss$groups == 'reg_down'), c(2, grep('cluster|dynamic', colnames(tss)))]
-
 DEs = DEs[which(!is.na(DEs$cluster)), ]
-examples.sel = unique(grep(paste0(dev.example, collapse = '|'), DEs$gene))
-matures.sel = unique(grep(paste0(mature.example, collapse = '|'), DEs$gene))
+kk = which(!is.na(DEs$gene))
+rownames(DEs)[kk] = paste0(DEs$gene[kk], '_', rownames(DEs)[kk])
 
 DEs = DEs[,-c(1:2)]
 DEs[is.na(DEs)] = 0
@@ -1257,29 +1281,33 @@ upset(DEs, sets = c("H3K4me3", "H3K27ac","atac","H3K4me1", "H3K27me3"),
 
 dev.off()
 
-# upset(movies, sets = c("Action", "Adventure", "Comedy", "Drama", "Mystery", 
-#                        "Thriller", "Romance", "War", "Western"), mb.ratio = c(0.65, 0.35), order.by = "freq")
-# 
-# # prepare for ggupset
-# DEs[!is.na(DEs)] = TRUE
-# DEs[is.na(DEs)] = FALSE
-# DEs = DEs > 0.5
-# tidy_de <- t(DEs) %>%
-#   as_tibble(rownames = "features") %>%
-#   gather(tss, Member, -features) %>%
-#   filter(Member) %>%
-#   dplyr::select(- Member)
-# 
-# p1 = tidy_de %>%
-#   group_by(tss) %>%
-#   summarize(features_all = list(features)) %>%
-#   ggplot(aes(x = features_all)) +
-#   geom_bar() +
-#   scale_x_upset()
-# 
-# ggsave(filename = paste0(figureDir, "chromatinFeatures_relatedTo_dynamicGenes_2000genes.pdf"), 
-#        plot = p1,  
-#        width = 8, height = 6)
+ss = apply(DEs, 1, sum)
+jj = which(ss==1 & DEs$H3K27me3 == 1)
+ids = get_geneID(rownames(DEs)[jj])
+
+test = tss[match(ids, rownames(tss)), grep('H3K27me3_logFC_', colnames(tss))]
+range <- 3
+test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
+
+library(khroma)
+nb_breaks = 7
+sunset <- colour("sunset")
+PRGn <- colour("PRGn")
+cols = rev(PRGn(nb_breaks-1))
+
+pheatmap(test, 
+         #scale = 'row',
+         cluster_rows = TRUE, 
+         cluster_cols = FALSE, 
+         show_rownames = FALSE, show_colnames = FALSE,
+         treeheight_row = 20,
+         #color = c('darkgray', 'blue'), 
+         #color = colorRampPalette((brewer.pal(n = 7, name ="PRGn")))(nb_breaks),
+         color = cols,
+         #breaks = seq(-range, range, length.out = nb_breaks), 
+         #gaps_row = gaps.row,
+         filename = paste0(figureDir, '/regeneration_H3K27me3_dynamics_log2fc.vs.mUA_downregulatedGenes.pdf'), 
+         width = 3, height = 12)
 
 
 ##########################################
@@ -1294,43 +1322,6 @@ library("cowplot")
 require(gridExtra)
 library(tidyr)
 require(patchwork)
-
-tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM.rds'))
-tss$gene[which(tss$geneID == 'AMEX60DD018448'|tss$geneID == 'AMEX60DD018449')] = NA
-tss$gene[which(tss$geneID == 'AMEX60DD002780')] = NA
-tss$gene[which(tss$geneID == 'AMEX60DD003752'|tss$geneID=='AMEX60DD024053')] = NA
-
-tss$groups1 = tss$groups
-tss$groups = NA
-
-## import the smart-seq2 data to further refine the gene groups
-load(file=paste0('../results/RNAseq_data_used/Rdata/', # design and dds for smartseq2 REGENERATION data
-                 'design_dds_all_regeneration_12selectedSamples_v47.hox.patch.Rdata')) 
-rm(design); 
-dds$condition = droplevels(dds$condition)
-ss = rowSums(counts(dds))
-ids = get_geneID(rownames(dds))
-
-# double check the non-expressed genes
-ggs = tss$geneID[which(tss$groups == 'non_expr')]
-length(intersect(ggs, ids[which(ss==0)]))
-#tss$groups[which(tss$groups == 'non_expr')] = NA
-tss$groups[which(!is.na(match(tss$geneID, ids[which(ss==0)])))] = 'non_expr'
-
-tss$groups[which(!is.na(match(tss$geneID, ids[which(ss>0 & ss<100)])))] = 'lowlyExpr_stable'
-tss$groups[which(!is.na(match(tss$geneID, ids[which(ss>100)])))] = 'highlyExpr_stable'
-
-ss = apply(tss[, grep('smartseq2_', colnames(tss))], 1, mean) # define house-keeping genes
-tss$groups[which(tss$groups == 'highlyExpr_stable' & ss>2.5 & tss$groups1 == 'house_keep')] = 'house_keep'
-
-jj = which(tss$groups1 == 'reg_down' & (tss$groups == "lowlyExpr_stable"|tss$groups == 'highlyExpr_stable'|tss$groups == 'house_keep'))
-tss$groups[jj] = 'DE_down'
-
-jj = which(tss$groups1 == 'reg_up' & (tss$groups == "lowlyExpr_stable"|tss$groups == 'highlyExpr_stable'|tss$groups == 'house_keep'))
-tss$groups[jj] = 'DE_up'
-
-
-saveRDS(tss, file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM_geneCorrection_v2.rds'))
 
 ## bivalent analysis here
 tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM_geneCorrection_v2.rds'))
@@ -1902,6 +1893,3 @@ table(res$DE_histM)
 
 table(res$dynamic.peaks, res$DE_histM)
 table()
-
-
-
