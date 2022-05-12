@@ -1488,7 +1488,23 @@ rna%>%
         legend.position=c(0.9, 0.8)) +
   labs(x = "", y= 'normalized gene expression (log2 cpm)')
 
-ggsave(paste0(figureDir, "Bivalent_TSS_mUA_geneExpression.pdf"),  width = 8, height = 6)
+rna%>%
+  mutate(groups = factor(groups, levels = c('active', 'both', 'absent', 'repressive'))) %>%
+  ggplot(aes(x = mUA)) +
+  geom_histogram(aes(color = groups, fill = groups), 
+                 position = "identity", bins = 20, alpha = 0.6) +
+  scale_color_manual(values = c("#117733",  "blue", 'cyan',  'magenta')) +
+  scale_fill_manual(values=c("#117733",  "blue", 'cyan',  'magenta')) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 0, size = 14), 
+        axis.text.y = element_text(angle = 0, size = 14), 
+        axis.title =  element_text(size = 14),
+        legend.text = element_text(size=12),
+        legend.title = element_text(size = 14),
+        legend.position=c(0.9, 0.7)) +
+  labs(y = "counts", x= 'gene expression in mUA (log2 cpm)')
+
+ggsave(paste0(figureDir, "Bivalent_TSS_mUA_geneExpression.pdf"),  width = 6, height = 4)
 
 ##########################################
 # go term enrichment for bivalent promoters 
@@ -1513,10 +1529,8 @@ firstup <- function(x) {
   x
 }
 
-
 grps = c('active', 'both', 'absent', 'repressive')
-
-for(n in 1:length(grs))
+for(n in 1:length(grps))
 {
   # n = 1
   jj = which(rna$groups == grps[n])
