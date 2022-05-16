@@ -30,7 +30,7 @@ annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotat
 gtf.file =  paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf')
 
 figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
-tableDir = paste0(figureDir, 'tables4plots/')
+tableDir = paste0('/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/SupTables/')
 
 saveTables = FALSE
 
@@ -1114,9 +1114,46 @@ if(grouping.position.dependent.peaks){
   
   ggsave(paste0(figureDir, "distance_to_closest_genes_positionalPeaks.pdf"), width=4, height = 3)
 
-  
-  
 }
+
+########################################################
+########################################################
+# Section : positiona features in the regenerations 
+# 
+########################################################
+########################################################
+
+##########################################
+# plot individual gene examples of different features, RNAseq, atac, histone marks around TSS 
+##########################################
+source('Functions_histM.R')
+library(ggrepel)
+library(dplyr)
+library(tibble)
+library("cowplot")
+require(gridExtra)
+library(tidyr)
+require(patchwork)
+
+## bivalent analysis here
+tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM_geneCorrection_v3.rds'))
+tss$gene[which(rownames(tss) == 'AMEX60DD028208')] = 'PROD1'
+tss$gene[which(rownames(tss) == 'AMEX60DD024424')] = NA
+
+kk = which(!is.na(tss$gene))
+rownames(tss)[kk] = paste0(tss$gene[kk], '_', rownames(tss)[kk])
+tss$gene[-kk] = rownames(tss)[-kk]
+
+dev.genes = c('SHH', 'FGF8', 'FGF10', 'HAND2', 'BMP4', 'ALX1',
+                'ALX4', 'PRRX1', 'GREM1', 'LHX2', 'LHX9', 'TBX2_', 'TBX4', 'SALL4')
+positional.genes = c('PROD1', 'RARRES1', 'MEIS1', 'MEIS2', 'SHOX', 'SHOX2', 'HOXA13', 'HOXA11', 'HOXA9', 'HOXD13',
+                    'HOXD11', 'HOXD9')
+
+outDir = "/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/Gene_Examples"   
+
+source('Functions_atac.R')
+plot_rna_chromainFeatures_geneExamples(tss, geneList = dev.genes, outDir = outDir)
+plot_rna_chromainFeatures_geneExamples(tss, geneList = positional.genes, outDir = outDir)
 
 ########################################################
 ########################################################
@@ -1389,5 +1426,9 @@ if(Explore_histM_positional.genes){
   ggsave(paste0(figureDir, "histMarker_H3K27me3_scatterplot_Hand.vs.Hand.pdf"), width=12, height = 8)
   
 }
+
+
+
+
 
 

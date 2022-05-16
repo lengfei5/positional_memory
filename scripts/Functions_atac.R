@@ -5059,6 +5059,46 @@ add_CpG_features = function(yy)
    
 }
 
+add_TFmotifs_feature = function()
+{
+  ## process the fimo output to make a motif occurrency matrix
+  Process.fimo.output = FALSE
+  if(Process.fimo.output){
+    library(data.table)
+    
+    fimo.out = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/motif_analysis/FIMO_promoters/promoter_tfs/'
+    fimo = fread(paste0(fimo.out, 'fimo_out/fimo.tsv'), header = TRUE)
+    
+    motif.oc = table(fimo$motif_id, fimo$sequence_name, useNA = 'ifany')
+    motif.oc = t(motif.oc)
+    
+    print(head(rownames(motif.oc), 20))
+    
+    saveRDS(motif.oc, file = '../results/motif_analysis/motif_oc_fimo_jaspar2022_pval.0.0001_regenerationTSS.rds')
+  }
+  
+  motif.oc = readRDS(file = '../results/motif_analysis/motif_oc_fimo_jaspar2022_pval.0.0001_regenerationTSS.rds')
+  yy = readRDS(file = paste0(RdataDir, '/chromatin_promoter_features_geneGroups.rds')) 
+  
+  tp = data.frame(t(sapply(yy$promoters, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  tp$X3 = as.numeric(as.character(tp$X3)) - 1700
+  tp$X2 = as.numeric(as.character(tp$X2)) -1
+  rownames(tp) = rownames(yy)
+  tp$promoter = paste0(tp$X1, ':', tp$X2, '-', tp$X3)
+  
+  mm = match(tp$promoter, rownames(motif.oc))
+  motif.oc = motif.oc[mm, ]
+  rownames(motif.oc) = rownames(yy)
+  motif.oc = as.matrix(motif.oc)
+  ss = apply(motif.oc, 2, sum)
+  
+  xx = as.data.frame(unclass(motif.oc))
+  yy = cbind(yy, xx)
+  
+  saveRDS(yy, file = paste0(RdataDir, '/chromatin_promoter_features_Tfmotifs_geneGroups.rds')) 
+  
+}
+
 FeatureImportance.RF = function()
 {
   library(randomForest)
@@ -5066,62 +5106,62 @@ FeatureImportance.RF = function()
   require(ggplot2)
   require(ggrepel)
   
-  yy = readRDS(file = paste0(RdataDir, '/chromatin_promoter_features_geneGroups.rds'))
+  #yy = readRDS(file = paste0(RdataDir, '/chromatin_promoter_features_geneGroups.rds'))
+  yy = readRDS(file = paste0(RdataDir, '/chromatin_promoter_features_Tfmotifs_geneGroups.rds')) 
   
   X = yy[which(yy$groups == 'DE_up'|yy$groups == 'DE_down'), ]
   X$groups = gsub('DE_', 'DE', X$groups)
   
-  examples.sel = unique(grep(paste0(dev.example, collapse = '|'), X$gene))
-  
-  ggplot(data = X, aes(x = rna_mUA, y = H3K27me3_mUA, color = groups, label = gene)) +   
-    geom_point(size = 0.4) +
-    theme(axis.text.x = element_text(size = 12), 
-          axis.text.y = element_text(size = 12)) + 
-    #geom_text_repel(data=subset(yy, pvalue_pos > 2), size = 4)
-    geom_text_repel(data= X[c(examples.sel), ], size =5)
+  ## check the relevant features
+  Feature.checing = FALSE
+  if(Feature.checing){
+    examples.sel = unique(grep(paste0(dev.example, collapse = '|'), X$gene))
     
-  
-  ggplot(data = X, aes(x = H3K4me3_mUA, y = H3K27me3_mUA, color = groups, label = gene)) +   
-    geom_point(size = 0.4) +
-    theme(axis.text.x = element_text(size = 12), 
-          axis.text.y = element_text(size = 12)) +
-    geom_text_repel(data= X[c(examples.sel), ], size =5)
-  
-  ggplot(data = X, aes(x = H3K4me3_mUA, y = cpg.oe, color = groups, label = gene)) +   
-    geom_point(size = 0.4) +
-    theme(axis.text.x = element_text(size = 12), 
-          axis.text.y = element_text(size = 12)) +
-    geom_text_repel(data= X[c(examples.sel), ], size =5)
-  
-  ggplot(data = X, aes(x = H3K27me3_mUA, y = cpg.oe, color = groups)) +   
-    geom_point(size = 0.4) +
-    theme(axis.text.x = element_text(size = 12), 
-          axis.text.y = element_text(size = 12))
-  
-  ggplot(data = X, aes(x = rna_mUA, y = cpg.oe, color = groups)) +   
-    geom_point(size = 0.4) +
-    theme(axis.text.x = element_text(size = 12), 
-          axis.text.y = element_text(size = 12))
+    ggplot(data = X, aes(x = rna_mUA, y = H3K27me3_mUA, color = groups, label = gene)) +   
+      geom_point(size = 0.4) +
+      theme(axis.text.x = element_text(size = 12), 
+            axis.text.y = element_text(size = 12)) + 
+      #geom_text_repel(data=subset(yy, pvalue_pos > 2), size = 4)
+      geom_text_repel(data= X[c(examples.sel), ], size =5)
+    
+    
+    ggplot(data = X, aes(x = H3K4me3_mUA, y = H3K27me3_mUA, color = groups, label = gene)) +   
+      geom_point(size = 0.4) +
+      theme(axis.text.x = element_text(size = 12), 
+            axis.text.y = element_text(size = 12)) +
+      geom_text_repel(data= X[c(examples.sel), ], size =5)
+    
+    ggplot(data = X, aes(x = H3K4me3_mUA, y = cpg.oe, color = groups, label = gene)) +   
+      geom_point(size = 0.4) +
+      theme(axis.text.x = element_text(size = 12), 
+            axis.text.y = element_text(size = 12)) +
+      geom_text_repel(data= X[c(examples.sel), ], size =5)
+    
+    ggplot(data = X, aes(x = H3K27me3_mUA, y = cpg.oe, color = groups)) +   
+      geom_point(size = 0.4) +
+      theme(axis.text.x = element_text(size = 12), 
+            axis.text.y = element_text(size = 12))
+    
+    ggplot(data = X, aes(x = rna_mUA, y = cpg.oe, color = groups)) +   
+      geom_point(size = 0.4) +
+      theme(axis.text.x = element_text(size = 12), 
+            axis.text.y = element_text(size = 12))
     #geom_text_repel(data=subset(yy, pvalue_pos > 2), size = 4)
     #geom_text_repel(size = 4)
-  
-  
+  }
   
   ## test some interactions
   y = as.factor(X$groups)
-  x = data.frame(X[, c(4:9, 11:12)])
+  x = data.frame(X[, c(4:9, 11:ncol(X))])
   #x$K27me3.K4me3 = x
-  
-  
   
   tic()
   set.seed(42)
-  rf <- randomForest::randomForest(x = x, y = y, ntree = 200, keep.forest = TRUE, 
+  rf <- randomForest::randomForest(x = x, y = y, ntree = 200, keep.forest = FALSE, 
                                    importance = TRUE)
   toc()
   
-  varImpPlot(rf, type = 1)
-  
+  varImpPlot(rf, type = 1, n.var = 10)
   
   # plot the feature importance to distinguish 
   imps = importance(rf, type = 1)
@@ -5129,6 +5169,7 @@ FeatureImportance.RF = function()
   imps$names = rownames(imps)
   colnames(imps)[1] = 'scores'
   imps$rank = rank(imps$scores)
+  imps = imps[order(-imps$scores), ]
   
   saveRDS(imps, file = paste0(RdataDir, '/RF_featuresImportance.rds'))
   
@@ -5161,6 +5202,91 @@ FeatureImportance.RF = function()
   
   
 }
+
+plot_rna_chromainFeatures_geneExamples = function(tss, 
+                                                  geneList = c('FGF10', 'SALL4'), 
+                                                  outDir = 'Gene_Examepls')
+{
+  source('Functions_histM.R')
+  library(ggrepel)
+  library(dplyr)
+  library(tibble)
+  library("cowplot")
+  require(gridExtra)
+  library(tidyr)
+  require(patchwork)
+  
+  # outDir = "/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/Gene_Examples"   
+  # geneList = dev.genes
+  
+  if(!dir.exists(outDir)) dir.create(outDir)
+  features = c('rna', 'atac', 'H3K4me3', 'H3K27me3', 'H3K4me1')
+  samples = c('mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d')
+  
+  for(n in 1:length(geneList))
+  {
+    # n = 1
+    kk = which(tss$gene == geneList[n])
+    if(length(kk) == 1){
+      cat(n, ' -- ', geneList[n], '\n')
+      test = matrix(NA, nrow = length(samples), ncol = length(features))
+      rownames(test) = samples
+      colnames(test) = features
+      for(m in 1:ncol(test))
+      {
+        if(m == 1) {
+          mm = grep('smartseq2_', colnames(tss))
+          test[,m] = as.numeric(tss[kk, mm[order(mm)]])
+        }
+        if(m == 2){
+          mm = grep(paste0(colnames(test)[m], '_mUA|', colnames(test)[m], '_X'), colnames(tss))
+          test[,m] = as.numeric(tss[kk, mm[order(mm)]]) 
+        }
+        if(m > 2){
+          mm = grep(paste0(colnames(test)[m], '_mUA|', colnames(test)[m], '_BL'), colnames(tss))
+          test[ ,m] = apply(matrix(as.numeric(tss[kk, mm[order(mm)]]), nrow = 2), 2, mean)
+        }
+      }
+      
+      test = data.frame(test, sample = rownames(test))
+      #test[which(test[,1]<(-2)),1] = -2
+      test[,1] = (test[, 1] - min(test[, 1]))/(max(test[,1]) - min(test[, 1])) * 3
+      ylims = range(test[, c(1:5)])
+      as_tibble(test) %>%  gather(features, signals,  1:5) %>% 
+        mutate(features = factor(features, levels=c('rna', 'atac', 'H3K4me3', 'H3K27me3', 'H3K4me1'))) %>%
+        mutate(sample = factor(sample, levels = c('mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d'))) %>%
+        ggplot(aes(y=signals, x=sample, color = features, group = features)) + 
+        geom_line(aes(linetype=features, color=features), size = 1.2) +
+        geom_point(size = 4.0) +
+        theme_classic() +
+        geom_hline(yintercept=c(0), col="darkgray", size = 1.2) +
+        theme(axis.text.x = element_text(angle = 0, size = 14), 
+              axis.text.y = element_text(angle = 0, size = 14), 
+              axis.title =  element_text(size = 14),
+              legend.text = element_text(size=12),
+              legend.title = element_text(size = 14)
+              )+
+        scale_color_manual(values=c('black', 'springgreen', 'blue', 'red','gold2')) +
+        scale_linetype_manual(values=c("longdash", "solid", "solid", "solid", "longdash")) + 
+        labs( x = '', y = 'feature signals') +
+        ylim(ylims[1], ylims[2]) +
+        ggtitle(geneList[n])
+        
+      ggsave(paste0(outDir, "/Regeneration_allFeatures_", geneList[n],  ".pdf"),  width = 7, height = 4)  
+      
+    }else{
+      cat(n, ' -- ', geneList[n], 'FOUND in tss',  length(kk), '\n')  
+    }
+  }
+   
+}
+
+########################################################
+########################################################
+# Section : another section
+# 
+########################################################
+########################################################
 
 ##########################################
 # test the comparisons of histmarker across group which are redefined RNA-seq data 

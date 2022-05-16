@@ -29,7 +29,7 @@ dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memo
 annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
 
 figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
-tableDir = paste0(figureDir, 'tables4plots/')
+tableDir = paste0('/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/SupTables/')
 
 saveTables = FALSE
 
@@ -589,6 +589,18 @@ if(PLOT.global.dynamic.parameters.for.histM){
   
   yy_atac = yy_atac[mapping$queryHits,]
   res_atac = res_atac[mapping$queryHits, ]
+  
+  if(saveTables){
+    xx = yy_atac
+    colnames(xx) = paste0('atac_', colnames(xx))
+    xx = data.frame(xx, yy1, stringsAsFactors = FALSE)
+    xx$peak_coordinates = rownames(xx)
+    xx$clusters = res_atac$clusters
+    xx$clusters = gsub('mc', 'c', xx$clusters)
+    xx = xx[, c(30, 29, 1:28)]
+    write.csv(xx, file = paste0(tableDir, 'Dyanmic_atacseqPeaks_clustering_and_histM.csv'), row.names = TRUE)
+     
+  }
   
   ## specify row gaps as atac-seq peaks
   cluster_order = paste0('mc', c(1:8))
@@ -1432,10 +1444,13 @@ ggplot(data=res, aes(x=x, y=y, label = gene)) +
                   # Add extra padding around each data point.
                   point.padding = unit(1.6, 'lines')) +
   theme_classic() +
-  theme(legend.text = element_text(size=12),
-        legend.title = element_text(size = 14),
-        legend.position=c(0.2, 0.8),
-        plot.margin = margin()
+  theme(axis.text.x = element_text(angle = 0, size = 14), 
+        axis.text.y = element_text(angle = 0, size = 14), 
+        axis.title =  element_text(size = 14),
+        legend.text = element_text(size=12),
+        legend.title = element_text(size = 14)
+        #legend.position=c(0.2, 0.8),
+        #plot.margin = margin()
         #legend.key.size = unit(1, 'cm')
         #legend.key.width= unit(1, 'cm')
   ) + 
@@ -1444,8 +1459,44 @@ ggplot(data=res, aes(x=x, y=y, label = gene)) +
   labs(x = "UA_H3K4me3 (log2 cpm)", y= 'UA_H3K27me3 (log2 cpm)') +
   guides(colour = guide_legend(override.aes = list(size=2)))
 
-
 ggsave(paste0(figureDir, "Bivalent_TSS_mUA_scatterplot.pdf"),  width = 8, height = 6)
+
+res$x = res$smartseq2_mUA
+res$y = res$smartseq2_X9dpa
+
+ggplot(data=res, aes(x=x, y=y, label = gene)) +
+  geom_point(size = 0.1, color = 'darkgray') + 
+  #geom_point(size = 0.1 ) +
+  theme(axis.text.x = element_text(size = 12), 
+        axis.text.y = element_text(size = 12)) +
+  geom_point(data=res[res$groups == 'house_keep', ], aes(x=x, y=y),  size=0.3, color = 'red') +
+  geom_point(data=res[res$groups == 'non_expr', ], aes(x=x, y=y),  size=0.3, color = 'darkorange') +
+  geom_point(data=res[examples.sel, ], aes(x=x, y=y),  size=1.5, color = 'black') +
+  #geom_text_repel(data= res[examples.sel, ], size = 4.0, color = 'blue') +
+  #geom_point(data=res[matures.sel, ], aes(x=x, y=y),  size=1.5, color = 'black') +
+  geom_text_repel(data= res[c(examples.sel), ], 
+                  aes(x, y),
+                  size = 5,
+                  color = "blue",
+                  #family = 'Times',
+                  fontface = 'bold',
+                  # Add extra padding around each text label.
+                  box.padding = unit(0.3, 'lines'),
+                  # Add extra padding around each data point.
+                  point.padding = unit(1.6, 'lines')) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 0, size = 14), 
+        axis.text.y = element_text(angle = 0, size = 14), 
+        axis.title =  element_text(size = 14),
+        legend.text = element_text(size=12),
+        legend.title = element_text(size = 14)) + 
+  geom_abline(slope = 1, intercept = 0, col = 'black') +
+  #geom_vline(xintercept=c(1), col='black') +
+  #geom_hline(yintercept=c(0), col="black") +
+  labs(x = "gene expression in mUA (log2 cpm)", y= 'gene expression in 9dpa (log2 cpm)') +
+  guides(colour = guide_legend(override.aes = list(size=2)))
+
+ggsave(paste0(figureDir, "geneExpression_comparison_mUA_BLday9.pdf"),  width = 10, height = 8)
 
 ##########################################
 # check the gene expression of those bivalent promoters 
@@ -1703,27 +1754,33 @@ yy = data.frame(groups = res$groups,
                 yy, 
                 stringsAsFactors = FALSE)
 
-#yy = add_CpG_features(yy)
+# yy = add_CpG_features(yy)
+# yy = add_TFmotifs_feature(yy)
+
+## load features importance with RF
 imps = readRDS(file = paste0(RdataDir, '/RF_featuresImportance.rds'))
+imps = imps[c(1:10), ]
 
 ggplot(data = imps, aes(x = scores, y = rank, label = names)) +   
   geom_point(size = 3.0, color = 'blue') +
   theme_classic() +
   theme(axis.text.x = element_text(size = 14), 
-        axis.text.y = element_text(size = 14),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
         axis.title = element_text(size = 15)) + 
   #geom_text_repel(data=subset(yy, pvalue_pos > 2), size = 4)
-  geom_text_repel(size = 4, box.padding = 0.3) +
-  labs(x = "feature importance (RF)", y= 'rank')
+  geom_text_repel(size = 4, box.padding = 0.4) +
+  labs(x = "feature importance (RF)", y= 'feature rank')
 
 ggsave(paste0(figureDir, "promoter_chromatinFeatures_Importance_RF_forUpDownRegulated.pdf"),  width = 6, height = 4)
 
-yy = readRDS(file = paste0(RdataDir, '/chromatin_promoter_features_geneGroups.rds'))
+## reload the groups with all added features
+yy = readRDS(file = paste0(RdataDir, '/chromatin_promoter_features_Tfmotifs_geneGroups.rds')) 
 #geom_label_repel(data=  as.tibble(res) %>%  dplyr::mutate_if(is.factor, as.character) %>% dplyr::filter(gene %in% examples.sel), size = 2) + 
 #scale_color_manual(values=c("blue", "black", "red")) +
-library(wesanderson)
+# library(wesanderson)
 
-fts = c('rna_mUA', 'H3K27me3_mUA', 'H3K4me3_mUA', 'H3K27ac_mUA','atac_mUA',  'H3K4me1_mUA')
+fts = c('rna_mUA', 'H3K27me3_mUA', 'H3K4me3_mUA', 'atac_mUA')
 yy$rna_mUA[is.na(yy$rna_mUA)] = -6
 yy %>% 
   pivot_longer(cols = fts, names_to = 'features') %>%
@@ -1734,11 +1791,43 @@ yy %>%
   #geom_jitter(width = 0.1)+
   #geom_violin(width = 0.8) +
   theme_classic() +
-  theme(axis.text.x = element_text(angle = 0, size = 10)) +
-  labs(x = "", y= 'normalized data (log2)') + 
+  theme(axis.text.x = element_text(angle = 0, size = 10), 
+        axis.text.y = element_text(angle = 0, size = 10), 
+        axis.title =  element_text(size = 10),
+        legend.text = element_text(size=10),
+        legend.title = element_text(size = 10)
+        #legend.position=c(0.3, 0.9)
+        ) +
+  labs(x = "", y= ' log2 cpm') + 
   scale_fill_brewer(palette = "Dark2")
 
-ggsave(paste0(figureDir, "promoter_chromatinFeatures_geneGroups.pdf"),  width = 10, height = 4)
+ggsave(paste0(figureDir, "promoter_chromatinFeatures_geneGroups.pdf"),  width = 8, height = 4)
+
+
+
+fts = c('H3K4me1_mUA', 'H3K27ac_mUA')
+yy$rna_mUA[is.na(yy$rna_mUA)] = -6
+yy %>% 
+  pivot_longer(cols = fts, names_to = 'features') %>%
+  mutate(features = factor(features, levels = fts)) %>%
+  mutate(groups = factor(groups, levels = c('DE_up', 'DE_down', 'house_keep', 'highlyExpr_stable', 'lowlyExpr_stable',  'non_expr'))) %>% 
+  ggplot(aes(x = features, y=value, fill= groups)) + 
+  geom_boxplot(outlier.alpha = 0.1) + 
+  #geom_jitter(width = 0.1)+
+  #geom_violin(width = 0.8) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 0, size = 10), 
+        axis.text.y = element_text(angle = 0, size = 10), 
+        axis.title =  element_text(size = 10),
+        legend.text = element_text(size=10),
+        legend.title = element_text(size = 10)
+        #legend.position=c(0.3, 0.9)
+  ) +
+  labs(x = "", y= ' log2 cpm') + 
+  scale_fill_brewer(palette = "Dark2")
+
+ggsave(paste0(figureDir, "promoter_chromatinFeatures_geneGroups_lessImportant.pdf"),  width = 8, height = 4)
+
 
 fts = c('cpg.oe')
 yy %>% 
@@ -1750,16 +1839,43 @@ yy %>%
   #geom_jitter(width = 0.1)+
   #geom_violin(width = 0.8) +
   theme_classic() +
-  theme(axis.text.x = element_text(angle = 0, size = 10)) +
+  theme(axis.text.x = element_text(angle = 0, size = 10), 
+        axis.text.y = element_text(angle = 0, size = 10), 
+        axis.title =  element_text(size = 10),
+        legend.text = element_text(size=10),
+        legend.title = element_text(size = 10)
+        #legend.position=c(0.3, 0.9)
+  ) +
   labs(x = "", y= 'CpG scores') +
   scale_fill_brewer(palette = "Dark2")
 
 ggsave(paste0(figureDir, "CpGscores_geneGroups.pdf"),  width = 6, height = 4)
 
+fts = c("ZFP42_MA1651.1")
+yy %>% 
+  pivot_longer(cols = fts, names_to = 'features') %>%
+  mutate(features = factor(features, levels = fts)) %>%
+  mutate(groups = factor(groups, levels = c('DE_up', 'DE_down', 'house_keep', 'highlyExpr_stable', 'lowlyExpr_stable',  'non_expr'))) %>%
+  ggplot(aes(x = features, y=value, fill= groups)) + 
+  #geom_boxplot(outlier.alpha = 0.1) + 
+  #geom_jitter(width = 0.1)+
+  #geom_violin(width = 0.8) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 0, size = 10), 
+        axis.text.y = element_text(angle = 0, size = 10), 
+        axis.title =  element_text(size = 10),
+        legend.text = element_text(size=10),
+        legend.title = element_text(size = 10)
+        #legend.position=c(0.3, 0.9)
+  ) +
+  labs(x = "", y= '') +
+  scale_fill_brewer(palette = "Dark2")
+
+ggsave(paste0(figureDir, "CpGscores_geneGroups.pdf"),  width = 6, height = 4)
 
 ########################################################
 ########################################################
-# Section : regeneration peaks, not found in mUA and embryo stages only in regeneration process 
+# Section : regeneraiton enhancer and motif analysis
 # 
 ########################################################
 ########################################################
