@@ -134,7 +134,7 @@ process.normalize.atac.histM.allTSS.matureSamples = function()
   
   
   ##########################################
-  # batch correct TSS for atac data and histM have already majority of TSS considered here 
+  # batch correct TSS in atac data,  histM have already majority of TSS considered here 
   ##########################################
   Check.overlaps.between.tss.with.atacseq.And.BatchCorrection = FALSE
   if(Check.overlaps.between.tss.with.atacseq.And.BatchCorrection){
@@ -145,7 +145,7 @@ process.normalize.atac.histM.allTSS.matureSamples = function()
     tp = makeGRangesFromDataFrame(tp, seqnames.field=c("X1"),
                                   start.field="X2", end.field="X3", strand.field="strand")
     
-    load(file = paste0(RdataDir, '/regeneration_samples_beforeBatchCorrection.Rdata'))
+    load(file = paste0(RdataDir, '/atac_matureSamples_beforeBatchCorrection.Rdata'))
     
     pp = data.frame(t(sapply(rownames(ddx), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
     pp$strand = '*'
@@ -160,8 +160,8 @@ process.normalize.atac.histM.allTSS.matureSamples = function()
     cat(length(missed), ' tss missed \n')
     
     ## add missing tss to regeneration atac data
-    load(file = paste0(RdataDir, '/tss_perGene_atac_histM_sample_design_regeneration.embryo_counts_expressedGenes_controls.Rdata'))
-    load(file = paste0(RdataDir, '/regeneration_samples_beforeBatchCorrection.Rdata'))
+    load( file = paste0(RdataDir, '/tss_perGene_atac_histM_sample_design_matureSamples_counts_expressedGenes_controls.Rdata'))
+    load(file = paste0(RdataDir, '/atac_matureSamples_beforeBatchCorrection.Rdata'))
     
     counts = counts(ddx)
     #kk = grep('Embryo_', design.sels$condition, invert = TRUE)
@@ -172,7 +172,7 @@ process.normalize.atac.histM.allTSS.matureSamples = function()
     raw = tss[missed, kk2]
     design.atac = design[kk2, ]
     
-    rownames(raw) = tss$coords[missed]
+    # rownames(raw) = tss$coords[missed]
     
     mm = match(design.sels$sampleID, design.atac$SampleID)
     design.atac = design.atac[mm, ]
@@ -182,6 +182,10 @@ process.normalize.atac.histM.allTSS.matureSamples = function()
     counts = rbind(counts, raw)
     
     ## batch correction for those 69k loci 
+    require(edgeR)
+    require(sva)
+    source('Functions_atac.R')
+    
     table(design.sels$conds, design.sels$batch)
     
     d <- DGEList(counts=counts, group=design.sels$conds)
@@ -201,61 +205,193 @@ process.normalize.atac.histM.allTSS.matureSamples = function()
     # plot(fpm.bc[,1], tmm[, 1]);abline(0, 1, lwd = 2.0, col = 'red')
     
     make.pca.plots(tmm, ntop = 3000, conds.plot = 'all')
-    ggsave(paste0(resDir, "/regeneration_embryo_TSS_Samples_batchCorrect_before_",  version.analysis, ".pdf"), width = 16, height = 14)
+    ggsave(paste0(resDir, "/matureSamples_TSS_batchCorrect_before_",  version.analysis, ".pdf"), width = 16, height = 14)
     
     make.pca.plots(fpm.bc, ntop = 3000, conds.plot = 'all')
-    ggsave(paste0(resDir, "/regeneration_embryo_TSS_Samples_batchCorrect_after_",  version.analysis, ".pdf"), width = 16, height = 14)
+    ggsave(paste0(resDir, "/matureSamples_TSS_batchCorrect_after_",  version.analysis, ".pdf"), width = 16, height = 14)
     
     fpm = fpm.bc
     
     rm(fpm.bc)
     
-    saveRDS(fpm, file = paste0(RdataDir, '/fpm.bc_TMM_combat_mUA_regeneration.dev.TSS_2Batches.R10723_R7977_', version.analysis, '.rds'))
+    saveRDS(fpm, file = paste0(RdataDir, '/fpm.bc_TMM_combat_matureSamples.TSS_2Batches.R10723_R7977_', version.analysis, '.rds'))
     saveRDS(design.sels, 
-            file = paste0(RdataDir, '/design_sels_bc_TMM_combat_mUA_regeneration.dev.TSS_2Batches.R10723_R7977',
+            file = paste0(RdataDir, '/design_sels_bc_TMM_combat_matureSamples.TSS_2Batches.R10723_R7977',
                           version.analysis, '.rds'))
     
-    ## dynamic peak analysis
-    fpm = readRDS(file = paste0(RdataDir, '/fpm.bc_TMM_combat_mUA_regeneration.dev.TSS_2Batches.R10723_R7977_', version.analysis, '.rds'))
-    design = readRDS(file = paste0(RdataDir, '/design_sels_bc_TMM_combat_mUA_regeneration.dev.TSS_2Batches.R10723_R7977',
+    ##########################################
+    # ## segment-specific peak analysis
+    ##########################################
+    fpm = readRDS(file = paste0(RdataDir, '/fpm.bc_TMM_combat_matureSamples.TSS_2Batches.R10723_R7977_', version.analysis, '.rds'))
+    design = readRDS(file = paste0(RdataDir, '/design_sels_bc_TMM_combat_matureSamples.TSS_2Batches.R10723_R7977',
                                    version.analysis, '.rds'))
     
     # prepare the background distribution
     fpm.bg = fpm[grep('bg_', rownames(fpm), invert = FALSE), ]
     fpm = fpm[grep('bg_', rownames(fpm), invert = TRUE), ]
-    # rownames(fpm) = gsub('_', '-', rownames(fpm))
+    rownames(fpm) = gsub('_', '-', rownames(fpm))
     
+    conds = c("Mature_UA", "Mature_LA", "Mature_Hand")
     
-    conds = c("Embryo_Stage40", "Embryo_Stage44_proximal", 'Embryo_Stage44_distal', 
-              "Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal", 'BL_UA_13days_distal')
-    
-    sample.sels = c(); cc = c()
-    sample.means = c()
+    sample.sels = c();  cc = c()
     for(n in 1:length(conds)) {
-      kk = which(design$conds == conds[n])
+      #kk = which(design$conds == conds[n] & design$SampleID != '136159')
+      kk = which(design$conds == conds[n]) 
       sample.sels = c(sample.sels, kk)
       cc = c(cc, rep(conds[n], length(kk)))
-      sample.means = cbind(sample.means, apply(fpm[, kk], 1, mean))
     }
-    colnames(sample.means) = conds
     
+    library(tictoc)
+    ii.test = c(1:nrow(fpm)) # takes about 2 mins for 40k peaks
     source('Functions_atac.R')
+    
     cpm = fpm[, sample.sels]
     
     source('Functions_atac.R')
-    tic()
-    ## define the dynamic enhancers with mature UA and BL.UA and check them if embryo samples
-    #sels = grep('Embryo', cc, invert = TRUE) 
-    res = temporal.peaks.test(cpm, c = cc)
     
+    tic() 
+    res = spatial.peaks.test(cpm = cpm, c = cc, test.Dev.Reg = FALSE)
+    #res = data.frame(res, pp.annots[ii.test, ], stringsAsFactors = FALSE)
     toc()
     
     res = data.frame(fpm, res, stringsAsFactors = FALSE)
     
-    saveRDS(res, file = paste0(RdataDir, '/res_temporal_dynamicPeaks_regeneration.dev.TSS_2Batches.R10723_R7977_peakAnnot_v1.rds'))
-    
+    saveRDS(res, file = paste0(RdataDir, '/res_segment_specific_atac_matureSamples.TSS_2Batches.R10723_R797.rds'))
     
   }
+}
+
+Add.TSS.chromatinFeatures.in.matureSamples = function()
+{
+  ## load tss with already regeneration data
+  tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM_geneCorrection_v3.rds'))
+  tss$gene[which(rownames(tss) == 'AMEX60DD028208')] = 'PROD1'
+  tss$gene[which(rownames(tss) == 'AMEX60DD024424')] = NA
+  
+  ## add analysis results
+  #rna = readRDS(file = paste0("../results/RNAseq_data_used/Rdata/", 
+  #                            'regeneration_dynamicGeneClusters_allGenes.rds'))
+  #rna$geneID = get_geneID(rownames(rna))
+  #tss[, c(8:12)] = rna[match(tss$geneID, rna$geneID), c(1:5)]
+  #colnames(tss)[8:12] = paste0('smartseq2_', colnames(tss)[8:12])
+  #annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+  #                       'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
+  
+  # tss$gene = annot$gene.symbol.toUse[match(tss$geneID, annot$geneID)]
+  tp = data.frame(t(sapply(tss$coords, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  tp$strand = '*'
+  tp = makeGRangesFromDataFrame(tp, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
+  
+  ########
+  ## start to add atac peaks overlapping tss
+  ## and the histM overlapping the tss
+  ########
+  aa = readRDS(file = paste0(RdataDir, '/res_segment_specific_atac_matureSamples.TSS_2Batches.R10723_R797.rds'))
+  names = rownames(aa)
+  names = gsub('bg_', '', names)
+  jj = grep('^chr', names, invert = TRUE)
+  names[jj] = tss$coords[match(names[jj], tss$transcript)]
+  names.uniq = unique(names)
+  names.uniq = names.uniq[!is.na(names.uniq)]
+  
+  aa = aa[match(names.uniq, names), ]
+  aa = data.frame(aa, stringsAsFactors = FALSE)
+  rownames(aa) = as.character(names.uniq)
+  
+  mat = aa[, c(1:14)]
+  aa = aa[, -c(1:14)]
+  
+  # mat = mat[, grep('Embryo_', colnames(mat), invert = TRUE)]
+  mat = cal_sample_means(mat, conds = c('Mature_UA', 'Mature_LA', 'Mature_Hand', 'HEAD'))
+  newcc = c('mUA', 'mLA', 'mHand', 'Head')
+  colnames(mat) = newcc
+  
+  pp = data.frame(t(sapply(rownames(aa), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  pp$strand = '*'
+  pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
+  
+  mapping = findOverlaps(tp, pp, ignore.strand=TRUE,  minoverlap=100L)
+  jj = (unique(mapping@from))
+  missed = setdiff(c(1:nrow(tss)), jj)
+  
+  mapping = data.frame(mapping) # mapping from gene to 
+  
+  # jj_sel = mapping$subjectHits[match(c(1:nrow(tss)), mapping$queryHits)] # randomly select one atac-seq peaks
+  jj_sels = c() # if multiple atac peaks overlapping with the tss considered, the one with max signals will be picked up
+  for(n in 1:nrow(tss))
+  {
+    kk = mapping$subjectHits[which(mapping$queryHits == n)]
+    if(length(kk) == 0){
+      cat(n, '-- missing \n')
+      jj_sels = c(jj_sels, NA)
+    }else{
+      if(length(kk) == 1){
+        jj_sels = c(jj_sels, kk)
+      }else{
+        ss = apply(mat[kk, ], 1, mean)
+        jj_sels = c(jj_sels, kk[which.max(ss)])
+      }
+    }
+  }
+  
+  res = data.frame(mat[jj_sels, ], aa[jj_sels, ], stringsAsFactors = FALSE)
+  
+  fdr.cutoff = 0.05; logfc.cutoff = 1
+  select = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & abs(res$logFC.mLA.vs.mUA) > logfc.cutoff) |
+                        (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & abs(res$logFC.mHand.vs.mUA) > logfc.cutoff)|
+                        (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & abs(res$logFC.mHand.vs.mLA) > logfc.cutoff)
+  )
+  
+  cat(length(select), 'DE peaks found !\n')
+  res$dynamic = NA
+  res$dynamic[select] = 1
+  
+  colnames(res) = paste0('atacM_', colnames(res))
+  
+  tss =  data.frame(tss, res, stringsAsFactors = FALSE)
+  
+  ## add histM analysis results
+  keep = readRDS(file = paste0('../results/CT_merged_20220328/Rdata/regeneration_combined_4histMarkers_DE_345k.rds'))
+  
+  peakNames = rownames(keep)
+  peakNames = gsub('tss.', '', peakNames)
+  pp = data.frame(t(sapply(peakNames, function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
+  pp$strand = '*'
+  pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
+  
+  mapping = findOverlaps(tp, pp, ignore.strand=TRUE,  minoverlap=100L)
+  jj = (unique(mapping@from))
+  missed = setdiff(c(1:nrow(tss)), jj)
+  mapping = data.frame(mapping)
+  
+  #jj_sel = mapping$subjectHits[match(c(1:nrow(tss)), mapping$queryHits)]
+  jj_sels = c() # if multiple atac peaks overlapping with the tss considered, the one with max H3K4me3 signals will be picked up
+  for(n in 1:nrow(tss))
+  {
+    kk = mapping$subjectHits[which(mapping$queryHits == n)]
+    if(length(kk) == 0){
+      cat(n, '-- missing \n')
+      jj_sels = c(jj_sels, NA)
+    }else{
+      if(length(kk) == 1){
+        jj_sels = c(jj_sels, kk)
+      }else{
+        ss = apply(keep[kk, grep('H3K4me3_mUA|H3K4me3_BL', colnames(keep))], 1, mean)
+        jj_sels = c(jj_sels, kk[which.max(ss)])
+      }
+    }
+  }
+  
+  res = keep[jj_sels,]
+  
+  tss =  data.frame(tss, res, stringsAsFactors = FALSE)
+  
+  saveRDS(tss, file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM.rds'))
+  
+  
   
   
   

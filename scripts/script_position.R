@@ -82,6 +82,7 @@ if(Split.Mature.Regeneration.samples){
     ddx$conds = droplevels(ddx$conds)
     ss = rowSums(counts(ddx))
     
+    save(ddx, design.sels, file = paste0(RdataDir, '/atac_matureSamples_beforeBatchCorrection.Rdata'))
     # remove low count genes, otherwise combat returns error 
     # 'Error in while (change > conv) { : missing value where TRUE/FALSE needed'
     #ddx = ddx[which(ss>5), ] 
