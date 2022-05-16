@@ -938,3 +938,56 @@ Combine.regeneration.peaks.all.four.markers = function()
   
 }
 
+Combine.mature.peaks.all.four.markers = function()   
+{
+  ##########################################
+  # Combine all four markers  
+  ##########################################
+  #atacseq_peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rxxxx_R10723_R11637_R12810_atac/Rdata/',
+  #                                      'ATACseq_peak_consensus_filtered_55k.rds'))
+  conds_histM = c('H3K4me3','H3K27me3', 'H3K4me1', 'H3K27ac')
+  
+  keep = c()
+  #DE.locus = c()
+  
+  fdr.cutoff = 0.05; 
+  logfc.cutoff = 1;
+  marker.cutoff = -1;
+  
+  for(n_histM in 1:length(conds_histM))
+  {
+    # n_histM = 1
+    res = readRDS(file = paste0(RdataDir, '/fpm_bc_TMM_combat_DBedgeRtest_', conds_histM[n_histM], '_', version.analysis, '.rds'))
+    
+    select = which(((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & abs(res$logFC.mLA.vs.mUA) > logfc.cutoff) |
+                      (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & abs(res$logFC.mHand.vs.mUA) > logfc.cutoff)|
+                      (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & abs(res$logFC.mHand.vs.mLA) > logfc.cutoff)) &
+                     res$maxs > marker.cutoff
+    )
+    cat(length(select), ' DE ', conds_histM[n_histM],  ' in total \n')
+    
+    ### focus on the atac-seq peak sets
+    ii_bgs = grep('tss.', rownames(res))
+    rownames(res) = gsub('tss.', '', rownames(res))
+    xx = res
+    names = colnames(xx)
+    ii_missed = grep(conds_histM[n_histM], names, invert = TRUE)
+    names[ii_missed] = paste0(conds_histM[n_histM], '.M_', names[ii_missed])
+    colnames(xx) = names
+    xx$dynamic = NA
+    xx$dynamic[select] = 1
+    colnames(xx)[ncol(xx)] = paste0('segment_', conds_histM[n_histM])
+    
+    if(n_histM == 1){
+      keep = data.frame(xx, stringsAsFactors = FALSE)
+      
+    }else{
+      keep = data.frame(keep, xx[match(rownames(keep), rownames(xx)), ], stringsAsFactors = FALSE)
+      
+    }
+  }
+  
+  saveRDS(keep, file = paste0(RdataDir, '/matureSamples_combined_4histMarkers_DE_345k.Rdata'))
+  
+}
+

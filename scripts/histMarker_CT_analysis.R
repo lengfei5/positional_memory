@@ -1011,7 +1011,8 @@ conds_histM = c('H3K4me3','H3K27me3', 'H3K4me1', 'H3K27ac')
 keep = c()
 DE.locus = c()
 
-fdr.cutoff = 0.01; 
+fdr.cutoff = 0.05; 
+#fdr.cutoff = 0.01; 
 logfc.cutoff = 1;
 marker.cutoff = 1;
 

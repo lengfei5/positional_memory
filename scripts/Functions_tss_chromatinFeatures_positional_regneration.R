@@ -261,8 +261,11 @@ process.normalize.atac.histM.allTSS.matureSamples = function()
   }
 }
 
+
 Add.TSS.chromatinFeatures.in.matureSamples = function()
 {
+  source('Functions_histM.R')
+  
   ## load tss with already regeneration data
   tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM_geneCorrection_v3.rds'))
   tss$gene[which(rownames(tss) == 'AMEX60DD028208')] = 'PROD1'
@@ -348,12 +351,12 @@ Add.TSS.chromatinFeatures.in.matureSamples = function()
   res$dynamic = NA
   res$dynamic[select] = 1
   
-  colnames(res) = paste0('atacM_', colnames(res))
+  colnames(res) = paste0('atac.M_', colnames(res))
   
   tss =  data.frame(tss, res, stringsAsFactors = FALSE)
   
   ## add histM analysis results
-  keep = readRDS(file = paste0('../results/CT_merged_20220328/Rdata/regeneration_combined_4histMarkers_DE_345k.rds'))
+  keep = readRDS(file = paste0('../results/CT_merged_20220328/Rdata/matureSamples_combined_4histMarkers_DE_345k.Rdata'))
   
   peakNames = rownames(keep)
   peakNames = gsub('tss.', '', peakNames)
@@ -379,7 +382,7 @@ Add.TSS.chromatinFeatures.in.matureSamples = function()
       if(length(kk) == 1){
         jj_sels = c(jj_sels, kk)
       }else{
-        ss = apply(keep[kk, grep('H3K4me3_mUA|H3K4me3_BL', colnames(keep))], 1, mean)
+        ss = apply(keep[kk, grep('H3K4me3_mUA|H3K4me3_mHand|H3K4me3_LA', colnames(keep))], 1, mean)
         jj_sels = c(jj_sels, kk[which.max(ss)])
       }
     }
@@ -389,10 +392,7 @@ Add.TSS.chromatinFeatures.in.matureSamples = function()
   
   tss =  data.frame(tss, res, stringsAsFactors = FALSE)
   
-  saveRDS(tss, file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM.rds'))
-  
-  
-  
+  saveRDS(tss, file = paste0(RdataDir, '/regeneration_matureSamples_tss_perGene_smartseq2_atac_histM_v4.rds'))
   
   
 }

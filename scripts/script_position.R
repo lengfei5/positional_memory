@@ -1137,7 +1137,8 @@ library(tidyr)
 require(patchwork)
 
 ## bivalent analysis here
-tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM_geneCorrection_v3.rds'))
+tss = readRDS(file = paste0(RdataDir, '/regeneration_matureSamples_tss_perGene_smartseq2_atac_histM_v4.rds'))
+
 tss$gene[which(rownames(tss) == 'AMEX60DD028208')] = 'PROD1'
 tss$gene[which(rownames(tss) == 'AMEX60DD024424')] = NA
 
@@ -1153,8 +1154,9 @@ positional.genes = c('PROD1', 'RARRES1', 'MEIS1', 'MEIS2', 'SHOX', 'SHOX2', 'HOX
 outDir = "/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/Gene_Examples"   
 
 source('Functions_atac.R')
-plot_rna_chromainFeatures_geneExamples(tss, geneList = dev.genes, outDir = outDir)
-plot_rna_chromainFeatures_geneExamples(tss, geneList = positional.genes, outDir = outDir)
+plot_rna_chromainFeatures_geneExamples(tss, geneList = dev.genes, outDir = outDir, incl_Mature = FALSE)
+plot_rna_chromainFeatures_geneExamples(tss, geneList = positional.genes, outDir = outDir, incl_Mature = FALSE)
+
 
 ########################################################
 ########################################################
