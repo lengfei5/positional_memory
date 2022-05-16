@@ -3849,92 +3849,94 @@ process.normalize.atac.histM.allTSS = function()
   }
   
   ##########################################
-  # batch correction separately for TSS
+  # batch correction of each chromatin features separately for TSS
+  # not used here,
+  # because all histM includes the majority of TSS and the batch correction is only redone for atac TSS (see above)
   ##########################################
-  Batch.correction.TSS = FALSE
-  if(Batch.correction.TSS){
-    require(edgeR)
-    require(sva)
-    source('Functions_atac.R')
-    
-    load(file = paste0(RdataDir,  '/atac_histoneMarkers_normSignals_axolotlAllTSS.2kb_TSS_genelevel_beforeBatchCorrection.Rdata'))
-    raw = data.frame(raw[,-1], transcript = raw[, 1], stringsAsFactors = FALSE)
-    
-    conds = c('atac','H3K4me3', 'H3K4me1', 'H3K27me3', 'H3K27ac')
-    samples = c('mUA', 'BL5days', 'BL9days', 'BL13days.prox', 'BL13days.dist')
-    
-    
-    tss_list = readRDS(file = paste0(RdataDir, '/list_TSS_considered.rds'))
-    raw = raw[which(!is.na(match(rownames(raw), tss_list$geneID))), ]
-    
-    aa = c()
-    
-    for(n in 1:length(conds))
-    {
-      # n = 4
-      sels = c()
-      for(s in samples)
-      {
-        sels = c(sels, which(design$condition == paste0(conds[n], '_', s)))
-      }
-      
-      cat(n, ' --', conds[n], '--', samples, '--', length(sels), 'samples\n')
-      
-      counts = raw[, sels]
-      design.sel = design[sels, ]
-      
-      #ss = apply(counts, 1, sum)
-      #ii_missed = which(ss<10)
-      
-      # normalization
-      d <- DGEList(counts=counts, group=design.sel$condition)
-      
-      if(conds[n] == 'H3K27ac' | conds[n] == 'IgG'){
-        tmm <- calcNormFactors(d, method='TMMwsp') # TMMwsp used for H3K27ac
-      }else{
-        tmm <- calcNormFactors(d, method='TMM')
-      }
-      
-      tmm = cpm(tmm, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 0.5)
-      
-      ## batch correction
-      #design.sel$condition = droplevels(design.sel$condition)
-      #design.sel$batch = droplevels(design.sel$batch)
-      bc = as.factor(design.sel$batch)
-      mod = model.matrix(~ as.factor(condition), data = design.sel)
-      
-      make.pca.plots(tmm, ntop = 3000, conds.sel = as.character(unique(design.sel$condition)))
-      ggsave(paste0(resDir, "/", conds[n], "_beforeBatchCorrect_",  version.analysis, ".pdf"), width = 16, height = 14)
-      
-      #tmm = as.matrix(tmm)
-      #vars = apply(tmm, 1, var)
-      #tmm = tmm[which(vars>0.5), ]
-      # if specify ref.batch, the parameters will be estimated from the ref, inapprioate here, 
-      # because there is no better batche other others 
-      #ref.batch = '2021S'# 2021S as reference is better for some reasons (NOT USED here)
-      
-      fpm.bc = ComBat(dat=as.matrix(tmm), batch=bc, mod=mod, par.prior=TRUE, ref.batch = NULL) 
-      
-      make.pca.plots(fpm.bc, ntop = 3000, conds.sel = as.character(unique(design.sel$condition)))
-      ggsave(paste0(resDir, "/", conds[n], "_afterBatchCorrect_",  version.analysis, ".pdf"), width = 10, height = 6)
-      
-      aa = cbind(aa, fpm.bc)
-      
-      rm(fpm.bc)
-      
-      #saveRDS(fpm, file = paste0(RdataDir, '/fpm_bc_TMM_combat_', conds[n], '_', version.analysis, '.rds'))
-      #saveRDS(design.sel, file = paste0(RdataDir, '/design.sels_bc_TMM_combat_', conds[n], '_', version.analysis, '.rds'))
-      
-    }
-    
-    aa = data.frame(aa, raw$transcript, stringsAsFactors = FALSE)
-    
-    ## sample means regardless of batches
-    #source('Functions_histM.R')
-    #cpmm = cal_sample_means(cpm, conds = unique(design$condition))
-    saveRDS(aa, file = paste0(RdataDir,  '/atac_histoneMarkers_normSignals_axolotlAllTSS.2kb_TSS_genelevel_batchCorrected.rds'))
-  }
-  
+  # Batch.correction.TSS = FALSE
+  # if(Batch.correction.TSS){
+  #   require(edgeR)
+  #   require(sva)
+  #   source('Functions_atac.R')
+  #   
+  #   load(file = paste0(RdataDir,  '/atac_histoneMarkers_normSignals_axolotlAllTSS.2kb_TSS_genelevel_beforeBatchCorrection.Rdata'))
+  #   raw = data.frame(raw[,-1], transcript = raw[, 1], stringsAsFactors = FALSE)
+  #   
+  #   conds = c('atac','H3K4me3', 'H3K4me1', 'H3K27me3', 'H3K27ac')
+  #   samples = c('mUA', 'BL5days', 'BL9days', 'BL13days.prox', 'BL13days.dist')
+  #   
+  #   
+  #   tss_list = readRDS(file = paste0(RdataDir, '/list_TSS_considered.rds'))
+  #   raw = raw[which(!is.na(match(rownames(raw), tss_list$geneID))), ]
+  #   
+  #   aa = c()
+  #   
+  #   for(n in 1:length(conds))
+  #   {
+  #     # n = 4
+  #     sels = c()
+  #     for(s in samples)
+  #     {
+  #       sels = c(sels, which(design$condition == paste0(conds[n], '_', s)))
+  #     }
+  #     
+  #     cat(n, ' --', conds[n], '--', samples, '--', length(sels), 'samples\n')
+  #     
+  #     counts = raw[, sels]
+  #     design.sel = design[sels, ]
+  #     
+  #     #ss = apply(counts, 1, sum)
+  #     #ii_missed = which(ss<10)
+  #     
+  #     # normalization
+  #     d <- DGEList(counts=counts, group=design.sel$condition)
+  #     
+  #     if(conds[n] == 'H3K27ac' | conds[n] == 'IgG'){
+  #       tmm <- calcNormFactors(d, method='TMMwsp') # TMMwsp used for H3K27ac
+  #     }else{
+  #       tmm <- calcNormFactors(d, method='TMM')
+  #     }
+  #     
+  #     tmm = cpm(tmm, normalized.lib.sizes = TRUE, log = TRUE, prior.count = 0.5)
+  #     
+  #     ## batch correction
+  #     #design.sel$condition = droplevels(design.sel$condition)
+  #     #design.sel$batch = droplevels(design.sel$batch)
+  #     bc = as.factor(design.sel$batch)
+  #     mod = model.matrix(~ as.factor(condition), data = design.sel)
+  #     
+  #     make.pca.plots(tmm, ntop = 3000, conds.sel = as.character(unique(design.sel$condition)))
+  #     ggsave(paste0(resDir, "/", conds[n], "_beforeBatchCorrect_",  version.analysis, ".pdf"), width = 16, height = 14)
+  #     
+  #     #tmm = as.matrix(tmm)
+  #     #vars = apply(tmm, 1, var)
+  #     #tmm = tmm[which(vars>0.5), ]
+  #     # if specify ref.batch, the parameters will be estimated from the ref, inapprioate here, 
+  #     # because there is no better batche other others 
+  #     #ref.batch = '2021S'# 2021S as reference is better for some reasons (NOT USED here)
+  #     
+  #     fpm.bc = ComBat(dat=as.matrix(tmm), batch=bc, mod=mod, par.prior=TRUE, ref.batch = NULL) 
+  #     
+  #     make.pca.plots(fpm.bc, ntop = 3000, conds.sel = as.character(unique(design.sel$condition)))
+  #     ggsave(paste0(resDir, "/", conds[n], "_afterBatchCorrect_",  version.analysis, ".pdf"), width = 10, height = 6)
+  #     
+  #     aa = cbind(aa, fpm.bc)
+  #     
+  #     rm(fpm.bc)
+  #     
+  #     #saveRDS(fpm, file = paste0(RdataDir, '/fpm_bc_TMM_combat_', conds[n], '_', version.analysis, '.rds'))
+  #     #saveRDS(design.sel, file = paste0(RdataDir, '/design.sels_bc_TMM_combat_', conds[n], '_', version.analysis, '.rds'))
+  #     
+  #   }
+  #   
+  #   aa = data.frame(aa, raw$transcript, stringsAsFactors = FALSE)
+  #   
+  #   ## sample means regardless of batches
+  #   #source('Functions_histM.R')
+  #   #cpmm = cal_sample_means(cpm, conds = unique(design$condition))
+  #   saveRDS(aa, file = paste0(RdataDir,  '/atac_histoneMarkers_normSignals_axolotlAllTSS.2kb_TSS_genelevel_batchCorrected.rds'))
+  # }
+  # 
 }
 
 ##########################################
@@ -3943,6 +3945,7 @@ process.normalize.atac.histM.allTSS = function()
 # so we are going to do:
 # add missing tss of interest by checking if all tss to considered are already included in the 
 # atac and all 4 histone markers
+# not done yet
 ##########################################
 
 
