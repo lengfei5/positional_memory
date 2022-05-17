@@ -476,7 +476,7 @@ if(grouping.position.dependent.peaks){
     require(RColorBrewer)
     
     # load keep object in which all histM peaks overlapping with atac-seq peaks and segement-specific test 
-    load(file = paste0('../results/CT_merged_20220328/Rdata', '/combined_4histMarkers_overlapped55kATACseq_DE.Rdata'))
+    load(file = paste0('../results/CT_merged_20220328/Rdata', '/combined_4histMarkers_overlapped55kATACseq_DE_fdr0.05.Rdata'))
     design = readRDS(file = paste0('../results/CT_merged_20220328/Rdata', '/histM_CT_design_info.rds'))
     
     yy = keep[, c(53:60, 27:34, 1:8, 79:85)]
@@ -747,7 +747,7 @@ if(grouping.position.dependent.peaks){
   peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rdata/', 
                                 'position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters_6.rds'))
   signals = readRDS(file = paste0(RdataDir, '/peak_signals_atac_4histM_positionalPeaks.rds'))
-  load(file = paste0(RdataDir, '/combined_4histMarkers_overlapped55kATACseq_DE.Rdata'))
+  load(file = paste0(RdataDir, '/combined_4histMarkers_overlapped55kATACseq_DE_fdr0.05.Rdata'))
   
   mm = match(rownames(signals), rownames(keep))
   missed = which(is.na(mm))
@@ -859,7 +859,7 @@ if(grouping.position.dependent.peaks){
   # promoter peaks and top enhancer peaks with atac-seq and histone markers
   ##########################################
   signals = readRDS(file = paste0(RdataDir, '/peak_signals_atac_4histM_positionalPeaks.rds'))
-  load(file = paste0(RdataDir, '/combined_4histMarkers_overlapped55kATACseq_DE.Rdata'))
+  load(file = paste0(RdataDir, '/combined_4histMarkers_overlapped55kATACseq_DE_fdr0.05.Rdata'))
   peaks = readRDS(paste0(RdataDir, 
        '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters6_DEtest_peakSignals_peakAnnot.updated.rds'))
   
