@@ -1498,6 +1498,25 @@ ggplot(data=res, aes(x=x, y=y, label = gene)) +
 
 ggsave(paste0(figureDir, "geneExpression_comparison_mUA_BLday9.pdf"),  width = 10, height = 8)
 
+tss = readRDS(file = paste0(RdataDir, '/regeneration_matureSamples_tss_perGene_smartseq2_atac_histM_v4.rds'))
+
+## examples
+tss$gene[which(rownames(tss) == 'AMEX60DD028208')] = 'PROD1'
+tss$gene[which(rownames(tss) == 'AMEX60DD024424')] = NA
+
+kk = which(!is.na(tss$gene))
+rownames(tss)[kk] = paste0(tss$gene[kk], '_', rownames(tss)[kk])
+tss$gene[-kk] = rownames(tss)[-kk]
+
+dev.genes = c('SHH', 'FGF8', 'FGF10', 'HAND2', 'BMP4', 'ALX1',
+              'ALX4', 'PRRX1', 'GREM1', 'LHX2', 'LHX9', 'TBX2_', 'TBX4', 'SALL4')
+
+outDir = "/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/Gene_Examples"   
+
+source('Functions_atac.R')
+
+plot_rna_chromainFeatures_geneExamples(tss, geneList = dev.genes, outDir = outDir, incl_Mature = FALSE)
+
 ##########################################
 # check the gene expression of those bivalent promoters 
 ##########################################

@@ -1052,7 +1052,8 @@ if(grouping.position.dependent.peaks){
 ########################################################
 ########################################################
 # Section : positiona features in the regenerations 
-# 
+# TSS of postional genes
+# positional enhancers 
 ########################################################
 ########################################################
 
@@ -1078,16 +1079,22 @@ kk = which(!is.na(tss$gene))
 rownames(tss)[kk] = paste0(tss$gene[kk], '_', rownames(tss)[kk])
 tss$gene[-kk] = rownames(tss)[-kk]
 
-dev.genes = c('SHH', 'FGF8', 'FGF10', 'HAND2', 'BMP4', 'ALX1',
-                'ALX4', 'PRRX1', 'GREM1', 'LHX2', 'LHX9', 'TBX2_', 'TBX4', 'SALL4')
 positional.genes = c('PROD1', 'RARRES1', 'MEIS1', 'MEIS2', 'SHOX', 'SHOX2', 'HOXA13', 'HOXA11', 'HOXA9', 'HOXD13',
                     'HOXD11', 'HOXD9')
 
 outDir = "/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/Gene_Examples"   
 
 source('Functions_atac.R')
-plot_rna_chromainFeatures_geneExamples(tss, geneList = dev.genes, outDir = outDir, incl_Mature = FALSE)
-plot_rna_chromainFeatures_geneExamples(tss, geneList = positional.genes, outDir = outDir, incl_Mature = FALSE)
+if(!dir.exists(outDir)) dir.create(outDir)
+
+plot_rna_chromainFeatures_geneExamples(tss, geneList = positional.genes, outDir = outDir, incl_Mature = TRUE, log2fc = TRUE)
+
+##########################################
+# TSS of positional genes (known and from microarray data) in mature and regeneration samples 
+##########################################
+positioanl.genes_all = 
+
+
 
 
 ########################################################

@@ -581,7 +581,6 @@ names(sample_colors) = c('Mature_UA', 'Mature_LA', 'Mature_Hand')
 annot_colors = list(segments = sample_colors)
 
 
-
 pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
          color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(16), 
          show_colnames = FALSE,

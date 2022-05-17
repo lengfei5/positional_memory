@@ -5209,7 +5209,8 @@ FeatureImportance.RF = function()
 plot_rna_chromainFeatures_geneExamples = function(tss, 
                                                   geneList = c('FGF10', 'SALL4'), 
                                                   outDir = 'Gene_Examepls',
-                                                  incl_Mature = FALSE)
+                                                  incl_Mature = FALSE,
+                                                  log2fc = FALSE)
 {
   source('Functions_histM.R')
   library(ggrepel)
@@ -5220,12 +5221,10 @@ plot_rna_chromainFeatures_geneExamples = function(tss,
   library(tidyr)
   require(patchwork)
   
-  # outDir = "/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/Gene_Examples"   
+  # outDir = "/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/positional_genes"   
   # geneList = dev.genes
   
-  if(!dir.exists(outDir)) dir.create(outDir)
   features = c('atac', 'H3K4me3', 'H3K27me3', 'H3K4me1')
- 
   
   for(n in 1:length(geneList))
   {
@@ -5233,7 +5232,7 @@ plot_rna_chromainFeatures_geneExamples = function(tss,
     kk = which(tss$gene == geneList[n])
     if(length(kk) == 1){
       
-      cat(n, ' -- ', geneList[n], '\n')
+      cat(n, ' -- ', geneList[n], '-- with tss :', tss$coords[kk], '\n')
       
       if(incl_Mature){
         samples = c('mHand', 'mLA', 'mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d')
@@ -5248,7 +5247,13 @@ plot_rna_chromainFeatures_geneExamples = function(tss,
                   grep(paste0(colnames(test)[m], '.M_mLA$'), colnames(tss)),
                   grep(paste0(colnames(test)[m], '.M_mUA$'), colnames(tss)),
                   grep(paste0(colnames(test)[m], '_mUA|', colnames(test)[m], '_X'), colnames(tss)))
-            test[,m] = c(as.numeric(tss[kk, mm[1:2]]), mean(as.numeric(tss[kk, mm[3:4]])), as.numeric(tss[kk, mm[5:8]]))
+            if(log2fc){
+              test[,m] = c(as.numeric(tss[kk, mm[1:2]]) - as.numeric(tss[kk, mm[3]]), 0, 
+                           as.numeric(tss[kk, mm[5:8]])- as.numeric(tss[kk, mm[4]]))
+            }else{
+              test[,m] = c(as.numeric(tss[kk, mm[1:2]]), mean(as.numeric(tss[kk, mm[3:4]])), as.numeric(tss[kk, mm[5:8]]))
+            }
+            
           }
           if(m > 1){
             mm0 = grep(paste0(colnames(test)[m], '_mUA'), colnames(tss))
@@ -5260,8 +5265,11 @@ plot_rna_chromainFeatures_geneExamples = function(tss,
                    grep(paste0(colnames(test)[m], '_BL'), colnames(tss))
             )
             tmp = apply(matrix(as.numeric(tss[kk, mm]), nrow = 2), 2, mean)
-            test[ ,m] = c(tmp[c(1:2)], mean(tmp[3:4]), tmp[5:8])
-            
+            if(log2fc){
+              test[ ,m] = c(tmp[c(1:2)] - tmp[3], 0, tmp[5:8] - tmp[4])
+            }else{
+              test[ ,m] = c(tmp[c(1:2)], mean(tmp[3:4]), tmp[5:8])
+            }
           }
           
         }
@@ -5276,16 +5284,16 @@ plot_rna_chromainFeatures_geneExamples = function(tss,
           mutate(features = factor(features, levels=c('atac', 'H3K4me3', 'H3K27me3', 'H3K4me1'))) %>%
           mutate(sample = factor(sample, levels = c('mHand','mLA', 'mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d'))) %>%
           ggplot(aes(y=signals, x=sample, color = features, group = features)) + 
-          geom_line(aes(linetype=features, color=features), size = 1.2) +
-          geom_point(size = 4.0) +
+          geom_line(aes(linetype=features, color=features), size = 1.0) +
+          geom_point(size = 4.5) +
           theme_classic() +
-          geom_hline(yintercept=c(0), col="darkgray", size = 1.2) +
+          geom_hline(yintercept=c(0), col="gray", size = 0.5) +
           #geom_vline(xintercept=c(3), col="blue", size = 1.2) +
           theme(axis.text.x = element_text(angle = 0, size = 14), 
                 axis.text.y = element_text(angle = 0, size = 14), 
                 axis.title =  element_text(size = 14),
-                legend.text = element_text(size=12),
-                legend.title = element_text(size = 14)
+                legend.text = element_text(size=10),
+                legend.title = element_text(size = 10)
           ) +
           scale_color_manual(values=c('springgreen', 'blue', 'red','gold2')) +
           scale_linetype_manual(values=c("solid", "longdash", "solid", "longdash")) + 
@@ -5293,7 +5301,7 @@ plot_rna_chromainFeatures_geneExamples = function(tss,
           ylim(ylims[1], ylims[2]) +
           ggtitle(geneList[n])
         
-        ggsave(paste0(outDir, "/Regeneration_allFeatures_", geneList[n],  ".pdf"),  width = 7, height = 4) 
+        ggsave(paste0(outDir, "/Regeneration_allFeatures_", geneList[n],  ".pdf"),  width = 8, height = 4) 
         
       }else{
         samples = c('mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d')
@@ -5305,7 +5313,12 @@ plot_rna_chromainFeatures_geneExamples = function(tss,
         {
           if(m == 1) {
             mm =c(grep(paste0(colnames(test)[m], '_mUA|', colnames(test)[m], '_X'), colnames(tss)))
-            test[,m] = as.numeric(tss[kk, mm])
+            if(log2fc){
+              test[,m] = as.numeric(tss[kk, mm]) - as.numeric(tss[kk, mm[1]])
+            }else{
+              test[,m] = as.numeric(tss[kk, mm])
+            }
+            
           }
           if(m > 1){
             mm0 = grep(paste0(colnames(test)[m], '_mUA'), colnames(tss))
@@ -5314,7 +5327,10 @@ plot_rna_chromainFeatures_geneExamples = function(tss,
                    grep(paste0(colnames(test)[m], '_BL'), colnames(tss))
             )
             tmp = apply(matrix(as.numeric(tss[kk, mm]), nrow = 2), 2, mean)
-            test[ ,m] = tmp
+            test[ ,m] = tmp 
+            if(log2fc){
+              test[,m] = test[,m] - test[1,m]
+            }
             
           }
           
@@ -5333,7 +5349,7 @@ plot_rna_chromainFeatures_geneExamples = function(tss,
           geom_line(aes(linetype=features, color=features), size = 1.2) +
           geom_point(size = 4.0) +
           theme_classic() +
-          geom_hline(yintercept=c(0), col="darkgray", size = 1.2) +
+          geom_hline(yintercept=c(0), col="darkgray", size = 0.7) +
           #geom_vline(xintercept=c(3), col="blue", size = 1.2) +
           theme(axis.text.x = element_text(angle = 0, size = 14), 
                 axis.text.y = element_text(angle = 0, size = 14), 
