@@ -1003,6 +1003,7 @@ for(n_histM in 1:length(conds_histM))
 ##########################################
 # Combine all four markers  
 ##########################################
+source('Functions_histM.R')
 atacseq_peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rxxxx_R10723_R11637_R12810_atac/Rdata/',
                                       'ATACseq_peak_consensus_filtered_55k.rds'))
 
@@ -1108,7 +1109,7 @@ for(n_histM in 1:length(conds_histM))
   }
 }
 
-save(keep, DE.locus, file = paste0(RdataDir, '/combined_4histMarkers_overlapped55kATACseq_DE.Rdata'))
+save(keep, DE.locus, file = paste0(RdataDir, '/combined_4histMarkers_overlapped55kATACseq_DE_fdr0.05.Rdata'))
 
 
 ##########################################

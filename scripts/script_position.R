@@ -460,12 +460,9 @@ if(grouping.position.dependent.peaks){
   write.csv(xx, file = paste0(saveDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters', 
                               nb_clusters, '.csv'), quote = FALSE, row.names = TRUE)
   
-  
   ##########################################
   # try to add histone marker with the same order as atac-seq peaks 
-  # this part is in histMarker_CT_analysis.R
-  ##########################################
-  ##########################################
+  # this part is firstly done in histMarker_CT_analysis.R
   # overview of segment-specific chromatin landscape
   # histone marker with the same cluster order as atac-seq peaks 
   ##########################################
@@ -478,6 +475,7 @@ if(grouping.position.dependent.peaks){
     require(pheatmap)
     require(RColorBrewer)
     
+    # load keep object in which all histM peaks overlapping with atac-seq peaks and segement-specific test 
     load(file = paste0('../results/CT_merged_20220328/Rdata', '/combined_4histMarkers_overlapped55kATACseq_DE.Rdata'))
     design = readRDS(file = paste0('../results/CT_merged_20220328/Rdata', '/histM_CT_design_info.rds'))
     
@@ -507,14 +505,14 @@ if(grouping.position.dependent.peaks){
     ## peaks mapped to postional atac-peaks 
     yy1 = yy[mapping@to, ]
     
-    ## peaks not mapped to positional atac-peaks
-    yy0 = yy[-mapping@to, ]
+    ## peaks not mapped to positional atac-peaks but overlapped wiht atac peaks
+    yy0 = yy[-unique(mapping@to), ]
     
     ss = apply(DE.locus[, c(1:3)], 1, sum)
     mm = match(names(ss[which(ss>0)]), rownames(yy0))
     length(which(!is.na(mm)))
     
-    yy0 = yy0[mm[!is.na(mm)], ]
+    yy0 = yy0[mm[!is.na(mm)], ] ## histM overlapped with stable atacPeak but significantly changed
     
     #plot.pair.comparison.plot(yy1[, grep('H3K4me1_mUA_', colnames(yy1))], linear.scale = FALSE)
     #plot.pair.comparison.plot(yy1[, grep('H3K4me3_mUA_', colnames(yy1))], linear.scale = FALSE)
@@ -522,17 +520,22 @@ if(grouping.position.dependent.peaks){
     saveRDS(yy1, file = paste0(RdataDir, '/peak_signals_atac_4histM_positionalPeaks.rds'))
     saveRDS(yy0, file = paste0(RdataDir, '/peak_signals_atac_4histM_notOverlapped.positionalPeaks.rds'))
     
+    ##########################################
+    # plot segment-specific histone marks overlapped with segement-specific atac
+    # and segment-specific histone marks overlapped with stable atac
+    ##########################################
+    yy0 = readRDS(file = paste0(RdataDir, '/peak_signals_atac_4histM_notOverlapped.positionalPeaks.rds'))
+    yy1 = readRDS(file = paste0(RdataDir, '/peak_signals_atac_4histM_positionalPeaks.rds'))
+    
     yy1 = yy1[, grep('mRep', colnames(yy1))]
     yy0 = yy0[, grep('mRep', colnames(yy0))]
-    
-    # not consider H3K27ac in the main figure
-    yy1 = yy1[, grep('H3K27ac', colnames(yy1), invert = TRUE)]
     
     mm = match(rownames(yy1), rownames(DE.locus))
     DE.peaks = DE.locus[mm, ]
     ss = apply(DE.peaks, 1, sum)
     length(which(ss>0))
     
+    conds_histM = c('H3K4me3','H3K27me3', 'H3K4me1', 'H3K27ac')
     source('Functions_histM.R')
     for(n in 1:length(conds_histM))
     {
@@ -544,6 +547,9 @@ if(grouping.position.dependent.peaks){
       yy0[ ,jj0] = t(apply(yy0[,jj0], 1, cal_transform_histM, cutoff.min = 0, cutoff.max = 5, centering = FALSE, toScale = TRUE))
       
     }
+    
+    # not consider H3K27ac in the main figure
+    yy1 = yy1[, grep('H3K27ac', colnames(yy1), invert = TRUE)]
     
     ### peaks overlapped with atac-seq 
     df = as.data.frame(sapply(colnames(yy1), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[2])}))
