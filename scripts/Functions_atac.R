@@ -5610,3 +5610,128 @@ Test.other.mark.combinations.besides.bivalency = function()
   
 }
 
+
+##########################################
+# reorder the positional histM for postional atac-seq peaks 
+##########################################
+subsampling.postional.histM.postioinalAtacPeaks = function()
+{
+  ##########################################
+  #  # reorder the histM according to the atac-seq peak clusters
+  # cluster order : 6, 1, 5, 3, 4, 2
+  # gaps.row = c(32, 32+76, 31 + 32 + 76, 292 + 31 + 32 + 76, 292 + 31 + 32 + 76 + 103)
+  ##########################################
+  peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rdata/', 
+                                'position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters_6.rds'))
+  table(peaks$clusters)
+  cluster_order = c(6, 1, 5, 3, 4, 2)
+  
+  ## specify row gaps as atac-seq peaks
+  gaps.row = c()
+  for(n in 1:(length(cluster_order)-1))
+  {
+    if(n == 1)  {gaps.row = c(gaps.row, length(which(peaks$clusters == cluster_order[n])))
+    }else{
+      gaps.row = c(gaps.row,  gaps.row[n-1] + length(which(peaks$clusters == cluster_order[n])))
+    }
+  }
+  
+  ## refine histone subclusters for each ATACseq peak cluster
+  peakNm = c()
+  library(dendextend)
+  library(ggplot2)
+  
+  for(ac in cluster_order)
+  {
+    # ac = 6
+    kk = which(peaks$cluster == ac)
+    cat('clsuter ', ac, ' -- ', length(kk), ' peaks \n')
+    
+    hm_hclust <- hclust(dist(as.matrix(yy1[kk,])), method = "complete")
+    #hm_cluster <- cutree(tree = as.dendrogram(hm_hclust), h = 5)
+    peakNm = c(peakNm, hm_hclust$labels[hm_hclust$order])
+  }
+  
+  new_order = match(peakNm, rownames(yy1))
+  
+  
+  ## plot the histone marker side by side with replicates
+  df_histM = data.frame(segments = sapply(colnames(yy1), function(x) unlist(strsplit(as.character(x), '_'))[2])
+                        #markers = sapply(colnames(yy0), function(x) unlist(strsplit(as.character(x), '_'))[2]), stringsAsFactors = FALSE
+  )
+  colnames(df_histM) = c('seg')
+  rownames(df_histM) = colnames(yy1)
+  sample_colors_histM = c('springgreen4', 'steelblue2', 'gold2')
+  names(sample_colors_histM) = c('mUA', 'mLA', 'mHand')
+  #marker_colors_histM = c('blue', 'red', 'deepskyblue2', 'darkgreen')
+  #names(marker_colors_histM) = histMs
+  annot_colors_histM = list(seg = sample_colors_histM)
+  gaps.col_histM = c(2, 4)
+  
+  kk = c(1:6)
+  df_histM_new = as.data.frame(df_histM[kk,])
+  colnames(df_histM_new) = colnames(df_histM)
+  rownames(df_histM_new) = rownames(df_histM)[kk]
+  
+  cols = colorRampPalette((brewer.pal(n = 7, name ="BrBG")))(10)
+  p1 = pheatmap(yy1[new_order, kk], cluster_rows=FALSE, show_rownames=FALSE, fontsize_row = 5,
+                #color = colorRampPalette(rev(brewer.pal(n = 7, name ="YlGnBu")))(8), 
+                color = cols,
+                show_colnames = FALSE,
+                scale = 'none',
+                cluster_cols=FALSE, annotation_col= df_histM_new,
+                annotation_colors = annot_colors_histM,
+                gaps_col = gaps.col_histM, 
+                annotation_legend = FALSE,
+                gaps_row = gaps.row)
+  
+  kk = c(7:12)
+  df_histM_new = as.data.frame(df_histM[kk,])
+  colnames(df_histM_new) = colnames(df_histM)
+  rownames(df_histM_new) = rownames(df_histM)[kk]
+  
+  
+  cols = rev(c("#d53e4f", "#f46d43", "#fdae61", "#fee08b", "#e6f598", "#abdda4", "#ddf1da"))
+  p2 = pheatmap(yy1[new_order, kk], cluster_rows=FALSE, show_rownames=FALSE, fontsize_row = 5,
+                color = cols,
+                show_colnames = FALSE,
+                scale = 'none',
+                cluster_cols=FALSE, annotation_col=df_histM,
+                annotation_colors = annot_colors_histM,
+                gaps_col = gaps.col_histM, 
+                annotation_legend = FALSE,
+                gaps_row = gaps.row)
+  
+  
+  kk = c(13:18)
+  df_histM_new = as.data.frame(df_histM[kk,])
+  colnames(df_histM_new) = colnames(df_histM)
+  rownames(df_histM_new) = rownames(df_histM)[kk]
+  
+  cols = rev(terrain.colors(10))
+  p3 = pheatmap(yy1[new_order, kk], cluster_rows=FALSE, show_rownames=FALSE, fontsize_row = 5,
+                color = cols,
+                show_colnames = FALSE,
+                scale = 'none',
+                cluster_cols=FALSE, annotation_col=df_histM,
+                annotation_colors = annot_colors_histM,
+                annotation_legend = FALSE,
+                gaps_col = gaps.col_histM, 
+                gaps_row = gaps.row)
+  
+  plot_list=list()
+  plot_list[['p1']]=p1[[4]]
+  plot_list[['p2']]=p2[[4]]
+  plot_list[['p3']]=p3[[4]]
+  
+  pdf(paste0(figureDir, "/Segemet_specific_chromatin_landscape_atac_histM.pdf"),
+      width = 8, height = 10) # Open a new pdf file
+  
+  layout = matrix(c(1, 2, 3), nrow = 1)
+  grid.arrange(grobs=plot_list, nrow= 1,
+               layout_matrix = layout)
+  
+  dev.off()
+}
+
+
