@@ -599,6 +599,9 @@ pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
          width = 8, height = 12, 
          filename = paste0(figureDir, '/Fig2A_heatmap_DEgenes_matureSample_fdr.0.05_log2fc.1_microarray_nonScaled.pdf')) 
 
+
+saveRDS(yy, file = paste0(RdataDir, 'microarray_positionalGenes_data.rds'))
+
 ##########################################
 # GO term analysis of DE genes 
 ##########################################

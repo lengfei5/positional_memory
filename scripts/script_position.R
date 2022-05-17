@@ -1082,8 +1082,8 @@ tss$gene[-kk] = rownames(tss)[-kk]
 positional.genes = c('PROD1', 'RARRES1', 'MEIS1', 'MEIS2', 'SHOX', 'SHOX2', 'HOXA13', 'HOXA11', 'HOXA9', 'HOXD13',
                     'HOXD11', 'HOXD9')
 
-outDir = "/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/Gene_Examples"   
 
+outDir = "/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/Gene_Examples"   
 source('Functions_atac.R')
 if(!dir.exists(outDir)) dir.create(outDir)
 
@@ -1092,9 +1092,15 @@ plot_rna_chromainFeatures_geneExamples(tss, geneList = positional.genes, outDir 
 ##########################################
 # TSS of positional genes (known and from microarray data) in mature and regeneration samples 
 ##########################################
-positioanl.genes_all = 
+genelists = readRDS(file = paste0('../results/RNAseq_data_used/Rdata/', 
+                                             'microarray_positionalGenes_data.rds'))
+
+ids = get_geneID(rownames(genelists)) 
+ids = c(ids, tss$geneID[match(positional.genes, tss$gene)])
+ids = unique(ids)
 
 
+Analysis_TSS_positionalGenes_in_mature_regeneration(ids)
 
 
 ########################################################
