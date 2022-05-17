@@ -341,7 +341,8 @@ if(grouping.position.dependent.peaks){
   save(xx, keep, file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata'))
   
   ##########################################
-  # quick clustering of postional peaks using three replicates of each segments
+  # postional peak clustering using three replicates of each segments
+  # one of main overview of positional atac-seq profiles 
   ##########################################
   library(dendextend)
   library(ggplot2)
@@ -452,6 +453,7 @@ if(grouping.position.dependent.peaks){
           filename = paste0(figureDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
           width = 6, height = 12)
   
+  save(plt, file = paste0(RdataDir, '/postional_atacPeaks_heatmap_orderSaved.rdsd'))
   
   saveRDS(xx, file = paste0(resDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters_6.rds'))
   
@@ -467,8 +469,8 @@ if(grouping.position.dependent.peaks){
   # overview of segment-specific chromatin landscape
   # histone marker with the same cluster order as atac-seq peaks 
   ##########################################
-  Assembly_histMarkers_togetherWith_ATACseq = FALSE
-  if(Assembly_histMarkers_togetherWith_ATACseq){
+  Add_histMarkers_for_positionalATAC = FALSE
+  if(Add_histMarkers_for_positionalATAC){
     library(gridExtra)
     library(grid)
     library(ggplot2)
@@ -476,9 +478,8 @@ if(grouping.position.dependent.peaks){
     require(pheatmap)
     require(RColorBrewer)
     
-    load(file = paste0(RdataDir, '/combined_4histMarkers_overlapped55kATACseq_DE.Rdata'))
-    design = readRDS(file = paste0(RdataDir, '/histM_CT_design_info.rds'))
-    
+    load(file = paste0('../results/CT_merged_20220328/Rdata', '/combined_4histMarkers_overlapped55kATACseq_DE.Rdata'))
+    design = readRDS(file = paste0('../results/CT_merged_20220328/Rdata', '/histM_CT_design_info.rds'))
     
     yy = keep[, c(53:60, 27:34, 1:8, 79:85)]
     sampleID = sapply(colnames(yy), function(x) unlist(strsplit(as.character(x), '_'))[3])
@@ -490,6 +491,7 @@ if(grouping.position.dependent.peaks){
     #                        'position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters6.csv'))
     peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rdata/', 
                                   'position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters_6.rds'))
+    
     pp_atac = data.frame(t(sapply(rownames(peaks), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
     pp_atac$strand = '*'
     pp_atac = makeGRangesFromDataFrame(pp_atac, seqnames.field=c("X1"),
@@ -507,6 +509,7 @@ if(grouping.position.dependent.peaks){
     
     ## peaks not mapped to positional atac-peaks
     yy0 = yy[-mapping@to, ]
+    
     ss = apply(DE.locus[, c(1:3)], 1, sum)
     mm = match(names(ss[which(ss>0)]), rownames(yy0))
     length(which(!is.na(mm)))
@@ -541,7 +544,6 @@ if(grouping.position.dependent.peaks){
       yy0[ ,jj0] = t(apply(yy0[,jj0], 1, cal_transform_histM, cutoff.min = 0, cutoff.max = 5, centering = FALSE, toScale = TRUE))
       
     }
-    
     
     ### peaks overlapped with atac-seq 
     df = as.data.frame(sapply(colnames(yy1), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[2])}))
@@ -582,8 +584,6 @@ if(grouping.position.dependent.peaks){
              #annotation_colors = annot_colors,
              width = 4, height = 8, 
              filename = paste0(figureDir, '/heatmap_histoneMarker_DE_notoverlapped.with.atac.postionalPeaks.pdf'))
-    
-    
     
     ##########################################
     #  # reorder the histM according to the atac-seq peak clusters
