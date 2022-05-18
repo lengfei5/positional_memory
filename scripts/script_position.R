@@ -1061,6 +1061,7 @@ if(grouping.position.dependent.peaks){
 # plot individual gene examples of different features, RNAseq, atac, histone marks around TSS 
 ##########################################
 source('Functions_histM.R')
+source('Functions_integration_mature_regneration.R')
 library(ggrepel)
 library(dplyr)
 library(tibble)
@@ -1079,12 +1080,12 @@ kk = which(!is.na(tss$gene))
 rownames(tss)[kk] = paste0(tss$gene[kk], '_', rownames(tss)[kk])
 tss$gene[-kk] = rownames(tss)[-kk]
 
-positional.genes = c('PROD1', 'RARRES1', 'MEIS1', 'MEIS2', 'SHOX', 'SHOX2', 'HOXA13', 'HOXA11', 'HOXA9', 'HOXD13',
+positional.genes = c('HOXA13','PROD1', 'RARRES1', 'MEIS1', 'MEIS2', 'SHOX', 'SHOX2',  'HOXA11', 'HOXA9', 'HOXD13',
                     'HOXD11', 'HOXD9')
 
 
 outDir = "/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/Gene_Examples"   
-source('Functions_atac.R')
+source('Functions_integration_mature_regneration.R')
 if(!dir.exists(outDir)) dir.create(outDir)
 
 plot_rna_chromainFeatures_geneExamples(tss, geneList = positional.genes, outDir = outDir, incl_Mature = TRUE, log2fc = TRUE)
@@ -1096,11 +1097,11 @@ genelists = readRDS(file = paste0('../results/RNAseq_data_used/Rdata/',
                                              'microarray_positionalGenes_data.rds'))
 
 ids = get_geneID(rownames(genelists)) 
-ids = c(ids, tss$geneID[match(positional.genes, tss$gene)])
+ids = c(tss$geneID[match(positional.genes, tss$gene)], ids)
 ids = unique(ids)
 
-
-Analysis_TSS_positionalGenes_in_mature_regeneration(ids)
+source('Functions_integration_mature_regneration.R')
+Analysis_TSS_positionalGenes_in_mature_regeneration(tss, ids)
 
 
 ########################################################

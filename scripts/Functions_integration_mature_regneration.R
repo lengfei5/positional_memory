@@ -394,5 +394,282 @@ Add.TSS.chromatinFeatures.in.matureSamples = function()
   
   saveRDS(tss, file = paste0(RdataDir, '/regeneration_matureSamples_tss_perGene_smartseq2_atac_histM_v4.rds'))
   
+}
+
+########################################################
+########################################################
+# Section : integration analysis for gene examples
+# 
+########################################################
+########################################################
+plot_rna_chromainFeatures_geneExamples = function(tss, 
+                                                  geneList = c('FGF10', 'SALL4'), 
+                                                  outDir = 'Gene_Examepls',
+                                                  incl_Mature = FALSE,
+                                                  log2fc = FALSE)
+{
+  source('Functions_histM.R')
+  library(ggrepel)
+  library(dplyr)
+  library(tibble)
+  library("cowplot")
+  require(gridExtra)
+  library(tidyr)
+  require(patchwork)
+  
+  # outDir = "/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/positional_genes"   
+  # geneList = dev.genes
+  
+  features = c('atac', 'H3K4me3', 'H3K27me3', 'H3K4me1')
+  
+  for(n in 1:length(geneList))
+  {
+    # n = 1
+    kk = which(tss$gene == geneList[n])
+    if(length(kk) == 1){
+      
+      cat(n, ' -- ', geneList[n], '-- with tss :', tss$coords[kk], '\n')
+      
+      if(incl_Mature){
+        samples = c('mHand', 'mLA', 'mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d')
+        test = matrix(NA, nrow = length(samples), ncol = length(features))
+        rownames(test) = samples
+        colnames(test) = features
+        
+        for(m in 1:ncol(test))
+        {
+          if(m == 1) {
+            mm =c(grep(paste0(colnames(test)[m], '.M_mHand$'), colnames(tss)),  
+                  grep(paste0(colnames(test)[m], '.M_mLA$'), colnames(tss)),
+                  grep(paste0(colnames(test)[m], '.M_mUA$'), colnames(tss)),
+                  grep(paste0(colnames(test)[m], '_mUA|', colnames(test)[m], '_X'), colnames(tss)))
+            if(log2fc){
+              test[,m] = c(as.numeric(tss[kk, mm[1:2]]) - as.numeric(tss[kk, mm[3]]), 0, 
+                           as.numeric(tss[kk, mm[5:8]])- as.numeric(tss[kk, mm[4]]))
+            }else{
+              test[,m] = c(as.numeric(tss[kk, mm[1:2]]), mean(as.numeric(tss[kk, mm[3:4]])), as.numeric(tss[kk, mm[5:8]]))
+            }
+            
+          }
+          if(m > 1){
+            mm0 = grep(paste0(colnames(test)[m], '_mUA'), colnames(tss))
+            mm0 = mm0[grep('Rep1$|Rep2$', colnames(tss)[mm0])]
+            mm = c(grep(paste0(colnames(test)[m], '_mHand'), colnames(tss)),
+                   grep(paste0(colnames(test)[m], '_mLA'), colnames(tss)),
+                   mm0[grep('mRep', colnames(tss)[mm0])], 
+                   mm0[grep('rRep', colnames(tss)[mm0])], 
+                   grep(paste0(colnames(test)[m], '_BL'), colnames(tss))
+            )
+            tmp = apply(matrix(as.numeric(tss[kk, mm]), nrow = 2), 2, mean)
+            if(log2fc){
+              test[ ,m] = c(tmp[c(1:2)] - tmp[3], 0, tmp[5:8] - tmp[4])
+            }else{
+              test[ ,m] = c(tmp[c(1:2)], mean(tmp[3:4]), tmp[5:8])
+            }
+          }
+          
+        }
+        
+        test = data.frame(test, sample = rownames(test))
+        
+        #test[which(test[,1]<(-2)),1] = -2
+        #test[,1] = (test[, 1] - min(test[, 1]))/(max(test[,1]) - min(test[, 1])) * 3
+        ylims = range(test[, c(1:length(features))])
+        ylims[1] = min(c(0, ylims[1]))
+        as_tibble(test) %>%  gather(features, signals,  1:4) %>% 
+          mutate(features = factor(features, levels=c('atac', 'H3K4me3', 'H3K27me3', 'H3K4me1'))) %>%
+          mutate(sample = factor(sample, levels = c('mHand','mLA', 'mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d'))) %>%
+          ggplot(aes(y=signals, x=sample, color = features, group = features)) + 
+          geom_line(aes(linetype=features, color=features), size = 1.0) +
+          geom_point(size = 4.5) +
+          theme_classic() +
+          geom_hline(yintercept=c(0), col="gray", size = 0.5) +
+          #geom_vline(xintercept=c(3), col="blue", size = 1.2) +
+          theme(axis.text.x = element_text(angle = 0, size = 14), 
+                axis.text.y = element_text(angle = 0, size = 14), 
+                axis.title =  element_text(size = 14),
+                legend.text = element_text(size=10),
+                legend.title = element_text(size = 10)
+          ) +
+          scale_color_manual(values=c('springgreen', 'blue', 'red','gold2')) +
+          scale_linetype_manual(values=c("solid", "longdash", "solid", "longdash")) + 
+          labs( x = '', y = 'feature signals') +
+          ylim(ylims[1], ylims[2]) +
+          ggtitle(geneList[n])
+        
+        ggsave(paste0(outDir, "/Regeneration_allFeatures_", geneList[n],  ".pdf"),  width = 8, height = 4) 
+        
+      }else{
+        samples = c('mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d')
+        test = matrix(NA, nrow = length(samples), ncol = length(features))
+        rownames(test) = samples
+        colnames(test) = features
+        
+        for(m in 1:ncol(test))
+        {
+          if(m == 1) {
+            mm =c(grep(paste0(colnames(test)[m], '_mUA|', colnames(test)[m], '_X'), colnames(tss)))
+            if(log2fc){
+              test[,m] = as.numeric(tss[kk, mm]) - as.numeric(tss[kk, mm[1]])
+            }else{
+              test[,m] = as.numeric(tss[kk, mm])
+            }
+            
+          }
+          if(m > 1){
+            mm0 = grep(paste0(colnames(test)[m], '_mUA'), colnames(tss))
+            mm0 = mm0[grep('Rep1$|Rep2$', colnames(tss)[mm0])]
+            mm = c(mm0[grep('rRep', colnames(tss)[mm0])], 
+                   grep(paste0(colnames(test)[m], '_BL'), colnames(tss))
+            )
+            tmp = apply(matrix(as.numeric(tss[kk, mm]), nrow = 2), 2, mean)
+            test[ ,m] = tmp 
+            if(log2fc){
+              test[,m] = test[,m] - test[1,m]
+            }
+            
+          }
+          
+        }
+        
+        test = data.frame(test, sample = rownames(test))
+        
+        #test[which(test[,1]<(-2)),1] = -2
+        #test[,1] = (test[, 1] - min(test[, 1]))/(max(test[,1]) - min(test[, 1])) * 3
+        ylims = range(test[, c(1:length(features))])
+        ylims[1] = min(c(0, ylims[1]))
+        as_tibble(test) %>%  gather(features, signals,  1:4) %>% 
+          mutate(features = factor(features, levels=c('atac', 'H3K4me3', 'H3K27me3', 'H3K4me1'))) %>%
+          mutate(sample = factor(sample, levels = c('mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d'))) %>%
+          ggplot(aes(y=signals, x=sample, color = features, group = features)) + 
+          geom_line(aes(linetype=features, color=features), size = 1.2) +
+          geom_point(size = 4.0) +
+          theme_classic() +
+          geom_hline(yintercept=c(0), col="darkgray", size = 0.7) +
+          #geom_vline(xintercept=c(3), col="blue", size = 1.2) +
+          theme(axis.text.x = element_text(angle = 0, size = 14), 
+                axis.text.y = element_text(angle = 0, size = 14), 
+                axis.title =  element_text(size = 14),
+                legend.text = element_text(size=12),
+                legend.title = element_text(size = 14)
+          ) +
+          scale_color_manual(values=c('springgreen', 'blue', 'red','gold2')) +
+          scale_linetype_manual(values=c("solid", "longdash", "solid", "longdash")) + 
+          labs( x = '', y = 'feature signals') +
+          ylim(ylims[1], ylims[2]) +
+          ggtitle(geneList[n])
+        
+        ggsave(paste0(outDir, "/Regeneration_allFeatures_", geneList[n],  ".pdf"),  width = 7, height = 4) 
+      }
+      
+    }else{
+      cat(n, ' -- ', geneList[n], 'FOUND in tss',  length(kk), '\n')  
+    }
+  }
+  
+}
+
+Analysis_TSS_positionalGenes_in_mature_regeneration = function(tss, ids)
+{
+  features = c('atac', 'H3K4me3', 'H3K27me3', 'H3K4me1', 'H3K27ac')
+  
+  kks = match(ids, tss$geneID)
+  kks = kks[!is.na(kks)]
+  
+  samples = c('mHand', 'mLA', 'mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d')
+  test = matrix(NA, nrow = length(kks), ncol = length(samples)*length(features))
+  rownames(test) = tss$geneID[kks]
+  test = data.frame(test, gene = tss$gene[kks], stringsAsFactors = FALSE)
+  test$coords = tss$coords[kks]
+  #colnames(test) = features
+  
+  for(n in 1:nrow(test))
+  { 
+    # n = 1
+    cat(n, ' -- ', test$gene[n], '-- with tss :', tss$coords[n], '\n')
+    kk = kks[n]
+    
+    for(m in 1:length(features))
+    {
+      if(m == 1) {
+        mm =c(grep(paste0(features[m], '.M_mHand$'), colnames(tss)),  
+              grep(paste0(features[m], '.M_mLA$'), colnames(tss)),
+              grep(paste0(features[m], '.M_mUA$'), colnames(tss)),
+              grep(paste0(features[m], '_mUA|', features[m], '_X'), colnames(tss)))
+        test[n,c(((m-1)*length(samples) +1):(m*length(samples)))] = c(as.numeric(tss[kk, mm[1:2]]) - as.numeric(tss[kk, mm[3]]), 0, 
+                     as.numeric(tss[kk, mm[5:8]])- as.numeric(tss[kk, mm[4]]))
+      }
+      if(m > 1 & m <5){
+        mm0 = grep(paste0(features[m], '_mUA'), colnames(tss))
+        mm0 = mm0[grep('Rep1$|Rep2$', colnames(tss)[mm0])]
+        mm = c(grep(paste0(features[m], '_mHand'), colnames(tss)),
+               grep(paste0(features[m], '_mLA'), colnames(tss)),
+               mm0[grep('mRep', colnames(tss)[mm0])], 
+               mm0[grep('rRep', colnames(tss)[mm0])], 
+               grep(paste0(features[m], '_BL'), colnames(tss))
+        )
+        tmp = apply(matrix(as.numeric(tss[kk, mm]), nrow = 2), 2, mean)
+        test[n,c(((m-1)*length(samples) +1):(m*length(samples)))] = c(tmp[c(1:2)] - tmp[3], 0, tmp[5:8] - tmp[4])
+      }
+      
+      if(m >=5){
+        mm0 = grep(paste0(features[m], '_mUA'), colnames(tss))
+        mm0 = mm0[grep('Rep1$|Rep2$', colnames(tss)[mm0])]
+        mm = c(grep(paste0(features[m], '_mHand'), colnames(tss)),
+               grep(paste0(features[m], '_mLA'), colnames(tss)),
+               mm0[grep('mRep', colnames(tss)[mm0])], 
+               mm0[grep('rRep', colnames(tss)[mm0])], 
+               grep(paste0(features[m], '_BL'), colnames(tss))
+        )
+        tmpx = as.numeric(tss[kk, mm])
+        tmp = apply(matrix(tmpx[-3], nrow = 2), 2, mean)
+        tmp = c(tmp[1], tmpx[3], tmp[2:length(tmp)])
+        rm(tmpx)
+        test[n,c(((m-1)*length(samples) +1):(m*length(samples)))] = c(tmp[c(1:2)] - tmp[3], 0, tmp[5:8] - tmp[4])
+        
+      }
+      
+    }
+    
+  }
+  
+  saveRDS(test, file = paste0(RdataDir, '/positional_gene_TSS_chromatinFeatures.rds'))
+  
+  ### SVD analysis
+  Test.SVD = FALSE
+  if(Test.SVD){
+    for(n in 1:nrow(test))
+    {
+      # n = 7
+      cat(n, '--', test$gene[n], '\n')
+      xx = t(matrix(as.numeric(test[n, c(1:35)]), nrow = length(samples)))
+      rownames(xx) = features
+      colnames(xx) = samples
+      #xx = t(apply(xx, 1, cal_z_score))
+      ss = svd(xx)
+      #L = length(ss$d)
+      pl = ss$d^2/sum(ss$d^2)
+      
+      #### first 2 components, first change the first two conlums to positive
+      u1 = ss$u[,1]
+      #u2 = ss$u[,2]
+      v1 = ss$v[,1]
+      #v2 = ss$v[,2]
+      #nb.positive = length(which(u1>=0))
+      #nb.negative = length(which(u1<0))
+      #if(nb.positive<nb.negative){u1 = -u1; v1 = -v1;}
+      
+      xx = rbind(xx, v1)
+      
+      data.frame(xx, fts = rownames(xx)) %>%
+        as_tibble() %>% gather(ss, signals,  1:7) %>%
+        mutate(ss = factor(ss, levels = c('mHand', 'mLA', 'mUA', 'X5dpa', 'X9dpa', 'X13dpa.p', 'X13dpa.d'))) %>%
+        ggplot(aes(y=signals, x=ss, color = fts, group = fts)) + 
+        geom_line(aes(linetype=fts, color=fts), size = 0.7) +
+        theme_classic() +
+        scale_color_manual(values=c('springgreen', 'gold2', 'black', 'blue', 'orange', 'red')) +
+        scale_linetype_manual(values=c("longdash", "longdash", "longdash", "longdash", "longdash", 'solid'))
+    }
+  }
   
 }
