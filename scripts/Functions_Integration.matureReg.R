@@ -1,7 +1,7 @@
 ##########################################################################
 ##########################################################################
 # Project: positional memory project
-# Script purpose: process TSS and merge with regeneration TSS
+# Script purpose: mainly for integration of mature and regeneration data and process TSS and merge with regeneration TSS
 # Usage example: 
 # Author: Jingkui Wang (jingkui.wang@imp.ac.at)
 # Date of creation: Mon May 16 10:38:58 2022
@@ -396,6 +396,16 @@ Add.TSS.chromatinFeatures.in.matureSamples = function()
   
 }
 
+
+##########################################
+# define enhancer regions  
+##########################################
+find_enhancers_integeticRegions_Introns_H3K4me1 = function()
+{
+  
+    
+}
+
 ########################################################
 ########################################################
 # Section : integration analysis for gene examples
@@ -633,6 +643,7 @@ Analysis_TSS_positionalGenes_in_mature_regeneration = function(tss, ids)
     
   }
   
+  colnames(test)[c(1:(length(features)*length(samples)))] = paste0(rep(features, each = length(samples)), '_', samples)
   saveRDS(test, file = paste0(RdataDir, '/positional_gene_TSS_chromatinFeatures.rds'))
   
   ### SVD analysis
@@ -673,6 +684,5 @@ Analysis_TSS_positionalGenes_in_mature_regeneration = function(tss, ids)
   }
   
   return(test)
-  
   
 }

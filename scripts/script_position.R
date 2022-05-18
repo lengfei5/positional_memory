@@ -1061,7 +1061,7 @@ if(grouping.position.dependent.peaks){
 # plot individual gene examples of different features, RNAseq, atac, histone marks around TSS 
 ##########################################
 source('Functions_histM.R')
-source('Functions_integration_mature_regneration.R')
+source('Functions_Integration.matureReg.R')
 library(ggrepel)
 library(dplyr)
 library(tibble)
@@ -1085,7 +1085,7 @@ positional.genes = c('HOXA13','PROD1', 'RARRES1', 'MEIS1', 'MEIS2', 'SHOX', 'SHO
 
 
 outDir = "/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/Gene_Examples"   
-source('Functions_integration_mature_regneration.R')
+source('Functions_Integration.matureReg.R')
 if(!dir.exists(outDir)) dir.create(outDir)
 
 plot_rna_chromainFeatures_geneExamples(tss, geneList = positional.genes, outDir = outDir, incl_Mature = TRUE, log2fc = TRUE)
@@ -1100,34 +1100,78 @@ ids = get_geneID(rownames(genelists))
 ids = c(tss$geneID[match(positional.genes, tss$gene)], ids)
 ids = unique(ids)
 
-source('Functions_integration_mature_regneration.R')
-test = Analysis_TSS_positionalGenes_in_mature_regeneration(tss, ids)
+
+source('Functions_Integration.matureReg.R')
+#test = Analysis_TSS_positionalGenes_in_mature_regeneration(tss, ids)
 
 test = readRDS(file = paste0(RdataDir, '/positional_gene_TSS_chromatinFeatures.rds'))
+
 xx = as.matrix(test[,c(1:35)])
 rownames(xx) = tss$gene[kks]
-
-maxs = apply(xx, 1, function(x) max(abs(x)))
-xx = xx[which(maxs>2),]
 
 range <- 3.0
 xx = t(apply(xx, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
 
-pheatmap(xx, 
-         #annotation_col = df, 
+# pheatmap(xx, 
+#          #annotation_col = df, 
+#          show_rownames = FALSE, scale = 'none', 
+#          color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(7),
+#          show_colnames = FALSE,
+#          cluster_rows = TRUE, 
+#          cluster_cols = FALSE, 
+#          #annotation_colors = annot_colors, 
+#          gaps_col = seq(7, 35, by = 7), 
+#          fontsize_row = 8,
+#          treeheight_row = 50,
+#          cutree_rows = 8,
+#          #gaps_row =  gaps.row, 
+#          filename = paste0(figureDir, '/heatmap_positionalGens_TSS_mature_regeneration_all.pdf'), 
+#          width = 6, height = 15)
+
+maxs = apply(xx, 1, function(x) max(abs(x)))
+tops = which(maxs>2)
+
+df = as.data.frame(sapply(colnames(xx), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[2])}))
+colnames(df) = 'samples'
+rownames(df) = colnames(xx)
+
+sample_colors = c('gold2',  'steelblue2', 'springgreen4',   'springgreen3', 'magenta', 'darkblue', 'red')
+names(sample_colors) = unique(df$samples)
+annot_colors = list(samples = sample_colors)
+
+
+pheatmap(xx[tops, ], 
+         annotation_col = df, 
          show_rownames = TRUE, scale = 'none', 
          color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(7),
          show_colnames = FALSE,
          cluster_rows = TRUE, 
          cluster_cols = FALSE, 
-         #annotation_colors = annot_colors, 
+         annotation_colors = annot_colors, 
          gaps_col = seq(7, 35, by = 7), 
-         fontsize_row = 8,
+         fontsize_row = 7,
          treeheight_row = 50,
          cutree_rows = 8,
          #gaps_row =  gaps.row, 
-         filename = paste0(figureDir, '/heatmap_positionalGens_TSS_mature_regeneration.pdf'), 
-         width = 6, height = 16)
+         filename = paste0(figureDir, '/heatmap_positionalGens_TSS_mature_regeneration_log2FC.2.pdf'), 
+         width = 8, height = 15)
+
+## predicted postional genes from above clusters 
+outDir = "/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/Gene_Examples"   
+source('Functions_Integration.matureReg.R')
+if(!dir.exists(outDir)) dir.create(outDir)
+
+tss$gene[which(tss$geneID == 'AMEX60DD023963')] = 'AMEX60DD023963'
+tss$gene[which(tss$geneID == 'AMEX60DD004776')] = 'AMEX60DD004776'
+plot_rna_chromainFeatures_geneExamples(tss, geneList = c('LHX2', 'COL9A2', 'GDF5', 'SALL1', 'SCUBE2', 'ECM2', 'CYP2F1', 'CYP2A13'), 
+                                       outDir = outDir, incl_Mature = TRUE, log2fc = TRUE)
+
+##########################################
+# positional enhancers in mature and regeneration 
+##########################################
+
+
+
 
 ########################################################
 ########################################################
