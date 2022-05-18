@@ -1101,8 +1101,33 @@ ids = c(tss$geneID[match(positional.genes, tss$gene)], ids)
 ids = unique(ids)
 
 source('Functions_integration_mature_regneration.R')
-Analysis_TSS_positionalGenes_in_mature_regeneration(tss, ids)
+test = Analysis_TSS_positionalGenes_in_mature_regeneration(tss, ids)
 
+test = readRDS(file = paste0(RdataDir, '/positional_gene_TSS_chromatinFeatures.rds'))
+xx = as.matrix(test[,c(1:35)])
+rownames(xx) = tss$gene[kks]
+
+maxs = apply(xx, 1, function(x) max(abs(x)))
+xx = xx[which(maxs>2),]
+
+range <- 3.0
+xx = t(apply(xx, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
+
+pheatmap(xx, 
+         #annotation_col = df, 
+         show_rownames = TRUE, scale = 'none', 
+         color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(7),
+         show_colnames = FALSE,
+         cluster_rows = TRUE, 
+         cluster_cols = FALSE, 
+         #annotation_colors = annot_colors, 
+         gaps_col = seq(7, 35, by = 7), 
+         fontsize_row = 8,
+         treeheight_row = 50,
+         cutree_rows = 8,
+         #gaps_row =  gaps.row, 
+         filename = paste0(figureDir, '/heatmap_positionalGens_TSS_mature_regeneration.pdf'), 
+         width = 6, height = 16)
 
 ########################################################
 ########################################################
