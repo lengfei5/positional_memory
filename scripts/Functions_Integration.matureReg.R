@@ -402,8 +402,140 @@ Add.TSS.chromatinFeatures.in.matureSamples = function()
 ##########################################
 find_enhancers_integeticRegions_Introns_H3K4me1 = function()
 {
+  source('Functions_histM.R')
   
+  samples = c('mHand', 'mLA', 'mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d')
+  
+  ### enhancer regions must be open at least one condition, meaning overlapping with 55k atac-seq peaks
+  ### so the total nubmer of candidates are 55 regions
+  atac = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rxxxx_R10723_R11637_R12810_atac/Rdata/',
+                                        'ATACseq_peak_consensus_filtered_55k.rds'))
+  enhancers = data.frame(coords = names(atac))
+  rownames(enhancers) = enhancers$coords
+  
+  ## add positional atac-seq data
+  fpm = readRDS(file = paste0(RdataDir, '/fpm.bc_TMM_combat_MatureSamples_batch2019.2020.2021.2021S.2022.rds'))
+  #fpm.bg = fpm[grep('bg_', rownames(fpm), invert = FALSE), ]
+  fpm = fpm[grep('bg_', rownames(fpm), invert = TRUE), ]
+  rownames(fpm) = gsub('_', '-', rownames(fpm))
+  
+  mm = match(rownames(enhancers), rownames(fpm))
+  
+  fpm = fpm[mm, ]
+  fpm.mean = cal_sample_means(fpm, conds = c('Mature_Hand', 'Mature_LA', 'Mature_UA'))
+  colnames(fpm.mean) = paste0('atac_', samples[1:3], '_mRep')
+  
+  enhancers = data.frame(enhancers, fpm.mean, stringsAsFactors = FALSE)  
+  
+  ## add regeneration atac data
+  fpm = readRDS(file = paste0(RdataDir, '/fpm.bc_TMM_combat_mUA_regeneration_dev_2Batches.R10723_R7977_', version.analysis, '.rds'))
+  fpm = fpm[grep('bg_', rownames(fpm), invert = TRUE), ]
+  rownames(fpm) = gsub('_', '-', rownames(fpm))
+  
+  mm = match(rownames(enhancers), rownames(fpm))
+  
+  fpm = fpm[mm, ]
+  fpm.mean = cal_sample_means(fpm, conds = c('Mature_UA', 'BL_UA_5days', 'BL_UA_9days', 'BL_UA_13days_proximal', 'BL_UA_13days_distal'))
+  colnames(fpm.mean) = paste0('atac_', samples[3:7], '_rRep')
+  
+  enhancers = data.frame(enhancers, fpm.mean, stringsAsFactors = FALSE)  
+  
+  
+  ## add histM feature by features
+  #load(file = paste0('../results/CT_merged_20220328/Rdata', 
+  #                   '/combined_4histMarkers_overlapped55kATACseq_DE_fdr0.05.Rdata'))
+  for(n_histM in 2:length(features))
+  {
+    # n_histM = 2
+    cat('--', features[n_histM], '--\n')
     
+    cpm = readRDS(file = paste0('../results/CT_merged_20220328/Rdata', 
+                                '/fpm_bc_TMM_combat_', features[n_histM], '_', 'CT_merged_20220328', '.rds'))
+    
+    conds = c("mUA", "mLA", "mHand")
+    sm1 = cal_sample_means(cpm[, grep('_mRep', colnames(cpm))], conds = conds)
+    colnames(sm1) = paste0(features[n_histM], '_', samples[1:3], '_mRep')
+    
+    conds = c("mUA", "BL5days", "BL9days", 'BL13days.prox', 'BL13days.dist')
+    sm2 = cal_sample_means(cpm[, grep('_rRep', colnames(cpm))], conds = conds)
+    colnames(sm2) = paste0(features[n_histM], '_', samples[3:7], '_rRep')
+    sms = cbind(sm1, sm2)
+    
+    if(n_histM == 2){
+      keep = data.frame(sms, stringsAsFactors = FALSE)
+    }else{
+      keep = data.frame(keep, sms[match(rownames(keep), rownames(sms)), ], stringsAsFactors = FALSE)
+    }
+  }
+  
+  saveRDS(keep, file = paste0(RdataDir, '/histM_samleMean_345k_loci.rds'))
+  
+  ## relate atac peaks to histM 
+  tp = data.frame(t(sapply(enhancers$coords, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  tp$strand = '*'
+  tp = makeGRangesFromDataFrame(tp, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
+  
+  pp = gsub('tss.', '', rownames(keep))
+  pp = data.frame(t(sapply(rownames(keep), function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
+  rownames(pp) = rownames(keep)
+  pp$strand = '*'
+  pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
+  
+  mapping = GenomicRanges::findOverlaps(tp, pp, ignore.strand=TRUE)
+  mapping = data.frame(mapping)
+  
+  index_enhancer = rep(NA, nrow(enhancers))
+  for(n in 1:length(index_enhancer))
+  {
+    # n = 1
+    cat(n, '\n')
+    kk = mapping$subjectHits[which(mapping$queryHits == n)]
+    if(length(kk) == 1){
+      index_enhancer[n] = kk
+    }
+    if(length(kk) >1){
+      stop()
+    }
+  }
+  
+  enhancers = data.frame(enhancers, keep[index_enhancer, ], histM_coords = rownames(keep)[index_enhancer],  stringsAsFactors = FALSE)
+  
+  enhancers = data.frame(enhancers, histM_coords = rownames(keep)[index_enhancer],  stringsAsFactors = FALSE)
+  saveRDS(enhancers, file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM.rds'))
+  
+  enhancers = readRDS(file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM.rds'))
+  
+  # save also length information
+  tp = data.frame(t(sapply(enhancers$coords, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  tp$strand = '*'
+  tp = makeGRangesFromDataFrame(tp, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
+  enhancers$atac_peak_width = width(tp)
+  
+  tp = as.character((enhancers$histM_coords))
+  jj = which(!is.na(tp))
+  tp = tp[jj]
+  tp = t(sapply(tp, function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':'))))
+  tp = data.frame((tp))
+  tp$strand = '*'
+  tp = makeGRangesFromDataFrame(tp, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
+  enhancers$histM_width = NA
+  enhancers$histM_width[jj] = width(tp)
+  
+  test = as.matrix(enhancers[, grep('H3K4me1', colnames(enhancers))])
+  ss = apply(test, 1, max)
+  ss = ss + log2(10^3/enhancers$histM_width)
+  
+  enhancers$rpkm_H3K4me1 = ss
+  enhancers$enhancer = NA
+  enhancers$enhancer[which(ss>1)] = 1
+  
+  saveRDS(enhancers, file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1.rds'))
+  
+  
 }
 
 ########################################################

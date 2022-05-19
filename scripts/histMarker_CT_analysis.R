@@ -1111,11 +1111,10 @@ for(n_histM in 1:length(conds_histM))
 
 save(keep, DE.locus, file = paste0(RdataDir, '/combined_4histMarkers_overlapped55kATACseq_DE_fdr0.05.Rdata'))
 
-
 ##########################################
 # plot all DE histone markers
 ##########################################
-load(file = paste0(RdataDir, '/combined_4histMarkers_overlapped55kATACseq_DE.Rdata'))
+load(file = paste0(RdataDir, '/combined_4histMarkers_overlapped55kATACseq_DE_fdr0.05.Rdata'))
 ss = apply(DE.locus[, c(1:4)], 1, sum)
 
 yy = keep[match(names(ss[which(ss>0)]), rownames(keep)), c(1:8, 27:34, 53:60, 79:85)]
