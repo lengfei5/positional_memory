@@ -398,7 +398,7 @@ Add.TSS.chromatinFeatures.in.matureSamples = function()
 
 
 ##########################################
-# define enhancer regions  
+# collect putative enhancer regions  
 ##########################################
 find_enhancers_integeticRegions_Introns_H3K4me1 = function()
 {
@@ -778,6 +778,41 @@ Analysis_TSS_positionalGenes_in_mature_regeneration = function(tss, ids)
   
   colnames(test)[c(1:(length(features)*length(samples)))] = paste0(rep(features, each = length(samples)), '_', samples)
   saveRDS(test, file = paste0(RdataDir, '/positional_gene_TSS_chromatinFeatures.rds'))
+  
+  ### add RNA-seq data
+  test = readRDS(file = paste0(RdataDir, '/positional_gene_TSS_chromatinFeatures.rds'))
+  samples = c('mHand', 'mLA', 'mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d')
+  
+  ## here import the microarray data of all genes, becasue Prod1, Tig1 are missing in the list of postional genes identified
+  ## but still HOXA9, HOXA11 and HOXD9 are missing in the microarray probes
+  rna = readRDS(file = paste0("../results/microarray/Rdata/", 
+                'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_limma.DE.stats.rds'))
+  ids = get_geneID(rownames(rna))
+  ggs = get_geneName(rownames(rna))
+  rna = cal_sample_means(rna, conds = c('mUA', 'mLA', 'mHand'))
+  mm = match(rownames(test), ids)
+  missed = which(is.na(mm))
+  mm_missed = match(rownames(test)[missed], ggs)
+  
+  mm[missed] = mm_missed 
+  rna = rna[mm, ]
+  rownames(rna) = rownames(test)
+  colnames(rna) = paste0('rna_', colnames(rna))
+  rna = rna[, c(3:1)]
+  
+  ## add regeneration data
+  res = readRDS(file = paste0('../results/RNAseq_data_used/Rdata/', 
+          'smartseq2_R10724_R11635_cpm.batchCorrect_DESeq2.test.withbatch.log2FC.shrinked_RNAseq_data_used_20220408.rds'))
+  cpm = res[, c(1,2, 5:12)]
+  cpm = cal_sample_means(cpm, conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal",  "BL_UA_13days_distal"))
+  colnames(cpm) = samples[3:7]
+  #cpm = cpm - cpm[,1]
+  ids = get_geneID(rownames(cpm))
+  mm = match(rownames(rna), ids)
+  cpm = cpm[mm, ]
+  colnames(cpm) = paste0('rna_', colnames(cpm))
+  
+  rna = data.frame(rna, cpm[, -1])
   
   ### SVD analysis
   Test.SVD = FALSE

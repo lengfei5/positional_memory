@@ -1093,6 +1093,9 @@ plot_rna_chromainFeatures_geneExamples(tss, geneList = positional.genes, outDir 
 ##########################################
 # TSS of positional genes (known and from microarray data) in mature and regeneration samples 
 ##########################################
+source('Functions_Integration.matureReg.R')
+source('Functions_histM.R')
+
 genelists = readRDS(file = paste0('../results/RNAseq_data_used/Rdata/', 
                                              'microarray_positionalGenes_data.rds'))
 
@@ -1101,7 +1104,6 @@ ids = c(tss$geneID[match(positional.genes, tss$gene)], ids)
 ids = unique(ids)
 
 
-source('Functions_Integration.matureReg.R')
 #test = Analysis_TSS_positionalGenes_in_mature_regeneration(tss, ids)
 
 test = readRDS(file = paste0(RdataDir, '/positional_gene_TSS_chromatinFeatures.rds'))
