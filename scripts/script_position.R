@@ -15,6 +15,8 @@ source(RNA.functions)
 source(RNA.QC.functions)
 source('functions_chipSeq.R')
 source('Functions_atac.R')
+source('Functions_histM.R')
+source('Functions_Integration.matureReg.R')
 
 version.analysis = 'Rxxxx_R10723_R11637_R12810_atac'
 #peakDir = "Peaks/macs2_broad"
@@ -1056,10 +1058,6 @@ if(grouping.position.dependent.peaks){
 # positional enhancers 
 ########################################################
 ########################################################
-
-##########################################
-# plot individual gene examples of different features, RNAseq, atac, histone marks around TSS 
-##########################################
 source('Functions_histM.R')
 source('Functions_Integration.matureReg.R')
 library(ggrepel)
@@ -1079,11 +1077,13 @@ tss$gene[which(rownames(tss) == 'AMEX60DD024424')] = NA
 kk = which(!is.na(tss$gene))
 rownames(tss)[kk] = paste0(tss$gene[kk], '_', rownames(tss)[kk])
 tss$gene[-kk] = rownames(tss)[-kk]
-
 positional.genes = c('HOXA13','PROD1', 'RARRES1', 'MEIS1', 'MEIS2', 'SHOX', 'SHOX2',  'HOXA11', 'HOXA9', 'HOXD13',
-                    'HOXD11', 'HOXD9')
+                     'HOXD11', 'HOXD9')
 
 
+##########################################
+# plot individual gene examples of different features, RNAseq, atac, histone marks around TSS 
+##########################################
 outDir = "/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/Gene_Examples"   
 source('Functions_Integration.matureReg.R')
 if(!dir.exists(outDir)) dir.create(outDir)
@@ -1105,11 +1105,10 @@ ids = unique(ids)
 
 
 #test = Analysis_TSS_positionalGenes_in_mature_regeneration(tss, ids)
-
-test = readRDS(file = paste0(RdataDir, '/positional_gene_TSS_chromatinFeatures.rds'))
-
+#test = readRDS(file = paste0(RdataDir, '/positional_gene_TSS_chromatinFeatures.rds'))
+test = readRDS(file = paste0(RdataDir, '/positional_gene_TSS_chromatinFeatures_smartseq2_mature.reg.rds'))
 xx = as.matrix(test[,c(1:35)])
-rownames(xx) = tss$gene[kks]
+rownames(xx) = test$gene
 
 range <- 3.0
 xx = t(apply(xx, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
@@ -1141,7 +1140,6 @@ sample_colors = c('gold2',  'steelblue2', 'springgreen4',   'springgreen3', 'mag
 names(sample_colors) = unique(df$samples)
 annot_colors = list(samples = sample_colors)
 
-
 pheatmap(xx[tops, ], 
          annotation_col = df, 
          show_rownames = TRUE, scale = 'none', 
@@ -1157,6 +1155,8 @@ pheatmap(xx[tops, ],
          #gaps_row =  gaps.row, 
          filename = paste0(figureDir, '/heatmap_positionalGens_TSS_mature_regeneration_log2FC.2.pdf'), 
          width = 8, height = 15)
+
+
 
 ## predicted postional genes from above clusters 
 outDir = "/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/Gene_Examples"   

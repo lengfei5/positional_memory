@@ -785,34 +785,42 @@ Analysis_TSS_positionalGenes_in_mature_regeneration = function(tss, ids)
   
   ## here import the microarray data of all genes, becasue Prod1, Tig1 are missing in the list of postional genes identified
   ## but still HOXA9, HOXA11 and HOXD9 are missing in the microarray probes
-  rna = readRDS(file = paste0("../results/microarray/Rdata/", 
-                'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_limma.DE.stats.rds'))
-  ids = get_geneID(rownames(rna))
-  ggs = get_geneName(rownames(rna))
-  rna = cal_sample_means(rna, conds = c('mUA', 'mLA', 'mHand'))
+  ## test the microarray data, however the dynamic ranges are very different from the smartseq2 data in regeneration
+  ## so use smart-seq2 mature samples as well
+  rna = readRDS( file = paste0("../results/RNAseq_data_used/Rdata/matureSamples_cpm_DEgenes_8selectedSamples.batch4_v47.hox.patch.rds"))
+  ids = rna$geneID
+  ggs = rna$gene
+  
+  rna = data.frame(rna$log2FoldChange_mHand.vs.mUA, rna$log2FoldChange_mLA.vs.mUA, rep(0, nrow(rna)))
   mm = match(rownames(test), ids)
   missed = which(is.na(mm))
-  mm_missed = match(rownames(test)[missed], ggs)
+  #mm_missed = match(rownames(test)[missed], ggs)
+  #mm[missed] = mm_missed 
   
-  mm[missed] = mm_missed 
   rna = rna[mm, ]
   rownames(rna) = rownames(test)
+  colnames(rna) = samples[1:3]
   colnames(rna) = paste0('rna_', colnames(rna))
-  rna = rna[, c(3:1)]
+  #rna = rna[, c(3:1)]
   
   ## add regeneration data
   res = readRDS(file = paste0('../results/RNAseq_data_used/Rdata/', 
           'smartseq2_R10724_R11635_cpm.batchCorrect_DESeq2.test.withbatch.log2FC.shrinked_RNAseq_data_used_20220408.rds'))
-  cpm = res[, c(1,2, 5:12)]
-  cpm = cal_sample_means(cpm, conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal",  "BL_UA_13days_distal"))
-  colnames(cpm) = samples[3:7]
+  cpm = res[, grep('log2FoldChange_d', colnames(res))]
+  #cpm = cal_sample_means(cpm, conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal",  "BL_UA_13days_distal"))
+  colnames(cpm) = samples[4:7]
   #cpm = cpm - cpm[,1]
   ids = get_geneID(rownames(cpm))
   mm = match(rownames(rna), ids)
+  
   cpm = cpm[mm, ]
   colnames(cpm) = paste0('rna_', colnames(cpm))
   
-  rna = data.frame(rna, cpm[, -1])
+  rna = data.frame(rna, cpm, stringsAsFactors = FALSE)
+  
+  test = data.frame(test, rna, stringsAsFactors = FALSE)
+  
+  saveRDS(test, file = paste0(RdataDir, '/positional_gene_TSS_chromatinFeatures_smartseq2_mature.reg.rds'))
   
   ### SVD analysis
   Test.SVD = FALSE

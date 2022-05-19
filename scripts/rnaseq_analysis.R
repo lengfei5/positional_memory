@@ -483,6 +483,9 @@ if(Test.mature.smartseq2){
   res$gene = sapply(rownames(res), function(x) unlist(strsplit(as.character(x), '_'))[1])
   res$geneID = sapply(rownames(res), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
   
+  saveRDS(data.frame(cpm, res, stringsAsFactors = FALSE), 
+       file = paste0("../results/RNAseq_data_used/Rdata/matureSamples_cpm_DEgenes_8selectedSamples.batch4_v47.hox.patch.rds"))
+  
   # load results from microarray with limma to compare with 
   res0 = readRDS(file = paste0("../results/microarray/Rdata/", 
                                'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_limma.DE.stats.rds'))
