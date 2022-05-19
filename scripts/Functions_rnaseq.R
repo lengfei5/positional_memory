@@ -1382,7 +1382,411 @@ Dev.vs.Mature_edgeR.DE.test.without.replicates = function()
   
 }
 
-
+########################################################
+########################################################
+# Section I : data processing and sequencing quality controls, Normalization
+# 
+########################################################
+########################################################
+smartseq2_processing_nomrlaization.test = function()
+{
+  #dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/Rxxxx_rnaseq_old/'
+  #design = read.table(paste0(dataDir, 'sampleInfos_parsed.txt'), sep = '\t', header = TRUE)
+  #dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/R161513_rnaseq/'
+  #design = read.csv(file = paste0(dataDir, 'sampleInfos.csv'))
+  design = read.table(design.file, header = TRUE)
+  colnames(design) = c('sampleID', 'fileName')
+  
+  ##########################################
+  # prepare design matrix, count table and QC table
+  # here the statistics were collected batch by batch (request by request)
+  # merge in the later steps
+  ##########################################
+  xlist = list.files(path=paste0(dataDir, 'featurecounts_Q10'),
+                     pattern = "*_featureCounts.txt$", full.names = TRUE) ## list of data set to merge
+  
+  all = cat.countTable(xlist, countsfrom = 'featureCounts')
+  
+  # design = colnames(all)[-1]
+  # design = gsub('_uniq_rmdup_featureCounts.txt', '', design)
+  # design = data.frame(sample = design, stringsAsFactors = FALSE)
+  # design$sampleID = sapply(design$sample, function(x) {test = unlist(strsplit(as.character(x), '_')); return(test[length(test)])})
+  # design$condition = sapply(design$sample, function(x) {
+  #   test = unlist(strsplit(as.character(x), '_')); 
+  #   return(paste0(test[-length(test)], collapse = '_'))})
+  # design = design[, c(2,3, 1)]
+  
+  colnames(design)[1] = 'SampleID'
+  
+  counts = process.countTable(all=all, design = design[, c(1,2)])
+  
+  design$condition = design$fileName
+  design$fileName = paste0(design$fileName, '_', design$SampleID)
+  design$conds = design$condition
+  design$batch = NA
+  design$batch[grep('8134', design$SampleID)] = 1
+  design$batch[grep('1063', design$SampleID)] = 2
+  design$batch[grep('1361', design$SampleID)] = 3
+  design$batch[grep('1615', design$SampleID)] = 4
+  
+  add.featureCounts.summary = TRUE
+  if(add.featureCounts.summary){
+    design$mapped = NA
+    design$mapped.QCs = NA
+    design$assigned = NA
+    xlist = list.files(path=paste0(dataDir, 'featurecounts_Q10'),
+                       pattern = "*_featureCounts.txt.summary$", full.names = TRUE) ## list of data set to merge
+    
+    for(n in 1:nrow(design))
+    {
+      # n = 1
+      xx = read.delim(xlist[grep(design$SampleID[n], xlist)], sep = '\t', row.names = c(1))
+      design$mapped.QCs[n] = sum(xx[which(rownames(xx) != 'Unassigned_MappingQuality'), 1])
+      design$mapped[n] = sum(xx)
+      design$assigned[n] = xx[1, 1]
+      
+    }
+    
+  }
+  
+  save(design, counts, file=paste0(RdataDir, 'Design_stats_readCounts_updatedResequenced', version.analysis, '.Rdata'))
+  
+  Add.Stat.QCs.for.design = FALSE
+  if(Add.Stat.QCs.for.design){
+    
+    stats = read.delim(paste0(dataDir, 'nf_out_RNAseq/MultiQC/multiqc_data/multiqc_general_stats.txt'), sep = '\t', 
+                       header = TRUE)
+    alignment = read.delim(paste0(dataDir, 'nf_out_RNAseq/MultiQC/multiqc_data/multiqc_hisat2.txt'), sep = '\t')
+    
+    stats = stats[, c(1, 2, 3, 4, 6, 8, 9, 10)]
+    colnames(stats) = c('sample', 'pct.duplication', 'pct.GC', 'avg.seq.length', 'total.reads', 
+                        'pct.assign', 'assigned.reads', 'alignment.rate')
+    
+    stats = data.frame(stats, alignment[match(stats$sample, alignment$Sample), c(2, 4, 5)], stringsAsFactors = FALSE)
+    colnames(stats)[c(9:11)] = c('trimmed.reads', 'unique.aligned', 'multimapper')
+    stats = stats[, c(1:5, 9, 8, 10, 11, 7)]
+    
+    ii = c()
+    jj = c()
+    for(n in 1:nrow(design))
+    {
+      # n = 1;
+      cat(n, '\n')
+      kk = grep(design$sampleID[n], stats$sample)
+      ii = c(ii, rep(n, length(kk)))
+      jj = c(jj, kk)
+      #kk = c(kk, grep(design$sampleID[n], stats$sample))
+      #kk = c(kk, which(design$sampleID == ))
+    }
+    
+    xx = data.frame(design[ii, ], stats[jj, ], stringsAsFactors = FALSE)
+    xx = xx[order(xx$fileName), ]
+    
+    ##################################################
+    ## Import design matrix and prepare count table
+    ##################################################
+    design = read.xlsx(design.file, sheet = 1) # all samples included in this file
+    
+    colnames(design)[1] = 'SampleID'
+    design$conds = paste0(design$condition, '_', design$SampleID,  '.batch', design$batch)
+    
+    # prepare the data table for different batches
+    dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/'
+    
+    batch1 = read.delim(paste0(dataDir,  'R10724_rnaseq/nf_out_RNAseq/featureCounts/merged_gene_counts.txt'), sep = '\t',  header = TRUE)
+    batch2 = read.delim(paste0(dataDir, 'Rxxxx_rnaseq_old/nf_out_RNAseq/featureCounts/merged_gene_counts.txt'), sep = '\t',  header = TRUE)
+    batch4 = read.delim(paste0(dataDir, 'R161513_rnaseq/nf_out_RNAseq/featureCounts/merged_gene_counts.txt'), sep = '\t', header = TRUE)
+    
+    batch3 = batch2[, grep('HLVGMDRXX', colnames(batch2), invert = TRUE)]
+    batch2 = batch2[, c(1, grep('HLVGMDRXX', colnames(batch2)))]
+    
+    source(RNA.functions)
+    xx1 = process.countTable(all=batch1, design = design[which(design$batch == '3'), c(1:2)], ensToGeneSymbol = FALSE)
+    colnames(xx1)[-1] = paste0(colnames(xx1)[-1], '.batch3')
+    
+    xx2 = process.countTable(all=batch2, design = design[which(design$batch == '2'), c(1:2)], merge.technicalRep.sameID = TRUE,
+                             ensToGeneSymbol = FALSE)
+    colnames(xx2)[-1] = paste0(colnames(xx2)[-1], '.batch2')
+    
+    xx3 = process.countTable(all=batch3, design = design[which(design$batch == '1'), c(1:2)], merge.technicalRep.sameID = TRUE,
+                             ensToGeneSymbol = FALSE)
+    
+    colnames(xx3)[-1] = paste0(colnames(xx3)[-1], '.batch1')
+    
+    xx4 = process.countTable(all=batch4, design = design[which(design$batch == '4'), c(1:2)], merge.technicalRep.sameID = FALSE,
+                             ensToGeneSymbol = FALSE)
+    
+    colnames(xx4)[-1] = paste0(colnames(xx4)[-1], '.batch4')
+    
+    all <- Reduce(function(dtf1, dtf2) merge(dtf1, dtf2, by = "gene", all = TRUE), list(xx1, xx2, xx3, xx4))
+    
+    # make sure that the sample order is the same in design and all matrix
+    mm = match(design$conds, colnames(all))
+    all = all[, c(1, mm)]
+    
+    write.csv(design, file = paste0(resDir, '/designSampleInfos_QCstat.csv'), row.names = FALSE)
+    
+    save(design, all, file=paste0(RdataDir, 'Design_Raw_readCounts_', version.analysis, '.Rdata'))
+    
+    ##########################################
+    # add stats into design 
+    ##########################################
+    load(file=paste0(RdataDir, 'Design_Raw_readCounts_', version.analysis, '.Rdata'))
+    stat0 = read.csv(file = '../results/R10724_rnaseq_202102019/QCs_stats.csv')
+    stat1 = read.csv(file = '../results/Rxxxx.rnaseq.old_202102020/QCs_stats.csv')
+    stat2 = read.csv(file = '../results/rnaseq_Rxxxx.old_R10724_R161513/QCs_stats.csv')
+    
+    xx = data.frame(design, matrix(NA, nrow = nrow(design), ncol = 9), stringsAsFactors = FALSE)
+    colnames(xx)[7:15] = colnames(stat0)[-c(1:3)]
+    
+    mm = match(stat0$sampleID, design$SampleID)
+    
+    xx[mm, c(7:15)] = stat0[, -c(1:3)]
+    
+    for(n in 1:nrow(xx))
+    {
+      if(is.na(xx$pct.duplication[n])){
+        # batch 1
+        if(xx$batch[n] == 1) {
+          kk = which(stat1$sampleID == xx$SampleID[n])
+          kk = kk[grep('HLVGMDRXX_', stat1$sample[kk], invert = TRUE)]
+          if(length(kk) != 1) cat(n, ' -- Error \n')
+          xx[n, c(7:15)] = stat1[kk, c(4:12)]
+        }
+        # batch 2
+        if(xx$batch[n] == 2) {
+          kk = which(stat1$sampleID == xx$SampleID[n])
+          kk = kk[grep('HLVGMDRXX_', stat1$sample[kk])]
+          if(length(kk) != 2) cat(n, ' -- Error \n')
+          xx[n, c(7:9, 12)] = apply(stat1[kk, c(4:6, 9)], 2, mean)
+          xx[n, c(10:11, 13:15)] = apply(stat1[kk, c(7:8, 10:12)], 2, sum)
+        }
+        # batch 4
+        if(xx$batch[n] == 4){
+          kk = which(stat2$sampleID == xx$SampleID[n])
+          if(length(kk) != 1) cat(n, ' -- Error \n')
+          xx[n, c(7:15)] = stat2[kk, c(4:12)]
+        }
+      }
+    }
+    
+    xx = data.frame(xx, stringsAsFactors = FALSE)
+    
+    xx$pct.assigned.to.features = xx$assigned.reads/xx$total.reads *100
+    xx$alignment.uniq.rate = xx$unique.aligned/xx$trimmed.reads *100
+    xx = xx[, c(1:11, 13:15, 12, 17, 16)]
+    
+    design = xx
+    
+    save(design, all, file=paste0(RdataDir, 'Design_stats_readCounts_', version.analysis, '.Rdata'))
+    
+    
+  }
+  
+  ########################################################
+  #  Normalize the RNA-seq data and PCA plots 
+  # 
+  ########################################################
+  source('Functions_rnaseq.R')
+  load(file=paste0(RdataDir, 'Design_stats_readCounts_updatedResequenced', version.analysis, '.Rdata'))
+  
+  colnames(counts)[-1] = design$fileName
+  
+  design$batch = as.factor(design$batch)
+  
+  annot_all = readRDS(file = paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                                    'AmexT_v47_transcriptID_transcriptCotig_geneSymbol.nr_geneSymbol.hs_geneID_gtf.geneInfo_gtf.transcriptInfo.rds'))
+  annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                         'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
+  
+  
+  # tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
+  # sps = readRDS(file = '~/workspace/imp/organoid_patterning/results/Rdata/curated_signaling.pathways_gene.list_v2.rds')
+  
+  all = counts
+  
+  ##########################################
+  # convert gene names to gene symbols
+  ##########################################
+  mm = match(all$gene, annot$geneID)
+  ggs = paste0(annot$gene.symbol.toUse[mm], '_',  annot$geneID[mm])
+  all$gene[!is.na(mm)] = ggs[!is.na(mm)]
+  
+  # Select.genes.having.symbols = FALSE
+  # if(Select.genes.having.symbols){
+  #   gene.mapping = gene.mapping[which(!is.na(gene.mapping$gene.symbol.nr) | !is.na(gene.mapping$gene.symbol.hs)), ]
+  #   all = all[!is.na(match(all$gene, gene.mapping$gene.id)), ]
+  # }
+  
+  ## general QC for RNA-seq
+  QC.for.cpm = FALSE
+  if(QC.for.cpm){
+    Run.QC.for.RNA.replicates(design, raw)
+  }
+  
+  
+  ##########################################
+  # because the gene symbol from nr and hs are not consistent sometimes, so we keep gene.id from AMEXDD60
+  # Dimensionality reduction to visulize the difference between time points
+  # Here we select only the batch 3 and batch 2
+  ##########################################
+  raw = as.matrix(all[, -1])
+  rownames(raw) = all$gene
+  
+  # select samples 
+  #sels = which(design$batch != 1 & !(design$SampleID == '136150' & design$batch == 3))
+  sels = c(1:nrow(design))
+  design.matrix = design[sels, ]
+  
+  raw = raw[, sels]
+  
+  rm(design)
+  
+  dds <- DESeqDataSetFromMatrix(raw, DataFrame(design.matrix), design = ~ condition)
+  
+  
+  # this save was for identifying limb fibroblast expressing genes
+  # save(dds, design.matrix, file = paste0(RdataDir, 'dds_design.matrix_all29smartseq2_beforeFiltering.Rdata'))
+  
+  ## first filtering of gene with number of reads
+  ss = rowMaxs(counts(dds))
+  
+  hist(log10(ss), breaks = 100)
+  abline(v = log10(20), col = 'red', lwd = 2.0)
+  
+  length(which(ss>0))
+  length(which(ss>10))
+  length(which(ss>20))
+  
+  dds = dds[which(ss > 20), ]
+  
+  dds = estimateSizeFactors(dds)
+  
+  ss = rowSums(counts(dds))
+  length(which(ss > quantile(ss, probs = 0.6)))
+  
+  #ss = rowMeans(counts(dds))
+  dd0 = dds[ss > quantile(ss, probs = 0.6), ]
+  dd0 = estimateSizeFactors(dd0)
+  
+  sizefactors.UQ = sizeFactors(dds)
+  
+  jj = c(1:length(sizefactors.UQ))
+  #jj = which(design.matrix$batch == 4)
+  
+  plot(sizefactors.UQ[jj], colSums(counts(dds))[jj], log = 'xy')
+  text(sizefactors.UQ[jj], colSums(counts(dds))[jj], colnames(dds), cex =0.6)
+  
+  design.matrix$sizefactor = sizefactors.UQ
+  
+  #hist(log10(ss), breaks = 200, main = 'log2(sum of reads for each gene)')
+  
+  #cutoff.gene = 100
+  #cat(length(which(ss > cutoff.gene)), 'genes selected \n')
+  
+  #dds <- dds[ss > cutoff.gene, ]
+  #design.matrix = design.matrix[with(design.matrix, order(condition, SampleID)), ]
+  
+  # save.scalingFactors.for.deeptools(dds)
+  
+  # normalization and dimensionality reduction
+  #sizeFactors(dds) = sizefactors.UQ
+  
+  fpm = fpm(dds, robust = TRUE)
+  
+  save(dds, design.matrix, file = paste0(RdataDir, 'RNAseq_design_dds.object.Rdata'))
+  #save(fpm, design.matrix, file = paste0(tfDir, '/RNAseq_fpm_fitered.cutoff.', cutoff.gene, '.Rdata'))
+  
+  Make.pca.plots = FALSE
+  if(Make.pca.plots){
+    vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
+    
+    pca=plotPCA(vsd, intgroup = c('condition', 'batch'), returnData = FALSE)
+    print(pca)
+    
+    pca2save = as.data.frame(plotPCA(vsd, intgroup = c('condition', 'batch'), returnData = TRUE))
+    ggp = ggplot(data=pca2save, aes(PC1, PC2, label = name, color= condition, shape = batch))  + 
+      geom_point(size=3) + 
+      geom_text(hjust = 0.7, nudge_y = 1, size=2.5)
+    
+    plot(ggp) + ggsave(paste0(resDir, "/PCAplot_batch2.3.4.pdf"), width=12, height = 8)
+    
+    ggp = ggplot(data=pca2save[which(pca2save$batch==4), ], aes(PC1, PC2, label = name, color= condition, shape = batch))  + 
+      geom_point(size=3) + 
+      geom_text(hjust = 0.7, nudge_y = 1, size=2.5)
+    
+    plot(ggp) + ggsave(paste0(resDir, "/PCAplot_batch4.pdf"), width=12, height = 8)
+    
+  }
+  
+  
+  ##########################################
+  # try to correct batches 
+  ##########################################
+  Run.batch.correction = FALSE
+  if(Run.batch.correction){
+    require("sva")
+    sels = c(1:nrow(design.matrix))
+    cpm = log2(fpm[, sels] + 2^-6)
+    
+    bc = droplevels(design.matrix$batch[sels])
+    #bc = levelsdroplevels(bc)
+    mod = model.matrix(~ as.factor(condition), data = design.matrix[sels, ])
+    
+    cpm.bc = ComBat(dat=cpm, batch=bc, mod=mod, par.prior=TRUE, ref.batch = 3, mean.only = FALSE)    
+    
+    ntop = 5000
+    library(factoextra)
+    xx = as.matrix(cpm.bc)
+    vars = apply(xx, 1, var)
+    xx = xx[order(-vars), ]
+    xx = xx[1:ntop, ]
+    
+    #res.pca <- prcomp(t(xx[ ,grep('Mature', colnames(xx))]), scale = TRUE)
+    res.pca <- prcomp(t(xx), scale = TRUE)
+    #res.var <- get_pca_var(res.pca)
+    
+    fviz_pca_ind(res.pca,
+                 col.ind = "cos2", # Color by the quality of representation
+                 gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+                 repel = FALSE     # Avoid text overlapping
+    )
+    
+    
+  }
+  
+  Test.glmpca.mds = FALSE
+  if(Test.glmpca.mds){
+    library("glmpca")
+    gpca <- glmpca(counts(dds), L=2)
+    
+    gpca.dat <- gpca$factors
+    gpca.dat$condition <- dds$condition
+    gpca.dat$batch <- dds$batch
+    gpca.dat$name = rownames(gpca.dat)
+    
+    ggplot(gpca.dat, aes(x = dim1, y = dim2, label = name, color = condition, shape = batch)) +
+      geom_point(size =3) + coord_fixed() + ggtitle("glmpca - Generalized PCA") +
+      geom_text(hjust = 0.7, nudge_y = 1, size=2.5) + 
+      ggsave(paste0(resDir, "/GPCAplot_batch2.batch3.pdf"), width=12, height = 8)
+    
+    sampleDists <- dist(t(assay(vsd)))
+    sampleDistMatrix <- as.matrix( sampleDists )
+    rownames(sampleDistMatrix) <- paste( vsd$condition, vsd$batch, sep = " - " )
+    colnames(sampleDistMatrix) <- NULL
+    
+    mds <- as.data.frame(colData(vsd))  %>%
+      cbind(cmdscale(sampleDistMatrix))
+    mds$name = rownames(mds)
+    
+    ggplot(mds, aes(x = `1`, y = `2`, label = name, color = condition, shape = batch)) +
+      geom_point(size = 3) + coord_fixed() + ggtitle("MDS with VST data") +
+      geom_text(hjust = 0.7, nudge_y = 1, size=2.5) 
+    
+  }
+  
+  
+}
 
 
 
