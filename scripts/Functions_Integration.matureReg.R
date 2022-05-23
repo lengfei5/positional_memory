@@ -565,9 +565,12 @@ find_enhancers_integeticRegions_Introns_H3K4me1 = function()
   
   saveRDS(enhancers, file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1_chipseekerAnnot.rds'))
   
+  enhancers = readRDS(file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1_chipseekerAnnot.rds'))
   cat(length(which(enhancers$enhancer == 1 & 
                  (enhancers$annotation_chipseeker == 'Distal Intergenic'| enhancers$annotation_chipseeker == 'Intron'))),
        ' enhancer candidates \n')
+  
+  
   
   
 }
