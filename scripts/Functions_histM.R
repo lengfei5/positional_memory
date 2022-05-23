@@ -80,6 +80,26 @@ get_geneID = function(xx)
 }
 
 
+cal_clusterGaps = function(plt, nb_clusters = 8)
+{
+  # (cutree(plt$tree_row, k=8))
+  clusters = cutree(plt$tree_row, k = nb_clusters)
+  clusters = clusters[plt$tree_row$order]
+  cluster_order = unique(clusters)
+  
+  gaps.row = c()
+  for(n in 1:(length(cluster_order)-1))
+  {
+    if(n == 1)  {gaps.row = c(gaps.row, length(which(clusters == cluster_order[n])))
+    }else{
+      gaps.row = c(gaps.row,  gaps.row[n-1] + length(which(clusters == cluster_order[n])))
+    }
+  }
+  
+  return(gaps.row)
+  
+}
+
 ##########################################
 # try to subtract the input IgG 
 ##########################################

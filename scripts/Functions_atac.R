@@ -4954,6 +4954,8 @@ prepare_for_promoterScanning = function()
 {
   annot = data.frame(annot)
   
+  yy = readRDS(file = paste0(RdataDir, '/chromatin_promoter_features_geneGroups.rds'))
+  
   yy$CpG = NA
   
   outDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/motif_analysis/FIMO_promoters/'
@@ -4968,17 +4970,20 @@ prepare_for_promoterScanning = function()
   export(tp, format = 'bed', con = paste0(outDir, 'promoters_2kb.300bp_TFmotifs.bed'))
   
   ## file for TATA box searching
-  tp = data.frame(t(sapply(yy$promoters, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  sels = which(yy$groups == 'DE_up')
+  tp = data.frame(t(sapply(yy$promoters[sels], 
+                           function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
   
   #tp$X2 = as.numeric(as.character(tp$X2)) + 1900
-  tp$X3 = as.numeric(as.character(tp$X3)) - 2000 - 20
-  tp$X2 = tp$X3 - 30
-  rownames(tp) = rownames(yy)
-  tp$strand = annot$strand[match(rownames(tp), annot$gene_id)]
+  tp$X3 = as.numeric(as.character(tp$X3)) - 2000 +50
+  tp$X2 = tp$X3 - 100
+  rownames(tp) = rownames(yy)[sels]
+  #tp$strand = annot$strand[match(rownames(tp), annot$gene_id)]
+  tp$strand = '*'
   tp = makeGRangesFromDataFrame(tp, seqnames.field=c("X1"),
                                 start.field="X2", end.field="X3", strand.field="strand")
   
-  export(tp, format = 'bed', con = paste0(outDir, 'promoters_50.20bp_TATAbox.bed'))
+  export(tp, format = 'bed', con = paste0(outDir, 'promoters_50.tss.50bp_denovoMotifs_DEup.bed'))
   
   ## file for CpG enrichment
   tp = data.frame(t(sapply(yy$promoters, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))

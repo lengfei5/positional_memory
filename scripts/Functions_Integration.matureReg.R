@@ -535,6 +535,39 @@ find_enhancers_integeticRegions_Introns_H3K4me1 = function()
   
   saveRDS(enhancers, file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1.rds'))
   
+  enhancers = readRDS(file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1.rds'))
+  
+  ### peak annotation and then we know if they are integeic/exon
+  tp = data.frame(t(sapply(enhancers$coords, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  tp$strand = '*'
+  tp = makeGRangesFromDataFrame(tp, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
+  
+  # limb fibroblast expressing genes
+  gtf.file =  '../data/AmexT_v47_Hox.patch_limb.fibroblast.expressing.23585.genes.dev.mature.regeneration.gtf'
+  amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
+  
+  pp.annots = annotatePeak(tp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+  pp.annots = data.frame(pp.annots, stringsAsFactors = FALSE)
+  
+  # shorten the annotation
+  pp.annots = pp.annots[, c(6:14)]
+  xx = pp.annots
+  xx$annotation[grep('Intron', xx$annotation)] = 'Intron'
+  xx$annotation[grep('Promoter', xx$annotation)] = 'Promoter'
+  xx$annotation[grep('Exon', xx$annotation)] = 'Exon'
+  xx$annotation[grep('Downstream', xx$annotation)] = 'Downstream'
+  colnames(xx) = paste0(colnames(xx), '_chipseeker')
+  
+  enhancers = data.frame(enhancers, xx, stringsAsFactors = FALSE)
+  
+  rm(pp.annots)
+  
+  saveRDS(enhancers, file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1_chipseekerAnnot.rds'))
+  
+  cat(length(which(enhancers$enhancer == 1 & 
+                 (enhancers$annotation_chipseeker == 'Distal Intergenic'| enhancers$annotation_chipseeker == 'Intron'))),
+       ' enhancer candidates \n')
   
   
 }

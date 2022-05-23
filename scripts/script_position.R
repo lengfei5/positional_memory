@@ -1103,16 +1103,18 @@ ids = get_geneID(rownames(genelists))
 ids = c(tss$geneID[match(positional.genes, tss$gene)], ids)
 ids = unique(ids)
 
-
 #test = Analysis_TSS_positionalGenes_in_mature_regeneration(tss, ids)
 #test = readRDS(file = paste0(RdataDir, '/positional_gene_TSS_chromatinFeatures.rds'))
 test = readRDS(file = paste0(RdataDir, '/positional_gene_TSS_chromatinFeatures_smartseq2_mature.reg.rds'))
 xx = as.matrix(test[,c(1:35)])
+yy = as.matrix(test[, c(38:ncol(test))])
 rownames(xx) = test$gene
+rownames(yy) = rownames(xx)
 
 range <- 3.0
 xx = t(apply(xx, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
-
+range = 6.
+yy = t(apply(yy, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
 # pheatmap(xx, 
 #          #annotation_col = df, 
 #          show_rownames = FALSE, scale = 'none', 
@@ -1131,6 +1133,8 @@ xx = t(apply(xx, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-ran
 
 maxs = apply(xx, 1, function(x) max(abs(x)))
 tops = which(maxs>2)
+xx = xx[tops, ]
+yy = yy[tops, ]
 
 df = as.data.frame(sapply(colnames(xx), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[2])}))
 colnames(df) = 'samples'
@@ -1140,9 +1144,9 @@ sample_colors = c('gold2',  'steelblue2', 'springgreen4',   'springgreen3', 'mag
 names(sample_colors) = unique(df$samples)
 annot_colors = list(samples = sample_colors)
 
-pheatmap(xx[tops, ], 
+plt = pheatmap(xx, 
          annotation_col = df, 
-         show_rownames = TRUE, scale = 'none', 
+         show_rownames = FALSE, scale = 'none', 
          color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(7),
          show_colnames = FALSE,
          cluster_rows = TRUE, 
@@ -1150,12 +1154,36 @@ pheatmap(xx[tops, ],
          annotation_colors = annot_colors, 
          gaps_col = seq(7, 35, by = 7), 
          fontsize_row = 7,
-         treeheight_row = 50,
+         treeheight_row = 40,
          cutree_rows = 8,
          #gaps_row =  gaps.row, 
          filename = paste0(figureDir, '/heatmap_positionalGens_TSS_mature_regeneration_log2FC.2.pdf'), 
-         width = 8, height = 15)
+         width = 6, height = 14)
 
+df = as.data.frame(sapply(colnames(yy), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[2])}))
+colnames(df) = 'samples'
+rownames(df) = colnames(yy)
+
+
+source('Functions_histM.R')
+gaps.row = cal_clusterGaps(plt, nb_clusters = 8)
+
+pheatmap(yy[plt$tree_row$order, ], 
+         annotation_col = df, 
+         show_rownames = TRUE, 
+         scale = 'none', 
+         color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(12),
+         show_colnames = FALSE,
+         cluster_rows = FALSE, 
+         cluster_cols = FALSE, 
+         annotation_colors = annot_colors, 
+         #gaps_col = seq(7, 35, by = 7), 
+         fontsize_row = 7,
+         #treeheight_row = 40,
+         #cutree_rows = 8,
+         gaps_row =  gaps.row, 
+         filename = paste0(figureDir, '/heatmap_positionalGens_smartseq2_mature_regeneration_log2FC.2.pdf'), 
+         width = 3, height = 14)
 
 
 ## predicted postional genes from above clusters 
@@ -1172,8 +1200,6 @@ plot_rna_chromainFeatures_geneExamples(tss, geneList = c('LHX2', 'COL9A2', 'GDF5
 # positional enhancers in mature and regeneration 
 # not sure if it is necessary
 ##########################################
-
-
 
 
 ########################################################
