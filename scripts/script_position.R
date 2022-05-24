@@ -1074,6 +1074,8 @@ tss = readRDS(file = paste0(RdataDir, '/regeneration_matureSamples_tss_perGene_s
 tss$gene[which(rownames(tss) == 'AMEX60DD028208')] = 'PROD1'
 tss$gene[which(rownames(tss) == 'AMEX60DD024424')] = NA
 
+# saveRDS(tss, file =paste0(RdataDir, '/regeneration_matureSamples_tss_perGene_smartseq2_atac_histM_v5.rds'))
+
 kk = which(!is.na(tss$gene))
 rownames(tss)[kk] = paste0(tss$gene[kk], '_', rownames(tss)[kk])
 tss$gene[-kk] = rownames(tss)[-kk]

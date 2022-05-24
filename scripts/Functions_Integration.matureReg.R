@@ -570,17 +570,97 @@ find_enhancers_integeticRegions_Introns_H3K4me1 = function()
                  (enhancers$annotation_chipseeker == 'Distal Intergenic'| enhancers$annotation_chipseeker == 'Intron'))),
        ' enhancer candidates \n')
   
-  
+  enhnacers = peak_to_gene_assignment_TADs_correlation(enhancers)
   
   
 }
 
+peak_to_gene_assignment_TADs_correlation = function(enhancers)
+{
+  ## require the gene expression data, TSS and also TADs information
+  tad = read.table(file = paste0('../data/final.TAD.res100000.bed'), sep = '\t', header = FALSE)
+  length(which(tad$V1 != tad$V4))
+  length(which(tad$V2 != tad$V5))
+  length(which(tad$V3 != tad$V6))
+  tad = tad[, -c(4:6)]
+  rownames(tad) = paste0(tad$V1, ':', tad$V2, '-', tad$V3)
+  tad$strand = '*'
+  tad = makeGRangesFromDataFrame(tad, seqnames.field=c("V1"),
+                                start.field="V2", end.field="V3", strand.field="strand")
+  
+  rna = readRDS(file = paste0(RdataDir, '/TSS_chromatinFeatures_smartseq2_mature.reg.rds'))
+  rna = rna[which(rna$groups != 'non_expr'), ]
+  ss = apply(as.matrix(rna[, grep('rna_', colnames(rna))]), 1, mean)
+  rna = rna[which(!is.na(ss)), ]
+  rna = rna[, c(1:4,7, grep('rna_', colnames(rna)))]
+  
+  tp = data.frame(t(sapply(rna$coords, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  tp$strand = '*'
+  tp = makeGRangesFromDataFrame(tp, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
+  
+  enhancers = readRDS(file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1_chipseekerAnnot.rds'))
+  cat(length(which(enhancers$enhancer == 1 & 
+                     (enhancers$annotation_chipseeker == 'Distal Intergenic'| enhancers$annotation_chipseeker == 'Intron'))),
+      ' enhancer candidates \n')
+  ee = data.frame(t(sapply(enhancers$coords, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  ee$strand = '*'
+  ee = makeGRangesFromDataFrame(ee, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
+  
+  
+  
+  
+}
 ########################################################
 ########################################################
 # Section : integration analysis for gene examples
 # 
 ########################################################
 ########################################################
+Add.RNAdata.for.TSS = function()
+{
+  tss = readRDS(file =paste0(RdataDir, '/regeneration_matureSamples_tss_perGene_smartseq2_atac_histM_v5.rds'))
+  
+  rna = readRDS( file = paste0("../results/RNAseq_data_used/Rdata/matureSamples_cpm_DEgenes_8selectedSamples.batch4_v47.hox.patch.rds"))
+  ids = rna$geneID
+  ggs = rna$gene
+  
+  rna = data.frame(rna$log2FoldChange_mHand.vs.mUA, rna$log2FoldChange_mLA.vs.mUA, rep(0, nrow(rna)))
+  mm = match(rownames(tss), ids)
+  missed = which(is.na(mm))
+  #mm_missed = match(rownames(test)[missed], ggs)
+  #mm[missed] = mm_missed 
+  
+  rna = rna[mm, ]
+  rownames(rna) = rownames(tss)
+  colnames(rna) = samples[1:3]
+  colnames(rna) = paste0('rna_', colnames(rna))
+  #rna = rna[, c(3:1)]
+  
+  ## add regeneration data
+  res = readRDS(file = paste0('../results/RNAseq_data_used/Rdata/', 
+                              'smartseq2_R10724_R11635_cpm.batchCorrect_DESeq2.test.withbatch.log2FC.shrinked_RNAseq_data_used_20220408.rds'))
+  cpm = res[, grep('log2FoldChange_d', colnames(res))]
+  #cpm = cal_sample_means(cpm, conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal",  "BL_UA_13days_distal"))
+  colnames(cpm) = samples[4:7]
+  #cpm = cpm - cpm[,1]
+  ids = get_geneID(rownames(cpm))
+  mm = match(rownames(rna), ids)
+  missed = which(is.na(mm))
+  
+  cpm = cpm[mm, ]
+  colnames(cpm) = paste0('rna_', colnames(cpm))
+  
+  rna = data.frame(rna, cpm, stringsAsFactors = FALSE)
+  
+  tss_rna = data.frame(tss, rna, stringsAsFactors = FALSE)
+  
+  saveRDS(tss_rna, file = paste0(RdataDir, '/TSS_chromatinFeatures_smartseq2_mature.reg.rds'))
+  
+  
+}
+
 plot_rna_chromainFeatures_geneExamples = function(tss, 
                                                   geneList = c('FGF10', 'SALL4'), 
                                                   outDir = 'Gene_Examepls',
