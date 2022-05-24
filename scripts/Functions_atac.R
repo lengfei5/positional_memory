@@ -5603,7 +5603,6 @@ Test.positional.peaks.in.regeneration = function()
   ##########################################
   # process the positional result and regeneration analysis and combine them 
   ##########################################
-  
   ## import positional peaks in Figure 1
   peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rdata/', 
                                 'position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters_6.rds'))
