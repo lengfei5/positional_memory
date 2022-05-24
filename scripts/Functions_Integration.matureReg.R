@@ -608,10 +608,135 @@ peak_to_gene_assignment_TADs_correlation = function(enhancers)
   ee = makeGRangesFromDataFrame(ee, seqnames.field=c("X1"),
                                 start.field="X2", end.field="X3", strand.field="strand")
   
+  features = c('atac', 'H3K4me3', 'H3K27me3', 'H3K4me1', 'H3K27ac')
+  enhancers$targets = NA
+  corrMax = matrix(NA, nrow = nrow(enhancers), ncol = length(features))
+  rownames(corrMax) = rownames(enhancers)
+  colnames(corrMax) = features
+  
+  for(n in 1:nrow(enhancers))
+  {
+    # considered as putative enhancers with high H3K4me1 and distal or introns 
+    if(!is.na(enhancers$enhancer[n]) & 
+      (enhancers$annotation_chipseeker[n] == 'Distal Intergenic'| enhancers$annotation_chipseeker[n] == 'Intron')){
+      
+      if(n%%500 == 0) cat(n, ' -- ')
+      map1 = data.frame(findOverlaps(ee[n], tad))
+      
+      if(nrow(map1) == 0){
+        cat('no TAD found \n')
+      }else{
+        map2 = data.frame(findOverlaps(tp, tad[unique(map1$subjectHits)]))
+        ggs = rna[unique(map2$queryHits), grep('rna', colnames(rna))]
+        if(n%%500 == 0) cat(nrow(ggs), ' potential targets found \n')
+        
+        if(nrow(ggs) >0){
+          for(i in 1:length(features))
+          {
+            test = as.numeric(enhancers[n, grep(paste0('^', features[i], '_'), colnames(enhancers)[1:41])])
+            test = c(test[1:2] - test[3], test[4:8] - test[4])
+            test.corr = cor(test, t(ggs), method = 'pearson')
+            if(i == 1) enhancers$targets[n] = rownames(ggs)[which.max(test.corr)]
+            
+            if(features[i] == 'H3K27me3') {
+              corrMax[n, i] = min(test.corr)
+            }else{
+              corrMax[n, i] = max(test.corr)
+            }
+          }
+        }
+        
+      }
+    }  
+  }
+  
+  save(corrMax, enhancers, rna, file = paste0(RdataDir, '/peak_to_gene_assignment_atacseqPeaks_all.Rdata'))
+  
+  ##########################################
+  # compare the corrections between features and rna and it turns out that atac-seq data have the best correlation with RNA-seq data
+  ##########################################
+  load(file = paste0(RdataDir, '/peak_to_gene_assignment_atacseqPeaks_all.Rdata'))
+  corrMax[,3] = - corrMax[,3]
+  
+  as_tibble(corrMax) %>% 
+    gather(features, corr, 1:5) %>%
+    ggplot(aes(x = corr, color = features)) +
+    geom_density(size = 1.) +
+    scale_color_manual(values = c("#117733",  "blue", 'red', 'cyan', 'black')) +
+    #scale_color_brewer(palette="Dark2") +
+    #scale_fill_manual(values=c("#117733",  "blue", 'cyan',  'magenta')) +
+    theme_classic() +
+    theme(axis.text.x = element_text(angle = 0, size = 14), 
+          axis.text.y = element_text(angle = 0, size = 14), 
+          axis.title =  element_text(size = 14),
+          legend.text = element_text(size=12),
+          legend.title = element_text(size = 14),
+          legend.position=c(0.5, 0.8)) +
+    labs(x = "Pearson correlation with gene expression", y= 'density')
+  ggsave(paste0(figureDir, "peak_to_gene_assignmenet_correlation_chromatinFeatures_rna_minus_H3K27me3.pdf"),  width = 6, height = 4)
+  
+  ##########################################
+  # generate the correlation distribution for random peak-to-gene assginment  
+  # to find cutoff 
+  ##########################################
+  x = corrMax[, 1]
+  t = x*sqrt(7-2)/sqrt(1 - x^2)
+  pvs = pt(q=t, df=5, lower.tail=FALSE)
+  
+  cat(length(which(pvs<0.05)), ' peak-to-gene assignment are significant \n')
+  corrMax = data.frame(corrMax, stringsAsFactors = FALSE)
+  corrMax = data.frame(corrMax, pval = pvs)
+  colnames(corrMax) = paste0(colnames(corrMax), '.corr.with.rna')
+  corrMax = data.frame(corrMax, enhancers$targets, stringsAsFactors = FALSE)
+  enhancers = enhancers[, c(1:55)]
+  colnames(corrMax)[7] = 'targets'
+  corrMax$targets[which(corrMax$pval.corr.with.rna >0.05)] = NA
+  
+  enhancers = data.frame(enhancers, corrMax, stringsAsFactors = FALSE)
+  
+  saveRDS(enhancers, file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1_chipseekerAnnot_manual.rds'))
+  
+  # nb_sampling = 1000
+  # ii.sampling = sample(1:nrow(enhancers), size = nb_sampling, replace = FALSE)
+  # jj.sampling = sample(c(1:nrow(rna)), size = nb_sampling, replace = FALSE)
+  # bgs = rep(NA, nb_sampling)
+  # 
+  # for(n in 1:length(bgs))
+  # {
+  #   # n = 1
+  #   ggs = rna[jj.sampling[n], grep('rna', colnames(rna))]
+  #   test = as.numeric(enhancers[ii.sampling[n], grep(paste0('^', features[i], '_'), colnames(enhancers)[1:41])])
+  #   test = c(test[1:2] - test[3], test[4:8] - test[4])
+  #   bgs[n] = max(cor(test, t(ggs), method = 'pearson'))
+  #   
+  # }
+  
+  enhancers = readRDS(file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1_chipseekerAnnot_manual.rds'))
+  colnames(enhancers)[46] = 'pass.threshold.H3K4me1'
+  enhancers$annotation = NA
+  kk = which(enhancers$pass.threshold.H3K4me1 == 1 & 
+                     (enhancers$annotation_chipseeker == 'Distal Intergenic'| enhancers$annotation_chipseeker == 'Intron'))
+  enhancers$annotation[kk] = 'enhancers'
+  enhancers$annotation[which(enhancers$annotation_chipseeker == 'Promoter')] = 'promoters'
+  
+  jj = which(enhancers$annotation == 'promoters')
+  enhancers$targets[jj] = enhancers$geneId_chipseeker[jj]
+  enhancers$distanceToTSS = NA
+  enhancers$distanceToTSS[jj] = enhancers$distanceToTSS_chipseeker[jj]
+  
+  kk = which(enhancers$annotation == 'enhancers' & !is.na(enhancers$targets))
+  mm = match(enhancers$targets[kk], rna$geneID)
+  tp_sel = data.frame(tp[mm])
+  ee_sel = data.frame(ee[kk])
+  
+  lls = (apply(ee_sel[, c(2, 3)], 1, mean) - apply(tp_sel[, c(2, 3)], 1, mean))
+  enhancers$distanceToTSS[kk] = lls
   
   
+  kk = which(enhancers$annotation == 'enhancers' & abs(enhancers$distanceToTSS)<2000)
+  enhancers$annotation[kk] = 'promoters'
   
-  
+  saveRDS(enhancers, file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1_chipseekerAnnot_manual_targets.rds'))
   
 }
 ########################################################

@@ -41,6 +41,13 @@ require(DESeq2)
 require(GenomicRanges)
 require(pheatmap)
 library(tictoc)
+library(tidyr)
+library(dplyr)
+require(ggplot2)
+library("gridExtra")
+library("cowplot")
+require(ggpubr)
+
 
 ########################################################
 ########################################################
