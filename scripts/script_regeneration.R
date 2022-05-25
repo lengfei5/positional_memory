@@ -2038,6 +2038,7 @@ pheatmap(xx[plt$tree_row$order, ],
          gaps_row = gaps.row,
          filename = paste0(figureDir, '/putative_targets_dynamic_regeneration_peaks.pdf'))
 
+
 ##########################################
 # first motif activity analysis for temporally dynamic peaks 
 ##########################################
