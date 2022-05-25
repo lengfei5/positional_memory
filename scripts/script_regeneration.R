@@ -1995,25 +1995,33 @@ annot_colors = list(
 #ii.gaps = c(3, 4)
 col = colorRampPalette(c("navy", "white", "red3"))(10)
 
+callback = function(hc, mat){
+  sv = svd(t(mat))$v[,1]
+  dend = reorder(as.dendrogram(hc), wts = sv)
+  as.hclust(dend)
+}
+
 plt = pheatmap(yy, 
                #annotation_row = my_gene_col, 
                annotation_col = df, show_rownames = FALSE, scale = 'none', 
                color = col, 
                show_colnames = FALSE,
                cluster_rows = TRUE, cluster_cols = FALSE,  
-               clustering_method = 'complete', 
+               clustering_method = 'complete', cutree_rows = 6, 
                annotation_colors = annot_colors, 
-               #clustering_callback = callback,
+               clustering_callback = callback,
                treeheight_row = 20,
+               legend = TRUE, annotation_legend =  FALSE,
                #gaps_col = ii.gaps, 
                filename = paste0(figureDir, 'dynamic_regeneration_peaks.pdf'), 
-               width = 4, height = 10)
+               width = 3.2, height = 10)
 
 xx = rna[, grep('rna_', colnames(rna))]
 xx = xx[, -c(1:2)]
 xx <- t(apply(xx, 1, cal_z_score))
 colnames(xx) = gsub('rna_', '', colnames(yy))
 
+gaps.row = cal_clusterGaps(plt, nb_clusters = 6)
 pheatmap(xx[plt$tree_row$order, ], 
          #annotation_row = my_gene_col, 
          annotation_col = df, show_rownames = FALSE, scale = 'none', 
@@ -2023,12 +2031,12 @@ pheatmap(xx[plt$tree_row$order, ],
          cluster_cols = FALSE,  
          #clustering_method = 'complete', cutree_rows = nb_clusters, 
          annotation_colors = annot_colors, 
-         width = 3.5, height = 10, 
+         width = 3., height = 10, 
+         legend = TRUE, annotation_legend =  FALSE,
          #clustering_callback = callback,
          #treeheight_row = 30,
+         gaps_row = gaps.row,
          filename = paste0(figureDir, '/putative_targets_dynamic_regeneration_peaks.pdf'))
-
-
 
 ##########################################
 # first motif activity analysis for temporally dynamic peaks 
