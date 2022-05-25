@@ -1363,71 +1363,25 @@ run.MARA.atac.spatial = function(keep, cc)
 }
 
 
-run.MARA.atac.temporal = function(keep, cc)
+########################################################
+########################################################
+# Section : one of the main functions for regeneration motif analysis
+# 
+########################################################
+########################################################
+run.MARA.atac.temporal = function(keep, method = c('Bayesian.ridge'))
 {
-  # prepare Y response matrix
-  Prepare.Response.Matrix = FALSE
-  if(Prepare.Response.Matrix){
-    fpm = readRDS(file = paste0(RdataDir, '/fpm.bc_TMM_combat_mUA_regeneration_embryoStages.rds'))
-    design = readRDS(file = paste0(RdataDir, '/design_sels_bc_TMM_combat_mUA_regeneration_embryoStages.rds'))
-    
-    # prepare the background distribution
-    fpm.bg = fpm[grep('bg_', rownames(fpm), invert = FALSE), ]
-    fpm = fpm[grep('bg_', rownames(fpm), invert = TRUE), ]
-    rownames(fpm) = gsub('_', '-', rownames(fpm))
-    
-    hist(fpm.bg, breaks = 100, main = 'background distribution')
-    abline(v = 1, col = 'red', lwd = 2.0)
-    quantile(fpm.bg, c(0.95, 0.99))
-    
-    res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks_test_v5.rds'))
-    
-    # select the temporal dynamic peaks
-    length(which(res$prob.M0<0.05))
-    length(which(res$prob.M0<0.05 & res$log2FC > 1))
-    length(which(res$prob.M0<0.01 & res$log2FC > 1))
-    length(which(res$prob.M0<0.01 & res$log2FC > 1.5))
-    length(which(res$prob.M0<0.01 & res$log2FC > 2))
-    
-    jj = which(res$prob.M0 < 0.01 & res$log2FC > 1 )
-    
-    conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal", "BL_UA_13days_distal")
-    
-    sample.sels = c(); cc = c()
-    for(n in 1:length(conds)) {
-      kk = which(design$conds == conds[n])
-      sample.sels = c(sample.sels, kk)
-      cc = c(cc, rep(conds[n], length(kk)))
-    }
-    
-    xx = res[c(jj), ]
-    xx = xx[order(-xx$log2FC), ]
-    
-    keep = fpm[!is.na(match(rownames(fpm), rownames(xx))), sample.sels]
-  }
+  library(pheatmap)
+  library(RColorBrewer)
   
   ## prepare reponse matrix with selected dynamic peaks
-  keep = as.matrix(keep)
-  cc.uniq = unique(cc)
-  Y = matrix(NA, ncol = length(cc.uniq), nrow = nrow(keep))
-  
-  for(n in 1:ncol(Y))
-  {
-    jj = which(cc == cc.uniq[n])
-    if(length(jj) == 1) {
-      Y[,n] = keep[,jj]
-    }else{
-      Y[,n] = apply(keep[ ,jj], 1, mean)
-    }
-  }
-  
-  colnames(Y) = cc.uniq
-  rownames(Y) = rownames(keep)
-  
+  Y = as.matrix(keep)
   
   # prepare X matrix from motif occurrency matrix
   motif.oc = readRDS(file = '../results/motif_analysis/motif_oc_fimo_jaspar2022_pval.0.0001_v1.rds')
   mm = match(rownames(motif.oc), rownames(Y))
+  cat(length(which(!is.na(mm))), ' peaks found with peak name matching \n')
+  
   motif.oc = motif.oc[!is.na(mm), ]
   
   ss.m = apply(motif.oc, 2, sum)
@@ -1442,12 +1396,10 @@ run.MARA.atac.temporal = function(keep, cc)
   X = as.matrix(motif.oc)
   Y = as.matrix(Y)
   
+  cat(nrow(Y), ' genomeic regions will be used after filtering \n')
   
-  Run.Bayesian.ridge = FALSE
-  if(Run.Bayesian.ridge){ 
-    
-    library(pheatmap)
-    library(RColorBrewer)
+  if(method = 'Bayesian.ridge'){ 
+   
     library(scchicFuncs)
   
     # the original code from Jake 
@@ -1489,9 +1441,24 @@ run.MARA.atac.temporal = function(keep, cc)
     rownames(df) = colnames(bb)
     colnames(df) = 'regeneration time'
     
+    bb = data.frame(motifs = rownames(bb), bb)
+    bb$motifs = sapply(bb$motifs, function(x) {x = unlist(strsplit(as.character(x), '_')); x = x[-length(x)]; paste0(x, collapse = '_')})
+    
+    library(RColorBrewer)
+    as_tibble(bb) %>% 
+      gather(samples, activity, 2:6) %>%
+      mutate(samples=factor(samples, levels=c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal", 
+                                              "BL_UA_13days_distal"))) %>%
+      ggplot(aes(x=samples, y=motifs, fill=activity))+
+      geom_tile()
+    
+    
+    #change the scale_fill_manual from previous code to below
+    scale_fill_manual(values=rev(brewer.pal(7, "YlGnBu")), na.value="grey90")+
+    
     pheatmap(bb, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE, 
              colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(10),
-             scale = 'row', cluster_cols=FALSE, main = '', 
+             scale = 'none', cluster_cols=FALSE, main = '', 
              na_col = "white", fontsize_row = 12, 
              annotation_col = df, 
              filename = paste0(resDir, '/MARA_bayesianRidge_temporalpeaks_Jaspar2022.pdf'), 
@@ -1627,12 +1594,9 @@ run.MARA.atac.temporal = function(keep, cc)
     
     dev.off()
     
-    
-    
   }
   
-  Run.glmnet = FALSE
-  if(Run.glmnet){
+  if(method == 'glmnet'){
     require(glmnet)
     
     # prepare Y matrix 
