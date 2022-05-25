@@ -33,11 +33,17 @@ tableDir = paste0('/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akan
 
 saveTables = FALSE
 
-require(ggplot2)
 require(DESeq2)
 require(GenomicRanges)
 require(pheatmap)
 library(tictoc)
+
+library(tidyr)
+library(dplyr)
+require(ggplot2)
+library("gridExtra")
+library("cowplot")
+require(ggpubr)
 
 # limb fibroblast expressing genes
 gtf.file =  '../data/AmexT_v47_Hox.patch_limb.fibroblast.expressing.23585.genes.dev.mature.regeneration.gtf'
@@ -627,7 +633,7 @@ if(PLOT.global.dynamic.parameters.for.histM){
   ## heatmaps of log2FC, time point vs mUA for each histone marks 
   for(n in 1:conds_histM)
   {
-    # n = 3
+    # n = 1
     ii.test = intersect(grep('logFC_', colnames(keep1)), grep(conds_histM[n], colnames(keep1)))
     test = keep1[, ii.test]
     fc_sels = c('5dpa.vs.mUA', '9dpa.vs.mUA', '13dpap.vs.mUA', '13dpad')
@@ -658,10 +664,10 @@ if(PLOT.global.dynamic.parameters.for.histM){
              gaps_row = gaps.row,
              filename = paste0(figureDir, '/regeneration_histM_dynamics_log2fc.vs.mUA_dynamicATACpeaks_', conds_histM[n], '.pdf'), 
              width = 3, height = 12)
-    
   }
   
 }
+
 
 ##########################################
 # save peak list for deeptool heatmap  
@@ -800,7 +806,7 @@ if(Save_peak.list_for_deeptools){
 }
 
 ##########################################
-# combine profile plots of histone markers of each cluster  
+# combine profile plots of histone markers of each cluster from Deeptools output  
 ##########################################
 Assembly_histMarkers_profilePlots = FALSE
 if(Assembly_histMarkers_profilePlots){
@@ -1934,6 +1940,87 @@ if(saveTable){
 ########################################################
 ########################################################
 
+##########################################
+# regeneration dynamic peaks and gene expressoin of targets 
+##########################################
+## peak-to-gene assignment of 55k atac-seq peaks
+peaks = readRDS(file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1_chipseekerAnnot_manual_targets.rds'))
+
+res = readRDS(file = paste0(RdataDir, '/renegeration_dynamicPeaks_GPDPclustering.merged.extended.rds')) # dynamic atac-seq peak
+res = res[which(!is.na(res$clusters)), ]
+rownames(res) = gsub('_', '-', rownames(res))
+
+mm = match(rownames(res), rownames(peaks))
+length(which(is.na(mm)))
+
+peaks = peaks[mm, ]
+
+rna = readRDS(file = paste0(RdataDir, '/TSS_chromatinFeatures_smartseq2_mature.reg.rds'))
+rna = rna[, c(1:4,7, grep('rna_', colnames(rna)))]
+
+mm = match(peaks$targets, rna$geneID)
+jj = which(!is.na(mm))
+mm = mm[jj]
+
+peaks = peaks[jj,]
+rna = rna[mm, ]
+
+ss = apply(as.matrix(rna[, grep('rna_', colnames(rna))]), 1, mean)
+
+sels = which(!is.na(ss) & (rna$groups == 'DE_up'| rna$groups == 'DE_down'))
+peaks = peaks[sels, ]
+rna = rna[sels, ]
+
+yy = peaks[, intersect(grep('atac', colnames(peaks)), grep('rRep', colnames(peaks)))] 
+
+yy <- t(apply(yy, 1, cal_z_score))
+colnames(yy) = gsub('_rRep', '', gsub('atac_', '', colnames(yy)))
+
+df <- data.frame(colnames(yy))
+rownames(df) = colnames(yy)
+colnames(df) = 'sample'
+
+sample_colors = c('darkblue', 'springgreen', 'springgreen3', 'gold2', 'red')[1:nrow(df)]
+names(sample_colors) = df$sample
+
+annot_colors = list(
+  sample = sample_colors)
+
+#ii.gaps = c(3, 4)
+col = colorRampPalette(c("navy", "white", "red3"))(10)
+
+plt = pheatmap(yy, 
+         #annotation_row = my_gene_col, 
+         annotation_col = df, show_rownames = FALSE, scale = 'none', 
+         color = col, 
+         show_colnames = FALSE,
+         cluster_rows = TRUE, cluster_cols = FALSE,  
+         clustering_method = 'complete', 
+         annotation_colors = annot_colors, 
+         #clustering_callback = callback,
+         treeheight_row = 20,
+         #gaps_col = ii.gaps, 
+         filename = paste0(figureDir, 'dynamic_regeneration_peaks.pdf'), 
+         width = 4, height = 10)
+
+xx = rna[, grep('rna_', colnames(rna))]
+xx = xx[, -c(1:2)]
+xx <- t(apply(xx, 1, cal_z_score))
+colnames(xx) = gsub('rna_', '', colnames(yy))
+
+pheatmap(xx[plt$tree_row$order, ], 
+         #annotation_row = my_gene_col, 
+         annotation_col = df, show_rownames = FALSE, scale = 'none', 
+         color =  colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(10), 
+         show_colnames = FALSE,
+         cluster_rows = FALSE, 
+         cluster_cols = FALSE,  
+         #clustering_method = 'complete', cutree_rows = nb_clusters, 
+         annotation_colors = annot_colors, 
+         width = 3.5, height = 10, 
+         #clustering_callback = callback,
+         #treeheight_row = 30,
+         filename = paste0(figureDir, '/putative_targets_dynamic_regeneration_peaks.pdf'))
 
 
 ##########################################
