@@ -2043,12 +2043,14 @@ pheatmap(xx[plt$tree_row$order, ],
 # first motif activity analysis for temporally dynamic peaks 
 ##########################################
 source('MARA_functions.R')
-library(qvalue)
+source('Functions_histM.R')
 res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks__mUA_regeneration_dev_2Batches.R10723_R7977_peakAnnot_v8.rds'))
 
 Select.dynamic.peaks.for.MARA = TRUE
 if(Select.dynamic.peaks.for.MARA){
   res = res[order(-res$log2FC), ]
+  
+  library(qvalue)
   qv = qvalue(res$pval.lrt)
   res$fdr.lrt = qv$qvalues
   
@@ -2071,10 +2073,12 @@ if(Select.dynamic.peaks.for.MARA){
   
   res = res[select, ]
   res = res[order(-res$log2FC), ]
+  
   keep = as.matrix(res[, c(1:20)])
   
   conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal", 'BL_UA_13days_distal')
   
+  # select samples to use
   sample.sels = c(); cc = c()
   for(n in 1:length(conds)) {
     kk = grep(conds[n], colnames(keep))
@@ -2086,7 +2090,7 @@ if(Select.dynamic.peaks.for.MARA){
   }
   
   keep = keep[, sample.sels]
-  
+  keep = cal_sample_means(keep, conds = conds)
   
 }
 
