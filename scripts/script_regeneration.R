@@ -802,7 +802,6 @@ if(Save_peak.list_for_deeptools){
                 sep = '\t', quote = FALSE, row.names = FALSE, col.names = FALSE)
     
   }
-  
 }
 
 ##########################################
@@ -1943,6 +1942,8 @@ if(saveTable){
 ##########################################
 # regeneration dynamic peaks and gene expressoin of targets 
 ##########################################
+source('Functions_histM.R')
+
 ## peak-to-gene assignment of 55k atac-seq peaks
 peaks = readRDS(file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1_chipseekerAnnot_manual_targets.rds'))
 
@@ -1966,13 +1967,18 @@ peaks = peaks[jj,]
 rna = rna[mm, ]
 
 ss = apply(as.matrix(rna[, grep('rna_', colnames(rna))]), 1, mean)
-
 sels = which(!is.na(ss) & (rna$groups == 'DE_up'| rna$groups == 'DE_down'))
 peaks = peaks[sels, ]
 rna = rna[sels, ]
 
-yy = peaks[, intersect(grep('atac', colnames(peaks)), grep('rRep', colnames(peaks)))] 
+## import dpgp clustered atac peaks
+# dpgp = readRDS(file = paste0(RdataDir, '/DPGP_clusters_extended_allPeaks.rds'))
+# dpgp$gene = gsub('_', '-', dpgp$gene)
+# mm = match(rownames(peaks), dpgp$gene)
+# length(which(is.na(mm)))
+# peaks$clusters = dpgp$cluster[mm]
 
+yy = peaks[, intersect(grep('atac', colnames(peaks)), grep('rRep', colnames(peaks)))] 
 yy <- t(apply(yy, 1, cal_z_score))
 colnames(yy) = gsub('_rRep', '', gsub('atac_', '', colnames(yy)))
 
@@ -1990,18 +1996,18 @@ annot_colors = list(
 col = colorRampPalette(c("navy", "white", "red3"))(10)
 
 plt = pheatmap(yy, 
-         #annotation_row = my_gene_col, 
-         annotation_col = df, show_rownames = FALSE, scale = 'none', 
-         color = col, 
-         show_colnames = FALSE,
-         cluster_rows = TRUE, cluster_cols = FALSE,  
-         clustering_method = 'complete', 
-         annotation_colors = annot_colors, 
-         #clustering_callback = callback,
-         treeheight_row = 20,
-         #gaps_col = ii.gaps, 
-         filename = paste0(figureDir, 'dynamic_regeneration_peaks.pdf'), 
-         width = 4, height = 10)
+               #annotation_row = my_gene_col, 
+               annotation_col = df, show_rownames = FALSE, scale = 'none', 
+               color = col, 
+               show_colnames = FALSE,
+               cluster_rows = TRUE, cluster_cols = FALSE,  
+               clustering_method = 'complete', 
+               annotation_colors = annot_colors, 
+               #clustering_callback = callback,
+               treeheight_row = 20,
+               #gaps_col = ii.gaps, 
+               filename = paste0(figureDir, 'dynamic_regeneration_peaks.pdf'), 
+               width = 4, height = 10)
 
 xx = rna[, grep('rna_', colnames(rna))]
 xx = xx[, -c(1:2)]
@@ -2021,6 +2027,7 @@ pheatmap(xx[plt$tree_row$order, ],
          #clustering_callback = callback,
          #treeheight_row = 30,
          filename = paste0(figureDir, '/putative_targets_dynamic_regeneration_peaks.pdf'))
+
 
 
 ##########################################
