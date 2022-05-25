@@ -1436,39 +1436,55 @@ run.MARA.atac.temporal = function(keep, method = c('Bayesian.ridge'))
     topMotifs = sort(r$max.Zscore, decreasing = TRUE)[1:50]
     motif.names = rownames(r$Zscore)
     bb = r$Zscore[match(names(topMotifs), motif.names), ]
+    rownames(bb) = sapply(rownames(bb), function(x) {x = unlist(strsplit(as.character(x), '_')); 
+    x = x[-length(x)]; paste0(x, collapse = '_')})
+    
+    colnames(bb) = c('mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d')
     
     df <- data.frame(colnames(bb))
     rownames(df) = colnames(bb)
-    colnames(df) = 'regeneration time'
+    colnames(df) = 'samples'
     
-    bb = data.frame(motifs = rownames(bb), bb)
-    bb$motifs = sapply(bb$motifs, function(x) {x = unlist(strsplit(as.character(x), '_')); x = x[-length(x)]; paste0(x, collapse = '_')})
+    #bb = data.frame(motifs = rownames(bb), bb)
+    # library(RColorBrewer)
+    # as_tibble(bb) %>% 
+    #   gather(samples, activity, 2:6) %>%
+    #   mutate(samples=factor(samples, levels=c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal", 
+    #                                           "BL_UA_13days_distal"))) %>%
+    #   ggplot(aes(x=samples, y=motifs, fill=activity))+
+    #   geom_tile()
+    # 
+    # 
+    # #change the scale_fill_manual from previous code to below
+    # scale_fill_manual(values=rev(brewer.pal(7, "YlGnBu")), na.value="grey90")+
+    library(khroma)
+    BuRd <- colour("BuRd")
+    sunset <- colour("sunset")
+    cols = BuRd(10)
+    cols = sunset(10)
+    cols = rev(colour('PRGn')(12))
     
-    library(RColorBrewer)
-    as_tibble(bb) %>% 
-      gather(samples, activity, 2:6) %>%
-      mutate(samples=factor(samples, levels=c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal", 
-                                              "BL_UA_13days_distal"))) %>%
-      ggplot(aes(x=samples, y=motifs, fill=activity))+
-      geom_tile()
-    
-    
-    #change the scale_fill_manual from previous code to below
-    scale_fill_manual(values=rev(brewer.pal(7, "YlGnBu")), na.value="grey90")+
+    cool = rainbow(50, start=rgb2hsv(col2rgb('cyan'))[1], end=rgb2hsv(col2rgb('blue'))[1])
+    warm = rainbow(50, start=rgb2hsv(col2rgb('red'))[1], end=rgb2hsv(col2rgb('yellow'))[1])
+    cols = c(rev(cool), rev(warm))
+    cols <- colorRampPalette(cols)(12)
     
     pheatmap(bb, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE, 
-             colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(10),
+             color = cols,
              scale = 'none', cluster_cols=FALSE, main = '', 
-             na_col = "white", fontsize_row = 12, 
+             na_col = "white", #fontsize_row = 10, 
+             breaks = seq(-12, 12, length.out = 12), 
              annotation_col = df, 
-             filename = paste0(resDir, '/MARA_bayesianRidge_temporalpeaks_Jaspar2022.pdf'), 
-             width = 10, height = 12) 
+             treeheight_row = 20,
+             annotation_legend = FALSE,
+             filename = paste0(figureDir, 'MARA_bayesianRidge_Jaspar2022_regeneration.pdf'), 
+             width = 4, height = 10) 
     
     bb =data.frame(bb, stringsAsFactors = FALSE)
     bb$gene = rownames(bb)
     bb$combine.Zscore = r$combined.Zscore[match(rownames(bb), names(r$combined.Zscore))]
     bb$rank = order(bb$combine.Zscore)
-    #bb = bb[]
+    
     require(ggplot2)
     require(tidyverse)
     library(ggrepel)
@@ -1484,9 +1500,9 @@ run.MARA.atac.temporal = function(keep, method = c('Bayesian.ridge'))
             axis.text.y = element_text(size = 14),
             axis.title.x = element_text(size=14, face="bold"),
             axis.title.y = element_text(size=14, face="bold"))
-
+    
     ggsave(paste0(resDir, '/MARA_bayesianRidge_temporalpeaks_motifActivity.rank_vs_TFexpression.pdf'), width=8, height = 6)
-
+    
     
     ##########################################
     # compare with the smartseq2 data 
