@@ -38,6 +38,8 @@ tableDir = paste0(figureDir, 'tables4plots/')
 
 annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
                        'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
+
+
 tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
 sps = readRDS(file = '~/workspace/imp/organoid_patterning/results/Rdata/curated_signaling.pathways_gene.list_v2.rds')
 eps = readRDS(file = paste0('../data/human_chromatin_remodelers_Epifactors.database.rds'))
@@ -631,6 +633,26 @@ hist(log10(ss), breaks = 100);abline(v = log10(20), lwd = 2.0, col = 'red')
 cat(length(which(ss>50)), ' gene selected \n')
 
 dds = dds[which(ss>50), ]
+
+# annot = rbind(annot, c('AMEX60DD029624', rep(NA, 15), "POU6F1"))
+# tfs.examples = c("POU6F1", # not expressed 
+#                  "ZNF680", # not annotated
+#                  "ISL1",  # not expressed
+#                  "HNF1A", # not expressed
+#                  "POU6F2", # not expressed
+#                  "CTCFL", # not annotated
+#                  "ZNF701", # found expressed
+#                  "YY2", # no YY1, but found YY1
+#                  "ZFP335", # not annotated
+#                  "LHX1", # not expressed
+#                  "NKX6-3", # not expressed not annotated 
+#                  "ZNF263", # not annotated
+#                  "SNAI3" ) # not annotated but two SNAIL2 found 
+# gene2find = 'SNAI'
+# counts(dds)[grep(gene2find, rownames(dds)),]
+# annot[grep(gene2find, annot$hs.nr.new), ]
+# 
+# rownames(dds)[10783] = 'ZNF419.ZNF701_AMEX60DD023090'      
 
 dds$condition = droplevels(dds$condition)
 
