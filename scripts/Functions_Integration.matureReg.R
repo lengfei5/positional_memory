@@ -575,6 +575,10 @@ find_enhancers_integeticRegions_Introns_H3K4me1 = function()
   
 }
 
+##########################################
+# peak to gene assignment using similar method from Osterwalder et al. 2018
+# https://www.nature.com/articles/nature25461#Sec22
+##########################################
 peak_to_gene_assignment_TADs_correlation = function(enhancers)
 {
   ## require the gene expression data, TSS and also TADs information
@@ -675,6 +679,7 @@ peak_to_gene_assignment_TADs_correlation = function(enhancers)
     labs(x = "Pearson correlation with gene expression", y= 'density')
   ggsave(paste0(figureDir, "peak_to_gene_assignmenet_correlation_chromatinFeatures_rna_minus_H3K27me3.pdf"),  width = 6, height = 4)
   
+  
   ##########################################
   # generate the correlation distribution for random peak-to-gene assginment  
   # to find cutoff 
@@ -737,6 +742,37 @@ peak_to_gene_assignment_TADs_correlation = function(enhancers)
   enhancers$annotation[kk] = 'promoters'
   
   saveRDS(enhancers, file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1_chipseekerAnnot_manual_targets.rds'))
+  
+  check.plot.distance.to.TSS = FALSE
+  if(check.plot.distance.to.TSS){
+    xx = readRDS(file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1_chipseekerAnnot_manual_targets.rds'))
+    xx = data.frame(chipseeker = xx$distanceToTSS_chipseeker,  manual = xx$distanceToTSS)
+    
+    for(n in 1:ncol(xx))
+    {
+      jj = which(xx[,n] >= 0)
+      xx[jj, n] = log10(xx[jj,n]+1)
+      xx[-jj,n] = -log10(abs(xx[-jj, n]) +1)
+    }
+    
+    as_tibble(xx) %>%
+      gather(cond, dist, 1:2) %>%
+      ggplot(aes(x=dist, color = cond)) + 
+      geom_histogram(size = 1.) +
+      theme_classic() +
+      scale_color_brewer(palette="Dark2") +
+      labs(x = 'distance to closest TSS (log10 bp)') +
+      geom_vline(xintercept=c(-7, -5.5, 5.5, 7), col='gray', size = 1.) +
+      theme(legend.text = element_text(size=10),
+            legend.title = element_text(size = 10),
+            legend.position=c(0.5, 0.8),
+            plot.margin = margin()
+            #legend.key.size = unit(1, 'cm')
+            #legend.key.width= unit(1, 'cm')
+      )
+    
+    ggsave(paste0(figureDir, "distance_to_closest_genes_positionalPeaks.pdf"), width=4, height = 3)
+  }
   
 }
 ########################################################

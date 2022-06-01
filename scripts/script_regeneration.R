@@ -1605,6 +1605,7 @@ firstup <- function(x) {
 }
 
 grps = c('active', 'both', 'absent', 'repressive')
+
 for(n in 1:length(grps))
 {
   # n = 1
@@ -1628,10 +1629,12 @@ for(n in 1:length(grps))
                    #OrgDb         = org.Hs.eg.db,
                    OrgDb         = org.Mm.eg.db,
                    keyType       = 'ENSEMBL',
-                   ont           = "MF",
+                   ont           = "BP",
                    pAdjustMethod = "BH",
                    pvalueCutoff  = 0.05,
                    qvalueCutoff  = 0.1)
+  
+  barplot(ego, showCategory = 20)
   
   kk = grep('deoxyribonucleic', ego@result$Description)
   ego@result$Description[kk] = 'endonuclease activity'
@@ -2040,7 +2043,7 @@ pheatmap(xx[plt$tree_row$order, ],
 
 
 ##########################################
-# first motif activity analysis for temporally dynamic peaks 
+# MARA motif activity analysis for temporally dynamic peaks 
 ##########################################
 source('Functions_MARA.R')
 source('Functions_histM.R')

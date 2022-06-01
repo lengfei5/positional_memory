@@ -104,6 +104,7 @@ if(Run.limma.test){
   
 }
 
+require(limma)
 # load microarray analysis results: log2 signal (res), comparison (fit2), and raw data (raw)
 load(file = paste0("../results/microarray/Rdata/", 
                    'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_DEpval.Rdata'))
@@ -166,9 +167,8 @@ names(annot_colors) = c('mUA', 'mLA', 'mHand')
 annot_colors = list(segments = annot_colors)
 
 sample_colors = c('springgreen4', 'steelblue2', 'gold2')
-names(sample_colors) = c('Mature_UA', 'Mature_LA', 'Mature_Hand')
+names(sample_colors) = c('mUA', 'mLA', 'mHand')
 annot_colors = list(segments = sample_colors)
-
 
 pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
          color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(16), 
@@ -176,7 +176,7 @@ pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
          scale = 'row',
          cluster_cols=FALSE, annotation_col=df,
          annotation_colors = annot_colors,
-         width = 8, height = 12, 
+         width = 6, height = 12, 
          filename = paste0(figureDir, '/Fig2A_heatmap_DEgenes_matureSample_fdr.0.05_log2fc.1_microarray.pdf')) 
 
 pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
@@ -185,7 +185,7 @@ pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
          scale = 'none',
          cluster_cols=FALSE, annotation_col=df,
          annotation_colors = annot_colors,
-         width = 8, height = 12, 
+         width = 6, height = 12, 
          filename = paste0(figureDir, '/Fig2A_heatmap_DEgenes_matureSample_fdr.0.05_log2fc.1_microarray_nonScaled.pdf')) 
 
 
@@ -342,7 +342,7 @@ pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
          cluster_cols=FALSE, annotation_col=df, fontsize_row = 8, 
          width = 8, height = 10,
          annotation_colors = annot_colors,
-         filename = paste0(figureDir, 'FigS2A_heatmap_DE.tfs_eps_mature_qv.0.05_log2fc.1_microarray_nonScaled.lgo2.geneExp.pdf')) 
+         filename = paste0(figureDir, 'FigS2A_heatmap_DE.tfs_eps_mature_qv.0.05_log2fc.1_microarray_lgo2.geneExp_nonScaled.pdf')) 
 
 pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
          color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(16), 
@@ -350,7 +350,7 @@ pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
          cluster_cols=FALSE, annotation_col=df, fontsize_row = 8, 
          width = 8, height = 10,
          annotation_colors = annot_colors,
-         filename = paste0(figureDir, 'FigS2A_heatmap_DE.tfs_eps_mature_qv.0.05_log2fc.1_microarray_scaled.log2.geneExp.pdf')) 
+         filename = paste0(figureDir, 'FigS2A_heatmap_DE.tfs_eps_mature_qv.0.05_log2fc.1_microarray_scaled.log2.geneExp_zscore.pdf')) 
 
 mm = match(ggs, unique(c(toupper(sps))))
 yy1 = yy[unique(c(which(!is.na(mm)), grep('CYP2', rownames(yy)))), ]
@@ -361,7 +361,7 @@ pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
          cluster_cols=FALSE, annotation_col=df, fontsize_row = 8, 
          width = 8, height = 10,
          annotation_colors = annot_colors,
-         filename = paste0(figureDir, 'FigS2A_heatmap_DE_sps_mature_qv.0.05_log2FC.1_microarray_nonScaled.log2.geneExp.pdf')) 
+         filename = paste0(figureDir, 'FigS2A_heatmap_DE_sps_mature_qv.0.05_log2FC.1_microarray_log2.geneExp_nonScaled.pdf')) 
 
 pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
          scale = 'row',
@@ -369,8 +369,7 @@ pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
          cluster_cols=FALSE, annotation_col=df, fontsize_row = 8, 
          width = 8, height = 10,
          annotation_colors = annot_colors,
-         filename = paste0(figureDir, 'FigS2A_heatmap_DE_sps_mature_qv.0.05_log2FC.1_microarray_scaled.log2.geneExp.pdf')) 
-
+         filename = paste0(figureDir, 'FigS2A_heatmap_DE_sps_mature_qv.0.05_log2FC.1_microarray_log2.geneExp_zscore.pdf')) 
 
 ##########################################
 # RNA-seq data of mature sample to confirm the postional gene candidates
