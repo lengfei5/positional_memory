@@ -251,13 +251,16 @@ process.jaspar2022.meme.vetebrate = function()
   
   dev.off()
   
-  
-  ## make logos
-  dir_jaspar2022_logos = paste0(dir_jaspar2022, 'logos/')
+  ## make logos, modify motif names and save individual pwm
+  dir_jaspar2022_logos = paste0(dir_jaspar2022, 'core_vertebrates_nonRedundent_individualPWM_logo/')
   if(!dir.exists(dir_jaspar2022_logos)) dir.create(dir_jaspar2022_logos)
+  metadata$name = paste0(metadata$tfs, '_', metadata$motifs)
+  
   for(n in 1:length(yy))
   {
+    # n = 1
     cat(n, '\n')
+    # make logos
     pdfname = paste0(dir_jaspar2022_logos, metadata$tfs[n], '_',  metadata$motifs[n], '.pdf')
     pdf(pdfname, width=8, height = 6)
     par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
@@ -267,15 +270,12 @@ process.jaspar2022.meme.vetebrate = function()
     plot(p1)
     
     dev.off()
-  }
-  
-  metadata$name = paste0(metadata$tfs, '_', metadata$motifs)
-  
-  ## modify motif name
-  for(n in 1:length(yy))
-  {
-    cat(n, '\n')
+    
+    # change motif names
     yy[[n]]@name = metadata$name[n]
+    
+    write_meme(yy[[n]], overwrite = TRUE,  
+               file = paste0(dir_jaspar2022_logos, metadata$name[n], '.meme'))
     
   }
   
@@ -409,6 +409,7 @@ process.jaspar2022.meme.vetebrate = function()
   }
   
 }
+
 
 
 # manually add extra motifs for hnd-1, pha-4, unc-120 and nhr-67 from dm, mus and homo for c elegans motif analysis
@@ -1806,8 +1807,12 @@ run.MARA.atac.temporal = function(keep, method = c('Bayesian.ridge'))
   }
   
 }
-
-## post-MARA analysis
+########################################################
+########################################################
+# Section : ## post-MARA analysis
+# 
+########################################################
+########################################################
 collect.TFs.gene.expression = function()
 {
   tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
@@ -1819,5 +1824,12 @@ collect.TFs.gene.expression = function()
   
   
 }
+
+select_topMotifs_footprinting.analysis = function()
+{
+  dir_jaspar2022_logos = paste0(dir_jaspar2022, 'core_vertebrates_nonRedundent_individualPWM_logo/')
+  
+}
+
 
 
