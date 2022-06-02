@@ -141,7 +141,7 @@ if(Split.Mature.Regeneration.samples){
 
 ########################################################
 ########################################################
-# Section III : positional peaks
+# Section II : positional peaks
 # ##########################################
 # Position-dependent test
 # mainly use the mature samples, mUA, mLA and mHand
@@ -852,7 +852,7 @@ dev.off()
 
 
 ##########################################
-# promoter peaks and top enhancer peaks with atac-seq and histone markers
+# Figure 1 promoter peaks and top enhancer peaks with atac-seq and histone markers
 ##########################################
 signals = readRDS(file = paste0(RdataDir, '/peak_signals_atac_4histM_positionalPeaks.rds'))
 load(file = paste0(RdataDir, '/combined_4histMarkers_overlapped55kATACseq_DE_fdr0.05.Rdata'))
@@ -895,12 +895,11 @@ peaks.sels = peaks[promoter.sels, ]
 
 peaks.sels[grep('HOXA13|MEIS|SHOX|HOX', peaks.sels$transcriptId), ]
 
-## sort the promoters with fdr and takes the top30
+####### top 30 promoter peaks
 ntop = 30
 o1 = order(-peaks.sels$fdr.mean)
 peaks.sels = peaks.sels[o1[1:ntop], ]
 yy.sels = yy.sels[o1[1:ntop], ]
-
 
 geneSymbols = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
                              'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
@@ -911,41 +910,89 @@ ggs[!is.na(mm)] = geneSymbols$gene.symbol.toUse[mm[!is.na(mm)]]
 
 grep('HOX', ggs)
 
-if(saveTables){
-  write.table(data.frame(peak = rownames(yy.sels), gene = ggs, yy.sels, stringsAsFactors = FALSE), 
-              file = paste0(tableDir, 'Figure1_top30_promoter_segment_specific_atacPeak.txt'), 
-              sep = '\t', row.names = FALSE, col.names = TRUE, quote = FALSE)
-}
 
 rownames(yy.sels) = ggs
 yy.sels = as.matrix(yy.sels)
 
-df = data.frame(segments = sapply(colnames(yy.sels), function(x) unlist(strsplit(as.character(x), '_'))[2]))
+test = yy.sels
+for(n in 1:length(conds))
+{
+  ii = grep(conds[n], colnames(test))
+  test[, ii] = t(apply(test[,ii], 1, cal_centering))
+}
+
+range <- 3.0
+test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
+
+df = data.frame(segments = sapply(colnames(test), function(x) unlist(strsplit(as.character(x), '_'))[2]))
 colnames(df) = c('seg')
-rownames(df) = colnames(yy.sels)
+rownames(df) = colnames(test)
 
 sample_colors = c('springgreen4', 'steelblue2', 'gold2')
 names(sample_colors) = c('mUA', 'mLA', 'mHand')
 annot_colors = list(segments = sample_colors)
 
 gaps.col = c(3, 6, 9)
-pheatmap(yy.sels, 
-         annotation_col = df, show_rownames = TRUE, scale = 'row', 
-         color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdYlGn")))(8), 
+pheatmap(test, 
+         annotation_col = df, show_rownames = TRUE, scale = 'none', 
+         color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(7), 
          show_colnames = FALSE,
          cluster_rows = TRUE, cluster_cols = FALSE, 
          annotation_colors = annot_colors, 
          gaps_col = gaps.col, fontsize_row = 10,
+         #breaks = seq(-2, 2, length.out = 8),
          #gaps_row =  gaps.row, 
-         filename = paste0(figureDir, '/heatmap_positionalPeaks_top30.promoters.pdf'), 
-         width = 10, height = 6)
+         treeheight_row = 20,
+         legend_labels = FALSE,
+         annotation_legend = FALSE,
+         filename = paste0(figureDir, '/heatmap_positionalPeaks_top30.promoters_v2.pdf'), 
+         width = 6, height = 5)
 
-if(saveTable){
-  write.csv(data.frame(keep, yy, stringsAsFactors = FALSE), 
-            file = paste0(resDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_top50_promoterPeaks.csv'), 
-            quote = FALSE, row.names = TRUE)
-  
+if(saveTables){
+  write.table(data.frame(peak = rownames(yy.sels), gene = ggs, yy.sels, stringsAsFactors = FALSE), 
+              file = paste0(tableDir, 'Figure1_top30_promoter_segment_specific_atacPeak.txt'), 
+              sep = '\t', row.names = FALSE, col.names = TRUE, quote = FALSE)
 }
+
+
+xx = as.matrix(test[,c(1:35)])
+yy = as.matrix(test[, c(38:ncol(test))])
+rownames(xx) = test$gene
+rownames(yy) = rownames(xx)
+
+
+range = 6.
+yy = t(apply(yy, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
+
+maxs = apply(xx, 1, function(x) max(abs(x)))
+tops = which(maxs>2)
+xx = xx[tops, ]
+yy = yy[tops, ]
+
+df = as.data.frame(sapply(colnames(xx), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[2])}))
+colnames(df) = 'samples'
+rownames(df) = colnames(xx)
+
+sample_colors = c('gold2',  'steelblue2', 'springgreen4',   'springgreen3', 'magenta', 'darkblue', 'red')
+names(sample_colors) = unique(df$samples)
+annot_colors = list(samples = sample_colors)
+
+plt = pheatmap(xx, 
+               annotation_col = df, 
+               show_rownames = FALSE, scale = 'none', 
+               color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(7),
+               show_colnames = FALSE,
+               cluster_rows = TRUE, 
+               cluster_cols = FALSE, 
+               annotation_colors = annot_colors, 
+               gaps_col = seq(7, 35, by = 7), 
+               fontsize_row = 7,
+               treeheight_row = 40,
+               cutree_rows = 8,
+               #gaps_row =  gaps.row, 
+               filename = paste0(figureDir, '/heatmap_positionalGens_TSS_mature_regeneration_log2FC.2.pdf'), 
+               width = 6, height = 14)
+
 
 #### highlight the enhancers
 sels = grep('Intergenic|Intron', peaks$annotation)
@@ -1050,7 +1097,6 @@ as_tibble(dists) %>%
   )
 
 ggsave(paste0(figureDir, "distance_to_closest_genes_positionalPeaks.pdf"), width=4, height = 3)
-
 
 
 ########################################################
