@@ -1655,9 +1655,6 @@ run.MARA.atac.temporal = function(keep, method = c('Bayesian.ridge'))
     #   ylab('') +
     #   theme(axis.ticks = element_blank()) 
     
-   
-    
-    
     # annot = rbind(annot, c('AMEX60DD029624', rep(NA, 15), "POU6F1"))
     # tfs.examples = c("POU6F1", # not expressed 
     #                  "ZNF680", # not annotated
@@ -1799,7 +1796,6 @@ run.MARA.atac.temporal = function(keep, method = c('Bayesian.ridge'))
     cat(length(which(ss>0)), ' nzero features \n')
     
     print(aa[which(ss>0), ])
-    
     
     pheatmap(aa[which(ss>0), ], cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE, breaks = NA,
              scale = 'none', cluster_cols=FALSE, main = paste0("motif activity by MARA"), 
