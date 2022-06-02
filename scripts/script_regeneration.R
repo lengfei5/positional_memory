@@ -2099,3 +2099,62 @@ if(Select.dynamic.peaks.for.MARA){
 }
 
 xx = run.MARA.atac.temporal(keep)
+
+##########################################
+# plot footprint analysis results from TOBIAS 
+##########################################
+library(tidyr)
+library(dplyr)
+require(ggplot2)
+library("gridExtra")
+library("cowplot")
+require(ggpubr)
+
+file.list = list.files(path = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/',
+                       'Data/atacseq_using/footprinting/outs_footprints_oneRep/plots'), pattern = '*_all.txt', 
+                       full.names = TRUE)
+
+motif = 'RUNX2'
+
+
+f = file.list[grep(motif, file.list)]
+ff = read.table(f, as.is = c(1:3))
+xx = matrix(NA, nrow = nrow(ff), ncol = 500)
+for(n in 1:nrow(xx))
+{
+  xx[n, ] = sapply(ff[n, 3],  function(x) as.numeric(unlist(strsplit(as.character(x), ','))))
+}
+
+## scale the data according to 50bp in right/left sides
+ss = apply(xx[, c(1:50, 450:500)], 1, median)
+for(n in 1:nrow(xx)) xx[n,] = xx[n,] - ss[n]
+apply(xx[, c(1:50, 450:500)], 1, median)
+
+xx = data.frame(sample = c('mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d'), xx,  stringsAsFactors = FALSE)
+colnames(xx)[2:501] = as.factor(seq(1, 500, by = 1))
+
+as_tibble(xx) %>%
+  gather(bins, signals, 2:501) %>%
+  mutate(bins = factor(bins, levels=c(1:500))) %>% 
+  mutate(sample = factor(sample, levels = c('mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d'))) %>%
+  ggplot(aes(y=signals, x=bins, color = sample, group = sample)) + 
+  #geom_line(aes(linetype=sample, color = sample), size = 0) +
+  geom_smooth(span = 0.1, method = 'loess', se = FALSE, size =1.5) + 
+  theme_classic() +
+  theme(axis.text.y = element_text(angle = 0, size = 14), 
+        axis.text.x = element_text(angle = 0, size = 14),
+        legend.position = c(0.8, 0.9),
+        legend.text = element_text(size=14),
+        legend.title = element_text(size = 14)
+        #axis.text.x = element_blank(), 
+        #axis.ticks = element_blank()
+        ) +
+  #scale_color_manual(values=c('gray60', 'darkgreen', 'blue', 'gray70','gray80')) +
+  #scale_linetype_manual(values=c("dotted", "solid", "solid", "dotted", "dotted")) + 
+  labs( x = 'bp from center', y = 'Enrichment score') +
+  scale_x_discrete(
+    breaks=c(50, 150,  250, 350, 450),
+    labels=c("-200", '-100', "0", '100', "200")
+  )
+  
+ggsave(paste0(figureDir, "Footprint_RUNX.pdf"),  width = 6, height = 4)

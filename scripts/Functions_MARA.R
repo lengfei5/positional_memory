@@ -1442,6 +1442,8 @@ run.MARA.atac.temporal = function(keep, method = c('Bayesian.ridge'))
     r = readRDS(file = paste0(RdataDir, '/Bayesian_Ridge_output_fdr0.05_log2FC.1.rds'))
     
     topMotifs = sort(r$max.Zscore, decreasing = TRUE)
+    
+    
     topMotifs = topMotifs[which(topMotifs>=2.5)]
     
     motif.names = rownames(r$Zscore)
@@ -1452,7 +1454,6 @@ run.MARA.atac.temporal = function(keep, method = c('Bayesian.ridge'))
     bb$combine.Zscore = r$combined.Zscore[match(rownames(bb), names(r$combined.Zscore))]
     bb$rank = order(bb$combine.Zscore)
     bb$maxZscore = r$max.Zscore[match(rownames(bb), names(r$max.Zscore))]
-    
     bb$gene = sapply(rownames(bb), 
                      function(x) {x = unlist(strsplit(as.character(x), '_')); x = x[-length(x)]; paste0(x, collapse = '_')})
     
@@ -1828,8 +1829,33 @@ collect.TFs.gene.expression = function()
 select_topMotifs_footprinting.analysis = function()
 {
   dir_jaspar2022_logos = paste0(dir_jaspar2022, 'core_vertebrates_nonRedundent_individualPWM_logo/')
+  dir_footprint = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/fooprinting/motifs'
+  
+  r = readRDS(file = paste0(RdataDir, '/Bayesian_Ridge_output_fdr0.05_log2FC.1.rds'))
+  topMotifs = sort(r$max.Zscore, decreasing = TRUE)
+  motif.names = rownames(r$Zscore)
+  bb = r$Zscore[match(names(topMotifs), motif.names), ]
+  bb =data.frame(bb, stringsAsFactors = FALSE)
+  bb$motifs = rownames(bb)
+  bb$combine.Zscore = r$combined.Zscore[match(rownames(bb), names(r$combined.Zscore))]
+  bb$rank = order(bb$combine.Zscore)
+  bb$maxZscore = r$max.Zscore[match(rownames(bb), names(r$max.Zscore))]
+  bb$gene = sapply(rownames(bb), 
+                   function(x) {x = unlist(strsplit(as.character(x), '_')); x = x[-length(x)]; paste0(x, collapse = '_')})
+  
+  colnames(bb)[1:5] = c('mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d')
+  
+  kk = unique(c(c(1:100), grep('MEIS|HAND|SOX9|SALL', bb$gene)))
+  for(n in kk)
+  {
+    cat(n, '\n')
+    # n = 1
+    if(file.exists(paste0(dir_jaspar2022_logos, rownames(bb)[n], '.meme'))){
+      system(paste0('cp ', paste0(dir_jaspar2022_logos, rownames(bb)[n], '.meme '), dir_footprint))
+      system(paste0('cp ', paste0(dir_jaspar2022_logos, rownames(bb)[n], '.pdf '), dir_footprint))
+    }else{
+      cat('NOT FOUND \n')
+    }
+  }
   
 }
-
-
-
