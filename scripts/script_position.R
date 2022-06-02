@@ -48,7 +48,6 @@ library("gridExtra")
 library("cowplot")
 require(ggpubr)
 
-
 ########################################################
 ########################################################
 # Section I: batch correction 
@@ -326,17 +325,9 @@ if(Filtering.peaks.in.Head.samples){
   
   jj = which(maxs > 3 & mins <3)
   
-  #jj =  which( maxs > 3 & mins <3 & ctl.mean > 3)
-  #jj = which(rr>1 & ctl.mean<3 & maxs > 3 & mins <3)
-  
-  # jj = which(rr>1 & maxs > 3 & mins <3)
-  
   sels = which(rr>1 & ctl.mean<3 & maxs > 3 & mins <3)
   cat(length(sels), 'peaks selected \n')
   
-  #sels = which(rr >1 & maxs > 3.)
-  #cat(length(sels), 'peaks selected \n')
-  #nonsels = which(rr<=1 | maxs <=2)
   xx = xx[sels, ]
   keep = keep[sels, ]
   
@@ -361,7 +352,6 @@ conds = c("Mature_UA", "Mature_LA", "Mature_Hand")
 
 pp = data.frame(t(sapply(rownames(xx), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
 pp$strand = '*'
-
 pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
                               start.field="X2", end.field="X3", strand.field="strand")
 
@@ -866,8 +856,9 @@ dev.off()
 ##########################################
 signals = readRDS(file = paste0(RdataDir, '/peak_signals_atac_4histM_positionalPeaks.rds'))
 load(file = paste0(RdataDir, '/combined_4histMarkers_overlapped55kATACseq_DE_fdr0.05.Rdata'))
+
 peaks = readRDS(paste0(RdataDir, 
-                       '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters6_DEtest_peakSignals_peakAnnot.updated.rds'))
+    '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters6_DEtest_peakSignals_peakAnnot.updated.rds'))
 
 mm = match(rownames(signals), rownames(keep))
 missed = which(is.na(mm))
@@ -910,6 +901,7 @@ o1 = order(-peaks.sels$fdr.mean)
 peaks.sels = peaks.sels[o1[1:ntop], ]
 yy.sels = yy.sels[o1[1:ntop], ]
 
+
 geneSymbols = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
                              'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
 
@@ -918,6 +910,12 @@ mm = match(ggs, geneSymbols$geneID)
 ggs[!is.na(mm)] = geneSymbols$gene.symbol.toUse[mm[!is.na(mm)]]
 
 grep('HOX', ggs)
+
+if(saveTables){
+  write.table(data.frame(peak = rownames(yy.sels), gene = ggs, yy.sels, stringsAsFactors = FALSE), 
+              file = paste0(tableDir, 'Figure1_top30_promoter_segment_specific_atacPeak.txt'), 
+              sep = '\t', row.names = FALSE, col.names = TRUE, quote = FALSE)
+}
 
 rownames(yy.sels) = ggs
 yy.sels = as.matrix(yy.sels)
@@ -1085,7 +1083,6 @@ rownames(tss)[kk] = paste0(tss$gene[kk], '_', rownames(tss)[kk])
 tss$gene[-kk] = rownames(tss)[-kk]
 positional.genes = c('HOXA13','PROD1', 'RARRES1', 'MEIS1', 'MEIS2', 'SHOX', 'SHOX2',  'HOXA11', 'HOXA9', 'HOXD13',
                      'HOXD11', 'HOXD9')
-
 
 ##########################################
 # plot individual gene examples of different features, RNAseq, atac, histone marks around TSS 
@@ -1479,9 +1476,3 @@ if(Explore_histM_positional.genes){
   ggsave(paste0(figureDir, "histMarker_H3K27me3_scatterplot_Hand.vs.Hand.pdf"), width=12, height = 8)
   
 }
-
-
-
-
-
-
