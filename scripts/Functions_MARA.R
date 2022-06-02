@@ -1439,12 +1439,12 @@ run.MARA.atac.temporal = function(keep, method = c('Bayesian.ridge'))
     sort(r$max.Zscore, decreasing=TRUE)[1:50]
     saveRDS(r, file = paste0(RdataDir, '/Bayesian_Ridge_output_fdr0.05_log2FC.1.rds'))
     
+    ## load the Bayesian ridge result
     r = readRDS(file = paste0(RdataDir, '/Bayesian_Ridge_output_fdr0.05_log2FC.1.rds'))
     
     topMotifs = sort(r$max.Zscore, decreasing = TRUE)
     
-    
-    topMotifs = topMotifs[which(topMotifs>=2.5)]
+    topMotifs = topMotifs[which(topMotifs>=2.0)]
     
     motif.names = rownames(r$Zscore)
     bb = r$Zscore[match(names(topMotifs), motif.names), ]
@@ -1463,13 +1463,81 @@ run.MARA.atac.temporal = function(keep, method = c('Bayesian.ridge'))
     
     bb = bb[which(rownames(bb) != 'NFIX_MA0671.1'), ]
     
-    saveRDS(bb, file = paste0(RdataDir, '/MARA_output_top50_maxZscore.rds'))
+    saveRDS(bb, file = paste0(RdataDir, '/MARA_output_top135_maxZscore.rds'))
+    
+    ##########################################
+    ## grouping similiar motifs 
+    ## some codes from https://bioconductor.org/packages/release/bioc/html/universalmotif.html
+    ## section : Motif comparisons and P-values
+    ##########################################
+    source('Functions_histM.R')
+    library(universalmotif)
+    library(ggtree) 
+    library(ggplot2)
+    
+    ntop = 135 
+    #ntop = 50
+    bb = readRDS(file = paste0(RdataDir, '/MARA_output_top', ntop, '_maxZscore.rds'))
+    
+    dir_jaspar2022 = '/Volumes/groups/tanaka/People/current/jiwang/Databases/motifs_TFs/JASPAR2022/'
+    file.pwm = paste0(dir_jaspar2022, 'JASPAR2022_CORE_vertebrates_nonRedundant.meme')
+    yy = read_meme(file = file.pwm, skip = 0)
+    # convert to PPM to have the propre format
+    yy = convert_type(yy, "PPM")
+    
+    ii = c()
+    for(n in 1:length(yy))
+    {
+      if(length(which(!is.na(match(rownames(bb), yy[[n]]@name)))) >0) ii = c(ii, n)
+    }
+    
+    yy = yy[ii]
+    
+    motifs = convert_motifs(yy, class = "universalmotif-universalmotif")
+    cat(length(motifs), ' motifs \n')
+    
+    pwm.corr <- compare_motifs(motifs, method = "PCC", min.mean.ic = 0,
+                               score.strat = "a.mean")
+    comparisons <- 1 - pwm.corr
+    dd = as.dist(comparisons)
+    
+    #comparisons <- as.dist(comparisons)
+    # We also want to extract names from the dist object to match annotations
+    #labels <- attr(comparisons, "Labels")
+    
+    comparisons <- ape::as.phylo(hclust(comparisons))
+    # Hierarchical clustering using Complete Linkage
+    hc <- hclust(dd, method = "ward.D2" )
+    
+    # Plot the obtained dendrogram
+    #plot(hc, cex = 0.6, hang = -1)
+    #sub_grp <- cutree(hc, h = 0.1)
+    pdfname = paste0(resDir, "/Jaspar2022_PWM_similarity_clustering.pdf")
+    pdf(pdfname, width=10, height = 20)
+    par(cex =0.5, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+    
+    #plot(hc, cex = 0.5, hang = -1)
+    plot(as.dendrogram(hc), cex=0.5, horiz=TRUE)
+    abline(v = c( 0.1, 0.15, 0.2, 0.25), col = c('orange', 'blue', 'red', 'green'))
+    #rect.hclust(hc, h = hc.cutoff, border="darkred")
+    #groups <- 
+    #length(unique(cutree(hc, h = 0.01)))
+    #length(unique(cutree(hc, h = 0.05)))
+    length(unique(cutree(hc, h = 0.1)))
+    length(unique(cutree(hc, h = 0.15)))
+    length(unique(cutree(hc, h = 0.2)))
+    length(unique(cutree(hc, h = 0.25)))
+    #length(unique(cutree(hc, h = 0.3)))
+    
+    dev.off()
     
     ##########################################
     ## add RNA-seq data and filter motifs with no-expressed TFs
     ##########################################
     source('Functions_histM.R')
-    bb = readRDS(file = paste0(RdataDir, '/MARA_output_top50_maxZscore.rds'))
+    ntop = 135 
+    #ntop = 50
+    bb = readRDS(file = paste0(RdataDir, '/MARA_output_top', ntop, '_maxZscore.rds'))
     
     res = readRDS(file = paste0('../results/RNAseq_data_used/Rdata/', 
                                 'smartseq2_R10724_R11635_cpm.batchCorrect_DESeq2.test.withbatch.log2FC.shrinked_RNAseq_data_used_20220408.rds'))
@@ -1513,13 +1581,17 @@ run.MARA.atac.temporal = function(keep, method = c('Bayesian.ridge'))
     xx = bb[which(!is.na(bb$tfs)), ]
     xx = data.frame(xx, cpm[xx$index,])
     
-    saveRDS(xx, file =  paste0(RdataDir, '/MARA_output_topMotifs_maxZscore_filteredTFsExpr.rds'))
+    saveRDS(xx, file =  paste0(RdataDir, '/MARA_output_Motifs_maxZscore_filteredTFsExpr_top', ntop, '.rds'))
+    
     ##########################################
     # plot the results 
     ##########################################
-    bb = readRDS(file =  paste0(RdataDir, '/MARA_output_topMotifs_maxZscore_filteredTFsExpr.rds'))
+    bb = readRDS(file =  paste0(RdataDir, '/MARA_output_Motifs_maxZscore_filteredTFsExpr_top', ntop, '.rds'))
+    bb = bb[c(1:57), ]
+    
     test = as.matrix(bb[, c(1:5)])
     rownames(test) = bb$gene
+    
     range <- 8
     test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
     
@@ -1544,16 +1616,27 @@ run.MARA.atac.temporal = function(keep, method = c('Bayesian.ridge'))
       as.hclust(dend)
     }
     
-    plt = pheatmap(test, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE, 
+    o1 = c("NRF1", "NFIC", "NFIX", "NFIB", "NFIA", "KLF3", "TFAP4", "MSANTD3", "ZNF701",  "PRDM1", "TEF", "ZBTB18", "ARID5A", 
+           "CTCF", "TFDP1", "IRF2", "MEF2C", "NFAT5","PLAGL2", "SNAI3",
+           "RUNX1", "RUNX2",  "BCL11B", "BACH1", "FOS", "FOSL1_JUN",  "FOS_JUND", "BATF3", 
+           "MAFK",  "BNC2",   "BACH1_MAFK", "MAF_NFE2", 
+           "TCF7L2",   "TCF7" ,"LEF1", "GCM1","RARA",
+           "REST", "ZNF549", "ZSCAN31",    
+           "OSR2","HIC2","THAP1", 
+            "ZFX", "BARX1","ZNF417","ZEB1", "ZNF384", "TCF4",     
+           "PLAG1", "HIC1",   "RELA", "TEAD3","TFAP2B","SMAD2", "HOXA13", "HOXC13")
+    mm = match(o1, rownames(test))
+    
+    plt = pheatmap(test[mm, ], cluster_rows=FALSE, show_rownames=TRUE, show_colnames = FALSE, 
              color = cols,
              scale = 'none', cluster_cols=FALSE, main = '', 
              na_col = "white", #fontsize_row = 10, 
              breaks = seq(-8, 8, length.out = 8), 
              annotation_col = df, 
-             treeheight_row = 20,
+             #treeheight_row = 20,
              #clustering_method = 'complete', cutree_rows = 6, 
              annotation_legend = FALSE,
-             clustering_callback = callback,
+             #clustering_callback = callback,
              filename = paste0(figureDir, 'MARA_bayesianRidge_Jaspar2022_regeneration.pdf'), 
              width = 3.5, height = 10)
     
@@ -1580,8 +1663,10 @@ run.MARA.atac.temporal = function(keep, method = c('Bayesian.ridge'))
     library(ggtree)
     library(patchwork) 
     
-    test = bb[plt$tree_row$order, c(13, 15:19)]
-    test$tfs[35] = 'MAFK.1'
+    test = bb[match(o1, rownames(test)), c(13, 15:19)]
+    
+    test$tfs[31] = 'MAFK.1'
+    
     rownames(test) = test$tfs
     test = test[, -1]
     colnames(test) = c('mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d')
@@ -1623,79 +1708,6 @@ run.MARA.atac.temporal = function(keep, method = c('Bayesian.ridge'))
             axis.title.y = element_text(size=14, face="bold"))
     
     ggsave(paste0(figureDir, 'MARA_bayesianRidge_temporalpeaks_motifActivity_vs_TFexpression.pdf'), width=6, height = 4)
-    
-    #gene_cluster <- read_tsv('https://github.com/davemcg/davemcg.github.io/raw/master/content/post/scRNA_dotplot_data.tsv.gz')
-    #gene_cluster %>% sample_n(5)
-    #markers <- gene_cluster$Gene %>% unique()
-    # data.frame(test) %>% as_tibble() %>%
-    #   gather(sample, expression, 2:6) %>%
-    #   mutate(sample = factor(sample, levels = c('mUA', 'X5dpa', 'X9dpa',  'X13dpa.p', 'X13dpa.d'))) %>%
-    #   ggplot(aes(x = sample, y = tfs, color = expression, size = corr)) + 
-    #   geom_point() + 
-    #   scale_color_viridis_c(name = 'corr') + 
-    #   cowplot::theme_cowplot() + 
-    #   theme(axis.line  = element_blank()) +
-    #   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-    #   ylab('') +
-    #   theme(axis.ticks = element_blank()) 
-    # # gene_cluster %>% filter(Gene %in% markers) %>% 
-    # #   mutate(`% Expressing` = (cell_exp_ct/cell_ct) * 100) %>% 
-    # #   ggplot(aes(x=cluster, y = Gene, color = count, size = `% Expressing`)) + 
-    # #   geom_point()
-    # 
-    # gene_cluster %>% filter(Gene %in% markers) %>% 
-    #   mutate(`% Expressing` = (cell_exp_ct/cell_ct) * 100) %>% 
-    #   filter(count > 0, `% Expressing` > 1) %>% 
-    #   ggplot(aes(x=cluster, y = Gene, color = count, size = `% Expressing`)) + 
-    #   geom_point() + 
-    #   scale_color_viridis_c(name = 'log2 (count + 1)') + 
-    #   cowplot::theme_cowplot() + 
-    #   theme(axis.line  = element_blank()) +
-    #   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-    #   ylab('') +
-    #   theme(axis.ticks = element_blank()) 
-    
-    # annot = rbind(annot, c('AMEX60DD029624', rep(NA, 15), "POU6F1"))
-    # tfs.examples = c("POU6F1", # not expressed 
-    #                  "ZNF680", # not annotated
-    #                  "ISL1",  # not expressed
-    #                  "HNF1A", # not expressed
-    #                  "POU6F2", # not expressed
-    #                  "CTCFL", # not annotated
-    #                  "ZNF701", # found expressed
-    #                  "YY2", # no YY1, but found YY1
-    #                  "ZFP335", # not annotated
-    #                  "LHX1", # not expressed
-    #                  "NKX6-3", # not expressed not annotated 
-    #                  "ZNF263", # not annotated
-    #                  "SNAI3" ) # not annotated but two SNAIL2 found 
-    # gene2find = 'SNAI'
-    # counts(dds)[grep(gene2find, rownames(dds)),]
-    # annot[grep(gene2find, annot$hs.nr.new), ]
-    # 
-    # rownames(dds)[10783] = 'ZNF419.ZNF701_AMEX60DD023090' 
-    
-    
-    # bb =data.frame(bb, stringsAsFactors = FALSE)
-    # bb$gene = rownames(bb)
-    # bb$combine.Zscore = r$combined.Zscore[match(rownames(bb), names(r$combined.Zscore))]
-    # bb$rank = c(1:nrow(bb))
-    # bb$cor = NA
-    # bb$tf.index = mm
-    # 
-    # for(n in 1:nrow(bb))
-    # {
-    #   if(!is.na(mm[n])) {
-    #     bb$cor[n] = cor(as.numeric(bb[n, c(1:5)]), sample.means[mm[n], c(1:5)]) 
-    #   }
-    # }
-    # 
-    # xx = bb[which(!is.na(bb$cor)), ]
-    # 
-    # xx$activity = NA
-    # xx$activity[xx$cor>0] = 'activator'
-    # xx$activity[xx$cor<0] = 'repressor'
-    # 
     
     
   }
