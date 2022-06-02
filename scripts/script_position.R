@@ -258,84 +258,89 @@ if(Run.test.spatial.peaks){
 # select all positional-dependent loci with below threshold
 ##########################################
 res = readRDS(file = paste0(RdataDir, '/res_position_dependant_test_', version.analysis, '_v12.rds'))
-
-# select the positional peaks with pairwise comparisions 
-# limma logFC is in log2 scale
 fdr.cutoff = 0.05; logfc.cutoff = 1
-jj = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & abs(res$logFC.mLA.vs.mUA) > logfc.cutoff) |
-             (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & abs(res$logFC.mHand.vs.mUA) > logfc.cutoff)|
-             (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & abs(res$logFC.mHand.vs.mLA) > logfc.cutoff)
-)
-cat(length(jj), '\n')
 
-jj1 = which(res$prob.M0< fdr.cutoff & res$log2FC>logfc.cutoff)
-cat(length(jj1), '\n')
-jj2 = which(res$pval.lrt < fdr.cutoff & res$log2FC > logfc.cutoff)
-cat(length(jj2), '\n')
-
-
-xx = res[c(jj), ]
-#xx = xx[order(-xx$log2FC.mature), ]
-xx[grep('HOXA13|SHOX', xx$transcriptId), ]
-# fpm[which(rownames(fpm) == 'chr2p:873464923-873465440'), ]
-
-xx[grep('HOXA13|SHOX|MEIS', xx$transcriptId), ]
-
-cat(nrow(xx), ' peaks left\n')
-# sort positional peaks with logFC
-#xx = xx[order(-xx$logFC.mean), ]
-xx = xx[order(-xx$log2FC), ]
-
-########
-## asscociate the signifiant postional peaks with expression matrix
-########
-conds = c("Mature_UA", "Mature_LA", "Mature_Hand", 'HEAD')
-
-sample.sels = c();  cc = c()
-for(n in 1:length(conds)) {
-  kk = which(design$conds == conds[n]) 
-  sample.sels = c(sample.sels, kk)
-  cc = c(cc, rep(conds[n], length(kk)))
+Filter.select.positional.atacPeaks = FALSE
+if(Filter.select.positional.atacPeaks){
+  # select the positional peaks with pairwise comparisions 
+  # limma logFC is in log2 scale
+  
+  jj = which((res$adj.P.Val.mLA.vs.mUA < fdr.cutoff & abs(res$logFC.mLA.vs.mUA) > logfc.cutoff) |
+               (res$adj.P.Val.mHand.vs.mUA < fdr.cutoff & abs(res$logFC.mHand.vs.mUA) > logfc.cutoff)|
+               (res$adj.P.Val.mHand.vs.mLA < fdr.cutoff & abs(res$logFC.mHand.vs.mLA) > logfc.cutoff)
+  )
+  cat(length(jj), '\n')
+  
+  jj1 = which(res$prob.M0< fdr.cutoff & res$log2FC>logfc.cutoff)
+  cat(length(jj1), '\n')
+  jj2 = which(res$pval.lrt < fdr.cutoff & res$log2FC > logfc.cutoff)
+  cat(length(jj2), '\n')
+  
+  
+  xx = res[c(jj), ]
+  #xx = xx[order(-xx$log2FC.mature), ]
+  xx[grep('HOXA13|SHOX', xx$transcriptId), ]
+  # fpm[which(rownames(fpm) == 'chr2p:873464923-873465440'), ]
+  
+  xx[grep('HOXA13|SHOX|MEIS', xx$transcriptId), ]
+  
+  cat(nrow(xx), ' peaks left\n')
+  # sort positional peaks with logFC
+  #xx = xx[order(-xx$logFC.mean), ]
+  xx = xx[order(-xx$log2FC), ]
+  
+  ########
+  ## asscociate the signifiant postional peaks with expression matrix
+  ########
+  conds = c("Mature_UA", "Mature_LA", "Mature_Hand", 'HEAD')
+  
+  sample.sels = c();  cc = c()
+  for(n in 1:length(conds)) {
+    kk = which(design$conds == conds[n]) 
+    sample.sels = c(sample.sels, kk)
+    cc = c(cc, rep(conds[n], length(kk)))
+  }
+  
+  keep = fpm[(match(rownames(xx), rownames(fpm))), sample.sels]
+  keep = as.matrix(keep)
+  
+  ### filter the peaks from head control sample
+  ## either filter soly based on the head signals or based on the logFC between max(mature samples/control) or both
+  Filtering.peaks.in.Head.samples = TRUE
+  if(Filtering.peaks.in.Head.samples){
+    maxs = apply(keep[, grep('Mature_', colnames(keep))], 1, function(x) return(max(c(mean(x[1:5]), mean(x[6:9]), mean(x[10:12])))))
+    mins = apply(keep[, grep('Mature_', colnames(keep))], 1, function(x) return(min(c(mean(x[1:5]), mean(x[6:9]), mean(x[10:12])))))
+    
+    ctl.mean = apply(keep[, grep('HEAD', colnames(keep))], 1, mean)
+    
+    rr = maxs - ctl.mean
+    #p.ctl = pp[match(names(ctl.sels), names(pp))]
+    #non.overlap = !overlapsAny(p0, p.ctl)
+    plot(maxs, ctl.mean, cex = 0.2);
+    abline(0, 1, lwd = 2.0, col = 'red')
+    abline(v = 3, lwd = 2.0, col = 'red')
+    abline(h = 3, lwd = 2.0, col = 'red')
+    
+    #xx = xx[non.overlap, ]
+    plot(rr, ctl.mean, cex = 0.2);
+    abline(h = 3, col = 'red', lwd = 2.0)
+    abline(v = c(0.5, 1), col = 'red', lwd = 2.0)
+    
+    jj = which(maxs > 3 & mins <3)
+    
+    sels = which(rr>1 & ctl.mean<3 & maxs > 3 & mins <3)
+    cat(length(sels), 'peaks selected \n')
+    
+    xx = xx[sels, ]
+    keep = keep[sels, ]
+    
+  }
+  
+  dim(xx)
+  
+  save(xx, keep, file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata'))
+  
 }
-
-keep = fpm[(match(rownames(xx), rownames(fpm))), sample.sels]
-keep = as.matrix(keep)
-
-### filter the peaks from head control sample
-## either filter soly based on the head signals or based on the logFC between max(mature samples/control) or both
-Filtering.peaks.in.Head.samples = TRUE
-if(Filtering.peaks.in.Head.samples){
-  maxs = apply(keep[, grep('Mature_', colnames(keep))], 1, function(x) return(max(c(mean(x[1:5]), mean(x[6:9]), mean(x[10:12])))))
-  mins = apply(keep[, grep('Mature_', colnames(keep))], 1, function(x) return(min(c(mean(x[1:5]), mean(x[6:9]), mean(x[10:12])))))
-  
-  ctl.mean = apply(keep[, grep('HEAD', colnames(keep))], 1, mean)
-  
-  rr = maxs - ctl.mean
-  #p.ctl = pp[match(names(ctl.sels), names(pp))]
-  #non.overlap = !overlapsAny(p0, p.ctl)
-  plot(maxs, ctl.mean, cex = 0.2);
-  abline(0, 1, lwd = 2.0, col = 'red')
-  abline(v = 3, lwd = 2.0, col = 'red')
-  abline(h = 3, lwd = 2.0, col = 'red')
-  
-  #xx = xx[non.overlap, ]
-  plot(rr, ctl.mean, cex = 0.2);
-  abline(h = 3, col = 'red', lwd = 2.0)
-  abline(v = c(0.5, 1), col = 'red', lwd = 2.0)
-  
-  jj = which(maxs > 3 & mins <3)
-  
-  sels = which(rr>1 & ctl.mean<3 & maxs > 3 & mins <3)
-  cat(length(sels), 'peaks selected \n')
-  
-  xx = xx[sels, ]
-  keep = keep[sels, ]
-  
-}
-
-dim(xx)
-
-save(xx, keep, file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata'))
 
 ##########################################
 # postional peak clustering using three replicates of each segments
@@ -343,6 +348,7 @@ save(xx, keep, file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headC
 ##########################################
 library(dendextend)
 library(ggplot2)
+source('Functions_histM.R')
 
 ### load the previous result: xx (test result and peak annotation) and keep (log2 data of mature samples)
 load(file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata'))
@@ -359,16 +365,10 @@ pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
 rep.sels = grep('HEAD|102657|102655|74938', colnames(keep), invert = TRUE)
 
 yy = keep[, rep.sels]
-cal_z_score <- function(x){
-  (x - mean(x)) / sd(x)
-}
 
 yy <- t(apply(yy, 1, cal_z_score))
 
 nb_clusters = 6
-
-saveDir = paste0(figureDir, 'positional_peaks_clusters_', nb_clusters)
-if(!dir.exists(saveDir)) dir.create(saveDir)
 
 my_hclust_gene <- hclust(dist(yy), method = "complete")
 
@@ -409,7 +409,7 @@ plt = pheatmap(yy, annotation_row = my_gene_col,
                annotation_colors = annot_colors, 
                gaps_col = gaps.col) 
 #gaps_row =  gaps.row, 
-#filename = paste0(saveDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
+#filename = paste0(figureDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
 #width = 6, height = 12)
 
 row_order = data.frame(plt$tree_row$order, plt$tree_row$labels, stringsAsFactors = FALSE)
@@ -453,14 +453,15 @@ saveRDS(plt, file = paste0(RdataDir, '/postional_atacPeaks_heatmap_orderSaved.rd
 
 saveRDS(xx, file = paste0(resDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters_6.rds'))
 
-write.csv(xx, file = paste0(saveDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters', 
+write.csv(xx, file = paste0(figureDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters', 
                             nb_clusters, '.csv'), quote = FALSE, row.names = TRUE)
 
 ##########################################
-# try to add histone marker with the same order as atac-seq peaks 
+# Add histone marker with together as atac-seq peaks 
 # this part is firstly done in histMarker_CT_analysis.R
 # overview of segment-specific chromatin landscape
 # histone marker with the same cluster order as atac-seq peaks 
+# 
 ##########################################
 Add_histMarkers_for_positionalATAC = FALSE
 if(Add_histMarkers_for_positionalATAC){
@@ -471,50 +472,55 @@ if(Add_histMarkers_for_positionalATAC){
   require(pheatmap)
   require(RColorBrewer)
   
-  # load keep object in which all histM peaks overlapping with atac-seq peaks and segement-specific test 
-  load(file = paste0('../results/CT_merged_20220328/Rdata', '/combined_4histMarkers_overlapped55kATACseq_DE_fdr0.05.Rdata'))
-  design = readRDS(file = paste0('../results/CT_merged_20220328/Rdata', '/histM_CT_design_info.rds'))
-  
-  yy = keep[, c(53:60, 27:34, 1:8, 79:85)]
-  sampleID = sapply(colnames(yy), function(x) unlist(strsplit(as.character(x), '_'))[3])
-  mm = match(sampleID, design$sampleID)
-  colnames(yy) = paste0(design$condition[mm], '_', design$Batch[mm], '_', design$sampleID[mm])
-  #yy = yy[, grep('mRep1|mRep2', colnames(yy))]
-  
-  #peaks = read.csv(paste0(figureDir, 'positional_peaks_clusters_6/', 
-  #                        'position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters6.csv'))
-  peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rdata/', 
-                                'position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters_6.rds'))
-  
-  pp_atac = data.frame(t(sapply(rownames(peaks), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
-  pp_atac$strand = '*'
-  pp_atac = makeGRangesFromDataFrame(pp_atac, seqnames.field=c("X1"),
-                                     start.field="X2", end.field="X3", strand.field="strand")
-  
-  pp_histM = data.frame(t(sapply(rownames(yy), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
-  pp_histM$strand = '*'
-  pp_histM = makeGRangesFromDataFrame(pp_histM, seqnames.field=c("X1"),
-                                      start.field="X2", end.field="X3", strand.field="strand")
-  
-  mapping = findOverlaps(pp_atac, pp_histM)
-  
-  ## peaks mapped to postional atac-peaks 
-  yy1 = yy[mapping@to, ]
-  
-  ## peaks not mapped to positional atac-peaks but overlapped wiht atac peaks
-  yy0 = yy[-unique(mapping@to), ]
-  
-  ss = apply(DE.locus[, c(1:3)], 1, sum)
-  mm = match(names(ss[which(ss>0)]), rownames(yy0))
-  length(which(!is.na(mm)))
-  
-  yy0 = yy0[mm[!is.na(mm)], ] ## histM overlapped with stable atacPeak but significantly changed
-  
-  #plot.pair.comparison.plot(yy1[, grep('H3K4me1_mUA_', colnames(yy1))], linear.scale = FALSE)
-  #plot.pair.comparison.plot(yy1[, grep('H3K4me3_mUA_', colnames(yy1))], linear.scale = FALSE)
-  #plot.pair.comparison.plot(yy1[, grep('H3K27me3_mUA_', colnames(yy1))], linear.scale = FALSE)
-  saveRDS(yy1, file = paste0(RdataDir, '/peak_signals_atac_4histM_positionalPeaks.rds'))
-  saveRDS(yy0, file = paste0(RdataDir, '/peak_signals_atac_4histM_notOverlapped.positionalPeaks.rds'))
+  Find.histonePeaks.overlapping.nonOverlapping.with.dynamicATACpeaks = FALSE
+  if(Find.histonePeaks.overlapping.nonOverlapping.with.dynamicATACpeaks)
+  {
+    # load keep object in which all histM peaks overlapping with atac-seq peaks and segement-specific test 
+    load(file = paste0('../results/CT_merged_20220328/Rdata', '/combined_4histMarkers_overlapped55kATACseq_DE_fdr0.05.Rdata'))
+    design = readRDS(file = paste0('../results/CT_merged_20220328/Rdata', '/histM_CT_design_info.rds'))
+    
+    yy = keep[, c(53:60, 27:34, 1:8, 79:85)]
+    sampleID = sapply(colnames(yy), function(x) unlist(strsplit(as.character(x), '_'))[3])
+    mm = match(sampleID, design$sampleID)
+    colnames(yy) = paste0(design$condition[mm], '_', design$Batch[mm], '_', design$sampleID[mm])
+    #yy = yy[, grep('mRep1|mRep2', colnames(yy))]
+    
+    #peaks = read.csv(paste0(figureDir, 'positional_peaks_clusters_6/', 
+    #                        'position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters6.csv'))
+    peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rdata/', 
+                                  'position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters_6.rds'))
+    
+    pp_atac = data.frame(t(sapply(rownames(peaks), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+    pp_atac$strand = '*'
+    pp_atac = makeGRangesFromDataFrame(pp_atac, seqnames.field=c("X1"),
+                                       start.field="X2", end.field="X3", strand.field="strand")
+    
+    pp_histM = data.frame(t(sapply(rownames(yy), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+    pp_histM$strand = '*'
+    pp_histM = makeGRangesFromDataFrame(pp_histM, seqnames.field=c("X1"),
+                                        start.field="X2", end.field="X3", strand.field="strand")
+    
+    mapping = findOverlaps(pp_atac, pp_histM)
+    
+    ## peaks mapped to postional atac-peaks 
+    yy1 = yy[mapping@to, ]
+    
+    ## peaks not mapped to positional atac-peaks but overlapped wiht atac peaks
+    yy0 = yy[-unique(mapping@to), ]
+    
+    ss = apply(DE.locus[, c(1:3)], 1, sum)
+    mm = match(names(ss[which(ss>0)]), rownames(yy0))
+    length(which(!is.na(mm)))
+    
+    yy0 = yy0[mm[!is.na(mm)], ] ## histM overlapped with stable atacPeak but significantly changed
+    
+    #plot.pair.comparison.plot(yy1[, grep('H3K4me1_mUA_', colnames(yy1))], linear.scale = FALSE)
+    #plot.pair.comparison.plot(yy1[, grep('H3K4me3_mUA_', colnames(yy1))], linear.scale = FALSE)
+    #plot.pair.comparison.plot(yy1[, grep('H3K27me3_mUA_', colnames(yy1))], linear.scale = FALSE)
+    saveRDS(yy1, file = paste0(RdataDir, '/peak_signals_atac_4histM_positionalPeaks.rds'))
+    saveRDS(yy0, file = paste0(RdataDir, '/peak_signals_atac_4histM_notOverlapped.positionalPeaks.rds'))
+    
+  }
   
   ##########################################
   # plot segment-specific histone marks overlapped with segement-specific atac
@@ -550,11 +556,12 @@ if(Add_histMarkers_for_positionalATAC){
       gaps.row = c(gaps.row,  gaps.row[n-1] + length(which(peaks$clusters == cluster_order[n])))
     }
   }
+  
   plt = readRDS(file = paste0(RdataDir, '/postional_atacPeaks_heatmap_orderSaved.rds'))
   
   for(n in 1:3)
   {
-    # n = 3
+    # n = 2
     ii.test = grep(conds_histM[n], colnames(yy1))
     test = yy1[, ii.test]
     fc_sels = c('mUA', 'mLA', 'mHand')
@@ -563,6 +570,7 @@ if(Add_histMarkers_for_positionalATAC){
     test = test[, jj.test]
     #colnames(test) = fc_sels
     
+    test =  cal_sample_means(test, conds = c('mUA', 'mLA', 'mHand'))
     test = t(apply(test, 1, cal_centering))
     #yy1[ ,jj] = t(apply(yy1[,jj], 1, cal_transform_histM, cutoff.min = 0, cutoff.max = 5, centering = FALSE, toScale = TRUE))
     
@@ -586,7 +594,7 @@ if(Add_histMarkers_for_positionalATAC){
              breaks = seq(-range, range, length.out = nb_breaks), 
              gaps_row = gaps.row,
              filename = paste0(figureDir, '/positional_histM_centerend_1246positionalATACpeaks_', conds_histM[n], '.pdf'), 
-             width = 4, height = 12)
+             width = 3, height = 10)
     
   }
   
@@ -945,7 +953,7 @@ pheatmap(test,
          treeheight_row = 20,
          legend_labels = FALSE,
          annotation_legend = FALSE,
-         filename = paste0(figureDir, '/heatmap_positionalPeaks_top30.promoters_v2.pdf'), 
+         filename = paste0(figureDir, '/heatmap_positionalPeaks_top30.promoters.pdf'), 
          width = 6, height = 5)
 
 if(saveTables){
@@ -955,43 +963,6 @@ if(saveTables){
 }
 
 
-xx = as.matrix(test[,c(1:35)])
-yy = as.matrix(test[, c(38:ncol(test))])
-rownames(xx) = test$gene
-rownames(yy) = rownames(xx)
-
-
-range = 6.
-yy = t(apply(yy, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
-
-maxs = apply(xx, 1, function(x) max(abs(x)))
-tops = which(maxs>2)
-xx = xx[tops, ]
-yy = yy[tops, ]
-
-df = as.data.frame(sapply(colnames(xx), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[2])}))
-colnames(df) = 'samples'
-rownames(df) = colnames(xx)
-
-sample_colors = c('gold2',  'steelblue2', 'springgreen4',   'springgreen3', 'magenta', 'darkblue', 'red')
-names(sample_colors) = unique(df$samples)
-annot_colors = list(samples = sample_colors)
-
-plt = pheatmap(xx, 
-               annotation_col = df, 
-               show_rownames = FALSE, scale = 'none', 
-               color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(7),
-               show_colnames = FALSE,
-               cluster_rows = TRUE, 
-               cluster_cols = FALSE, 
-               annotation_colors = annot_colors, 
-               gaps_col = seq(7, 35, by = 7), 
-               fontsize_row = 7,
-               treeheight_row = 40,
-               cutree_rows = 8,
-               #gaps_row =  gaps.row, 
-               filename = paste0(figureDir, '/heatmap_positionalGens_TSS_mature_regeneration_log2FC.2.pdf'), 
-               width = 6, height = 14)
 
 
 #### highlight the enhancers
@@ -1272,7 +1243,7 @@ xx = run.MARA.atac.spatial(keep, cc)
 ##########################################
 source('Functions_atac.R')
 
-pdfname = paste0(saveDir, "/Fig1E_positional_peak_feature_distribution_cluster_all.pdf")
+pdfname = paste0(figureDir, "/Fig1E_positional_peak_feature_distribution_cluster_all.pdf")
 pdf(pdfname, width = 8, height = 6)
 par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
 pp.annots = annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
@@ -1290,7 +1261,7 @@ for(m in 1:nb_clusters)
   cat('cluster - ',  m, '\n')
   pp.annots = annotatePeak(pp[which(xx$cluster == m)], TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
   
-  pdfname = paste0(saveDir, "/Fig1E_positional_peak_feature_distribution_cluster_", m, ".pdf")
+  pdfname = paste0(figureDir, "/Fig1E_positional_peak_feature_distribution_cluster_", m, ".pdf")
   pdf(pdfname, width = 8, height = 6)
   par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
   
@@ -1317,7 +1288,7 @@ rownames(scores) = rownames(scores)
 
 stats = data.frame(stats, scores, stringsAsFactors = FALSE)
 
-write.csv(stats, file = paste0(saveDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters', 
+write.csv(stats, file = paste0(figureDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters', 
                                nb_clusters, '_feature.Enrichment.depeletion.csv'), quote = FALSE, row.names = TRUE)
 
 
@@ -1330,7 +1301,7 @@ as_tibble(stats) %>%  gather(group, freq,  2:ncol(stats)) %>%
   geom_bar(position="dodge", stat="identity") +
   theme(axis.text.x = element_text(angle = 90, size = 10)) 
 
-ggsave(paste0(saveDir, "/Fig1E_positional_peak_feature_distribution_cluster_comparison.pdf"),  width = 12, height = 8)
+ggsave(paste0(figureDir, "/Fig1E_positional_peak_feature_distribution_cluster_comparison.pdf"),  width = 12, height = 8)
 
 
 ##########################################
