@@ -867,6 +867,7 @@ load(file = paste0(RdataDir, '/combined_4histMarkers_overlapped55kATACseq_DE_fdr
 
 peaks = readRDS(paste0(RdataDir, 
     '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters6_DEtest_peakSignals_peakAnnot.updated.rds'))
+enhancers = readRDS(file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1_chipseekerAnnot_manual_targets.rds'))
 
 mm = match(rownames(signals), rownames(keep))
 missed = which(is.na(mm))
@@ -929,7 +930,7 @@ for(n in 1:length(conds))
   test[, ii] = t(apply(test[,ii], 1, cal_centering))
 }
 
-range <- 3.0
+range <- 2.0
 test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
 
 df = data.frame(segments = sapply(colnames(test), function(x) unlist(strsplit(as.character(x), '_'))[2]))
@@ -943,12 +944,13 @@ annot_colors = list(segments = sample_colors)
 gaps.col = c(3, 6, 9)
 pheatmap(test, 
          annotation_col = df, show_rownames = TRUE, scale = 'none', 
-         color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(7), 
+         color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
          show_colnames = FALSE,
          cluster_rows = TRUE, cluster_cols = FALSE, 
          annotation_colors = annot_colors, 
          gaps_col = gaps.col, fontsize_row = 10,
          #breaks = seq(-2, 2, length.out = 8),
+         breaks = seq(-range, range, length.out = 8),
          #gaps_row =  gaps.row, 
          treeheight_row = 20,
          legend_labels = FALSE,
@@ -962,10 +964,9 @@ if(saveTables){
               sep = '\t', row.names = FALSE, col.names = TRUE, quote = FALSE)
 }
 
-
-
-
-#### highlight the enhancers
+##########################################
+# #### highlight the enhancers, probably should improve again the peak-to-gene assignment
+##########################################
 sels = grep('Intergenic|Intron', peaks$annotation)
 
 yy.sels = yy[sels, ]
@@ -982,7 +983,7 @@ yy.sels = yy.sels[o1[1:ntop], ]
 geneSymbols = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
                              'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
 
-ggs = peaks.sels$geneId
+ggs = enhancers$targets[match(rownames(yy.sels), rownames(enhancers))]
 mm = match(ggs, geneSymbols$geneID)
 ggs[!is.na(mm)] = geneSymbols$gene.symbol.toUse[mm[!is.na(mm)]]
 
@@ -990,6 +991,16 @@ grep('HOX', ggs)
 
 rownames(yy.sels) = ggs
 yy.sels = as.matrix(yy.sels)
+
+test = yy.sels
+for(n in 1:length(conds))
+{
+  ii = grep(conds[n], colnames(test))
+  test[, ii] = t(apply(test[,ii], 1, cal_centering))
+}
+
+range <- 2.0
+test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
 
 df = data.frame(segments = sapply(colnames(yy.sels), function(x) unlist(strsplit(as.character(x), '_'))[2]))
 colnames(df) = c('seg')
@@ -1000,17 +1011,20 @@ names(sample_colors) = c('mUA', 'mLA', 'mHand')
 annot_colors = list(segments = sample_colors)
 
 gaps.col = c(3, 6, 9)
-pheatmap(yy.sels, 
+pheatmap(test, 
          annotation_col = df, show_rownames = TRUE, scale = 'none', 
-         color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdYlGn")))(8), 
+         color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8),  
          show_colnames = FALSE,
          cluster_rows = TRUE, cluster_cols = FALSE, 
          annotation_colors = annot_colors, 
          gaps_col = gaps.col, fontsize_row = 10,
+         breaks = seq(-range, range, length.out = 8),
+         treeheight_row = 20,
+         legend_labels = FALSE,
+         annotation_legend = FALSE,
          #gaps_row =  gaps.row, 
          filename = paste0(figureDir, '/heatmap_positionalPeaks_top50.enhancers.pdf'), 
-         width = 10, height = 12)
-
+         width = 6, height = 10)
 
 ##########################################
 # distance distribution of between positional peaks and positional genes
