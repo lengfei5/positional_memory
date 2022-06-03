@@ -871,10 +871,90 @@ subclustering.postional.histM.postioinalAtacPeaks = function(test)
 ##########################################
 Process.deeptools.heatmapTable = function()
 {
+  dpt = read.table(file = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/', 
+                   'Data/atacseq_using/heatmap_deeptools/heatmaps_all/heatmap_allchrFeatures_matrix4save.txt'),
+                   comment.char = "#", sep = '\t', header = TRUE, skip = 2)
+  
+  peaks = c(rep(1, 76), 
+            rep(2, 712), 
+            rep(3, 292),
+            rep(4, 103), 
+            rep(5, 31), 
+            rep(6, 32))
+  
+  samples = colnames(dpt)
+  samples = sapply(samples, function(x){x = unlist(strsplit(as.character(x), '_')); paste0(x[1:3], collapse = '_')})          
+  
+  cluster_order = c(6, 1, 5, 3, 4, 2)
+  index = c()
+  gaps.row = c() 
+  for(n in 1:length(cluster_order)) ## compute row gaps as atac-seq peaks
+  {
+    jj = which(peaks == cluster_order[n])
+    index = c(index, jj)
+    if(n == 1)  {gaps.row = c(gaps.row, length(jj))
+    }else{
+      if(n < length(cluster_order)){
+        gaps.row = c(gaps.row,  gaps.row[n-1] + length(which(peaks == cluster_order[n])))
+      }
+    }
+  }
+  
+  dpt = dpt[index, ]
+  
+  ##########################################
+  # select representative samples 
+  ##########################################
+  features = c('atac', 'H3K27me3', 'H3K4me3', 'H3Kme1')
+  library(ComplexHeatmap)
+  library("RColorBrewer")
+  library("circlize")
+  
+  splits = c(rep(1, 32), 
+             rep(2, 76), 
+             rep(3, 31),
+             rep(4, 292), 
+             rep(5, 103), 
+             rep(6, 712))
+  
+  for(n in 1:length(features))
+  {
+    # n = 2
+    index = intersect(c(grep('H3K27me3', samples), grep('H3K4me1', samples), grep('H3K4me3', samples)), grep('mRep2', samples))
+    
+    test = as.matrix(dpt[, index])
+    
+    index = c(1:360)
+    index = c(361:720)
+    index = c(721:1080)
+    
+    index = c(grep('136164', samples), 
+              grep('161521', samples), 
+              grep('74940', samples)
+    )
+    
+    ha <- HeatmapAnnotation(
+      samples = samples[index]
+    )
+    
+    unique(samples[index])
+    
+    Heatmap(test*20, 
+            cluster_rows = FALSE,
+            cluster_columns = FALSE, 
+            show_row_names = FALSE,
+            show_column_names = FALSE,
+            row_split = splits,
+            column_split = samples[index],
+            top_annotation = ha,
+            col = colorRamp2(seq(0, 6, length.out = 4), rev(brewer.pal(n=4, name="RdBu")))
+            #name = "mtcars", #title of legend
+            #column_title = "Variables", row_title = "Samples",
+            #row_names_gp = gpar(fontsize = 7) # Text size for row names
+    )
+    
+    
+     
+  }
   
 }
-
-
-
-
-
