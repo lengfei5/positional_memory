@@ -676,7 +676,7 @@ aggregate_atacPeaks_histMpeaks = function()
 ##########################################
 # reorder the positional histM for postional atac-seq peaks 
 ##########################################
-subsampling.postional.histM.postioinalAtacPeaks = function()
+subsampling.postional.histM.postioinalAtacPeaks = function(test)
 {
   ##########################################
   #  # reorder the histM according to the atac-seq peak clusters
@@ -684,7 +684,7 @@ subsampling.postional.histM.postioinalAtacPeaks = function()
   # gaps.row = c(32, 32+76, 31 + 32 + 76, 292 + 31 + 32 + 76, 292 + 31 + 32 + 76 + 103)
   ##########################################
   peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rdata/', 
-                                'position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters_6.rds'))
+                                'position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters_6.rds')) # positional atac
   table(peaks$clusters)
   cluster_order = c(6, 1, 5, 3, 4, 2)
   
@@ -698,6 +698,29 @@ subsampling.postional.histM.postioinalAtacPeaks = function()
     }
   }
   
+  ## center the histone signals
+  # test = yy1
+  x = c()
+  for(ht in c("H3K4me3", "H3K27me3", "H3K4me1"))
+  {  # ht = "H3K4me3"
+    cat(ht, '\n')
+    ii.test = grep(ht, colnames(test))
+    ttest = test[, ii.test]
+    
+    fc_sels = c('mUA', 'mLA', 'mHand')
+    jj.test = c()
+    for(fc in fc_sels) jj.test = c(jj.test, grep(fc, colnames(ttest)))
+    ttest = ttest[, jj.test]
+    #colnames(test) = fc_sels
+    
+    ttest =  cal_sample_means(ttest, conds = c('mUA', 'mLA', 'mHand'))
+    ttest = t(apply(ttest, 1, cal_centering))
+    colnames(ttest) = paste0(ht, '_', fc_sels)
+    
+    x = cbind(x, ttest)
+  }
+  test = x
+  
   ## refine histone subclusters for each ATACseq peak cluster
   peakNm = c()
   library(dendextend)
@@ -709,20 +732,20 @@ subsampling.postional.histM.postioinalAtacPeaks = function()
     kk = which(peaks$cluster == ac)
     cat('clsuter ', ac, ' -- ', length(kk), ' peaks \n')
     
-    hm_hclust <- hclust(dist(as.matrix(yy1[kk,])), method = "complete")
+    hm_hclust <- hclust(dist(as.matrix(test[kk,])), method = "complete")
     #hm_cluster <- cutree(tree = as.dendrogram(hm_hclust), h = 5)
     peakNm = c(peakNm, hm_hclust$labels[hm_hclust$order])
   }
   
-  new_order = match(peakNm, rownames(yy1))
+  new_order = match(peakNm, rownames(test))
   
   
   ## plot the histone marker side by side with replicates
-  df_histM = data.frame(segments = sapply(colnames(yy1), function(x) unlist(strsplit(as.character(x), '_'))[2])
+  df_histM = data.frame(segments = sapply(colnames(test), function(x) unlist(strsplit(as.character(x), '_'))[2])
                         #markers = sapply(colnames(yy0), function(x) unlist(strsplit(as.character(x), '_'))[2]), stringsAsFactors = FALSE
   )
   colnames(df_histM) = c('seg')
-  rownames(df_histM) = colnames(yy1)
+  rownames(df_histM) = colnames(test)
   sample_colors_histM = c('springgreen4', 'steelblue2', 'gold2')
   names(sample_colors_histM) = c('mUA', 'mLA', 'mHand')
   #marker_colors_histM = c('blue', 'red', 'deepskyblue2', 'darkgreen')
@@ -736,7 +759,7 @@ subsampling.postional.histM.postioinalAtacPeaks = function()
   rownames(df_histM_new) = rownames(df_histM)[kk]
   
   cols = colorRampPalette((brewer.pal(n = 7, name ="BrBG")))(10)
-  p1 = pheatmap(yy1[new_order, kk], cluster_rows=FALSE, show_rownames=FALSE, fontsize_row = 5,
+  p1 = pheatmap(test[new_order, kk], cluster_rows=FALSE, show_rownames=FALSE, fontsize_row = 5,
                 #color = colorRampPalette(rev(brewer.pal(n = 7, name ="YlGnBu")))(8), 
                 color = cols,
                 show_colnames = FALSE,
@@ -754,7 +777,7 @@ subsampling.postional.histM.postioinalAtacPeaks = function()
   
   
   cols = rev(c("#d53e4f", "#f46d43", "#fdae61", "#fee08b", "#e6f598", "#abdda4", "#ddf1da"))
-  p2 = pheatmap(yy1[new_order, kk], cluster_rows=FALSE, show_rownames=FALSE, fontsize_row = 5,
+  p2 = pheatmap(test[new_order, kk], cluster_rows=FALSE, show_rownames=FALSE, fontsize_row = 5,
                 color = cols,
                 show_colnames = FALSE,
                 scale = 'none',
@@ -771,7 +794,7 @@ subsampling.postional.histM.postioinalAtacPeaks = function()
   rownames(df_histM_new) = rownames(df_histM)[kk]
   
   cols = rev(terrain.colors(10))
-  p3 = pheatmap(yy1[new_order, kk], cluster_rows=FALSE, show_rownames=FALSE, fontsize_row = 5,
+  p3 = pheatmap(test[new_order, kk], cluster_rows=FALSE, show_rownames=FALSE, fontsize_row = 5,
                 color = cols,
                 show_colnames = FALSE,
                 scale = 'none',
