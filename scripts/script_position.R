@@ -453,6 +453,28 @@ saveRDS(xx, file = paste0(resDir, '/position_dependent_peaks_from_matureSamples_
 write.csv(xx, file = paste0(figureDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters', 
                             nb_clusters, '.csv'), quote = FALSE, row.names = TRUE)
 
+## save group bed of each cluster for deeptools heatmap
+Save.peak.groups.for.Deeptools = FALSE
+if(Save.peak.groups.for.Deeptools){
+  res = readRDS(file = paste0(resDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters_6.rds'))
+  mcs = unique(res$clusters)
+  
+  peakGroupDir = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/',
+                        'positional_memory/Data//atacseq_using/makeHeatmaps/peak_groups')
+  
+  for(n in 1:length(mcs)){
+    jj = which(res$clusters == mcs[n])
+    pp_atac = data.frame(t(sapply(rownames(yy)[jj], function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+    pp_atac$name = rownames(yy)[jj]
+    pp_atac$score = 0
+    pp_atac$strand = '*'
+    
+    write.table(pp_atac, file = paste0(peakGroupDir, '/peak_group_', mcs[n], '.bed'), 
+                sep = '\t', quote = FALSE, row.names = FALSE, col.names = FALSE)
+    
+  }
+}
+
 ##########################################
 # Add histone marker with together as atac-seq peaks 
 # this part is firstly done in histMarker_CT_analysis.R

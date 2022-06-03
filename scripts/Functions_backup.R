@@ -676,7 +676,7 @@ aggregate_atacPeaks_histMpeaks = function()
 ##########################################
 # reorder the positional histM for postional atac-seq peaks 
 ##########################################
-subsampling.postional.histM.postioinalAtacPeaks = function(test)
+subclustering.postional.histM.postioinalAtacPeaks = function(test)
 {
   ##########################################
   #  # reorder the histM according to the atac-seq peak clusters
@@ -729,6 +729,7 @@ subsampling.postional.histM.postioinalAtacPeaks = function(test)
   ## try dendsort methods
   library("dendsort")
   library("seriation")
+  
   #new_order = c()
   for(ac in cluster_order)
   {
@@ -736,22 +737,27 @@ subsampling.postional.histM.postioinalAtacPeaks = function(test)
     kk = which(peaks$cluster == ac)
     cat('clsuter ', ac, ' -- ', length(kk), ' peaks \n')
     
-    data("iris")
-    x <- as.matrix(iris[-5]) #drop the 5th colum
-    d <- dist(x) #calculate Euclidian distance
+    #data("iris")
+    x <- as.matrix(test[kk,]) #drop the 5th colum
+    d <-as.dist(sqrt(2*(1-cor(t(test[kk, ])))))
     #Comparing different seriation methods
     methods <- c("HC", "GW", "OLO")
     results <- sapply(methods, FUN=function(m) seriate(d, m), simplify = FALSE)
     
+    hc_HC = results[["HC"]][[1]]
+    hc_GW = results[["GW"]][[1]]
+    hc_OLO = results[["OLO"]][[1]]
+    hc_OLO = as.hclust(dendsort(as.dendrogram(hclust(d, method = "complete"))))
+    
+    peakNm = c(peakNm, hc_OLO$labels[hc_OLO$order])
     # dd = dist(as.matrix(test[kk, ]))
-    dd = as.dist(sqrt(2*(1-cor(t(test[kk, ])))))
+    #dd = as.dist(sqrt(2*(1-cor(t(test[kk, ])))))
     #order <- seriate(dd)
     #new_order = c(new_order, order)
-    hm_hclust <- hclust(dd, method = "ward.D2")
-    hm_cluster <- cutree(tree = as.dendrogram(hm_hclust), h = 4)
-    peakNm = c(peakNm, hm_hclust$labels[hm_hclust$order])
+    #hm_hclust <- hclust(dd, method = "ward.D2")
+    #hm_cluster <- cutree(tree = as.dendrogram(hm_hclust), h = 4)
+    #peakNm = c(peakNm, hm_hclust$labels[hm_hclust$order])
   }
-  
   new_order = match(peakNm, rownames(test))
   
   ## plot the histone marker side by side with replicates
@@ -824,10 +830,10 @@ subsampling.postional.histM.postioinalAtacPeaks = function(test)
                 #gaps_col = gaps.col_histM, 
                 gaps_row = gaps.row)
   
-  plot_list=list()
-  plot_list[['p1']]=p1[[4]]
-  plot_list[['p2']]=p2[[4]]
-  plot_list[['p3']]=p3[[4]]
+  plot_list=list(); plot_list[['p1']]=p1[[4]]; plot_list[['p2']]=p2[[4]]; plot_list[['p3']]=p3[[4]];
+  layout = matrix(c(1, 2, 3), nrow = 1)
+  grid.arrange(grobs=plot_list, nrow= 1,
+               layout_matrix = layout)
   
   pdf(paste0(figureDir, "/positional_chromatin_landscape_3histM_clusteringAllHistM.pdf"),
       width = 6, height = 10) # Open a new pdf file
@@ -858,7 +864,17 @@ subsampling.postional.histM.postioinalAtacPeaks = function(test)
                  filename = paste0(figureDir, '/positional_atacPeaks_fdr0.05_log2FC.1_rmHeadPeaks_reorder2.pdf'), 
                  width = 4, height = 12)
   
-  
+}
+
+##########################################
+# process heatmap output from deeptools  
+##########################################
+Process.deeptools.heatmapTable = function()
+{
   
 }
+
+
+
+
 
