@@ -699,7 +699,7 @@ subsampling.postional.histM.postioinalAtacPeaks = function(test)
   }
   
   ## center the histone signals
-  # test = yy1
+  test = yy1
   x = c()
   for(ht in c("H3K4me3", "H3K27me3", "H3K4me1"))
   {  # ht = "H3K4me3"
@@ -719,26 +719,40 @@ subsampling.postional.histM.postioinalAtacPeaks = function(test)
     
     x = cbind(x, ttest)
   }
-  test = x
+  test = x; rm(x)
   
   ## refine histone subclusters for each ATACseq peak cluster
   peakNm = c()
   library(dendextend)
   library(ggplot2)
   
+  ## try dendsort methods
+  library("dendsort")
+  library("seriation")
+  #new_order = c()
   for(ac in cluster_order)
   {
     # ac = 6
     kk = which(peaks$cluster == ac)
     cat('clsuter ', ac, ' -- ', length(kk), ' peaks \n')
     
-    hm_hclust <- hclust(dist(as.matrix(test[kk,])), method = "complete")
-    #hm_cluster <- cutree(tree = as.dendrogram(hm_hclust), h = 5)
+    data("iris")
+    x <- as.matrix(iris[-5]) #drop the 5th colum
+    d <- dist(x) #calculate Euclidian distance
+    #Comparing different seriation methods
+    methods <- c("HC", "GW", "OLO")
+    results <- sapply(methods, FUN=function(m) seriate(d, m), simplify = FALSE)
+    
+    # dd = dist(as.matrix(test[kk, ]))
+    dd = as.dist(sqrt(2*(1-cor(t(test[kk, ])))))
+    #order <- seriate(dd)
+    #new_order = c(new_order, order)
+    hm_hclust <- hclust(dd, method = "ward.D2")
+    hm_cluster <- cutree(tree = as.dendrogram(hm_hclust), h = 4)
     peakNm = c(peakNm, hm_hclust$labels[hm_hclust$order])
   }
   
   new_order = match(peakNm, rownames(test))
-  
   
   ## plot the histone marker side by side with replicates
   df_histM = data.frame(segments = sapply(colnames(test), function(x) unlist(strsplit(as.character(x), '_'))[2])
@@ -751,14 +765,18 @@ subsampling.postional.histM.postioinalAtacPeaks = function(test)
   #marker_colors_histM = c('blue', 'red', 'deepskyblue2', 'darkgreen')
   #names(marker_colors_histM) = histMs
   annot_colors_histM = list(seg = sample_colors_histM)
-  gaps.col_histM = c(2, 4)
+  #gaps.col_histM = c(2, 4)
   
-  kk = c(1:6)
+  kk = c(1:3)
   df_histM_new = as.data.frame(df_histM[kk,])
   colnames(df_histM_new) = colnames(df_histM)
   rownames(df_histM_new) = rownames(df_histM)[kk]
   
-  cols = colorRampPalette((brewer.pal(n = 7, name ="BrBG")))(10)
+  nb_breaks = 8
+  sunset <- colour("sunset")
+  PRGn <- colour("PRGn")
+  range <- 2.0
+  cols = cols = (sunset(nb_breaks))
   p1 = pheatmap(test[new_order, kk], cluster_rows=FALSE, show_rownames=FALSE, fontsize_row = 5,
                 #color = colorRampPalette(rev(brewer.pal(n = 7, name ="YlGnBu")))(8), 
                 color = cols,
@@ -766,42 +784,44 @@ subsampling.postional.histM.postioinalAtacPeaks = function(test)
                 scale = 'none',
                 cluster_cols=FALSE, annotation_col= df_histM_new,
                 annotation_colors = annot_colors_histM,
-                gaps_col = gaps.col_histM, 
+                #gaps_col = gaps.col_histM,
+                breaks = seq(-range, range, length.out = nb_breaks), 
                 annotation_legend = FALSE,
                 gaps_row = gaps.row)
   
-  kk = c(7:12)
+  kk = c(4:6)
   df_histM_new = as.data.frame(df_histM[kk,])
   colnames(df_histM_new) = colnames(df_histM)
   rownames(df_histM_new) = rownames(df_histM)[kk]
   
-  
-  cols = rev(c("#d53e4f", "#f46d43", "#fdae61", "#fee08b", "#e6f598", "#abdda4", "#ddf1da"))
+  cols = cols = rev(PRGn(nb_breaks-1));
   p2 = pheatmap(test[new_order, kk], cluster_rows=FALSE, show_rownames=FALSE, fontsize_row = 5,
                 color = cols,
                 show_colnames = FALSE,
                 scale = 'none',
+                breaks = seq(-range, range, length.out = nb_breaks), 
                 cluster_cols=FALSE, annotation_col=df_histM,
                 annotation_colors = annot_colors_histM,
-                gaps_col = gaps.col_histM, 
+                #gaps_col = gaps.col_histM, 
                 annotation_legend = FALSE,
                 gaps_row = gaps.row)
   
   
-  kk = c(13:18)
+  kk = c(7:9)
   df_histM_new = as.data.frame(df_histM[kk,])
   colnames(df_histM_new) = colnames(df_histM)
   rownames(df_histM_new) = rownames(df_histM)[kk]
   
-  cols = rev(terrain.colors(10))
+  cols = cols = colorRampPalette(rev((brewer.pal(n = 8, name ="BrBG"))))(7)
   p3 = pheatmap(test[new_order, kk], cluster_rows=FALSE, show_rownames=FALSE, fontsize_row = 5,
                 color = cols,
                 show_colnames = FALSE,
                 scale = 'none',
+                breaks = seq(-range, range, length.out = nb_breaks), 
                 cluster_cols=FALSE, annotation_col=df_histM,
                 annotation_colors = annot_colors_histM,
                 annotation_legend = FALSE,
-                gaps_col = gaps.col_histM, 
+                #gaps_col = gaps.col_histM, 
                 gaps_row = gaps.row)
   
   plot_list=list()
@@ -809,13 +829,36 @@ subsampling.postional.histM.postioinalAtacPeaks = function(test)
   plot_list[['p2']]=p2[[4]]
   plot_list[['p3']]=p3[[4]]
   
-  pdf(paste0(figureDir, "/Segemet_specific_chromatin_landscape_atac_histM.pdf"),
-      width = 8, height = 10) # Open a new pdf file
+  pdf(paste0(figureDir, "/positional_chromatin_landscape_3histM_clusteringAllHistM.pdf"),
+      width = 6, height = 10) # Open a new pdf file
   
   layout = matrix(c(1, 2, 3), nrow = 1)
   grid.arrange(grobs=plot_list, nrow= 1,
                layout_matrix = layout)
   
   dev.off()
+  
+  ### reorder positional atacpeak acccordingly
+  yy = readRDS(paste0(RdataDir, '/positional_atacPeaks_data_3reps_forHeatmap.rds'))
+  col = colorRampPalette(c("navy", "white", "red3"))(8)
+  
+  pheatmap(yy[new_order, ], annotation_row = my_gene_col, 
+                 annotation_col = df, show_rownames = FALSE, scale = 'none', 
+                 color = col, 
+                 show_colnames = FALSE,
+                 cluster_rows = FALSE, 
+                 cluster_cols = FALSE,  
+                 #clustering_method = 'complete', cutree_rows = nb_clusters, 
+                 annotation_colors = annot_colors, 
+                 #clustering_callback = callback,
+                 gaps_col = gaps.col, 
+                 treeheight_row = 20,
+                 gaps_row = gaps.row,
+                 annotation_legend = FALSE,
+                 filename = paste0(figureDir, '/positional_atacPeaks_fdr0.05_log2FC.1_rmHeadPeaks_reorder2.pdf'), 
+                 width = 4, height = 12)
+  
+  
+  
 }
 
