@@ -581,10 +581,10 @@ find_enhancers_integeticRegions_Introns_H3K4me1 = function()
 ##########################################
 peak_to_gene_assignment_TADs_correlation = function(enhancers)
 {
-  enhancers = readRDS(file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1_chipseekerAnnot.rds'))
-  cat(length(which(enhancers$enhancer == 1 & 
-                     (enhancers$annotation_chipseeker == 'Distal Intergenic'| enhancers$annotation_chipseeker == 'Intron'))),
-      ' enhancer candidates \n')
+  #enhancers = readRDS(file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1_chipseekerAnnot.rds'))
+  #cat(length(which(enhancers$enhancer == 1 & 
+  #                   (enhancers$annotation_chipseeker == 'Distal Intergenic'| enhancers$annotation_chipseeker == 'Intron'))),
+  #   ' enhancer candidates \n')
   
   ## require the gene expression data, TSS and also TADs information
   tad = read.table(file = paste0('../data/final.TAD.res100000.bed'), sep = '\t', header = FALSE)
@@ -612,6 +612,7 @@ peak_to_gene_assignment_TADs_correlation = function(enhancers)
   cat(length(which(enhancers$enhancer == 1 & 
                      (enhancers$annotation_chipseeker == 'Distal Intergenic'| enhancers$annotation_chipseeker == 'Intron'))),
       ' enhancer candidates \n')
+  
   ee = data.frame(t(sapply(enhancers$coords, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
   ee$strand = '*'
   ee = makeGRangesFromDataFrame(ee, seqnames.field=c("X1"),
@@ -682,6 +683,7 @@ peak_to_gene_assignment_TADs_correlation = function(enhancers)
           legend.title = element_text(size = 14),
           legend.position=c(0.5, 0.8)) +
     labs(x = "Pearson correlation with gene expression", y= 'density')
+  
   ggsave(paste0(figureDir, "peak_to_gene_assignmenet_correlation_chromatinFeatures_rna_minus_H3K27me3.pdf"),  width = 6, height = 4)
   
   
@@ -693,9 +695,12 @@ peak_to_gene_assignment_TADs_correlation = function(enhancers)
   t = x*sqrt(7-2)/sqrt(1 - x^2)
   pvs = pt(q=t, df=5, lower.tail=FALSE)
   
+  cat(length(which(!is.na(x))), ' peaks to annotate \n')
   cat(length(which(pvs<0.05)), ' peak-to-gene assignment are significant \n')
+  
   corrMax = data.frame(corrMax, stringsAsFactors = FALSE)
   corrMax = data.frame(corrMax, pval = pvs)
+  
   colnames(corrMax) = paste0(colnames(corrMax), '.corr.with.rna')
   corrMax = data.frame(corrMax, enhancers$targets, stringsAsFactors = FALSE)
   enhancers = enhancers[, c(1:55)]
@@ -741,7 +746,6 @@ peak_to_gene_assignment_TADs_correlation = function(enhancers)
   
   lls = (apply(ee_sel[, c(2, 3)], 1, mean) - apply(tp_sel[, c(2, 3)], 1, mean))
   enhancers$distanceToTSS[kk] = lls
-  
   
   kk = which(enhancers$annotation == 'enhancers' & abs(enhancers$distanceToTSS)<2000)
   enhancers$annotation[kk] = 'promoters'

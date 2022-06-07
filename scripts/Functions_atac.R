@@ -1544,7 +1544,9 @@ pseudo.bulk.by.pooling.scRNAseq = function()
   
 }
 
-
+##########################################
+# udpate the analysis with the new verison of annot with hox patch
+##########################################
 pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
 {
   scRNADir = '/Volumes/groups/tanaka/People/current/jiwang/projects/limbRegeneration_scRNA/raw_NGS/axolotl/Gerber_2018/'
@@ -1618,6 +1620,7 @@ pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
   
   ggsave(paste0(resDir, "/Overview_Gerber2018_Fluidigm.C1_batches.pdf"), width = 12, height = 8)
   
+  saveRDS(aa, file = paste0(RdataDir, '/Gerber2018_Fluidigm.C1_batches_seuratObj.rds'))
   
   ## find DE genes between mUA and stage 40 and stage 44
   Idents(aa) = aa$timepoint
