@@ -74,3 +74,54 @@ tfs.mara[which(is.na(match(tfs.mara, genes)))]
 tfs.rna[which(is.na(match(tfs.rna, genes)))]
 
 
+### gene set of interest
+geneSet = unique(c(tfs.limb, tfs.mara, tfs.rna))
+E = aa@assays$RNA@data
+
+rownames(E) = ggs
+genes = get_geneName(rownames(E))
+mm = match(genes, geneSet)
+E = E[!is.na(mm), ]  # many gene IDs share the same gene symbols in the annotation
+ggs = get_geneName(rownames(E)) 
+
+
+##########################################
+# CRE regions to scan
+##########################################
+Prepare.enhancer.tss.4fimo.scanning = FALSE
+if(Prepare.enhancer.tss.4fimo.scanning)
+{
+  # atac-seq peaks
+  enhancers = readRDS(file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1_chipseekerAnnot_manual.rds'))
+  
+  # tss used in the analysis
+  tss = readRDS(file =paste0(RdataDir, '/regeneration_matureSamples_tss_perGene_smartseq2_atac_histM_v5.rds'))
+  
+  pp = unique(c(rownames(enhancers), tss$coords))
+  pp = data.frame(t(sapply(pp, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  pp$name = rownames(pp)
+  pp$strand = '*'
+  pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
+  ll = width(pp)
+  
+  saveDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/motif_analysis/peaks/'
+  write.table(pp, file = paste0(saveDir, 'atacPeaks_tss_for_fimo.bed'), 
+              row.names = FALSE, col.names = FALSE,
+              quote = FALSE, sep = '\t') 
+  
+}
+
+
+
+########################################################
+########################################################
+# Section : test GENIE3
+# 
+########################################################
+########################################################
+source('GENIE3/GENIE3_R_C_wrapper/GENIE3.R')
+expr.matrix = read.expr.matrix('GENIE3/GENIE3_R_C_wrapper/data.txt', form = 'rows.are.samples')
+weight.matrix1 = GENIE3(expr.matrix)
+
+
