@@ -920,18 +920,20 @@ Process.deeptools.heatmapTable = function()
   for(n in 1:length(features))
   {
     # n = 2
-    index = intersect(c(grep('H3K27me3', samples), grep('H3K4me1', samples), grep('H3K4me3', samples)), grep('mRep2', samples))
-    
-    test = as.matrix(dpt[, index])
-    
-    index = c(1:360)
-    index = c(361:720)
-    index = c(721:1080)
-    
     index = c(grep('136164', samples), 
               grep('161521', samples), 
               grep('74940', samples)
     )
+    index = c(1:360)
+    index = c(361:720)
+    index = c(721:1080)
+    
+    
+    index = intersect(c(grep('H3K27me3', samples), grep('H3K4me1', samples), grep('H3K4me3', samples)), grep('mRep2', samples))
+    
+    index = intersect(c(grep('H3K27me3', samples)), grep('mRep2', samples))
+    
+    test = as.matrix(dpt[, index])
     
     ha <- HeatmapAnnotation(
       samples = samples[index]
@@ -945,15 +947,31 @@ Process.deeptools.heatmapTable = function()
             show_row_names = FALSE,
             show_column_names = FALSE,
             row_split = splits,
-            column_split = samples[index],
+            #column_split = samples[index],
             top_annotation = ha,
-            col = colorRamp2(seq(0, 6, length.out = 4), rev(brewer.pal(n=4, name="RdBu")))
+            col = colorRamp2(seq(0, 1.2, length.out = 4), rev(brewer.pal(n=4, name="RdBu")))
             #name = "mtcars", #title of legend
             #column_title = "Variables", row_title = "Samples",
             #row_names_gp = gpar(fontsize = 7) # Text size for row names
     )
     
+    pdf(paste0(figureDir, "/positional_peaks_intensity_heatmap_H3K27me3.pdf"),
+        width = 6, height = 10) # Open a new pdf file
+    Heatmap(test*20, 
+            cluster_rows = FALSE,
+            cluster_columns = FALSE, 
+            show_row_names = FALSE,
+            show_column_names = FALSE,
+            row_split = splits,
+            column_split = samples[index],
+            top_annotation = ha,
+            col = colorRamp2(seq(0, 1.2, length.out = 4), rev(brewer.pal(n=4, name="RdBu")))
+            #name = "mtcars", #title of legend
+            #column_title = "Variables", row_title = "Samples",
+            #row_names_gp = gpar(fontsize = 7) # Text size for row names
+    )
     
+    dev.off()
      
   }
   
