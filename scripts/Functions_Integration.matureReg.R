@@ -581,6 +581,11 @@ find_enhancers_integeticRegions_Introns_H3K4me1 = function()
 ##########################################
 peak_to_gene_assignment_TADs_correlation = function(enhancers)
 {
+  enhancers = readRDS(file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1_chipseekerAnnot.rds'))
+  cat(length(which(enhancers$enhancer == 1 & 
+                     (enhancers$annotation_chipseeker == 'Distal Intergenic'| enhancers$annotation_chipseeker == 'Intron'))),
+      ' enhancer candidates \n')
+  
   ## require the gene expression data, TSS and also TADs information
   tad = read.table(file = paste0('../data/final.TAD.res100000.bed'), sep = '\t', header = FALSE)
   length(which(tad$V1 != tad$V4))
