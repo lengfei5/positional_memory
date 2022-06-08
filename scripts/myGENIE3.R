@@ -26,10 +26,10 @@
 #' link.list <- get.link.list(weight.matrix)
 #' head(link.list)
 #' @export
-GENIE3 <- function(expr.matrix, tree.method="RF", K="sqrt", ntrees=1000, regulators=NULL, ncores=1, verbose=FALSE, seed=NULL) {
-
-	dyn.load("GENIE3.so")
-
+GENIE3 <- function(expr.matrix, tree.method="RF", K="sqrt", ntrees=1000, regulators=NULL, ncores=1, verbose=TRUE, seed=NULL) 
+{
+  dyn.load("GENIE3.so")
+  
 	# check input arguments
 	if (!is.matrix(expr.matrix) && !is.array(expr.matrix)) {
 		stop("Parameter expr.matrix must be a two-dimensional matrix where each row corresponds to a gene and each column corresponds to a condition/sample.")
@@ -77,45 +77,45 @@ GENIE3 <- function(expr.matrix, tree.method="RF", K="sqrt", ntrees=1000, regulat
 		stop("Parameter ncores should be a stricly positive integer.")
 	}
 	
-	
 	# set random number generator seed if seed is given
-    if (!is.null(seed)) {
+  if (!is.null(seed)) {
         set.seed(seed)
-    }
+  }
     
-    # transpose expression matrix to (samples x genes)
-    expr.matrix <- t(expr.matrix)
-	
-    # setup weight matrix
-    num.samples <- dim(expr.matrix)[1]
-    num.genes <- dim(expr.matrix)[2]
-    gene.names <- colnames(expr.matrix)
-    weight.matrix <- matrix(0.0, nrow=num.genes, ncol=num.genes)
-    rownames(weight.matrix) <- gene.names
-    colnames(weight.matrix) <- gene.names
-	
-    # get names of input genes
-    if (is.null(regulators)) {
-        input.gene.names <- gene.names
+  # transpose expression matrix to (samples x genes)
+  expr.matrix <- t(expr.matrix)
+  
+  # setup weight matrix
+  num.samples <- dim(expr.matrix)[1]
+  num.genes <- dim(expr.matrix)[2]
+  gene.names <- colnames(expr.matrix)
+  weight.matrix <- matrix(0.0, nrow=num.genes, ncol=num.genes)
+  rownames(weight.matrix) <- gene.names
+  colnames(weight.matrix) <- gene.names
+  
+  # get names of input genes
+  if (is.null(regulators)) {
+    input.gene.names <- gene.names
+  } else {
+    # input gene indices given as integers
+    if (is.numeric(regulators)) {
+      input.gene.names <- gene.names[regulators]
+      # input gene indices given as names
     } else {
-        # input gene indices given as integers
-        if (is.numeric(regulators)) {
-            input.gene.names <- gene.names[regulators]
-        # input gene indices given as names
-        } else {
-            input.gene.names <- regulators
-            # for security, abort if some input gene name is not in gene names
-            missing.gene.names <- setdiff(input.gene.names, gene.names)
-            if (length(missing.gene.names) != 0) {
-                for (missing.gene.name in missing.gene.names) {
-                    cat(paste("Gene ", missing.gene.name,
-                              " was not in the expression matrix\n", sep=""))
-                }
-                stop("Aborting computation")
-            }
+      input.gene.names <- regulators
+      # for security, abort if some input gene name is not in gene names
+      missing.gene.names <- setdiff(input.gene.names, gene.names)
+      if (length(missing.gene.names) != 0) {
+        for (missing.gene.name in missing.gene.names) {
+          cat(paste("Gene ", missing.gene.name,
+                    " was not in the expression matrix\n", sep=""))
         }
+        stop("Aborting computation")
+      }
     }
-	
+  }
+  
+  
 	# tree method
 	if (tree.method == 'RF') {
 		RF_randomisation <- 1
@@ -128,116 +128,130 @@ GENIE3 <- function(expr.matrix, tree.method="RF", K="sqrt", ntrees=1000, regulat
 	} 
 	
 	if (verbose) {
-        cat(paste("Tree method: ", tree.method, "\nK: ", K,
-	              "\nNumber of trees: ", ntrees, "\n\n",
-                  sep=""))
-        flush.console()
+	  cat(paste("Tree method: ", tree.method, "\nK: ", K,
+	            "\nNumber of trees: ", ntrees, "\n\n",
+	            sep=""))
+	  flush.console()
+	  
 	}
     
-    # compute importances for every target gene
-   
+  # compute importances for every target gene
 	if (ncores==1) {
 		# serial computing
 		if (verbose) {
-		    cat("Using 1 core.\n\n")
-		    flush.console()
+		  cat("Using 1 core.\n\n")
+		  flush.console()
 		}
-		
-	    for (target.gene.idx in seq(from=1, to=num.genes)) {
-
-            if (verbose) {	
-                cat(paste("Computing gene ", target.gene.idx, "/", num.genes, "\n", sep=""))
-                flush.console()
-			 }
-
-	        target.gene.name <- gene.names[target.gene.idx]
-	        # remove target gene from input genes
-	        these.input.gene.names <- setdiff(input.gene.names, target.gene.name)
-			num.input.genes <- length(these.input.gene.names)
-		
-	        x <- expr.matrix[,these.input.gene.names]
-			y <- expr.matrix[,target.gene.name]
-			
-			# normalize output data
-			y <- y / sd(y)
-
-		    # set mtry
-		    if (class(K) == "numeric") {
-		        mtry <- K
-		    } else if (K == "sqrt") {
-		        mtry <- round(sqrt(num.input.genes))
-		    } else {
-		        mtry <- num.input.genes
-		    } 
-		
-			# some default parameters 
-			nmin <- 1
-			permutation_importance <- 0
-		
-	        im <- .C("BuildTreeEns",as.integer(num.samples),as.integer(num.input.genes),
-			          as.single(c(x)),as.single(c(y)),as.integer(nmin),
-					  as.integer(ET_randomisation),as.integer(RF_randomisation),
-					  as.integer(mtry),as.integer(ntrees),
-					  as.integer(bootstrap_sampling),as.integer(permutation_importance),
-					  as.double(vector("double",num.input.genes)))[[12]]
-			
-			# some variable importances might be slighly negative due to some rounding error
-			im[im<0] <- 0
-					  
-	     weight.matrix[these.input.gene.names, target.gene.name] <- im
+	  
+	  for (target.gene.idx in seq(from=1, to=num.genes)) 
+	  {
+	    # target.gene.idx = 1; verbose = TRUE;
+	    if (verbose) {	
+	      cat(paste("Computing gene ", target.gene.idx, "/", num.genes, "\n", sep=""))
+	      flush.console()
 	    }
+	    target.gene.name <- gene.names[target.gene.idx]
+	    
+	    # remove target gene from input genes
+	    these.input.gene.names <- setdiff(input.gene.names, target.gene.name)
+	    num.input.genes <- length(these.input.gene.names)
+	    
+	    x <- expr.matrix[ ,these.input.gene.names]
+	    y <- expr.matrix[ ,target.gene.name]
+	    
+	    # normalize output data
+	    y <- y / sd(y)
+	    
+	    # set mtry
+	    if (class(K) == "numeric") {
+	      mtry <- K
+	    } else if (K == "sqrt") {
+	      mtry <- round(sqrt(num.input.genes))
+	    } else {
+	      mtry <- num.input.genes
+	    } 
+	    
+	    # some default parameters 
+	    nmin <- 1
+	    permutation_importance <- 0
+	    
+	    im <- .C("BuildTreeEns",
+	             as.integer(num.samples),
+	             as.integer(num.input.genes),
+	             as.single(c(x)),
+	             as.single(c(y)),
+	             as.integer(nmin),
+	             as.integer(ET_randomisation),
+	             as.integer(RF_randomisation),
+	             as.integer(mtry),
+	             as.integer(ntrees),
+	             as.integer(bootstrap_sampling),
+	             as.integer(permutation_importance),
+	             as.double(vector("double",num.input.genes)))[[12]]
+	    
+	    # some variable importances might be slighly negative due to some rounding error
+	    im[im<0] <- 0
+	    weight.matrix[these.input.gene.names, target.gene.name] <- im
+	    
+	  }
+	  
 	} else {
 		# parallel computing
-	    library(doRNG); library(doParallel); registerDoParallel(); options(cores=ncores)
+	  library(doRNG); 
+	  library(doParallel); 
+	  registerDoParallel(); 
+	  options(cores=ncores)
 		
 		if (verbose) {
 		    message(paste("\nUsing", getDoParWorkers(), "cores."))
 		}
 		
-	    weight.matrix.reg <- foreach(target.gene.name=gene.names, .combine=cbind) %dorng% 
-	    {
-	        # remove target gene from input genes
-	        these.input.gene.names <- setdiff(input.gene.names, target.gene.name)
-			num.input.genes <- length(these.input.gene.names)
-		
-	        x <- expr.matrix[,these.input.gene.names]
-			y <- expr.matrix[,target.gene.name]
-			
-			# normalize output data
-			y <- y / sd(y)
-
-		    # set mtry
-		    if (class(K) == "numeric") {
-		        mtry <- K
-		    } else if (K == "sqrt") {
-		        mtry <- round(sqrt(num.input.genes))
-		    } else {
-		        mtry <- num.input.genes
-		    } 
-			
-			# some default parameters 
-			nmin <- 1
-			permutation_importance <- 0
-		
-	        im <- .C("BuildTreeEns",as.integer(num.samples),as.integer(num.input.genes),
-			          as.single(c(x)),as.single(c(y)),as.integer(nmin),
-					  as.integer(ET_randomisation),as.integer(RF_randomisation),
-					  as.integer(mtry),as.integer(ntrees),
-					  as.integer(bootstrap_sampling),as.integer(permutation_importance),
-					  as.double(vector("double",num.input.genes)))[[12]]
-					  
-		  	# some variable importances might be slighly negative due to some rounding error
-		  	im[im<0] <- 0
-					  			  
-			c(setNames(0, target.gene.name), setNames(im, these.input.gene.names))[input.gene.names]
-	    }
-	    attr(weight.matrix.reg, "rng") <- NULL
-	    weight.matrix[input.gene.names,] <- weight.matrix.reg
+	  weight.matrix.reg <- foreach(target.gene.name=gene.names, .combine=cbind) %dorng% 
+	  {
+	    # remove target gene from input genes
+	    these.input.gene.names <- setdiff(input.gene.names, target.gene.name)
+	    num.input.genes <- length(these.input.gene.names)
+	    
+	    x <- expr.matrix[,these.input.gene.names]
+	    y <- expr.matrix[,target.gene.name]
+	    
+	    # normalize output data
+	    y <- y / sd(y)
+	    
+	    # set mtry
+	    if (class(K) == "numeric") {
+	      mtry <- K
+	    } else if (K == "sqrt") {
+	      mtry <- round(sqrt(num.input.genes))
+	    } else {
+	      mtry <- num.input.genes
+	    } 
+	    
+	    # some default parameters 
+	    nmin <- 1
+	    permutation_importance <- 0
+	    
+	    im <- .C("BuildTreeEns",as.integer(num.samples),as.integer(num.input.genes),
+	             as.single(c(x)),as.single(c(y)),as.integer(nmin),
+	             as.integer(ET_randomisation),as.integer(RF_randomisation),
+	             as.integer(mtry),as.integer(ntrees),
+	             as.integer(bootstrap_sampling),as.integer(permutation_importance),
+	             as.double(vector("double",num.input.genes)))[[12]]
+	    
+	    # some variable importances might be slighly negative due to some rounding error
+	    im[im<0] <- 0
+	    c(setNames(0, target.gene.name), setNames(im, these.input.gene.names))[input.gene.names]
+	        
+	  }
+	  
+	  attr(weight.matrix.reg, "rng") <- NULL
+	  weight.matrix[input.gene.names,] <- weight.matrix.reg
+	    
 	}
-    return(weight.matrix / num.samples)
+  
+  return(weight.matrix / num.samples)
+  
 }       
-
-
 
 #' @title get.link.list
 #' 
@@ -265,9 +279,9 @@ GENIE3 <- function(expr.matrix, tree.method="RF", K="sqrt", ntrees=1000, regulat
 #' head(link.list)
 #' @export
 get.link.list <- function(weight.matrix, report.max=NULL, threshold=0) {
-    if(!is.numeric(threshold)) {
-    	stop("threshold must be a number.")
-    } 
+  if(!is.numeric(threshold)) {
+    stop("threshold must be a number.")
+  } 
 	
 	library(reshape2)
 	
@@ -286,8 +300,6 @@ get.link.list <- function(weight.matrix, report.max=NULL, threshold=0) {
   
     return(link.list)
 }
-
-
 
 
 read.expr.matrix <- function(filename, form="", sep="", default.gene.label="gene_", default.sample.label="sample_") {
