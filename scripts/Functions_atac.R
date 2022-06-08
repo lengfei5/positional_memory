@@ -1549,8 +1549,9 @@ pseudo.bulk.by.pooling.scRNAseq = function()
 ##########################################
 pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
 {
+  # v2 with annotation.with.HoxCluster.Patch
   scRNADir = '/Volumes/groups/tanaka/People/current/jiwang/projects/limbRegeneration_scRNA/raw_NGS/axolotl/Gerber_2018/'
-  scRNAseq.counts = read.delim(file = paste0(scRNADir, 'Fluidigm_C1/nf_out/featureCounts/merged_gene_counts.txt'), header = TRUE)
+  scRNAseq.counts = read.delim(file = paste0(scRNADir, 'Fluidigm_C1_gtf.hoxPatch/merged_gene_counts.txt'), header = TRUE)
   
   metadata = read.delim(file = paste0(scRNADir, 'Metadata_EBI.ENA_filereport_read_run_PRJNA416091_tsv.txt'), header = TRUE)
   metadata = data.frame(metadata$run_accession, metadata$sample_title)
@@ -1618,7 +1619,7 @@ pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
   
   p1 + p2
   
-  ggsave(paste0(resDir, "/Overview_Gerber2018_Fluidigm.C1_batches.pdf"), width = 12, height = 8)
+  ggsave(paste0(resDir, "/Overview_Gerber2018_Fluidigm.C1_batches_v2.pdf"), width = 12, height = 8)
   
   saveRDS(aa, file = paste0(RdataDir, '/Gerber2018_Fluidigm.C1_batches_seuratObj.rds'))
   

@@ -295,9 +295,9 @@ get.link.list <- function(weight.matrix, report.max=NULL, threshold=0) {
     if(!is.null(report.max)) {
     	link.list <- link.list[1:min(nrow(link.list), report.max),]
     } 
-  
+    
     rownames(link.list) <- NULL
-  
+    
     return(link.list)
 }
 

@@ -7,6 +7,44 @@
 # Date of creation: Tue Jun  7 10:46:45 2022
 ##########################################################################
 ##########################################################################
+rm(list=ls())
+
+RNA.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functions/RNAseq_functions.R'
+RNA.QC.functions = '/Volumes/groups/tanaka/People/current/jiwang/scripts/functions/RNAseq_QCs.R'
+source(RNA.functions)
+source(RNA.QC.functions)
+source('functions_chipSeq.R')
+source('Functions_atac.R')
+
+version.analysis = 'Rxxxx_R10723_R11637_R12810_atac'
+#peakDir = "Peaks/macs2_broad"
+
+resDir = paste0("../results/", version.analysis)
+
+RdataDir = paste0(resDir, '/Rdata')
+if(!dir.exists(resDir)) dir.create(resDir)
+if(!dir.exists(RdataDir)) dir.create(RdataDir)
+
+dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/'
+annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
+
+figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
+tableDir = paste0('/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/SupTables/')
+
+saveTables = FALSE
+
+require(DESeq2)
+require(GenomicRanges)
+require(pheatmap)
+library(tictoc)
+
+library(tidyr)
+library(dplyr)
+require(ggplot2)
+library("gridExtra")
+library("cowplot")
+require(ggpubr)
+
 source('Functions_histM.R')
 library(dplyr)
 library(Seurat)
@@ -55,18 +93,28 @@ tfs.mara[which(is.na(match(tfs.mara, tfs.rna)))]
 # scRNA-seq data 
 ##########################################
 aa = readRDS(file = paste0(RdataDir, '/Gerber2018_Fluidigm.C1_batches_seuratObj.rds'))
-p1 = DimPlot(aa, reduction = "umap", group.by = 'timepoint')
-#p2 = DimPlot(aa, reduction = "umap", group.by = 'batch')
-p1
+aa = subset(aa, cells = colnames(aa)[which(aa$timepoint != 'Stage28' & aa$timepoint != 'Stage40' & 
+                                             aa$timepoint != 'Stage44')])
+aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 3000)
+all.genes <- rownames(aa)
+aa <- ScaleData(aa, features = all.genes)
+aa <- RunPCA(aa, features = VariableFeatures(object = aa), verbose = FALSE)
+ElbowPlot(aa)
 
+aa <- FindNeighbors(aa, dims = 1:15)
+aa <- FindClusters(aa, resolution = 0.5)
+
+aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.1)
+DimPlot(aa, reduction = "umap", group.by = 'timepoint')
+
+# add gene names 
 annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
                        'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
 
 mm = match(rownames(aa), annot$geneID)
 ggs = paste0(annot$gene.symbol.toUse[mm], '_',  annot$geneID[mm])
 ggs[is.na(mm)] = rownames(aa)[is.na(mm)]
-rownames(aa) = ggs
-
+#rownames(aa) = ggs
 genes = get_geneName(ggs)
 
 tfs.limb[which(is.na(match(tfs.limb, genes)))]
@@ -82,46 +130,159 @@ rownames(E) = ggs
 genes = get_geneName(rownames(E))
 mm = match(genes, geneSet)
 E = E[!is.na(mm), ]  # many gene IDs share the same gene symbols in the annotation
-ggs = get_geneName(rownames(E)) 
+genes = get_geneName(rownames(E)) 
+gg.counts = table(genes)
 
+mm = match(genes, names(gg.counts)[which(gg.counts<5)])
+E = E[!is.na(mm), ]  # remove the TFs with more than 5 IDs in the annotations, mainly zfinger proteins
+genes = get_geneName(rownames(E)) 
+gg.counts = table(genes)
 
-##########################################
-# CRE regions to scan
-##########################################
+saveRDS(E, file = paste0(RdataDir, '/GRNinference_scExprMatrix.rds'))
+
+########################################################
+########################################################
+# Section : Prior network from bulk atac-seq
+# 
+########################################################
+########################################################
 Prepare.enhancer.tss.4fimo.scanning = FALSE
 if(Prepare.enhancer.tss.4fimo.scanning)
 {
-  # atac-seq peaks
-  enhancers = readRDS(file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1_chipseekerAnnot_manual.rds'))
-  
   # tss used in the analysis
   tss = readRDS(file =paste0(RdataDir, '/regeneration_matureSamples_tss_perGene_smartseq2_atac_histM_v5.rds'))
+  tp = data.frame(t(sapply(tss$coords, 
+                           function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
   
-  pp = unique(c(rownames(enhancers), tss$coords))
+  tp$X3 = as.numeric(as.character(tp$X3)) - 2000 +300
+  #tp$X2 = as.numeric(as.character(tp$X2))
+  rownames(tp) = rownames(tss)
+  tp$name = rownames(tss)
+  tp$strand = '*'
+  tp$X3 = as.factor(tp$X3)
+  
+  # atac-seq peaks
+  enhancers = readRDS(file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1_chipseekerAnnot_manual.rds'))
+  pp = rownames(enhancers)
   pp = data.frame(t(sapply(pp, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
   pp$name = rownames(pp)
   pp$strand = '*'
+  
+  pp = rbind(pp, tp)
   pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
                                 start.field="X2", end.field="X3", strand.field="strand")
   ll = width(pp)
   
   saveDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/motif_analysis/peaks/'
-  write.table(pp, file = paste0(saveDir, 'atacPeaks_tss_for_fimo.bed'), 
-              row.names = FALSE, col.names = FALSE,
-              quote = FALSE, sep = '\t') 
+  rtracklayer::export(pp, format = 'bed', con = paste0(saveDir, 'atacPeaks_2kbtss_for_fimo.bed'))
   
 }
 
+##########################################
+# process matrix for gene-regulator matrix 
+##########################################
+## CRE-motif-occurence matrix
+moc1 = readRDS(file = '../results/motif_analysis/motif_oc_fimo_jaspar2022_pval.0.0001_v1.rds')
+moc2 = readRDS(file = '../results/motif_analysis/motif_oc_fimo_jaspar2022_pval.0.0001_regenerationTSS.rds')
+cres = c(rownames(moc1), rownames(moc2))
 
+mm = match(colnames(moc1), colnames(moc2))
+moc2 = moc2[,mm]
+
+mocs = rbind(moc1, moc2)
+rm(moc1); rm(moc2)
+
+# collect CREs for targets defined previously = rownames(E)
+# target-to-CRE matrix
+targets.ids = get_geneID(rownames(E))
+targets = data.frame(geneID = targets.ids, stringsAsFactors = FALSE)
+targets$CREs = NA
+
+bed = read.table(file = 
+    paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/motif_analysis/FIMO_promoters/', 
+           'promoter_tfs/sorted.bed'), header = FALSE)
+kk = match(targets$geneID, bed$V4)
+mm = which(!is.na(kk))
+targets$CREs[mm] = paste0(bed$V1[kk[mm]], ':', bed$V2[kk[mm]], '-', bed$V3[kk[mm]])
+
+enhancers = readRDS(file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1_chipseekerAnnot_manual.rds'))
+
+mm = match(targets.ids, enhancers$targets)
+ii = which(!is.na(mm))
+mm = mm[ii]
+targets2 = data.frame(geneID = enhancers$targets[mm], CREs = rownames(enhancers)[mm], stringsAsFactors = FALSE)
+targets = rbind(targets, targets2)
+
+xx = table(targets$geneID, targets$CREs)
+
+ss = apply(xx, 1, sum)
+
+xx = xx[which(ss>0), ]
+mm = match(rownames(xx), targets.ids)
+rownames(xx) = rownames(E)[mm]
+
+jj = match(colnames(xx), rownames(mocs))
+ii = which(!is.na(jj))
+jj = jj[ii]
+
+xx = xx[,ii]
+mocs = mocs[jj, ]
+
+target.moc = xx %*% mocs
+ss = apply(target.moc, 2, sum)
+
+
+## motif to TF association matrix
+mapping =readRDS(file = 
+      paste0('../data/JASPAR2022_CORE_vertebrates_nonRedundant_metadata.rds')) # association between motifs and TF symbols
+mapping = mapping[, c(3, 2)]
+
+atm = matrix(0, nrow = ncol(target.moc), ncol = nrow(target.moc))
+colnames(atm) = rownames(target.moc)
+rownames(atm) = colnames(target.moc)
+genes = get_geneName(colnames(atm))
+
+for(n in 1:nrow(atm))
+{
+  # n = 164
+  tfs = unlist(strsplit(as.character(mapping$tfs[which(mapping$name == rownames(atm)[n])]), '_'))
+  cat(n, '--', rownames(atm)[n], ' -- tfs --', tfs, '\n')
+  
+  for(tf in tfs)
+  {
+    jj = which(genes == tf)
+    atm[n, jj] = 1
+  }
+}
+
+target.tfs = target.moc %*% atm
+
+x = target.tfs[grep('HOXA13', rownames(target.tfs)), ];
+x[which(x>0)]
+
+ss = apply(target.tfs, 2, sum) # due to missing motif for associated TFs
+target.tfs = target.tfs[, which(ss>0)]
+
+ss = apply(target.tfs>0, 1, sum)
+target.tfs = target.tfs[which(ss>0), ]
+
+saveRDS(target.tfs, file = paste0(RdataDir, '/GRN_priorNetwork_target_TFs.rds'))
 
 ########################################################
 ########################################################
-# Section : test GENIE3
+# Section : GENIE3 
 # 
 ########################################################
 ########################################################
-source('GENIE3/GENIE3_R_C_wrapper/GENIE3.R')
-expr.matrix = read.expr.matrix('GENIE3/GENIE3_R_C_wrapper/data.txt', form = 'rows.are.samples')
-weight.matrix1 = GENIE3(expr.matrix)
+source('myGENIE3.R')
+E = readRDS(file = paste0(RdataDir, '/GRNinference_scExprMatrix.rds'))
+target.tfs = readRDS(file = paste0(RdataDir, '/GRN_priorNetwork_target_TFs.rds'))
+
+mm = match(rownames(target.tfs), rownames(E))
+E = E[mm, ]
+
+weight.matrix1 = GENIE3(expr.matrix = E, priorRegulators =  target.tfs)
+
+
 
 
