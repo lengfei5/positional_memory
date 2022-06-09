@@ -171,10 +171,13 @@ if(Prepare.enhancer.tss.4fimo.scanning)
   # tss used in the analysis
   tss = readRDS(file =paste0(RdataDir, '/regeneration_matureSamples_tss_perGene_smartseq2_atac_histM_v5.rds'))
   tss = data.frame(geneID = tss$geneID, coords = tss$coords)
+  rownames(tss) = tss$geneID
   missed = which(is.na(match(geneID, tss$geneID)))
   cat(length(missed), ' TFs miss TSS \n')
   
   tss2 = readRDS(file = paste0(RdataDir, '/missed_tss_GRN_inference.rds'))
+  rownames(tss2) = tss2$geneID
+  
   tss = rbind(tss, tss2)
   
   missed = which(is.na(match(geneID, tss$geneID)))
@@ -213,7 +216,7 @@ if(Prepare.enhancer.tss.4fimo.scanning)
   tp$X3 = as.factor(tp$X3)
   
   # atac-seq peaks
-  enhancers = readRDS(file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1_chipseekerAnnot_manual.rds'))
+  enhancers = readRDS(file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1_chipseekerAnnot_manual_targets.rds'))
   
   missed = which(is.na(match(geneID, enhancers$targets)))
   cat(length(missed), ' TFs miss atacPeaks \n')
@@ -228,7 +231,7 @@ if(Prepare.enhancer.tss.4fimo.scanning)
                                 start.field="X2", end.field="X3", strand.field="strand")
   
   saveDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/motif_analysis/peaks/'
-  rtracklayer::export(pp, format = 'bed', con = paste0(saveDir, 'atacPeaks_2kbtss_for_fimo.bed'))
+  rtracklayer::export(pp, format = 'bed', con = paste0(saveDir, 'atacPeaks_2kbtss_for_fimo_v2.bed'))
   
 }
 
