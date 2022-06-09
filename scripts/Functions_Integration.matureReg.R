@@ -696,6 +696,7 @@ peak_to_gene_assignment_TADs_correlation = function(enhancers)
   pvs = pt(q=t, df=5, lower.tail=FALSE)
   
   cat(length(which(!is.na(x))), ' peaks to annotate \n')
+  cat(length(which(x>0.6)), ' peak-to-gene assignment are significant \n')
   cat(length(which(pvs<0.05)), ' peak-to-gene assignment are significant \n')
   
   corrMax = data.frame(corrMax, stringsAsFactors = FALSE)

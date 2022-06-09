@@ -56,6 +56,9 @@ library(patchwork)
 # mainly TFs here from bulk RNA-seq and limb-development genes 
 ########################################################
 ########################################################
+##########################################
+# collect TFs of interest
+##########################################
 # TF annotation from human
 tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
 tfs = unique(tfs$`HGNC symbol`)
@@ -73,13 +76,17 @@ bb = readRDS(file = paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata', '
 tfs.mara = unique(bb$gene)
 tfs.mara = unique(unlist(lapply(tfs.mara, function(x) unlist(strsplit(as.character(x), '_')))))
 
-# smart-seq2 data
+## postional TFs from microarray
+tfs.positional = readRDS(file = paste0(RdataDir, '/postional_genes_tfs.rds'))
+
+# DE tfs in regeneration samples of smart-seq2 data
 rna = readRDS(file = paste0("../results/RNAseq_data_used/Rdata/", 
                             'regeneration_dynamicGeneClusters_allGenes.rds'))
 rna$gene = get_geneName(rownames(rna))
 
 tfs.limb[which(is.na(match(tfs.limb, rna$gene)))]
 tfs.mara[which(is.na(match(tfs.mara, rna$gene)))]
+tfs.positional[which(is.na(match(tfs.positional, rna$gene)))]
 
 rna = rna[which(!is.na(rna$cluster)), ]
 rna = rna[which(!is.na(match(rna$gene, tfs))), ]
@@ -88,9 +95,10 @@ tfs.rna = unique(rna$gene)
 
 tfs.limb[which(is.na(match(tfs.limb, tfs.rna)))]
 tfs.mara[which(is.na(match(tfs.mara, tfs.rna)))]
+tfs.positional[which(is.na(match(tfs.positional, tfs.rna)))]
 
 ##########################################
-# scRNA-seq data 
+# import scRNA-seq data for the dataset to used in GENIE3
 ##########################################
 aa = readRDS(file = paste0(RdataDir, '/Gerber2018_Fluidigm.C1_batches_seuratObj.rds'))
 aa = subset(aa, cells = colnames(aa)[which(aa$timepoint != 'Stage28' & aa$timepoint != 'Stage40' & 
@@ -110,35 +118,39 @@ DimPlot(aa, reduction = "umap", group.by = 'timepoint')
 # add gene names 
 annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
                        'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
-
 mm = match(rownames(aa), annot$geneID)
 ggs = paste0(annot$gene.symbol.toUse[mm], '_',  annot$geneID[mm])
 ggs[is.na(mm)] = rownames(aa)[is.na(mm)]
-#rownames(aa) = ggs
-genes = get_geneName(ggs)
+
+E = aa@assays$RNA@data
+rownames(E) = ggs
+genes = get_geneName(rownames(E))
 
 tfs.limb[which(is.na(match(tfs.limb, genes)))]
 tfs.mara[which(is.na(match(tfs.mara, genes)))]
+tfs.positional[which(is.na(match(tfs.positional, genes)))]
 tfs.rna[which(is.na(match(tfs.rna, genes)))]
 
-
 ### gene set of interest
-geneSet = unique(c(tfs.limb, tfs.mara, tfs.rna))
-E = aa@assays$RNA@data
+geneSet = unique(c(tfs.limb, tfs.mara, tfs.positional,  tfs.rna))
+cat('total TFs of interest : ', length(geneSet), '\n')
 
-rownames(E) = ggs
-genes = get_geneName(rownames(E))
 mm = match(genes, geneSet)
 E = E[!is.na(mm), ]  # many gene IDs share the same gene symbols in the annotation
 genes = get_geneName(rownames(E)) 
 gg.counts = table(genes)
+cat(length(gg.counts), ' TFs was found in scRNA-seq data\n')
 
-mm = match(genes, names(gg.counts)[which(gg.counts<5)])
-E = E[!is.na(mm), ]  # remove the TFs with more than 5 IDs in the annotations, mainly zfinger proteins
+cat(names(gg.counts)[which(gg.counts>=4)])
+
+# remove the TFs with more than 5 IDs in the annotations, mainly zfinger proteins
+mm = match(genes, names(gg.counts)[which(gg.counts<4)])
+E = E[!is.na(mm), ]  
 genes = get_geneName(rownames(E)) 
 gg.counts = table(genes)
 
-saveRDS(E, file = paste0(RdataDir, '/GRNinference_scExprMatrix.rds'))
+## 346 TFs from scRNA-seq data with 289 unique gene symbols
+saveRDS(E, file = paste0(RdataDir, '/GRNinference_scExprMatrix_346geneID_289TFsymbols.rds')) 
 
 ########################################################
 ########################################################
@@ -146,11 +158,50 @@ saveRDS(E, file = paste0(RdataDir, '/GRNinference_scExprMatrix.rds'))
 # 
 ########################################################
 ########################################################
+
+##########################################
+# collect CRE regions for selected TFs
+##########################################
 Prepare.enhancer.tss.4fimo.scanning = FALSE
 if(Prepare.enhancer.tss.4fimo.scanning)
 {
+  E = readRDS(file = paste0(RdataDir, '/GRNinference_scExprMatrix_346geneID_289TFsymbols.rds'))
+  geneID = get_geneID(rownames(E))
+  
   # tss used in the analysis
   tss = readRDS(file =paste0(RdataDir, '/regeneration_matureSamples_tss_perGene_smartseq2_atac_histM_v5.rds'))
+  tss = data.frame(geneID = tss$geneID, coords = tss$coords)
+  missed = which(is.na(match(geneID, tss$geneID)))
+  cat(length(missed), ' TFs miss TSS \n')
+  
+  tss2 = readRDS(file = paste0(RdataDir, '/missed_tss_GRN_inference.rds'))
+  tss = rbind(tss, tss2)
+  
+  missed = which(is.na(match(geneID, tss$geneID)))
+  cat(length(missed), ' TFs miss TSS \n')
+  
+  Add.missed.TSS = FALSE
+  if(Add.missed.TSS){
+    gtf.all = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/AmexT_v47_Hox.patch.gtf'
+    amex.all = GenomicFeatures::makeTxDbFromGFF(file = gtf.all)
+    tss = GenomicFeatures::promoters(amex.all, upstream = 2000, downstream = 2000, use.names = TRUE)
+    
+    tss = as.data.frame(tss)
+    tss$tx_name = sapply(tss$tx_name, function(x){x = unlist(strsplit(as.character(x), '[|]')); x[length(x)]})
+    tss$start[which(tss$start<=1)] = 1
+    
+    annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+    'AmexT_v47_transcriptID_transcriptCotig_geneSymbol.nr_geneSymbol.hs_geneID_gtf.geneInfo_gtf.transcriptInfo.rds'))
+    tss$geneID = annot$geneID[match(tss$tx_name, annot$transcriptID)]
+    
+    kk = match(geneID[missed], tss$geneID)
+    
+    xx = data.frame(geneID = tss$geneID[kk], coords = paste0(tss$seqnames[kk], ':', tss$start[kk], '-', tss$end[kk]))
+    saveRDS(xx, file = paste0(RdataDir, '/missed_tss_GRN_inference.rds'))
+    
+  }
+  
+  ## resize the promoters to -2kb--+300bp
   tp = data.frame(t(sapply(tss$coords, 
                            function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
   
@@ -163,6 +214,10 @@ if(Prepare.enhancer.tss.4fimo.scanning)
   
   # atac-seq peaks
   enhancers = readRDS(file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1_chipseekerAnnot_manual.rds'))
+  
+  missed = which(is.na(match(geneID, enhancers$targets)))
+  cat(length(missed), ' TFs miss atacPeaks \n')
+  
   pp = rownames(enhancers)
   pp = data.frame(t(sapply(pp, function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
   pp$name = rownames(pp)
@@ -171,7 +226,6 @@ if(Prepare.enhancer.tss.4fimo.scanning)
   pp = rbind(pp, tp)
   pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
                                 start.field="X2", end.field="X3", strand.field="strand")
-  ll = width(pp)
   
   saveDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/motif_analysis/peaks/'
   rtracklayer::export(pp, format = 'bed', con = paste0(saveDir, 'atacPeaks_2kbtss_for_fimo.bed'))

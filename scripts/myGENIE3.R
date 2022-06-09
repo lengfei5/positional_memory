@@ -443,6 +443,9 @@ plot_tf_network = function(link.list)
     theme(legend.position = "none")
   
   # centrality layout
+  # https://github.com/schochastics/graphlayouts
+  bc <- betweenness(trn)
+  cc <- closeness(trn)
   ggraph(trn, layout = "centrality", cent = graph.strength(trn)) +
     geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
     geom_node_point(aes(fill = clu, size = size), shape = 21) +
@@ -457,17 +460,17 @@ plot_tf_network = function(link.list)
   ggsave(paste0(resDir, "/TRN_firstTest.pdf"), width=12, height = 10)
   
   # focus layout
-  ggraph(trn, layout = "focus", focus = 1) +
+  ggraph(trn, layout = "focus", focus = 10) +
     geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
     geom_node_point(aes(fill = clu, size = size), shape = 21) +
     #geom_node_text(aes(filter = (name == "Ned"), size = size, label = name),family = "serif") +
-    geom_node_text(aes(filter = size >= 30, size = size, label = name), family = "serif") +
+    geom_node_text(aes(size = size, label = name), family = "serif") +
     scale_edge_width_continuous(range = c(0.2, 1.2)) +
     scale_size_continuous(range = c(1, 5)) +
-    scale_fill_manual(values = c(got_palette, 'red', 'blue')) +
+    scale_fill_manual(values = got_palette) +
     coord_fixed() +
     theme_graph() +
     theme(legend.position = "none")
-  
+  ggsave(paste0(resDir, "/TRN_firstTest_focus.10.pdf"), width=12, height = 10)
     
 }

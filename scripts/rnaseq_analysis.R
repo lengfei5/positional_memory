@@ -151,8 +151,10 @@ cat(length(select), ' DE genes selected \n')
 ggs = ggs[select]
 
 cat(ggs[grep('MEIS', ggs)], '\n')
-
 print(intersect(ggs, tfs))
+
+saveRDS(intersect(ggs, tfs), file = paste0(RdataDir, '/postional_genes_tfs.rds'))
+
 print(intersect(ggs, sps))
 print(intersect(ggs, eps))
 print(intersect(ggs, rbp))
