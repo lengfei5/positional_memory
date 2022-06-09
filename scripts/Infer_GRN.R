@@ -275,14 +275,44 @@ saveRDS(target.tfs, file = paste0(RdataDir, '/GRN_priorNetwork_target_TFs.rds'))
 ########################################################
 ########################################################
 source('myGENIE3.R')
+
 E = readRDS(file = paste0(RdataDir, '/GRNinference_scExprMatrix.rds'))
 target.tfs = readRDS(file = paste0(RdataDir, '/GRN_priorNetwork_target_TFs.rds'))
 
 mm = match(rownames(target.tfs), rownames(E))
 E = E[mm, ]
+E = as.matrix(E)
 
-weight.matrix1 = GENIE3(expr.matrix = E, priorRegulators =  target.tfs)
+sds = apply(E, 1, sd)
+sels = which(sds>10^-4)
+E = E[sels, ]
+target.tfs = target.tfs[sels, ]
 
+#tic()
+#weight.matrix1 = GENIE3(expr.matrix = E, priorRegulators =  target.tfs)
+#toc()
+
+tic()
+wtm = GENIE3(expr.matrix = E, priorRegulators =  target.tfs, ncore = 8)
+saveRDS(wtm, file = paste0(RdataDir, '/first_test_Genie3.rds'))
+
+toc()
+
+
+wtm = readRDS(file =  paste0(RdataDir, '/first_test_Genie3.rds'))
+ggs = colnames(wtm)
+genes = get_geneName(ggs)
+gene.counts = table(genes)
+gene.unique = names(gene.counts)[which(gene.counts==1)]
+mm = match(genes, gene.unique)
+kk = which(!is.na(mm))
+ggs[kk] = genes[kk]
+colnames(wtm) = ggs
+rownames(wtm) = ggs
+
+link.list = get.link.list(wtm, threshold = 0.01)
+dim(link.list)
+head(link.list)
 
 
 

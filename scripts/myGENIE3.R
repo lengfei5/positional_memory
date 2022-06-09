@@ -26,17 +26,23 @@
 #' link.list <- get.link.list(weight.matrix)
 #' head(link.list)
 #' @export
-GENIE3 <- function(expr.matrix, tree.method="RF", K="sqrt", ntrees=1000, regulators=NULL, ncores=1, verbose=TRUE, seed=NULL) 
+GENIE3 <- function(expr.matrix, priorRegulators = NULL, 
+                   tree.method="RF", K="sqrt", ntrees=1000, regulators=NULL, ncores=1, 
+                   verbose=TRUE, seed=NULL) 
 {
+  # expr.matrix = E;  priorRegulators = target.tfs; tree.method="RF"; K="sqrt"; ntrees=1000; regulators=NULL; ncores=1; 
+  # verbose=TRUE; seed=NULL;
   dyn.load("GENIE3.so")
   
 	# check input arguments
 	if (!is.matrix(expr.matrix) && !is.array(expr.matrix)) {
-		stop("Parameter expr.matrix must be a two-dimensional matrix where each row corresponds to a gene and each column corresponds to a condition/sample.")
+		stop("Parameter expr.matrix must be a two-dimensional matrix where each row corresponds to a gene 
+		     and each column corresponds to a condition/sample.")
 	}
 	
 	if (length(dim(expr.matrix)) != 2) {
-		stop("Parameter expr.matrix must be a two-dimensional matrix where each row corresponds to a gene and each column corresponds to a condition/sample.")
+		stop("Parameter expr.matrix must be a two-dimensional matrix 
+		     where each row corresponds to a gene and each column corresponds to a condition/sample.")
 	}
 	
 	if (is.null(rownames(expr.matrix))) {
@@ -79,7 +85,7 @@ GENIE3 <- function(expr.matrix, tree.method="RF", K="sqrt", ntrees=1000, regulat
 	
 	# set random number generator seed if seed is given
   if (!is.null(seed)) {
-        set.seed(seed)
+     set.seed(seed)
   }
     
   # transpose expression matrix to (samples x genes)
@@ -97,6 +103,7 @@ GENIE3 <- function(expr.matrix, tree.method="RF", K="sqrt", ntrees=1000, regulat
   if (is.null(regulators)) {
     input.gene.names <- gene.names
   } else {
+    
     # input gene indices given as integers
     if (is.numeric(regulators)) {
       input.gene.names <- gene.names[regulators]
@@ -145,15 +152,23 @@ GENIE3 <- function(expr.matrix, tree.method="RF", K="sqrt", ntrees=1000, regulat
 	  
 	  for (target.gene.idx in seq(from=1, to=num.genes)) 
 	  {
-	    # target.gene.idx = 1; verbose = TRUE;
+	    # target.gene.idx = 244; verbose = TRUE;
 	    if (verbose) {	
 	      cat(paste("Computing gene ", target.gene.idx, "/", num.genes, "\n", sep=""))
 	      flush.console()
 	    }
+	    
 	    target.gene.name <- gene.names[target.gene.idx]
 	    
 	    # remove target gene from input genes
 	    these.input.gene.names <- setdiff(input.gene.names, target.gene.name)
+	    if(!is.null(priorRegulators)){
+	      preSels = priorRegulators[which(rownames(priorRegulators) == target.gene.name), ]
+	      preSels_regulators = colnames(priorRegulators)[which(preSels>0)]
+	      these.input.gene.names = intersect(these.input.gene.names, preSels_regulators)
+	      #cat('nb of prior regulators : ', length(these.input.gene.names), '\n')
+	    }
+	    
 	    num.input.genes <- length(these.input.gene.names)
 	    
 	    x <- expr.matrix[ ,these.input.gene.names]
@@ -195,7 +210,7 @@ GENIE3 <- function(expr.matrix, tree.method="RF", K="sqrt", ntrees=1000, regulat
 	    
 	  }
 	  
-	} else {
+	}else{
 		# parallel computing
 	  library(doRNG); 
 	  library(doParallel); 
@@ -203,13 +218,19 @@ GENIE3 <- function(expr.matrix, tree.method="RF", K="sqrt", ntrees=1000, regulat
 	  options(cores=ncores)
 		
 		if (verbose) {
-		    message(paste("\nUsing", getDoParWorkers(), "cores."))
+		  message(paste("\nUsing", getDoParWorkers(), "cores."))
 		}
 		
 	  weight.matrix.reg <- foreach(target.gene.name=gene.names, .combine=cbind) %dorng% 
 	  {
 	    # remove target gene from input genes
 	    these.input.gene.names <- setdiff(input.gene.names, target.gene.name)
+	    if(!is.null(priorRegulators)){
+	      preSels = priorRegulators[which(rownames(priorRegulators) == target.gene.name), ]
+	      preSels_regulators = colnames(priorRegulators)[which(preSels>0)]
+	      these.input.gene.names = intersect(these.input.gene.names, preSels_regulators)
+	      #cat('nb of prior regulators : ', length(these.input.gene.names), '\n')
+	    }
 	    num.input.genes <- length(these.input.gene.names)
 	    
 	    x <- expr.matrix[,these.input.gene.names]
@@ -364,4 +385,98 @@ read.expr.matrix <- function(filename, form="", sep="", default.gene.label="gene
     # transpose matrix to (genes x samples) if needed
     if (form == "rows.are.samples") m <- t(m)
     return(m)
+}
+
+##########################################
+# plot the GRN graph 
+# some original code from https://mr.schochastics.net/material/netvizr/
+# https://github.com/quadbiolab/Pando/blob/main/R/plots.R (Pando from Jonas)
+##########################################
+plot_tf_network = function(link.list)
+{
+  library(igraph)
+  library(ggraph)
+  library(tidygraph)
+  library(graphlayouts)
+  
+  trn <- graph_from_data_frame(link.list, directed = FALSE)
+  
+  library(networkdata)
+  data("got")
+  gotS1 <- got[[1]]
+  plot(gotS1)
+  
+  autograph(gotS1)
+  autograph(trn)
+  
+  # define a custom color palette
+  got_palette <- c(
+    "#1A5878", "#C44237", "#AD8941", "#E99093",
+    "#50594B", "#8968CD", "#9ACD32"
+  )
+  
+  # compute a clustering for node colors
+  V(gotS1)$clu <- as.character(membership(cluster_louvain(gotS1)))
+  # compute degree as node size
+  V(gotS1)$size <- degree(gotS1)
+  
+  V(trn)$clu <- as.character(membership(cluster_louvain(trn)))
+  # compute degree as node size
+  V(trn)$size <- degree(trn)
+  
+  # basic graph
+  ggraph(gotS1, layout = "stress") +
+    geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
+    geom_node_point(aes(fill = clu, size = size), shape = 21) +
+    geom_node_text(aes(filter = size >= 26, label = name), family = "serif") +
+    scale_fill_manual(values = got_palette) +
+    scale_edge_width(range = c(0.2, 3)) +
+    scale_size(range = c(1, 6)) +
+    theme_graph() +
+    theme(legend.position = "none")
+  
+  ggraph(trn, layout = "stress") +
+    geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
+    geom_node_point(aes(fill = clu, size = size), shape = 21) +
+    geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
+    scale_fill_manual(values = c(got_palette, 'red', 'blue')) +
+    scale_edge_width(range = c(0.2, 3)) +
+    scale_size(range = c(1, 6)) +
+    theme_graph() +
+    theme(legend.position = "none")
+  
+  ggraph(trn, layout = "graphopt") +
+    geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
+    geom_node_point(aes(fill = clu, size = size), shape = 21) +
+    geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
+    scale_fill_manual(values = c(got_palette, 'red', 'blue')) +
+    scale_edge_width(range = c(0.2, 3)) +
+    scale_size(range = c(1, 6)) +
+    theme_graph() +
+    theme(legend.position = "none")
+  
+  ggraph(trn, layout = "centrality", cent = graph.strength(trn)) +
+    geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
+    geom_node_point(aes(fill = clu, size = size), shape = 21) +
+    geom_node_text(aes(filter = size >= 30, label = name), family = "serif") +
+    scale_edge_width_continuous(range = c(0.05, 0.2)) +
+    scale_size_continuous(range = c(1, 10)) +
+    scale_fill_manual(values = c(got_palette, 'red', 'blue')) +
+    coord_fixed() +
+    theme_graph() +
+    theme(legend.position = "none")
+  
+  
+  ggraph(trn, layout = "focus", focus = 1) +
+    geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
+    geom_node_point(aes(fill = clu, size = size), shape = 21) +
+    #geom_node_text(aes(filter = (name == "Ned"), size = size, label = name),family = "serif") +
+    geom_node_text(aes(filter = size >= 30, size = size, label = name), family = "serif") +
+    scale_edge_width_continuous(range = c(0.2, 1.2)) +
+    scale_size_continuous(range = c(1, 5)) +
+    scale_fill_manual(values = c(got_palette, 'red', 'blue')) +
+    coord_fixed() +
+    theme_graph() +
+    theme(legend.position = "none")
+    
 }
