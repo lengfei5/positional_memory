@@ -401,40 +401,26 @@ plot_tf_network = function(link.list)
   
   trn <- graph_from_data_frame(link.list, directed = FALSE)
   
-  library(networkdata)
-  data("got")
-  gotS1 <- got[[1]]
-  plot(gotS1)
-  
-  autograph(gotS1)
-  autograph(trn)
-  
-  # define a custom color palette
-  got_palette <- c(
-    "#1A5878", "#C44237", "#AD8941", "#E99093",
-    "#50594B", "#8968CD", "#9ACD32"
-  )
-  
   # compute a clustering for node colors
-  V(gotS1)$clu <- as.character(membership(cluster_louvain(gotS1)))
-  # compute degree as node size
-  V(gotS1)$size <- degree(gotS1)
-  
   V(trn)$clu <- as.character(membership(cluster_louvain(trn)))
   # compute degree as node size
   V(trn)$size <- degree(trn)
   
-  # basic graph
-  ggraph(gotS1, layout = "stress") +
-    geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
-    geom_node_point(aes(fill = clu, size = size), shape = 21) +
-    geom_node_text(aes(filter = size >= 26, label = name), family = "serif") +
-    scale_fill_manual(values = got_palette) +
-    scale_edge_width(range = c(0.2, 3)) +
-    scale_size(range = c(1, 6)) +
-    theme_graph() +
-    theme(legend.position = "none")
+  # define a custom color palette
+  nb_clusters = length(unique(V(trn)$clu))
+  if(length(nb_clusters)<=9) {
+    library(khroma)
+    muted <- colour("muted")
+    got_palette = c("#CC6677", "#332288", "#DDCC77", "#117733", "#88CCEE", "#882255", "#44AA99")[1:nb_clusters] 
+  }else{
+    cat('More than 9 colors needed \n')
+    got_palette <- c(
+      "#1A5878", "#C44237", "#AD8941", "#E99093",
+      "#50594B", "#8968CD", "#9ACD32"
+    )
+  }
   
+  # # basic graph
   ggraph(trn, layout = "stress") +
     geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
     geom_node_point(aes(fill = clu, size = size), shape = 21) +
@@ -445,6 +431,7 @@ plot_tf_network = function(link.list)
     theme_graph() +
     theme(legend.position = "none")
   
+  # force-driven layout
   ggraph(trn, layout = "graphopt") +
     geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
     geom_node_point(aes(fill = clu, size = size), shape = 21) +
@@ -455,18 +442,21 @@ plot_tf_network = function(link.list)
     theme_graph() +
     theme(legend.position = "none")
   
+  # centrality layout
   ggraph(trn, layout = "centrality", cent = graph.strength(trn)) +
     geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
     geom_node_point(aes(fill = clu, size = size), shape = 21) +
-    geom_node_text(aes(filter = size >= 30, label = name), family = "serif") +
+    geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
     scale_edge_width_continuous(range = c(0.05, 0.2)) +
     scale_size_continuous(range = c(1, 10)) +
-    scale_fill_manual(values = c(got_palette, 'red', 'blue')) +
+    scale_fill_manual(values = got_palette) +
     coord_fixed() +
     theme_graph() +
+    #theme(legend.position = "bottom")
     theme(legend.position = "none")
+  ggsave(paste0(resDir, "/TRN_firstTest.pdf"), width=12, height = 10)
   
-  
+  # focus layout
   ggraph(trn, layout = "focus", focus = 1) +
     geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
     geom_node_point(aes(fill = clu, size = size), shape = 21) +
@@ -478,5 +468,6 @@ plot_tf_network = function(link.list)
     coord_fixed() +
     theme_graph() +
     theme(legend.position = "none")
+  
     
 }

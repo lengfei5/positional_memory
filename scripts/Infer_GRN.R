@@ -310,7 +310,13 @@ ggs[kk] = genes[kk]
 colnames(wtm) = ggs
 rownames(wtm) = ggs
 
-link.list = get.link.list(wtm, threshold = 0.01)
+cutoff = 0.01;
+ss1 = apply(wtm, 1, function(x) length(which(x>cutoff)))
+ss2 = apply(wtm, 2, function(x) length(which(x>cutoff)))
+sels = which(ss1>=5 & ss2>=5)
+wtm = wtm[sels, sels]
+
+link.list = get.link.list(wtm, threshold = cutoff)
 dim(link.list)
 head(link.list)
 
