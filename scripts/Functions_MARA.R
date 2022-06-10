@@ -219,10 +219,13 @@ extract.TFs.annotation.from.TFClass = function()
 process.jaspar2022.meme.vetebrate = function()
 {
   library(universalmotif)
+  
   dir_jaspar2022 = '/Volumes/groups/tanaka/People/current/jiwang/Databases/motifs_TFs/JASPAR2022/'
   pwm.old = paste0(dir_jaspar2022, 'JASPAR2022_CORE_vertebrates_non-redundant_pfms_meme.txt')
   xx = read_meme(file = pwm.old, skip = 0)
+  xx1 = read_meme(file = paste0(dir_jaspar2022, 'JASPAR2022_UNVALIDATED_non-redundant_pfms_meme.txt'))
   
+  xx = c(xx, xx1)
   # convert to PPM to have the propre format
   yy = convert_type(xx, "PPM")
   
@@ -239,24 +242,26 @@ process.jaspar2022.meme.vetebrate = function()
   metadata$tfs = toupper(metadata$tfs)
   
   metadata$tfs = gsub('::', '_', metadata$tfs)
-  
-  x = table(metadata$tfs)
-  y = x[which(x>1)]
-  
-  pdfname = paste0(resDir, "/Jaspar2022_PWM_multipleMotifs_perTF.pdf")
-  pdf(pdfname, width=12, height = 10)
-  par(cex =0.5, mar = c(4,10,4,5)+0.1, mgp = c(2.5,1.5,0),las = 0, tcl = 0.3)
-  
-  barplot(y, names.arg = names(y), horiz = TRUE, las = 2)
-  
-  dev.off()
+  metadata$tfs[grep('E2F1/2', metadata$tfs)] = "E2F1_E2F2_E2F3_E2F6"
+  # x = table(metadata$tfs)
+  # y = x[which(x>1)]
+  # 
+  # pdfname = paste0(resDir, "/Jaspar2022_PWM_multipleMotifs_perTF.pdf")
+  # pdf(pdfname, width=12, height = 10)
+  # par(cex =0.5, mar = c(4,10,4,5)+0.1, mgp = c(2.5,1.5,0),las = 0, tcl = 0.3)
+  # 
+  # barplot(y, names.arg = names(y), horiz = TRUE, las = 2)
+  # 
+  # dev.off()
   
   ## make logos, modify motif names and save individual pwm
-  dir_jaspar2022_logos = paste0(dir_jaspar2022, 'core_vertebrates_nonRedundent_individualPWM_logo/')
+  dir_jaspar2022_logos = paste0(dir_jaspar2022, 'core_unvalidated_vertebrates_nonRedundent_individualPWM_logo/')
   if(!dir.exists(dir_jaspar2022_logos)) dir.create(dir_jaspar2022_logos)
+  
   metadata$name = paste0(metadata$tfs, '_', metadata$motifs)
   
-  for(n in 1:length(yy))
+  
+  for(n in 1273:length(yy))
   {
     # n = 1
     cat(n, '\n')
@@ -274,15 +279,17 @@ process.jaspar2022.meme.vetebrate = function()
     # change motif names
     yy[[n]]@name = metadata$name[n]
     
-    write_meme(yy[[n]], overwrite = TRUE,  
+    write_meme(yy[[n]], overwrite = TRUE, 
                file = paste0(dir_jaspar2022_logos, metadata$name[n], '.meme'))
-    
   }
   
-  write_meme(yy, overwrite = TRUE,  
-             file = paste0(dir_jaspar2022, 'JASPAR2022_CORE_vertebrates_nonRedundant.meme'))
+  idx = c(1201, 1272)
+  yy0 = yy[-c(1201, 1272)]
+  write_meme(yy0, overwrite = TRUE,  
+             file = paste0(dir_jaspar2022, 'JASPAR2022_CORE_UNVALIDED_vertebrates_nonRedundant.meme'))
   
-  saveRDS(metadata, file = paste0('../data/JASPAR2022_CORE_vertebrates_nonRedundant_metadata.rds'))
+  metadata = metadata[-idx, ]
+  saveRDS(metadata, file = paste0('../data/JASPAR2022_CORE_UNVALIDED_vertebrates_nonRedundant_metadata.rds'))
   
   ### more annotation probably
   dir_Berando = '/Volumes/groups/tanaka/People/current/jiwang/Databases/motifs_TFs/Shared_byBernado/'

@@ -238,6 +238,42 @@ if(Prepare.enhancer.tss.4fimo.scanning)
 ##########################################
 # process matrix for gene-regulator matrix 
 ##########################################
+E = readRDS(file = paste0(RdataDir, '/GRNinference_scExprMatrix_346geneID_289TFsymbols.rds'))
+genes = unique(get_geneName(rownames(E)))
+
+# association between motifs and TF symbols from JASPAR core and unvalided
+mapping =readRDS(file = 
+        paste0('../data/JASPAR2022_CORE_UNVALIDED_vertebrates_nonRedundant_metadata.rds')) 
+
+mapping = rbind(mapping, c('UN0262.1', 'SALL1', 'SALL1_UN0262.1'))
+mapping = rbind(mapping, c('UN0262.1', 'SALL3', 'SALL3_UN0262.1'))
+mapping = rbind(mapping, c('MA0835.2', 'BATF2', 'BATF2_MA0835.2'))
+mapping = rbind(mapping, c('MA1504.1', 'HOXC5', 'HOXC5_MA1504.1'))
+mapping = rbind(mapping, c('MA0103.3', 'ZEB2', NA))
+mapping = rbind(mapping, c('MA1122.1', 'TFDP2', NA))
+mapping = rbind(mapping, c('MA0597.2', 'THAP4', NA))
+mapping = rbind(mapping, c('MA1928.1', 'BNC1', NA))
+mapping = rbind(mapping, c('UN0130.1', 'IRX5', NA))
+mapping = rbind(mapping, c('MA0626.1', 'NPAS3', NA))
+mapping = rbind(mapping, c('UN0116.1', 'DPF3', NA))
+mapping = rbind(mapping, c('MA0833.2', 'ATF5', NA))
+mapping = rbind(mapping, c('MA1989.1', 'BCL11A', NA))
+mapping = rbind(mapping, c('MA0108.2', 'TBPL1', NA))
+mapping = rbind(mapping, c('MA0690.2', 'TBX22', NA))
+mapping = rbind(mapping, c('MA0597.2', 'THAP6', NA))
+mapping = rbind(mapping, c('MA1638.1', 'SCX', NA))
+mapping = rbind(mapping, c('MA1707.1', 'DMRT2', NA))
+
+tfs = c()
+for(n in 1:nrow(mapping))
+{
+  tfs = unique(c(tfs, unlist(strsplit(as.character(mapping$tfs[n]), '_'))))
+}
+missed = which(is.na(match(genes, tfs)))
+genes[missed]
+
+saveRDS(mapping, file = '../data/JASPAR2022_CORE_UNVALIDED_vertebrates_nonRedundant_metadata_manual.rds')
+
 ## CRE-motif-occurence matrix
 moc1 = readRDS(file = '../results/motif_analysis/motif_oc_fimo_jaspar2022_pval.0.0001_v1.rds')
 moc2 = readRDS(file = '../results/motif_analysis/motif_oc_fimo_jaspar2022_pval.0.0001_regenerationTSS.rds')
