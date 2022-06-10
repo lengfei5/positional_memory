@@ -465,5 +465,71 @@ Compare.CutandRun.controls = function()
 }
 
 
+##########################################
+# sort the gene order with desired cluster order 
+##########################################
+sort_geneNames_desiredClusterRank_c1 = function(px, my_gene_col, desired_order = c(2, 4, 3, 1))
+{
+  oo = data.frame(px$tree_row$labels[px$tree_row$order])
+  oo = data.frame(name = oo[,1], clus = my_gene_col[match(oo[,1], names(my_gene_col))], stringsAsFactors = FALSE)
+  
+  gname = c()
+  for(c in desired_order)
+  {
+    gname  = c(gname, as.character(oo$name[which(oo$clus == c)]))
+  }
+  
+  return(gname)
+}
+
+sort_geneNames_desiredClusterRank_c3 = function(px, my_gene_col)
+{
+  oo = data.frame(px$tree_row$labels[px$tree_row$order])
+  oo = data.frame(name = oo[,1], clus = my_gene_col[match(oo[,1], names(my_gene_col))], stringsAsFactors = FALSE)
+  
+  desired_order = c(5, 2, 1, 6,4,3)
+  gname = c()
+  for(c in desired_order)
+  {
+    gname  = c(gname, as.character(oo$name[which(oo$clus == c)]))
+  }
+  
+  return(gname)
+}
+
+sort_geneNames_desiredClusterRank_c4 = function(px, my_gene_col)
+{
+  oo = data.frame(px$tree_row$labels[px$tree_row$order])
+  oo = data.frame(name = oo[,1], clus = my_gene_col[match(oo[,1], names(my_gene_col))], stringsAsFactors = FALSE)
+  unique(oo$clus)
+  table(oo$clus)[ unique(oo$clus)]
+  
+  desired_order = c(2, 4, 5, 1, 3, 6)
+  gname = c()
+  for(c in desired_order)
+  {
+    gname  = c(gname, as.character(oo$name[which(oo$clus == c)]))
+  }
+  
+  return(gname)
+}
+
+sort_geneNames_desiredClusterRank_c2 = function(px, my_gene_col)
+{
+  oo = data.frame(px$tree_row$labels[px$tree_row$order])
+  oo = data.frame(name = oo[,1], clus = my_gene_col[match(oo[,1], names(my_gene_col))], stringsAsFactors = FALSE)
+  unique(oo$clus)
+  table(oo$clus)[ unique(oo$clus)]
+  
+  desired_order = c(3,5,4,2,1,6)
+  gname = c()
+  for(c in desired_order)
+  {
+    gname  = c(gname, as.character(oo$name[which(oo$clus == c)]))
+  }
+  
+  return(gname)
+  
+}
 
 

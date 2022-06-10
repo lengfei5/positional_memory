@@ -733,50 +733,202 @@ subclustering.postional.histM.postioinalAtacPeaks = function(test)
   library("dendsort")
   library("seriation")
   
+  callback = function(hc, mat){
+    sv = svd(t(mat))$v[,1]
+    dend = reorder(as.dendrogram(hc), wts = sv)
+    as.hclust(dend)
+  }
+  
   #new_order = c()
   for(ac in cluster_order)
   {
-    # ac = 6
+    # ac = 2
     kk = which(peaks$cluster == ac)
     cat('clsuter ', ac, ' -- ', length(kk), ' peaks \n')
     
-    #data("iris")
-    x <- as.matrix(test[kk,]) #drop the 5th colum
-    
     if(ac == 6){
-      pheatmap(x[, c(4:9, 1:3)], cluster_rows = FALSE, cluster_cols = FALSE)
-      pheatmap(x[order(-x[,4]), c(4:9, 1:3)], cluster_rows = FALSE, cluster_cols = FALSE)
-      o1 = order(-x[,4])
+      ac = 6
+      kk = which(peaks$cluster == ac)
+      cat('clsuter ', ac, ' -- ', length(kk), ' peaks \n')
+      x <- as.matrix(test[kk,]) #drop the 5th colum
+      nb_clusters = 3
+      px = pheatmap(x[, c(4:9, 1:3)], #annotation_row = my_gene_col, 
+               #annotation_col = df, 
+               show_rownames = FALSE, scale = 'none', 
+               #color = col, 
+               show_colnames = FALSE,
+               cluster_rows = TRUE, 
+               cluster_cols = FALSE,  
+               clustering_callback = callback,
+               clustering_method = 'complete', cutree_rows = nb_clusters, 
+               #annotation_colors = annot_colors, 
+               gaps_col = c(3, 5))
+      peakNm = c(peakNm, px$tree_row$labels[px$tree_row$order])
       
-      d <-as.dist(sqrt(2*(1-cor(t(test[kk, ])))))
-      #Comparing different seriation methods
-      methods <- c("HC", "GW", "OLO")
-      results <- sapply(methods, FUN=function(m) seriate(d, m), simplify = FALSE)
-      #hc_HC = results[["HC"]][[1]]
-      #hc_GW = results[["GW"]][[1]]
-      #hc_OLO = results[["OLO"]][[1]]
-      hc_OLO = as.hclust(dendsort(as.dendrogram(hclust(d, method = "complete"))))
-      pheatmap(x[hc_OLO$order, c(4:9, 1:3)], cluster_rows = FALSE, cluster_cols = FALSE)
-      
-    }else{
-      d <-as.dist(sqrt(2*(1-cor(t(test[kk, ])))))
-      #Comparing different seriation methods
-      methods <- c("HC", "GW", "OLO")
-      results <- sapply(methods, FUN=function(m) seriate(d, m), simplify = FALSE)
-      #hc_HC = results[["HC"]][[1]]
-      #hc_GW = results[["GW"]][[1]]
-      #hc_OLO = results[["OLO"]][[1]]
-      hc_OLO = as.hclust(dendsort(as.dendrogram(hclust(d, method = "complete"))))
-      
-      peakNm = c(peakNm, hc_OLO$labels[hc_OLO$order])
-      # dd = dist(as.matrix(test[kk, ]))
-      #dd = as.dist(sqrt(2*(1-cor(t(test[kk, ])))))
-      #order <- seriate(dd)
-      #new_order = c(new_order, order)
-      #hm_hclust <- hclust(dd, method = "ward.D2")
-      #hm_cluster <- cutree(tree = as.dendrogram(hm_hclust), h = 4)
-      #peakNm = c(peakNm, hm_hclust$labels[hm_hclust$order])
     }
+    if(ac == 1){
+      ac = 1
+      kk = which(peaks$cluster == ac)
+      cat('clsuter ', ac, ' -- ', length(kk), ' peaks \n')
+      
+      x <- as.matrix(test[kk,]) #drop the 5th colum
+      nb_clusters = 4
+      my_hclust_gene <- hclust(dist(x), method = "complete")
+      my_gene_col <- cutree(tree = as.dendrogram(my_hclust_gene), k = nb_clusters)
+      
+      px = pheatmap(x[, c(4:9, 1:3)], #annotation_row = my_gene_col, 
+                    #annotation_col = df, 
+                    show_rownames = FALSE, scale = 'none', 
+                    #color = col, 
+                    show_colnames = FALSE,
+                    cluster_rows = TRUE, 
+                    cluster_cols = FALSE,  
+                    clustering_callback = callback,
+                    clustering_method = 'complete', cutree_rows = nb_clusters, 
+                    #annotation_colors = annot_colors, 
+                    gaps_col = c(3, 5))
+      source('Functions_utility.R')
+      gname = sort_geneNames_desiredClusterRank_c1(px, my_gene_col)
+      peakNm = c(peakNm, gname)
+      
+      saveRDS(peakNm, file = paste0(RdataDir, '/peak_names_manual_order_c6.c1.rds'))
+    }
+    
+    if(ac == 5){
+      ac = 5
+      kk = which(peaks$cluster == ac)
+      cat('clsuter ', ac, ' -- ', length(kk), ' peaks \n')
+      x <- as.matrix(test[kk,]) #drop the 5th colum
+      
+      nb_clusters = 4
+      my_hclust_gene <- hclust(dist(x), method = "complete")
+      my_gene_col <- cutree(tree = as.dendrogram(my_hclust_gene), k = nb_clusters)
+      
+      px = pheatmap(x[, c(4:9, 1:3)], #annotation_row = my_gene_col, 
+                    #annotation_col = df, 
+                    show_rownames = FALSE, scale = 'none', 
+                    #color = col, 
+                    show_colnames = FALSE,
+                    cluster_rows = TRUE, 
+                    cluster_cols = FALSE,  
+                    clustering_callback = callback,
+                    clustering_method = 'complete', cutree_rows = nb_clusters, 
+                    #annotation_colors = annot_colors, 
+                    gaps_col = c(3, 5))
+      
+      peakNm = c(peakNm, px$tree_row$labels[px$tree_row$order])
+      
+      saveRDS(peakNm, file = paste0(RdataDir, '/peak_names_manual_order_c6.c1.c5.rds'))
+    }
+    
+    if(ac == 3){
+      ac = 3
+      kk = which(peaks$cluster == ac)
+      cat('clsuter ', ac, ' -- ', length(kk), ' peaks \n')
+      
+      x <- as.matrix(test[kk,]) #drop the 5th colum
+      nb_clusters = 6
+      my_hclust_gene <- hclust(dist(x), method = "complete")
+      my_gene_col <- cutree(tree = as.dendrogram(my_hclust_gene), k = nb_clusters)
+      
+      px = pheatmap(x[, c(4:9, 1:3)], #annotation_row = my_gene_col, 
+                    #annotation_col = df, 
+                    show_rownames = FALSE, scale = 'none', 
+                    #color = col, 
+                    show_colnames = FALSE,
+                    cluster_rows = TRUE, 
+                    cluster_cols = FALSE,  
+                    clustering_callback = callback,
+                    clustering_method = 'complete', cutree_rows = nb_clusters, 
+                    #annotation_colors = annot_colors, 
+                    gaps_col = c(3, 5))
+      
+      source('Functions_utility.R')
+      gname = sort_geneNames_desiredClusterRank_c3(px, my_gene_col)
+      peakNm = c(peakNm, gname)
+      
+      saveRDS(peakNm, file = paste0(RdataDir, '/peak_names_manual_order_c6.c1.c5.c3.rds'))
+    }
+    
+    if(ac == 4){
+      ac = 4
+      kk = which(peaks$cluster == ac)
+      cat('clsuter ', ac, ' -- ', length(kk), ' peaks \n')
+      
+      x <- as.matrix(test[kk,]) #drop the 5th colum
+      nb_clusters = 6
+      my_hclust_gene <- hclust(dist(x), method = "complete")
+      my_gene_col <- cutree(tree = as.dendrogram(my_hclust_gene), k = nb_clusters)
+      
+      px = pheatmap(x[, c(4:9, 1:3)], #annotation_row = my_gene_col, 
+                    #annotation_col = df, 
+                    show_rownames = FALSE, scale = 'none', 
+                    #color = col, 
+                    show_colnames = FALSE,
+                    cluster_rows = TRUE, 
+                    cluster_cols = FALSE,  
+                    clustering_callback = callback,
+                    clustering_method = 'complete', cutree_rows = nb_clusters, 
+                    #annotation_colors = annot_colors, 
+                    gaps_col = c(3, 5))
+      
+      source('Functions_utility.R')
+      gname = sort_geneNames_desiredClusterRank_c4(px, my_gene_col)
+      peakNm = c(peakNm, gname)
+      
+      
+      saveRDS(peakNm, file = paste0(RdataDir, '/peak_names_manual_order_c6.c1.c5.c3.c4.rds'))
+      
+    }
+    
+    if(ac == 2){
+      ac = 2
+      kk = which(peaks$cluster == ac)
+      cat('clsuter ', ac, ' -- ', length(kk), ' peaks \n')
+      
+      x <- as.matrix(test[kk,]) #drop the 5th colum
+      nb_clusters = 6
+      my_hclust_gene <- hclust(dist(x), method = "complete")
+      my_gene_col <- cutree(tree = as.dendrogram(my_hclust_gene), k = nb_clusters)
+      
+      px = pheatmap(x[, c(4:9, 1:3)], #annotation_row = my_gene_col, 
+                    #annotation_col = df, 
+                    show_rownames = FALSE, scale = 'none', 
+                    #color = col, 
+                    show_colnames = FALSE,
+                    cluster_rows = TRUE, 
+                    cluster_cols = FALSE,  
+                    clustering_callback = callback,
+                    clustering_method = 'complete', cutree_rows = nb_clusters, 
+                    #annotation_colors = annot_colors, 
+                    gaps_col = c(3, 5))
+      source('Functions_utility.R')
+      gname = sort_geneNames_desiredClusterRank_c2(px, my_gene_col)
+      peakNm = c(peakNm, gname)
+      
+      saveRDS(peakNm, file = paste0(RdataDir, '/peak_names_manual_order_c6.c1.c5.c3.c4.c2.rds'))
+      
+    }
+    
+    # else{
+    #   d <-as.dist(sqrt(2*(1-cor(t(test[kk, ])))))
+    #   #Comparing different seriation methods
+    #   methods <- c("HC", "GW", "OLO")
+    #   results <- sapply(methods, FUN=function(m) seriate(d, m), simplify = FALSE)
+    #   #hc_HC = results[["HC"]][[1]]
+    #   #hc_GW = results[["GW"]][[1]]
+    #   #hc_OLO = results[["OLO"]][[1]]
+    #   hc_OLO = as.hclust(dendsort(as.dendrogram(hclust(d, method = "complete"))))
+    #   
+    #   peakNm = c(peakNm, hc_OLO$labels[hc_OLO$order])
+    #   # dd = dist(as.matrix(test[kk, ]))
+    #   #dd = as.dist(sqrt(2*(1-cor(t(test[kk, ])))))
+    #   #order <- seriate(dd)
+    #   #new_order = c(new_order, order)
+    #   #hm_hclust <- hclust(dd, method = "ward.D2")
+    #   #hm_cluster <- cutree(tree = as.dendrogram(hm_hclust), h = 4)
+    #   #peakNm = c(peakNm, hm_hclust$labels[hm_hclust$order])
+    # }
   }
   
   new_order = match(peakNm, rownames(test))
@@ -868,7 +1020,7 @@ subclustering.postional.histM.postioinalAtacPeaks = function(test)
   grid.arrange(grobs=plot_list, nrow= 1,
                layout_matrix = layout)
   
-  pdf(paste0(figureDir, "/positional_chromatin_landscape_3histM_clusteringAllHistM.pdf"),
+  pdf(paste0(figureDir, "/positional_chromatin_landscape_3histM_clusteringAllHistM_manual.pdf"),
       width = 6, height = 10) # Open a new pdf file
   
   layout = matrix(c(1, 2, 3), nrow = 1)
@@ -876,7 +1028,6 @@ subclustering.postional.histM.postioinalAtacPeaks = function(test)
                layout_matrix = layout)
   
   dev.off()
-  
   
   ### reorder positional atacpeak acccordingly
   yy = readRDS(paste0(RdataDir, '/positional_atacPeaks_data_3reps_forHeatmap.rds'))
@@ -904,7 +1055,6 @@ subclustering.postional.histM.postioinalAtacPeaks = function(test)
                 annotation_legend = FALSE)
   #filename = paste0(figureDir, '/positional_atacPeaks_fdr0.05_log2FC.1_rmHeadPeaks_reorder2.pdf'), 
   #width = 4, height = 12)
-  
   
 }
 
