@@ -545,6 +545,7 @@ if(Add_histMarkers_for_positionalATAC){
   library(lattice)
   require(pheatmap)
   require(RColorBrewer)
+  library(khroma)
   
   source('Functions_histM.R')
   conds_histM = c('H3K4me3','H3K27me3', 'H3K4me1', 'H3K27ac')

@@ -699,6 +699,8 @@ subclustering.postional.histM.postioinalAtacPeaks = function(test)
   }
   
   ## center the histone signals
+  yy1 = readRDS(file = paste0(RdataDir, '/peak_signals_atac_4histM_positionalPeaks.rds'))
+  yy1 = yy1[, grep('mRep', colnames(yy1))]
   test = yy1
   x = c()
   for(ht in c("H3K4me3", "H3K27me3", "H3K4me1"))
@@ -725,6 +727,7 @@ subclustering.postional.histM.postioinalAtacPeaks = function(test)
   peakNm = c()
   library(dendextend)
   library(ggplot2)
+  library(khroma)
   
   ## try dendsort methods
   library("dendsort")
@@ -739,25 +742,43 @@ subclustering.postional.histM.postioinalAtacPeaks = function(test)
     
     #data("iris")
     x <- as.matrix(test[kk,]) #drop the 5th colum
-    d <-as.dist(sqrt(2*(1-cor(t(test[kk, ])))))
-    #Comparing different seriation methods
-    methods <- c("HC", "GW", "OLO")
-    results <- sapply(methods, FUN=function(m) seriate(d, m), simplify = FALSE)
     
-    hc_HC = results[["HC"]][[1]]
-    hc_GW = results[["GW"]][[1]]
-    hc_OLO = results[["OLO"]][[1]]
-    hc_OLO = as.hclust(dendsort(as.dendrogram(hclust(d, method = "complete"))))
-    
-    peakNm = c(peakNm, hc_OLO$labels[hc_OLO$order])
-    # dd = dist(as.matrix(test[kk, ]))
-    #dd = as.dist(sqrt(2*(1-cor(t(test[kk, ])))))
-    #order <- seriate(dd)
-    #new_order = c(new_order, order)
-    #hm_hclust <- hclust(dd, method = "ward.D2")
-    #hm_cluster <- cutree(tree = as.dendrogram(hm_hclust), h = 4)
-    #peakNm = c(peakNm, hm_hclust$labels[hm_hclust$order])
+    if(ac == 6){
+      pheatmap(x[, c(4:9, 1:3)], cluster_rows = FALSE, cluster_cols = FALSE)
+      pheatmap(x[order(-x[,4]), c(4:9, 1:3)], cluster_rows = FALSE, cluster_cols = FALSE)
+      o1 = order(-x[,4])
+      
+      d <-as.dist(sqrt(2*(1-cor(t(test[kk, ])))))
+      #Comparing different seriation methods
+      methods <- c("HC", "GW", "OLO")
+      results <- sapply(methods, FUN=function(m) seriate(d, m), simplify = FALSE)
+      #hc_HC = results[["HC"]][[1]]
+      #hc_GW = results[["GW"]][[1]]
+      #hc_OLO = results[["OLO"]][[1]]
+      hc_OLO = as.hclust(dendsort(as.dendrogram(hclust(d, method = "complete"))))
+      pheatmap(x[hc_OLO$order, c(4:9, 1:3)], cluster_rows = FALSE, cluster_cols = FALSE)
+      
+    }else{
+      d <-as.dist(sqrt(2*(1-cor(t(test[kk, ])))))
+      #Comparing different seriation methods
+      methods <- c("HC", "GW", "OLO")
+      results <- sapply(methods, FUN=function(m) seriate(d, m), simplify = FALSE)
+      #hc_HC = results[["HC"]][[1]]
+      #hc_GW = results[["GW"]][[1]]
+      #hc_OLO = results[["OLO"]][[1]]
+      hc_OLO = as.hclust(dendsort(as.dendrogram(hclust(d, method = "complete"))))
+      
+      peakNm = c(peakNm, hc_OLO$labels[hc_OLO$order])
+      # dd = dist(as.matrix(test[kk, ]))
+      #dd = as.dist(sqrt(2*(1-cor(t(test[kk, ])))))
+      #order <- seriate(dd)
+      #new_order = c(new_order, order)
+      #hm_hclust <- hclust(dd, method = "ward.D2")
+      #hm_cluster <- cutree(tree = as.dendrogram(hm_hclust), h = 4)
+      #peakNm = c(peakNm, hm_hclust$labels[hm_hclust$order])
+    }
   }
+  
   new_order = match(peakNm, rownames(test))
   
   ## plot the histone marker side by side with replicates
@@ -771,7 +792,6 @@ subclustering.postional.histM.postioinalAtacPeaks = function(test)
   #marker_colors_histM = c('blue', 'red', 'deepskyblue2', 'darkgreen')
   #names(marker_colors_histM) = histMs
   annot_colors_histM = list(seg = sample_colors_histM)
-  #gaps.col_histM = c(2, 4)
   
   kk = c(1:3)
   df_histM_new = as.data.frame(df_histM[kk,])
@@ -781,16 +801,19 @@ subclustering.postional.histM.postioinalAtacPeaks = function(test)
   nb_breaks = 8
   sunset <- colour("sunset")
   PRGn <- colour("PRGn")
-  range <- 2.0
-  cols = cols = (sunset(nb_breaks))
-  p1 = pheatmap(test[new_order, kk], cluster_rows=FALSE, show_rownames=FALSE, fontsize_row = 5,
+  range <- 1.5
+  xx = test[new_order, kk]
+  xx = t(apply(xx, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
+  cols = (sunset(nb_breaks))
+  gaps.col_histM = c(1, 2)
+  p3 = pheatmap(xx, cluster_rows=FALSE, show_rownames=FALSE, fontsize_row = 5,
                 #color = colorRampPalette(rev(brewer.pal(n = 7, name ="YlGnBu")))(8), 
                 color = cols,
                 show_colnames = FALSE,
                 scale = 'none',
                 cluster_cols=FALSE, annotation_col= df_histM_new,
                 annotation_colors = annot_colors_histM,
-                #gaps_col = gaps.col_histM,
+                gaps_col = gaps.col_histM,
                 breaks = seq(-range, range, length.out = nb_breaks), 
                 annotation_legend = FALSE,
                 gaps_row = gaps.row)
@@ -800,15 +823,19 @@ subclustering.postional.histM.postioinalAtacPeaks = function(test)
   colnames(df_histM_new) = colnames(df_histM)
   rownames(df_histM_new) = rownames(df_histM)[kk]
   
+  range <- 2.0
+  xx = test[new_order, kk]
+  xx = t(apply(xx, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
+  
   cols = cols = rev(PRGn(nb_breaks-1));
-  p2 = pheatmap(test[new_order, kk], cluster_rows=FALSE, show_rownames=FALSE, fontsize_row = 5,
+  p1 = pheatmap(xx, cluster_rows=FALSE, show_rownames=FALSE, fontsize_row = 5,
                 color = cols,
                 show_colnames = FALSE,
                 scale = 'none',
                 breaks = seq(-range, range, length.out = nb_breaks), 
                 cluster_cols=FALSE, annotation_col=df_histM,
                 annotation_colors = annot_colors_histM,
-                #gaps_col = gaps.col_histM, 
+                gaps_col = gaps.col_histM, 
                 annotation_legend = FALSE,
                 gaps_row = gaps.row)
   
@@ -818,8 +845,12 @@ subclustering.postional.histM.postioinalAtacPeaks = function(test)
   colnames(df_histM_new) = colnames(df_histM)
   rownames(df_histM_new) = rownames(df_histM)[kk]
   
+  xx = test[new_order, kk]
+  range <- 2.0
+  xx = t(apply(xx, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
+  
   cols = cols = colorRampPalette(rev((brewer.pal(n = 8, name ="BrBG"))))(7)
-  p3 = pheatmap(test[new_order, kk], cluster_rows=FALSE, show_rownames=FALSE, fontsize_row = 5,
+  p2 = pheatmap(xx, cluster_rows=FALSE, show_rownames=FALSE, fontsize_row = 5,
                 color = cols,
                 show_colnames = FALSE,
                 scale = 'none',
@@ -827,10 +858,12 @@ subclustering.postional.histM.postioinalAtacPeaks = function(test)
                 cluster_cols=FALSE, annotation_col=df_histM,
                 annotation_colors = annot_colors_histM,
                 annotation_legend = FALSE,
-                #gaps_col = gaps.col_histM, 
+                gaps_col = gaps.col_histM, 
                 gaps_row = gaps.row)
   
-  plot_list=list(); plot_list[['p1']]=p1[[4]]; plot_list[['p2']]=p2[[4]]; plot_list[['p3']]=p3[[4]];
+ 
+  
+  plot_list=list(); plot_list[['p1']]=p1[[4]]; plot_list[['p2']]=p2[[4]]; plot_list[['p3']]=p3[[4]]; 
   layout = matrix(c(1, 2, 3), nrow = 1)
   grid.arrange(grobs=plot_list, nrow= 1,
                layout_matrix = layout)
@@ -844,25 +877,34 @@ subclustering.postional.histM.postioinalAtacPeaks = function(test)
   
   dev.off()
   
+  
   ### reorder positional atacpeak acccordingly
   yy = readRDS(paste0(RdataDir, '/positional_atacPeaks_data_3reps_forHeatmap.rds'))
+  df = data.frame(sapply(colnames(yy), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[2])}))
+  colnames(df) = 'seg'
+  rownames(df) = colnames(yy)
+  sample_colors = c('springgreen4', 'steelblue2', 'gold2')
+  names(sample_colors) = c('UA', 'LA', 'Hand')
+  annot_colors = list(
+    seg = sample_colors)
+  gaps.col = c(3, 6)
   col = colorRampPalette(c("navy", "white", "red3"))(8)
+  p1 = pheatmap(yy[new_order, ], #annotation_row = my_gene_col, 
+                annotation_col = df, show_rownames = FALSE, scale = 'none', 
+                color = col, 
+                show_colnames = FALSE,
+                cluster_rows = FALSE, 
+                cluster_cols = FALSE,  
+                #clustering_method = 'complete', cutree_rows = nb_clusters, 
+                annotation_colors = annot_colors, 
+                #clustering_callback = callback,
+                gaps_col = gaps.col, 
+                treeheight_row = 20,
+                gaps_row = gaps.row,
+                annotation_legend = FALSE)
+  #filename = paste0(figureDir, '/positional_atacPeaks_fdr0.05_log2FC.1_rmHeadPeaks_reorder2.pdf'), 
+  #width = 4, height = 12)
   
-  pheatmap(yy[new_order, ], annotation_row = my_gene_col, 
-                 annotation_col = df, show_rownames = FALSE, scale = 'none', 
-                 color = col, 
-                 show_colnames = FALSE,
-                 cluster_rows = FALSE, 
-                 cluster_cols = FALSE,  
-                 #clustering_method = 'complete', cutree_rows = nb_clusters, 
-                 annotation_colors = annot_colors, 
-                 #clustering_callback = callback,
-                 gaps_col = gaps.col, 
-                 treeheight_row = 20,
-                 gaps_row = gaps.row,
-                 annotation_legend = FALSE,
-                 filename = paste0(figureDir, '/positional_atacPeaks_fdr0.05_log2FC.1_rmHeadPeaks_reorder2.pdf'), 
-                 width = 4, height = 12)
   
 }
 
@@ -910,12 +952,7 @@ Process.deeptools.heatmapTable = function()
   library("RColorBrewer")
   library("circlize")
   
-  splits = c(rep(1, 32), 
-             rep(2, 76), 
-             rep(3, 31),
-             rep(4, 292), 
-             rep(5, 103), 
-             rep(6, 712))
+  splits = factor(peaks, levels = cluster_order)
   
   for(n in 1:length(features))
   {
@@ -930,8 +967,7 @@ Process.deeptools.heatmapTable = function()
     
     
     index = intersect(c(grep('H3K27me3', samples), grep('H3K4me1', samples), grep('H3K4me3', samples)), grep('mRep2', samples))
-    
-    index = intersect(c(grep('H3K27me3', samples)), grep('mRep2', samples))
+    index = intersect(c(grep('atac|H3K27me3', samples)), grep('mRep2', samples))
     
     test = as.matrix(dpt[, index])
     
@@ -947,9 +983,11 @@ Process.deeptools.heatmapTable = function()
             show_row_names = FALSE,
             show_column_names = FALSE,
             row_split = splits,
-            #column_split = samples[index],
+            cluster_column_slices = TRUE,
+            column_split = factor(samples[index], levels = c('H3K27me3_mUA_mRep2', 'H3K27me3_mLA_mRep2', 
+                                                             'H3K27me3_mHand_mRep2')),
             top_annotation = ha,
-            col = colorRamp2(seq(0, 1.2, length.out = 4), rev(brewer.pal(n=4, name="RdBu")))
+            col = colorRamp2(seq(0, 1.5, length.out = 8), (brewer.pal(n=8, name="BuPu")))
             #name = "mtcars", #title of legend
             #column_title = "Variables", row_title = "Samples",
             #row_names_gp = gpar(fontsize = 7) # Text size for row names
