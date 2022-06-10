@@ -1078,6 +1078,7 @@ Process.deeptools.heatmapTable = function()
   samples = sapply(samples, function(x){x = unlist(strsplit(as.character(x), '_')); paste0(x[1:3], collapse = '_')})          
   
   cluster_order = c(6, 1, 5, 3, 4, 2)
+  
   index = c()
   gaps.row = c() 
   for(n in 1:length(cluster_order)) ## compute row gaps as atac-seq peaks
@@ -1102,64 +1103,49 @@ Process.deeptools.heatmapTable = function()
   library("RColorBrewer")
   library("circlize")
   
-  splits = factor(peaks, levels = cluster_order)
+  ## select the sample to use for plotting
+  idx =  c(grep('136164', samples), 
+           grep('161521', samples), 
+           grep('74940', samples), 
+           intersect(c(grep('H3K27me3', samples), grep('H3K4me1', samples), grep('H3K4me3', samples)), grep('mRep2', samples))
+  )
+  samples = samples[idx]
+  dpt = dpt[, idx]
   
   for(n in 1:length(features))
   {
     # n = 2
-    index = c(grep('136164', samples), 
-              grep('161521', samples), 
-              grep('74940', samples)
-    )
-    index = c(1:360)
-    index = c(361:720)
-    index = c(721:1080)
-    
-    
-    index = intersect(c(grep('H3K27me3', samples), grep('H3K4me1', samples), grep('H3K4me3', samples)), grep('mRep2', samples))
-    index = intersect(c(grep('atac|H3K27me3', samples)), grep('mRep2', samples))
-    
+    index = grep(features[n], samples)
     test = as.matrix(dpt[, index])
     
-    ha <- HeatmapAnnotation(
-      samples = samples[index]
-    )
+    splits = factor(peaks, levels = cluster_order)
+    sample.sel = samples[index]
+    sample.sel = sapply(sample.sel, function(x) unlist(strsplit(as.character(x), '_'))[2])
+    ha <- HeatmapAnnotation(samples = sample.sel)
     
-    unique(samples[index])
+    unique(sample.sel)
     
-    Heatmap(test*20, 
-            cluster_rows = FALSE,
-            cluster_columns = FALSE, 
-            show_row_names = FALSE,
-            show_column_names = FALSE,
-            row_split = splits,
-            cluster_column_slices = TRUE,
-            column_split = factor(samples[index], levels = c('H3K27me3_mUA_mRep2', 'H3K27me3_mLA_mRep2', 
-                                                             'H3K27me3_mHand_mRep2')),
-            top_annotation = ha,
-            col = colorRamp2(seq(0, 1.5, length.out = 8), (brewer.pal(n=8, name="BuPu")))
-            #name = "mtcars", #title of legend
-            #column_title = "Variables", row_title = "Samples",
-            #row_names_gp = gpar(fontsize = 7) # Text size for row names
-    )
-    
-    pdf(paste0(figureDir, "/positional_peaks_intensity_heatmap_H3K27me3.pdf"),
+    pdf(paste0(figureDir, "/positional_peaks_intensity_heatmap_", features[n], "_v1.pdf"),
         width = 6, height = 10) # Open a new pdf file
+    
+    #col_fun = colorRamp2(c(0, 0.5, 1), c("#377EB8", "white", "#E41A1C"))
     Heatmap(test*20, 
             cluster_rows = FALSE,
             cluster_columns = FALSE, 
             show_row_names = FALSE,
             show_column_names = FALSE,
             row_split = splits,
-            column_split = samples[index],
+            cluster_column_slices = FALSE,
+            #column_split = factor(sample.sel, levels = c('mUA', 'mLA','mHand')),
             top_annotation = ha,
-            col = colorRamp2(seq(0, 1.2, length.out = 4), rev(brewer.pal(n=4, name="RdBu")))
+            col = colorRamp2(seq(0, 2, length.out = 8), rev(brewer.pal(n=8, name="RdBu")))
             #name = "mtcars", #title of legend
             #column_title = "Variables", row_title = "Samples",
             #row_names_gp = gpar(fontsize = 7) # Text size for row names
     )
-    
-    dev.off()
+      
+   dev.off()
+   
      
   }
   
