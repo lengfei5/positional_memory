@@ -988,7 +988,9 @@ if(saveTables){
 ##########################################
 # #### highlight the enhancers, probably should improve again the peak-to-gene assignment
 ##########################################
-sels = grep('Intergenic|Intron', peaks$annotation)
+peaks$targets = enhancers$targets[match(rownames(peaks), rownames(enhancers))]
+sels = intersect(grep('Intergenic|Intron', peaks$annotation), which(!is.na(peaks$targets)))
+ntop = 50
 
 yy.sels = yy[sels, ]
 peaks.sels = peaks[sels, ]
@@ -996,15 +998,14 @@ peaks.sels = peaks[sels, ]
 peaks.sels[grep('HOXA13|MEIS|SHOX|HOX', peaks.sels$transcriptId), ]
 
 ## sort the promoters with fdr and takes the top30
-ntop = 50
 o1 = order(-peaks.sels$fdr.mean)
 peaks.sels = peaks.sels[o1[1:ntop], ]
 yy.sels = yy.sels[o1[1:ntop], ]
 
+## use the updated peak-to-gene assignment
 geneSymbols = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
                              'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
-
-ggs = enhancers$targets[match(rownames(yy.sels), rownames(enhancers))]
+ggs = peaks.sels$targets
 mm = match(ggs, geneSymbols$geneID)
 ggs[!is.na(mm)] = geneSymbols$gene.symbol.toUse[mm[!is.na(mm)]]
 
@@ -1051,7 +1052,7 @@ pheatmap(test,
 # distance distribution of between positional peaks and positional genes
 ##########################################
 peaks = readRDS(paste0(RdataDir, 
-                       '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters6_DEtest_peakSignals_peakAnnot.updated.rds'))
+    '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters6_DEtest_peakSignals_peakAnnot.updated.rds'))
 
 pp = data.frame(t(sapply(rownames(peaks), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
 pp$strand = '*'
