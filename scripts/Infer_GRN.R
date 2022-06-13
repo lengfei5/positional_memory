@@ -278,50 +278,92 @@ if(Manual_correction_motif_tf_association){
   
   saveRDS(mapping, file = '../data/JASPAR2022_CORE_UNVALIDED_vertebrates_nonRedundant_metadata_manual.rds')
   
+  ##########################################
+  # prioritize the core motifs over unvalided ones
+  ##########################################
+  mapping = readRDS(file = '../data/JASPAR2022_CORE_UNVALIDED_vertebrates_nonRedundant_metadata_manual.rds')
+  jj = which(is.na(mapping$name))
+  mapping$name[jj] = paste0(mapping$tfs[jj], '_', mapping$motifs[jj])
+  
+  kk = grep('^UN', mapping$motifs)
+  
+  idx = c()
+  ggs = c()
+  for(n in 1:nrow(mapping))
+  {
+    test = unlist(strsplit(as.character(mapping$tfs[n]), '_'))
+    ggs = c(ggs, test)
+    idx = c(idx, rep(n, length(test)))
+  }
+  
+  mapping = data.frame(mapping[idx, ], gene = ggs, stringsAsFactors = FALSE)
+  
+  idx.rm = c()
+  ggs = unique(mapping$gene)
+  for(n in 1:length(ggs))
+  {
+    # n = 1
+    jj = which(mapping$gene == ggs[n])
+    motifs = mapping$motifs[jj]
+    jj1 = jj[grep('MA', motifs)]
+    jj2 = jj[grep('UN', motifs)]
+    if(length(jj1)>0 & length(jj2)>0) {
+      cat(n, '--', ggs[n], '\n')
+      idx.rm = c(idx.rm, jj2)  
+    }
+  }
+  
+  mapping = mapping[-idx.rm, ]
+  saveRDS(mapping, file = '../data/JASPAR2022_CORE_UNVALIDED_vertebrates_nonRedundant_metadata_manual_rmRedundantUNVALIDED.rds')
+    
 }
 
+### CRE-motif-occurence matrix
+mocs = readRDS(file = '../results/motif_analysis/motif_oc_fimo_atacPeaks.2kbTSS_jaspar2022.core.unvalided_pval.0.00001_v1.rds')
+cres = unique(rownames(mocs))
 
-## CRE-motif-occurence matrix
-moc1 = readRDS(file = '../results/motif_analysis/motif_oc_fimo_jaspar2022_pval.0.0001_v1.rds')
-moc2 = readRDS(file = '../results/motif_analysis/motif_oc_fimo_jaspar2022_pval.0.0001_regenerationTSS.rds')
-cres = c(rownames(moc1), rownames(moc2))
-
-mm = match(colnames(moc1), colnames(moc2))
-moc2 = moc2[,mm]
-
-mocs = rbind(moc1, moc2)
-rm(moc1); rm(moc2)
-
-# collect CREs for targets defined previously = rownames(E)
-# target-to-CRE matrix
+### target-to-CRE matrix
+E = readRDS(file = paste0(RdataDir, '/GRNinference_scExprMatrix_346geneID_289TFsymbols.rds'))
 targets.ids = get_geneID(rownames(E))
-targets = data.frame(geneID = targets.ids, stringsAsFactors = FALSE)
-targets$CREs = NA
 
+#targets = data.frame(geneID = targets.ids, stringsAsFactors = FALSE)
+#targets$CREs = NA
 bed = read.table(file = 
-    paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/motif_analysis/FIMO_promoters/', 
-           'promoter_tfs/sorted.bed'), header = FALSE)
-kk = match(targets$geneID, bed$V4)
+    paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/motif_analysis/', 
+           'FIMO_atacPeak_tss_mediumQ_core.unvalided_64Gmem/peaks_for_fimo_sorted.bed'), header = FALSE)
+kk = match(bed$V4, targets.ids)
 mm = which(!is.na(kk))
-targets$CREs[mm] = paste0(bed$V1[kk[mm]], ':', bed$V2[kk[mm]], '-', bed$V3[kk[mm]])
+targets = data.frame(geneID = bed$V4[mm], CREs = paste0(bed$V1[mm], ':', bed$V2[mm], '-', bed$V3[mm]), stringsAsFactors = FALSE)
 
 enhancers = readRDS(file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1_chipseekerAnnot_manual.rds'))
 
-mm = match(targets.ids, enhancers$targets)
-ii = which(!is.na(mm))
-mm = mm[ii]
+mm = match(enhancers$targets, targets.ids)
+mm = which(!is.na(mm))
+
 targets2 = data.frame(geneID = enhancers$targets[mm], CREs = rownames(enhancers)[mm], stringsAsFactors = FALSE)
+targets2$CREs = sapply(targets2$CREs, function(x) {x = unlist(strsplit(gsub(':', '-', as.character(x)), '-'));
+ paste0(x[1], ':', (as.numeric(x[2]) -1), '-', x[3])}) 
+# shift one bp due to the bed format and fasta formation
+
 targets = rbind(targets, targets2)
+rm(targets2)
 
-xx = table(targets$geneID, targets$CREs)
+targets = targets[match(unique(targets$CREs), targets$CREs), ]
+targets$geneID = as.character(droplevels(targets$geneID))
+#targets$CREs =droplevels(targets$CREs)
 
+xx = table(targets$geneID, targets$CREs) ## target-CRE matrix: each row is tf and each column is associated tss and enhancer peaks
 ss = apply(xx, 1, sum)
 
 xx = xx[which(ss>0), ]
 mm = match(rownames(xx), targets.ids)
 rownames(xx) = rownames(E)[mm]
 
+## match the tf-CRE
 jj = match(colnames(xx), rownames(mocs))
+missed = which(is.na(jj))
+cat(length(missed), ' CRE missed \n')
+
 ii = which(!is.na(jj))
 jj = jj[ii]
 
@@ -330,13 +372,16 @@ mocs = mocs[jj, ]
 
 target.moc = xx %*% mocs
 ss = apply(target.moc, 2, sum)
-
+length(which(ss==0))
 
 ## motif to TF association matrix
-mapping =readRDS(file = 
-      paste0('../data/JASPAR2022_CORE_vertebrates_nonRedundant_metadata.rds')) # association between motifs and TF symbols
-mapping = mapping[, c(3, 2)]
+mapping =readRDS(file = '../data/JASPAR2022_CORE_UNVALIDED_vertebrates_nonRedundant_metadata_manual_rmRedundantUNVALIDED.rds')
+# mapping = mapping[, c(3, 2)]
 
+mm = match(colnames(target.moc), mapping$name)
+target.moc = target.moc[,which(!is.na(mm))] # filter the unvalided motifs if core motifs are present
+
+#atm = table(mapping$name, mapping$gene)
 atm = matrix(0, nrow = ncol(target.moc), ncol = nrow(target.moc))
 colnames(atm) = rownames(target.moc)
 rownames(atm) = colnames(target.moc)
@@ -346,12 +391,15 @@ for(n in 1:nrow(atm))
 {
   # n = 164
   tfs = unlist(strsplit(as.character(mapping$tfs[which(mapping$name == rownames(atm)[n])]), '_'))
-  cat(n, '--', rownames(atm)[n], ' -- tfs --', tfs, '\n')
-  
   for(tf in tfs)
   {
+    
     jj = which(genes == tf)
-    atm[n, jj] = 1
+    if(length(jj)>0){
+      cat(n, '--', rownames(atm)[n], ' -- tfs --', tf, '\n')
+      atm[n, jj] = 1
+    }
+    
   }
 }
 
@@ -360,11 +408,11 @@ target.tfs = target.moc %*% atm
 x = target.tfs[grep('HOXA13', rownames(target.tfs)), ];
 x[which(x>0)]
 
-ss = apply(target.tfs, 2, sum) # due to missing motif for associated TFs
-target.tfs = target.tfs[, which(ss>0)]
+ss1 = apply(target.tfs, 2, sum) # due to missing motif for associated TFs
+#target.tfs = target.tfs[, which(ss>0)]
+ss2 = apply(target.tfs>0, 1, sum)
 
-ss = apply(target.tfs>0, 1, sum)
-target.tfs = target.tfs[which(ss>0), ]
+#target.tfs = target.tfs[which(ss>0), ]
 
 saveRDS(target.tfs, file = paste0(RdataDir, '/GRN_priorNetwork_target_TFs.rds'))
 
@@ -376,7 +424,7 @@ saveRDS(target.tfs, file = paste0(RdataDir, '/GRN_priorNetwork_target_TFs.rds'))
 ########################################################
 source('myGENIE3.R')
 
-E = readRDS(file = paste0(RdataDir, '/GRNinference_scExprMatrix.rds'))
+E = readRDS(file = paste0(RdataDir, '/GRNinference_scExprMatrix_346geneID_289TFsymbols.rds'))
 target.tfs = readRDS(file = paste0(RdataDir, '/GRN_priorNetwork_target_TFs.rds'))
 
 mm = match(rownames(target.tfs), rownames(E))
@@ -386,7 +434,7 @@ E = as.matrix(E)
 sds = apply(E, 1, sd)
 sels = which(sds>10^-4)
 E = E[sels, ]
-target.tfs = target.tfs[sels, ]
+target.tfs = target.tfs[sels, sels]
 
 #tic()
 #weight.matrix1 = GENIE3(expr.matrix = E, priorRegulators =  target.tfs)
@@ -394,12 +442,12 @@ target.tfs = target.tfs[sels, ]
 
 tic()
 wtm = GENIE3(expr.matrix = E, priorRegulators =  target.tfs, ncore = 8)
-saveRDS(wtm, file = paste0(RdataDir, '/first_test_Genie3.rds'))
+saveRDS(wtm, file = paste0(RdataDir, '/first_test_Genie3_v2.rds'))
 
 toc()
 
 
-wtm = readRDS(file =  paste0(RdataDir, '/first_test_Genie3.rds'))
+wtm = readRDS(file =  paste0(RdataDir, '/first_test_Genie3_v2.rds'))
 ggs = colnames(wtm)
 genes = get_geneName(ggs)
 gene.counts = table(genes)

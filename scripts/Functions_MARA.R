@@ -716,12 +716,14 @@ make.bed.file.from.fimo.out = function()
 ##########################################
 # after running FIMO, make motif occurrency matrix 
 ##########################################
-make.motif.oc.matrix.from.fimo.output = function()
+make.motif.oc.matrix.from.fimo.output = function(fimo.out, pval = 0.0001, saveDir = '../results/motif_analysis')
 {
   library(data.table)
   
   #motif.tf = readRDS( '../data/motifs_tfs/motif_tf_mapping.rds')
-  fimo.out = '../results/motif_analysis/FIMO_jaspar2022_v1/fimo_out/fimo.tsv'
+  fimo.out = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/',
+  'motif_analysis/FIMO_atacPeak_tss_mediumQ_core.unvalided_64Gmem/fimo_out/fimo.tsv')
+  
   fimo = fread(fimo.out, header = TRUE)
   
   motif.oc = table(fimo$motif_id, fimo$sequence_name, useNA = 'ifany')
@@ -729,28 +731,28 @@ make.motif.oc.matrix.from.fimo.output = function()
   
   print(head(rownames(motif.oc), 20))
   
-  saveRDS(motif.oc, file = '../results/motif_analysis/motif_oc_fimo_jaspar2022_pval.0.0001_v1.rds')
+  saveRDS(motif.oc, file = '../results/motif_analysis/motif_oc_fimo_atacPeaks.2kbTSS_jaspar2022.core.unvalided_pval.0.0001_v1.rds')
   
   jj = which(fimo$`p-value`<10^-5)
-  cat(length(jj)/nrow(fimo)*100, 'percents motifs \n')
+  cat(length(jj)/nrow(fimo)*100, '% motifs \n')
   
   motif.oc = table(fimo$motif_id[jj], fimo$sequence_name[jj], useNA = 'ifany')
   motif.oc = t(motif.oc)
   
   print(head(rownames(motif.oc), 20))
   
-  saveRDS(motif.oc, file = '../results/motif_analysis/motif_oc_fimo_jaspar2022_pval.0.00001_v1.rds')
+  saveRDS(motif.oc, file = '../results/motif_analysis/motif_oc_fimo_atacPeaks.2kbTSS_jaspar2022.core.unvalided_pval.0.00001_v1.rds')
   
   
   jj = which(fimo$`p-value`<10^-6)
-  cat(length(jj)/nrow(fimo)*100, 'percents motifs \n')
+  cat(length(jj)/nrow(fimo)*100, '% motifs \n')
   
   motif.oc = table(fimo$motif_id[jj], fimo$sequence_name[jj], useNA = 'ifany')
   motif.oc = t(motif.oc)
   
   print(head(rownames(motif.oc), 20))
   
-  saveRDS(motif.oc, file = '../results/motif_analysis/motif_oc_fimo_jaspar2022_pval.0.000001_v1.rds')
+  saveRDS(motif.oc, file = '../results/motif_analysis/motif_oc_fimo_atacPeaks.2kbTSS_jaspar2022.core.unvalided_pval.0.000001_v1.rds')
   
   ##########################################
   # associate the scanned regions with gene

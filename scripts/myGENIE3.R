@@ -399,10 +399,10 @@ plot_tf_network = function(link.list)
   library(tidygraph)
   library(graphlayouts)
   
-  trn <- graph_from_data_frame(link.list, directed = FALSE)
+  trn <- graph_from_data_frame(link.list, directed = TRUE)
   
   # compute a clustering for node colors
-  V(trn)$clu <- as.character(membership(cluster_louvain(trn)))
+  V(trn)$clu <- as.character(membership(cluster_louvain(graph_from_data_frame(link.list, directed = FALSE))))
   # compute degree as node size
   V(trn)$size <- degree(trn)
   
@@ -431,16 +431,16 @@ plot_tf_network = function(link.list)
     theme_graph() +
     theme(legend.position = "none")
   
-  # force-driven layout
-  ggraph(trn, layout = "graphopt") +
-    geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
-    geom_node_point(aes(fill = clu, size = size), shape = 21) +
-    geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
-    scale_fill_manual(values = c(got_palette, 'red', 'blue')) +
-    scale_edge_width(range = c(0.2, 3)) +
-    scale_size(range = c(1, 6)) +
-    theme_graph() +
-    theme(legend.position = "none")
+  # # force-driven layout
+  # ggraph(trn, layout = "graphopt") +
+  #   geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
+  #   geom_node_point(aes(fill = clu, size = size), shape = 21) +
+  #   geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
+  #   scale_fill_manual(values = c(got_palette, 'red', 'blue')) +
+  #   scale_edge_width(range = c(0.2, 3)) +
+  #   scale_size(range = c(1, 6)) +
+  #   theme_graph() +
+  #   theme(legend.position = "none")
   
   # centrality layout
   # https://github.com/schochastics/graphlayouts
@@ -450,27 +450,28 @@ plot_tf_network = function(link.list)
     geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
     geom_node_point(aes(fill = clu, size = size), shape = 21) +
     geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
-    scale_edge_width_continuous(range = c(0.05, 0.2)) +
+    scale_edge_width_continuous(range = c(0.02, 0.1)) +
     scale_size_continuous(range = c(1, 10)) +
     scale_fill_manual(values = got_palette) +
     coord_fixed() +
     theme_graph() +
     #theme(legend.position = "bottom")
     theme(legend.position = "none")
-  ggsave(paste0(resDir, "/TRN_firstTest.pdf"), width=12, height = 10)
+  ggsave(paste0(resDir, "/TRN_secondTest.pdf"), width=12, height = 10)
   
-  # focus layout
-  ggraph(trn, layout = "focus", focus = 10) +
-    geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
-    geom_node_point(aes(fill = clu, size = size), shape = 21) +
-    #geom_node_text(aes(filter = (name == "Ned"), size = size, label = name),family = "serif") +
-    geom_node_text(aes(size = size, label = name), family = "serif") +
-    scale_edge_width_continuous(range = c(0.2, 1.2)) +
-    scale_size_continuous(range = c(1, 5)) +
-    scale_fill_manual(values = got_palette) +
-    coord_fixed() +
-    theme_graph() +
-    theme(legend.position = "none")
-  ggsave(paste0(resDir, "/TRN_firstTest_focus.10.pdf"), width=12, height = 10)
+  # # focus layout
+  # ggraph(trn, layout = "focus", focus = 10) +
+  #   geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
+  #   geom_node_point(aes(fill = clu, size = size), shape = 21) +
+  #   #geom_node_text(aes(filter = (name == "Ned"), size = size, label = name),family = "serif") +
+  #   geom_node_text(aes(size = size, label = name), family = "serif") +
+  #   scale_edge_width_continuous(range = c(0.1, 1.0)) +
+  #   scale_size_continuous(range = c(1, 5)) +
+  #   scale_fill_manual(values = got_palette) +
+  #   coord_fixed() +
+  #   theme_graph() +
+  #   theme(legend.position = "none")
+  # ggsave(paste0(resDir, "/TRN_firstTest_focus.10.pdf"), width=12, height = 10)
+  
     
 }
