@@ -1098,7 +1098,6 @@ Process.deeptools.heatmapTable = function()
   ##########################################
   # select representative samples 
   ##########################################
-  features = c('atac', 'H3K27me3', 'H3K4me3', 'H3Kme1')
   library(ComplexHeatmap)
   library("RColorBrewer")
   library("circlize")
@@ -1112,13 +1111,25 @@ Process.deeptools.heatmapTable = function()
   samples = samples[idx]
   dpt = dpt[, idx]
   
+  ## sort by H3K27me3 for each cluster
+  index = grep('H3K27me3_mUA_mRep2', samples)
+  ss = apply(as.matrix(dpt[, index]), 1, mean)
+  new_order = c()
+  for(c in cluster_order)
+  {
+    kk = which(peaks==c)
+    new_order = c(new_order, kk[order(-ss[kk])])
+  }
+  
+  features = c('atac', 'H3K27me3', 'H3K4me3', 'H3K4me1')
+  
   for(n in 1:length(features))
   {
-    # n = 2
+    # n = 4
     index = grep(features[n], samples)
-    test = as.matrix(dpt[, index])
+    test = as.matrix(dpt[new_order, index])*20
     
-    splits = factor(peaks, levels = cluster_order)
+    splits = factor(peaks[new_order], levels = cluster_order)
     sample.sel = samples[index]
     sample.sel = sapply(sample.sel, function(x) unlist(strsplit(as.character(x), '_'))[2])
     ha <- HeatmapAnnotation(samples = sample.sel)
@@ -1126,27 +1137,39 @@ Process.deeptools.heatmapTable = function()
     unique(sample.sel)
     
     pdf(paste0(figureDir, "/positional_peaks_intensity_heatmap_", features[n], "_v1.pdf"),
-        width = 6, height = 10) # Open a new pdf file
+        width = 4, height = 10) # Open a new pdf file
     
     #col_fun = colorRamp2(c(0, 0.5, 1), c("#377EB8", "white", "#E41A1C"))
-    Heatmap(test*20, 
+    quantile(test, c(0, 0.05, 0.1, 0.15, 0.25, 0.5, 0.75, 0.8, 0.85,  0.90,  0.95, 0.99, 1))
+    
+    if(n == 1) {range = 2.5; 
+      cols = colorRamp2(c(0, 0.5, 1.5, range), rev(brewer.pal(n=4, name="RdBu")))
+      #cols = colorRamp2(c(0, 2, 4), c("blue", "white", "red"));
+    }
+    if(n == 2) {range = 5; cols = colorRamp2(c(0, range), colors = c('white', 'purple'))}
+    if(n == 3){range = 5; cols = colorRamp2(c(0, range), colors = c('white', 'darkorange'))}
+    if(n == 4){range = 6.5; cols = colorRamp2(c(0.2, range), c("white", "#3794bf"))}
+    
+    Heatmap(test, 
             cluster_rows = FALSE,
             cluster_columns = FALSE, 
             show_row_names = FALSE,
             show_column_names = FALSE,
             row_split = splits,
             cluster_column_slices = FALSE,
-            #column_split = factor(sample.sel, levels = c('mUA', 'mLA','mHand')),
+            column_split = factor(sample.sel, levels = c('mUA', 'mLA','mHand')),
             top_annotation = ha,
-            col = colorRamp2(seq(0, 2, length.out = 8), rev(brewer.pal(n=8, name="RdBu")))
+            show_heatmap_legend = TRUE,
+            #col = colorRamp2(seq(0, range, length.out = breaks), rev(brewer.pal(n=breaks, name="RdBu")))
+            col = cols
             #name = "mtcars", #title of legend
             #column_title = "Variables", row_title = "Samples",
             #row_names_gp = gpar(fontsize = 7) # Text size for row names
-    )
+   )
       
    dev.off()
    
-     
+   
   }
   
 }
