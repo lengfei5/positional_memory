@@ -401,6 +401,9 @@ plot_tf_network = function(link.list)
   
   trn <- graph_from_data_frame(link.list, directed = TRUE)
   
+  gsize(trn)
+  gorder(trn)
+  
   # compute a clustering for node colors
   V(trn)$clu <- as.character(membership(cluster_louvain(graph_from_data_frame(link.list, directed = FALSE))))
   # compute degree as node size
@@ -421,7 +424,7 @@ plot_tf_network = function(link.list)
   }
   
   # # basic graph
-  ggraph(trn, layout = "stress") +
+  ggraph(trn, layout = "fr") +
     geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
     geom_node_point(aes(fill = clu, size = size), shape = 21) +
     geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
@@ -429,23 +432,14 @@ plot_tf_network = function(link.list)
     scale_edge_width(range = c(0.2, 3)) +
     scale_size(range = c(1, 6)) +
     theme_graph() +
-    theme(legend.position = "none")
   
-  # # force-driven layout
-  # ggraph(trn, layout = "graphopt") +
-  #   geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
-  #   geom_node_point(aes(fill = clu, size = size), shape = 21) +
-  #   geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
-  #   scale_fill_manual(values = c(got_palette, 'red', 'blue')) +
-  #   scale_edge_width(range = c(0.2, 3)) +
-  #   scale_size(range = c(1, 6)) +
-  #   theme_graph() +
-  #   theme(legend.position = "none")
+      theme(legend.position = "none")
   
   # centrality layout
   # https://github.com/schochastics/graphlayouts
   bc <- betweenness(trn)
   cc <- closeness(trn)
+  set.seed(2022)
   ggraph(trn, layout = "centrality", cent = graph.strength(trn)) +
     geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
     geom_node_point(aes(fill = clu, size = size), shape = 21) +
@@ -458,6 +452,17 @@ plot_tf_network = function(link.list)
     #theme(legend.position = "bottom")
     theme(legend.position = "none")
   ggsave(paste0(resDir, "/TRN_secondTest.pdf"), width=12, height = 10)
+  
+  # # force-driven layout
+  # ggraph(trn, layout = "graphopt") +
+  #   geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
+  #   geom_node_point(aes(fill = clu, size = size), shape = 21) +
+  #   geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
+  #   scale_fill_manual(values = c(got_palette, 'red', 'blue')) +
+  #   scale_edge_width(range = c(0.2, 3)) +
+  #   scale_size(range = c(1, 6)) +
+  #   theme_graph() +
+  #   theme(legend.position = "none")
   
   # # focus layout
   # ggraph(trn, layout = "focus", focus = 10) +

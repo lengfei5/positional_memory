@@ -1148,7 +1148,9 @@ Process.deeptools.heatmapTable = function()
     }
     if(n == 2) {range = 5; cols = colorRamp2(c(0, range), colors = c('white', 'purple'))}
     if(n == 3){range = 5; cols = colorRamp2(c(0, range), colors = c('white', 'darkorange'))}
-    if(n == 4){range = 6.5; cols = colorRamp2(c(0.2, range), c("white", "#3794bf"))}
+    if(n == 4){range = 7; cols = colorRamp2(c(0, 2, range), c('darkgray', "white", "darkgreen"))
+      #cols = colorRamp2(c(0.2, range), c("white", "#3794bf"))
+    }
     
     Heatmap(test, 
             cluster_rows = FALSE,
