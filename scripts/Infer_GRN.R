@@ -135,6 +135,9 @@ tfs.rna[which(is.na(match(tfs.rna, genes)))]
 geneSet = unique(c(tfs.limb, tfs.mara, tfs.positional,  tfs.rna))
 cat('total TFs of interest : ', length(geneSet), '\n')
 
+which(geneSet == 'ZNF281')
+geneSet = c(geneSet, 'ZNF281')
+
 mm = match(genes, geneSet)
 E = E[!is.na(mm), ]  # many gene IDs share the same gene symbols in the annotation
 genes = get_geneName(rownames(E)) 
@@ -149,8 +152,11 @@ E = E[!is.na(mm), ]
 genes = get_geneName(rownames(E)) 
 gg.counts = table(genes)
 
+nrow(E);
+length(gg.counts)
+
 ## 346 TFs from scRNA-seq data with 289 unique gene symbols
-saveRDS(E, file = paste0(RdataDir, '/GRNinference_scExprMatrix_346geneID_289TFsymbols.rds')) 
+saveRDS(E, file = paste0(RdataDir, '/GRNinference_scExprMatrix_v3_347geneID_290TFsymbols.rds')) 
 
 ########################################################
 ########################################################
@@ -318,13 +324,13 @@ if(Manual_correction_motif_tf_association){
     
 }
 
+### target-to-CRE matrix
+E = readRDS(file = paste0(RdataDir, '/GRNinference_scExprMatrix_v3_347geneID_290TFsymbols.rds'))
+targets.ids = get_geneID(rownames(E))
+
 ### CRE-motif-occurence matrix
 mocs = readRDS(file = '../results/motif_analysis/motif_oc_fimo_atacPeaks.2kbTSS_jaspar2022.core.unvalided_pval.0.00001_v1.rds')
 cres = unique(rownames(mocs))
-
-### target-to-CRE matrix
-E = readRDS(file = paste0(RdataDir, '/GRNinference_scExprMatrix_346geneID_289TFsymbols.rds'))
-targets.ids = get_geneID(rownames(E))
 
 #targets = data.frame(geneID = targets.ids, stringsAsFactors = FALSE)
 #targets$CREs = NA
@@ -424,8 +430,11 @@ saveRDS(target.tfs, file = paste0(RdataDir, '/GRN_priorNetwork_target_TFs.rds'))
 ########################################################
 source('myGENIE3.R')
 
-E = readRDS(file = paste0(RdataDir, '/GRNinference_scExprMatrix_346geneID_289TFsymbols.rds'))
+E = readRDS(file = paste0(RdataDir, '/GRNinference_scExprMatrix_v3_347geneID_290TFsymbols.rds'))
 target.tfs = readRDS(file = paste0(RdataDir, '/GRN_priorNetwork_target_TFs.rds'))
+
+grep('ZNF281', rownames(E))
+grep('ZNF281', rownames(target.tfs))
 
 mm = match(rownames(target.tfs), rownames(E))
 E = E[mm, ]
@@ -436,18 +445,19 @@ sels = which(sds>10^-4)
 E = E[sels, ]
 target.tfs = target.tfs[sels, sels]
 
-#tic()
-#weight.matrix1 = GENIE3(expr.matrix = E, priorRegulators =  target.tfs)
-#toc()
+grep('ZNF281', rownames(E))
+grep('ZNF281', rownames(target.tfs))
+
 
 tic()
 wtm = GENIE3(expr.matrix = E, priorRegulators =  target.tfs, ncore = 8)
-saveRDS(wtm, file = paste0(RdataDir, '/first_test_Genie3_v2.rds'))
+saveRDS(wtm, file = paste0(RdataDir, '/first_test_Genie3_v3.rds'))
 
 toc()
 
 source('myGENIE3.R')
-wtm = readRDS(file =  paste0(RdataDir, '/first_test_Genie3_v2.rds'))
+wtm = readRDS(file =  paste0(RdataDir, '/first_test_Genie3_v3.rds'))
+
 ggs = colnames(wtm)
 genes = get_geneName(ggs)
 gene.counts = table(genes)

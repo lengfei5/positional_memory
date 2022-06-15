@@ -391,6 +391,8 @@ read.expr.matrix <- function(filename, form="", sep="", default.gene.label="gene
 # plot the GRN graph 
 # some original code from https://mr.schochastics.net/material/netvizr/
 # https://github.com/quadbiolab/Pando/blob/main/R/plots.R (Pando from Jonas)
+# Some basic network analysis 
+# from https://github.com/Arizonagong/vCIES2020_Network-Analysis/blob/master/igraph/vCIES_igraph.Rscript.R
 ##########################################
 plot_tf_network = function(link.list)
 {
@@ -401,48 +403,87 @@ plot_tf_network = function(link.list)
   
   trn <- graph_from_data_frame(link.list, directed = TRUE)
   
-  gsize(trn)
-  gorder(trn)
+  #1. Igraph object summary
+  gorder(trn) # nb of node
+  gsize(trn) # nb of edges
   
+  #2. Nodelist
+  V(trn)
+  
+  #3. Edgelist
+  E(trn)
+  
+  #4. Attributes
+  V(trn)$name
+  V(trn)$weight
   # compute a clustering for node colors
-  V(trn)$clu <- as.character(membership(cluster_louvain(graph_from_data_frame(link.list, directed = FALSE))))
+  V(trn)$cluster <- as.character(membership(cluster_louvain(graph_from_data_frame(link.list, directed = FALSE))))
   # compute degree as node size
   V(trn)$size <- degree(trn)
   
+  #5. Adjacency matrix
+  trn[c(1:10),c(1:10)]
+  
+  ##########################################
+  # Measuring Centrality and add them into attributes
+  ##########################################
+  #1. Degree centrality
+  Stucont_deg<-degree(Stucont,mode=c("All"))
+  V(trn)$degree<-degree(trn, mode = 'all')
+  V(trn)$degreeIn = degree(trn, mode = 'in')
+  V(trn)$degreeOut = degree(trn, mode = 'out')
+  V(trn)$name[which.max(V(trn)$degree)]
+  V(trn)$name[which.max(V(trn)$degreeIn)]
+  V(trn)$name[which.max(V(trn)$degreeOut)]
+  
+  V(trn)$degree[which(V(trn)$name == 'ZNF281')]
+  
+  #2. Eigenvector centrality
+  V(trn)$Eigen<-evcent(trn)$vector
+  V(trn)$Eigen
+  V(trn)$name[which.max(V(trn)$Eigen)]
+  
+  #3. Betweenness centrality
+  V(Stucont)$betweenness <- betweenness(Stucont, directed = FALSE)
+  V(Stucont)$betweenness
+  V(trn)$name[which.max(Stucont_bw)]
+  
+  DF<-as_long_data_frame(Stucont)
+  Stucont
+  
   # define a custom color palette
-  nb_clusters = length(unique(V(trn)$clu))
+  nb_clusters = length(unique(V(trn)$cluster))
+  cat(nb_clusters, ' clusters used here \n')
   if(length(nb_clusters)<=9) {
     library(khroma)
     muted <- colour("muted")
     got_palette = c("#CC6677", "#332288", "#DDCC77", "#117733", "#88CCEE", "#882255", "#44AA99")[1:nb_clusters] 
   }else{
     cat('More than 9 colors needed \n')
-    got_palette <- c(
-      "#1A5878", "#C44237", "#AD8941", "#E99093",
-      "#50594B", "#8968CD", "#9ACD32"
-    )
+    
+    got_palette = c("#CC6677", "#332288", "#DDCC77", "#117733", "#88CCEE", "#882255", "#44AA99", 
+                    "#1A5878", "#C44237", "#AD8941", "#E99093",
+                    "#50594B", "#8968CD", "#9ACD32")[1:nb_clusters]
   }
   
   # # basic graph
   ggraph(trn, layout = "fr") +
     geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
-    geom_node_point(aes(fill = clu, size = size), shape = 21) +
+    geom_node_point(aes(fill = cluster, size = size), shape = 21) +
     geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
     scale_fill_manual(values = c(got_palette, 'red', 'blue')) +
     scale_edge_width(range = c(0.2, 3)) +
     scale_size(range = c(1, 6)) +
     theme_graph() +
-  
-      theme(legend.position = "none")
+    theme(legend.position = "none")
   
   # centrality layout
   # https://github.com/schochastics/graphlayouts
-  bc <- betweenness(trn)
-  cc <- closeness(trn)
+    
   set.seed(2022)
   ggraph(trn, layout = "centrality", cent = graph.strength(trn)) +
     geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
-    geom_node_point(aes(fill = clu, size = size), shape = 21) +
+    geom_node_point(aes(fill = cluster, size = size), shape = 21) +
     geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
     scale_edge_width_continuous(range = c(0.02, 0.1)) +
     scale_size_continuous(range = c(1, 10)) +
@@ -451,32 +492,92 @@ plot_tf_network = function(link.list)
     theme_graph() +
     #theme(legend.position = "bottom")
     theme(legend.position = "none")
+  
   ggsave(paste0(resDir, "/TRN_secondTest.pdf"), width=12, height = 10)
   
-  # # force-driven layout
-  # ggraph(trn, layout = "graphopt") +
-  #   geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
-  #   geom_node_point(aes(fill = clu, size = size), shape = 21) +
-  #   geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
-  #   scale_fill_manual(values = c(got_palette, 'red', 'blue')) +
-  #   scale_edge_width(range = c(0.2, 3)) +
-  #   scale_size(range = c(1, 6)) +
-  #   theme_graph() +
-  #   theme(legend.position = "none")
+  ######################################################################
+  ## following code from https://github.com/lengfei5/pallium_evo/blob/main/analysis/GRN_analysis/moo_graph_layout.R
   
-  # # focus layout
-  # ggraph(trn, layout = "focus", focus = 10) +
-  #   geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
-  #   geom_node_point(aes(fill = clu, size = size), shape = 21) +
-  #   #geom_node_text(aes(filter = (name == "Ned"), size = size, label = name),family = "serif") +
-  #   geom_node_text(aes(size = size, label = name), family = "serif") +
-  #   scale_edge_width_continuous(range = c(0.1, 1.0)) +
-  #   scale_size_continuous(range = c(1, 5)) +
-  #   scale_fill_manual(values = got_palette) +
-  #   coord_fixed() +
-  #   theme_graph() +
-  #   theme(legend.position = "none")
-  # ggsave(paste0(resDir, "/TRN_firstTest_focus.10.pdf"), width=12, height = 10)
+  #### Net with only TFs ####
+  #### Get avg expression for genes ####
+  region_summary <- Pando::aggregate_matrix(rna_expr[, union(grn_net$tf, grn_net$target)], groups=mome_atac$pred_regions_all)
+  subclass_summary <- Pando::aggregate_matrix(rna_expr[, union(grn_net$tf, grn_net$target)], groups=mome_atac$subclasses)
+  
+  region_summary_df <- region_summary %>% t() %>% 
+    as_tibble(rownames='gene') 
+  
+  subclass_summary_df <- subclass_summary %>% t() %>% 
+    as_tibble(rownames='gene') 
+  
+  gene_scores <- inner_join(region_summary_df, subclass_summary_df)
+  
+  
+  ### Get coex and umap ####
+  gene_cor <- Pando::sparse_cor(rna_expr[, union(grn_net$tf, grn_net$target)])
+  
+  reg_mat <- grn_net %>% 
+    filter(!str_detect(target, '^(AMEX|LOC)')) %>% 
+    filter(target%in%tfs$symbol) %>%
+    distinct(target, tf, estimate) %>%
+    pivot_wider(names_from=tf, values_from=estimate, values_fill=0) %>% 
+    column_to_rownames('target') %>% as.matrix() %>% Matrix::Matrix(sparse=T)
+  reg_factor_mat <- abs(reg_mat) + 1
+  
+  weighted_coex_mat <- gene_cor[rownames(reg_factor_mat), colnames(reg_factor_mat)] * sqrt(reg_factor_mat)
+  weighted_coex_mat <- as.matrix(gene_cor[rownames(reg_factor_mat), colnames(reg_factor_mat)])
+  weight_coex_umap <- uwot::umap(weighted_coex_mat, n_neighbors=5)
+  rownames(weight_coex_umap) <- rownames(weighted_coex_mat)
+  colnames(weight_coex_umap) <- c('UMAP1', 'UMAP2')
+  
+  
+  #### Plot network ####
+  weight_coex_meta <- weight_coex_umap %>% 
+    as_tibble(rownames='gene') %>% 
+    left_join(gene_scores)
+  
+  
+  tf_graph <- as_tbl_graph(grn_net) %>% 
+    activate(edges) %>% 
+    mutate(from_node=.N()$name[from], to_node=.N()$name[to]) %>% 
+    activate(nodes) %>% 
+    mutate(
+      central_pr=centrality_pagerank(weights = estimate),
+      central_betw=centrality_betweenness(),
+      central_eig=centrality_eigen(),
+      central_deg=centrality_degree(),
+      outdegree=centrality_degree(mode='out'),
+      indegree=centrality_degree(mode='in')
+    ) %>% 
+    inner_join(weight_coex_meta, by=c('name'='gene')) %>% 
+    activate(edges) %>%
+    filter(padj<0.05) %N>% 
+    filter(!node_is_isolated())
+  
+  
+  
+  ggraph(tf_graph, x=UMAP1, y=UMAP2) + 
+    geom_edge_diagonal(aes(alpha=-log10(padj), color=factor(sign(estimate))), width=0.5) + 
+    geom_node_point(aes(size=outdegree), shape=21, color='black', fill='grey') +
+    geom_node_text(aes(label=name), size=5/ggplot2::.pt, repel=T) +
+    scale_edge_color_manual(values=c('#f5b7b1', '#7dcea0')) +
+    scale_edge_alpha_continuous(range=c(0.01,0.8), limits=c(2,20)) +
+    theme_void() 
+  ggsave('plots/tf_grn_umap.png', width=6, height=6)
+  ggsave('plots/tf_grn_umap.pdf', width=6, height=6)
+  
+  
+  ggraph(tf_graph, x=UMAP1, y=UMAP2) + 
+    geom_edge_diagonal(aes(alpha=-log10(padj), color=factor(sign(estimate))), width=0.5) + 
+    geom_node_point(aes(size=outdegree), shape=21, color='black', fill='grey') +
+    # geom_node_text(aes(label=name), size=5/ggplot2::.pt, repel=T) +
+    scale_edge_color_manual(values=c('#f5b7b1', '#7dcea0')) +
+    scale_edge_alpha_continuous(range=c(0.01,0.8), limits=c(2,20)) +
+    theme_void() 
+  ggsave('plots/tf_grn_unlabelled_umap.png', width=6, height=6)
+  ggsave('plots/tf_grn_unlabelled_umap.pdf', width=6, height=6)
+  
+  
+  
   
     
 }
