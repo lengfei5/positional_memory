@@ -458,6 +458,8 @@ toc()
 source('myGENIE3.R')
 wtm = readRDS(file =  paste0(RdataDir, '/first_test_Genie3_v3.rds'))
 
+gnames = rownames(wtm)
+
 ggs = colnames(wtm)
 genes = get_geneName(ggs)
 gene.counts = table(genes)
@@ -473,10 +475,14 @@ ss1 = apply(wtm, 1, function(x) length(which(x>cutoff)))
 ss2 = apply(wtm, 2, function(x) length(which(x>cutoff)))
 sels = which(ss1>=5 & ss2>=5)
 wtm = wtm[sels, sels]
+gnames = gnames[sels]
+
+gnames = data.frame(gnames, node = rownames(wtm), stringsAsFactors = FALSE)
+
+length(unique(get_geneName(rownames(wtm))))
 
 link.list = get.link.list(wtm, threshold = cutoff)
 dim(link.list)
 head(link.list)
-
 
 

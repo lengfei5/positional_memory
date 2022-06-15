@@ -399,7 +399,8 @@ plot_tf_network = function(link.list)
   library(igraph)
   library(ggraph)
   library(tidygraph)
-  library(graphlayouts)
+  library(graphlayouts) 
+  library(RColorBrewer) # This is the color library
   
   trn <- graph_from_data_frame(link.list, directed = TRUE)
   
@@ -428,8 +429,7 @@ plot_tf_network = function(link.list)
   # Measuring Centrality and add them into attributes
   ##########################################
   #1. Degree centrality
-  Stucont_deg<-degree(Stucont,mode=c("All"))
-  V(trn)$degree<-degree(trn, mode = 'all')
+  V(trn)$degree<-degree(trn, mode = 'All')
   V(trn)$degreeIn = degree(trn, mode = 'in')
   V(trn)$degreeOut = degree(trn, mode = 'out')
   V(trn)$name[which.max(V(trn)$degree)]
@@ -444,12 +444,12 @@ plot_tf_network = function(link.list)
   V(trn)$name[which.max(V(trn)$Eigen)]
   
   #3. Betweenness centrality
-  V(Stucont)$betweenness <- betweenness(Stucont, directed = FALSE)
-  V(Stucont)$betweenness
-  V(trn)$name[which.max(Stucont_bw)]
+  V(trn)$betweenness <- betweenness(trn, directed = FALSE)
+  V(trn)$betweenness
+  V(trn)$name[which.max(V(trn)$betweenness)]
   
-  DF<-as_long_data_frame(Stucont)
-  Stucont
+  DF <- as_long_data_frame(trn)
+  trn
   
   # define a custom color palette
   nb_clusters = length(unique(V(trn)$cluster))
@@ -465,9 +465,11 @@ plot_tf_network = function(link.list)
                     "#1A5878", "#C44237", "#AD8941", "#E99093",
                     "#50594B", "#8968CD", "#9ACD32")[1:nb_clusters]
   }
+ 
+  pal<-brewer.pal(length(unique(V(Stucont)$Class)), "Set3") # Vertex color assigned per each class number
   
   # # basic graph
-  ggraph(trn, layout = "fr") +
+  ggraph(trn, layout = "stress") +
     geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
     geom_node_point(aes(fill = cluster, size = size), shape = 21) +
     geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
@@ -495,9 +497,56 @@ plot_tf_network = function(link.list)
   
   ggsave(paste0(resDir, "/TRN_secondTest.pdf"), width=12, height = 10)
   
+  #########
+  ## test umap layout
+  #########
+  kk = match(gnames$gnames[match(V(trn)$name, gnames$node)], rownames(E))
+  matE = E[kk, ]
+  pcs <- prcomp((matE), scale = TRUE)
+  pcs = (pcs$x)
+  
+  nb_pcs = 10;
+  weight_coex_umap <- uwot::umap(pcs[, c(1:nb_pcs)], n_neighbors=10, min_dist = 0.01)
+  rownames(weight_coex_umap) <- V(trn)$name
+  colnames(weight_coex_umap) <- c('UMAP1', 'UMAP2')
+  
+  V(trn)$umap1 <-weight_coex_umap[,1]
+  V(trn)$umap2 <-weight_coex_umap[,2]
+  
+  
+  set.seed(2022)
+  ggraph(trn, x=umap1, y=umap2) +
+    geom_edge_link(aes(edge_width = weight), 
+                   edge_colour = "grey66", 
+                   # arrow = arrow(
+                   #   angle = 10,
+                   #   length = unit(0.15, "inches"),
+                   #   ends = "last",
+                   #   type = "closed")
+                   ) +
+    geom_node_point(aes(fill = cluster, size = degreeOut), shape = 21) +
+    #geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
+    geom_node_text(aes(label=name), size=8/ggplot2::.pt, repel=T, family = "serif")+
+    scale_edge_width_continuous(range = c(0.02, 0.1)) +
+    scale_size_continuous(range = c(1, 10)) +
+    scale_fill_manual(values = got_palette) +
+    coord_fixed() +
+    theme_graph() +
+    #theme(legend.position = "bottom")
+    theme(legend.position = "none")
+  
+  ggsave(paste0(resDir, "/TRN_tfExpr.umap_connectivity.clusters.pdf"), width=15, height = 10)
+  
+  geom_edge_diagonal(aes(alpha=-log10(padj), color=factor(sign(estimate))), width=0.5) + 
+    geom_node_point(aes(size=outdegree), shape=21, color='black', fill='grey') +
+    geom_node_text(aes(label=name), size=5/ggplot2::.pt, repel=T) +
+    scale_edge_color_manual(values=c('#f5b7b1', '#7dcea0')) +
+    scale_edge_alpha_continuous(range=c(0.01,0.8), limits=c(2,20)) +
+    theme_void() 
+  
   ######################################################################
   ## following code from https://github.com/lengfei5/pallium_evo/blob/main/analysis/GRN_analysis/moo_graph_layout.R
-  
+  ######################################################################
   #### Net with only TFs ####
   #### Get avg expression for genes ####
   region_summary <- Pando::aggregate_matrix(rna_expr[, union(grn_net$tf, grn_net$target)], groups=mome_atac$pred_regions_all)
@@ -535,7 +584,6 @@ plot_tf_network = function(link.list)
     as_tibble(rownames='gene') %>% 
     left_join(gene_scores)
   
-  
   tf_graph <- as_tbl_graph(grn_net) %>% 
     activate(edges) %>% 
     mutate(from_node=.N()$name[from], to_node=.N()$name[to]) %>% 
@@ -552,8 +600,6 @@ plot_tf_network = function(link.list)
     activate(edges) %>%
     filter(padj<0.05) %N>% 
     filter(!node_is_isolated())
-  
-  
   
   ggraph(tf_graph, x=UMAP1, y=UMAP2) + 
     geom_edge_diagonal(aes(alpha=-log10(padj), color=factor(sign(estimate))), width=0.5) + 
@@ -575,9 +621,6 @@ plot_tf_network = function(link.list)
     theme_void() 
   ggsave('plots/tf_grn_unlabelled_umap.png', width=6, height=6)
   ggsave('plots/tf_grn_unlabelled_umap.pdf', width=6, height=6)
-  
-  
-  
   
     
 }
