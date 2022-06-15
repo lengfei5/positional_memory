@@ -102,7 +102,8 @@ tfs.positional[which(is.na(match(tfs.positional, tfs.rna)))]
 ##########################################
 aa = readRDS(file = paste0(RdataDir, '/Gerber2018_Fluidigm.C1_batches_seuratObj.rds'))
 aa = subset(aa, cells = colnames(aa)[which(aa$timepoint != 'Stage28' & aa$timepoint != 'Stage40' & 
-                                             aa$timepoint != 'Stage44')])
+                                             aa$timepoint != 'Stage44' & aa$timepoint != '1apa')])
+
 aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 3000)
 all.genes <- rownames(aa)
 aa <- ScaleData(aa, features = all.genes)
@@ -485,4 +486,32 @@ link.list = get.link.list(wtm, threshold = cutoff)
 dim(link.list)
 head(link.list)
 
+##########################################
+# TF expression 
+##########################################
+rna = readRDS(file = paste0("../results/RNAseq_data_used/Rdata/", 'pooled_scRNAseq_cpm.mean_4GRN.rds'))
+rna = rna[match(gnames$gnames, rownames(rna)), ]
+rownames(rna) = gnames$node
+
+df = as.data.frame(colnames(rna))
+colnames(df) = 'condition'
+rownames(df) = colnames(rna)
+
+sample_colors = c('deepskyblue', 'deepskyblue3', 
+                  'springgreen4', 
+                  'springgreen', 'springgreen2', 'springgreen3', 'chartreuse', 'chartreuse4')[c(1:ncol(rna))]
+names(sample_colors) = colnames(rna)
+annot_colors = list(condition = sample_colors)
+
+pheatmap(as.matrix(rna), annotation_row = NA, 
+         annotation_col = df, show_rownames = TRUE, scale = 'row', 
+         color =  colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(10), 
+         show_colnames = FALSE, 
+         cluster_rows = TRUE, cluster_cols = FALSE,  
+         clustering_method = 'complete', cutree_rows = 8, 
+         annotation_colors = annot_colors, 
+         width = 5, height = 14, fontsize = 5,
+         #clustering_callback = callback,
+         treeheight_row = 30,
+         filename = paste0(figureDir, '/GRN_TFs_expression_pooledscRNAseq.pdf')) 
 

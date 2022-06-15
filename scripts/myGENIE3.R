@@ -401,6 +401,7 @@ plot_tf_network = function(link.list)
   library(tidygraph)
   library(graphlayouts) 
   library(RColorBrewer) # This is the color library
+  # require(uwot)
   
   trn <- graph_from_data_frame(link.list, directed = TRUE)
   
@@ -452,8 +453,11 @@ plot_tf_network = function(link.list)
   trn
   
   # define a custom color palette
+  V(trn)$cluster <- as.character(membership(cluster_louvain(graph_from_data_frame(link.list, directed = FALSE), 
+                                                            resolution = 1.2)))
   nb_clusters = length(unique(V(trn)$cluster))
   cat(nb_clusters, ' clusters used here \n')
+  
   if(length(nb_clusters)<=9) {
     library(khroma)
     muted <- colour("muted")
@@ -466,7 +470,51 @@ plot_tf_network = function(link.list)
                     "#50594B", "#8968CD", "#9ACD32")[1:nb_clusters]
   }
  
-  pal<-brewer.pal(length(unique(V(Stucont)$Class)), "Set3") # Vertex color assigned per each class number
+  pal<-brewer.pal(nb_clusters, "Set3") # Vertex color assigned per each class number
+  
+  #########
+  ## test umap layout
+  #########
+  kk = match(gnames$gnames[match(V(trn)$name, gnames$node)], rownames(E))
+  matE = E[kk, ]
+  pcs <- prcomp((matE), scale = TRUE)
+  pcs = data.frame(pcs$x)
+  
+  kk2 = match(V(trn)$name, rownames(wtm))
+  matC = wtm[kk2, ]
+  matC[is.na(matC)] = 0
+  pcs2 <- prcomp((matC), scale = TRUE)
+  pcs2 = data.frame(pcs2$x)
+  
+  nb_pcs = 5;
+  pcs.use = data.frame(pcs[, c(1:10)], pcs2[, c(1:nb_pcs)])
+  
+  set.seed(1011)
+  weight_coex_umap <- uwot::umap(pcs.use, n_neighbors=5)
+  rownames(weight_coex_umap) <- V(trn)$name
+  colnames(weight_coex_umap) <- c('UMAP1', 'UMAP2')
+  
+  V(trn)$umap1 <-weight_coex_umap[,1]
+  V(trn)$umap2 <-weight_coex_umap[,2]
+  
+  set.seed(2022)
+  ggraph(trn, x=umap1, y=umap2) +
+    geom_edge_link(aes(edge_width = weight), 
+                   edge_colour = "grey90"       
+                   ) +
+    geom_node_point(aes(fill = cluster, size = degreeOut), shape = 21) +
+    #geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
+    geom_node_text(aes(filter = size >= 30, label=name), size=8/ggplot2::.pt, repel=T, family = "serif")+
+    scale_edge_width_continuous(range = c(0.01, 0.05)) +
+    scale_edge_alpha_continuous(range=c(0.01,0.4), limits=c(2,20)) +
+    scale_size_continuous(range = c(1, 10)) +
+    scale_fill_manual(values = pal) +
+    coord_fixed() +
+    theme_graph() +
+    #theme(legend.position = "bottom")
+    theme(legend.position = "none")
+  
+  ggsave(paste0(figureDir, "TRN_tfExpr.umap_connectivity.clusters_v4.pdf"), width=15, height = 12)
   
   # # basic graph
   ggraph(trn, layout = "stress") +
@@ -481,7 +529,7 @@ plot_tf_network = function(link.list)
   
   # centrality layout
   # https://github.com/schochastics/graphlayouts
-    
+  
   set.seed(2022)
   ggraph(trn, layout = "centrality", cent = graph.strength(trn)) +
     geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
@@ -496,53 +544,6 @@ plot_tf_network = function(link.list)
     theme(legend.position = "none")
   
   ggsave(paste0(resDir, "/TRN_secondTest.pdf"), width=12, height = 10)
-  
-  #########
-  ## test umap layout
-  #########
-  kk = match(gnames$gnames[match(V(trn)$name, gnames$node)], rownames(E))
-  matE = E[kk, ]
-  pcs <- prcomp((matE), scale = TRUE)
-  pcs = (pcs$x)
-  
-  nb_pcs = 10;
-  weight_coex_umap <- uwot::umap(pcs[, c(1:nb_pcs)], n_neighbors=10, min_dist = 0.01)
-  rownames(weight_coex_umap) <- V(trn)$name
-  colnames(weight_coex_umap) <- c('UMAP1', 'UMAP2')
-  
-  V(trn)$umap1 <-weight_coex_umap[,1]
-  V(trn)$umap2 <-weight_coex_umap[,2]
-  
-  
-  set.seed(2022)
-  ggraph(trn, x=umap1, y=umap2) +
-    geom_edge_link(aes(edge_width = weight), 
-                   edge_colour = "grey66", 
-                   # arrow = arrow(
-                   #   angle = 10,
-                   #   length = unit(0.15, "inches"),
-                   #   ends = "last",
-                   #   type = "closed")
-                   ) +
-    geom_node_point(aes(fill = cluster, size = degreeOut), shape = 21) +
-    #geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
-    geom_node_text(aes(label=name), size=8/ggplot2::.pt, repel=T, family = "serif")+
-    scale_edge_width_continuous(range = c(0.02, 0.1)) +
-    scale_size_continuous(range = c(1, 10)) +
-    scale_fill_manual(values = got_palette) +
-    coord_fixed() +
-    theme_graph() +
-    #theme(legend.position = "bottom")
-    theme(legend.position = "none")
-  
-  ggsave(paste0(resDir, "/TRN_tfExpr.umap_connectivity.clusters.pdf"), width=15, height = 10)
-  
-  geom_edge_diagonal(aes(alpha=-log10(padj), color=factor(sign(estimate))), width=0.5) + 
-    geom_node_point(aes(size=outdegree), shape=21, color='black', fill='grey') +
-    geom_node_text(aes(label=name), size=5/ggplot2::.pt, repel=T) +
-    scale_edge_color_manual(values=c('#f5b7b1', '#7dcea0')) +
-    scale_edge_alpha_continuous(range=c(0.01,0.8), limits=c(2,20)) +
-    theme_void() 
   
   ######################################################################
   ## following code from https://github.com/lengfei5/pallium_evo/blob/main/analysis/GRN_analysis/moo_graph_layout.R

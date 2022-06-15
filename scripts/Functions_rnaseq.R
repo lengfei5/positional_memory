@@ -1785,8 +1785,224 @@ smartseq2_processing_nomrlaization.test = function()
     
   }
   
-  
 }
 
+Analysis.scRNAseq.Seurat = function()
+{
+  scRNAseq.analysis.seurat = FALSE
+  if(scRNAseq.analysis.seurat){
+    library(dplyr)
+    library(Seurat)
+    library(patchwork)
+    
+    aa = CreateSeuratObject(counts = counts, project = "limb_regeneration", assay = 'RNA', meta.data = as.data.frame(metadata),
+                            min.cells = 20, min.features = 500)
+    
+    
+    VlnPlot(aa, features = c("nFeature_RNA", "nCount_RNA"), ncol = 2)
+    FeatureScatter(aa, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+    
+    sce = Seurat::as.SingleCellExperiment(aa, assay = 'RNA')
+    
+    library(scran)
+    #library(scuttle)
+    clusters <- quickCluster(sce)
+    sce <- computeSumFactors(sce, clusters=clusters)
+    summary(sizeFactors(sce))
+    sce <- normalize(sce)
+    
+    aa = as.Seurat(sce, counts = "counts", data = "logcounts")
+    
+    
+    #aa <- NormalizeData(aa, normalization.method = "LogNormalize", scale.factor = 10000)
+    aa <- FindVariableFeatures(aa, selection.method = "vst", nfeatures = 5000)
+    all.genes <- rownames(aa)
+    aa <- ScaleData(aa, features = all.genes)
+    aa <- RunPCA(aa, features = VariableFeatures(object = aa))
+    ElbowPlot(aa)
+    
+    aa <- FindNeighbors(aa, dims = 1:10)
+    aa <- FindClusters(aa, resolution = 0.5)
+    
+    aa <- RunUMAP(aa, dims = 1:20, n.neighbors = 30, min.dist = 0.3)
+    p1 = DimPlot(aa, reduction = "umap", group.by = 'timepoint')
+    p2 = DimPlot(aa, reduction = "umap", group.by = 'batch')
+    
+    p1 + p2
+    
+    ggsave(paste0(resDir, "/Overview_Gerber2018_Fluidigm.C1_batches_v3.pdf"), width = 12, height = 8)
+    
+    aa$timepoint = factor(aa$timepoint, levels = c('0dpa', '3dpa', '5dpa', '8dpa', '11dpa', '18dpa', '1apa', 'Stage40', 'Stage44'))
+    
+    Idents(aa) = aa$timepoint
+    p1 = VlnPlot(aa, features = "nCount_RNA", split.by = "timepoint")
+    p2 = VlnPlot(aa, features = "nFeature_RNA", split.by = "timepoint")
+    
+    p1 + p2
+    
+    ggsave(paste0(resDir, "/Overview_Gerber2018_Fluidigm.C1_batches_nCount_nFeature.pdf"), width = 12, height = 12)
+    
+    saveRDS(aa, file = paste0(RdataDir, '/Gerber2018_Fluidigm.C1_dev.mature.regeneration.rds'))
+    
+    ##########################################
+    # ## find DE genes with FindMarkergene in Seurat
+    ##########################################
+    aa = readRDS(file = paste0(RdataDir, '/Gerber2018_Fluidigm.C1_dev.mature.regeneration.rds'))
+    aa = subset(aa, cells = colnames(aa)[which(aa$timepoint != '1apa' & aa$timepoint != '3dpa' & aa$timepoint != '18dpa')])
+    aa$timepoint = droplevels(aa$timepoint)
+    aa$timepoint = factor(aa$timepoint, levels = c('0dpa', '5dpa', '8dpa', '11dpa', 'Stage40', 'Stage44'))
+    
+    Idents(aa) = aa$timepoint
+    
+    DimPlot(aa, reduction = 'umap')
+    
+    degs = c()
+    fdr.cutoff = 0.05
+    min.pct = 0.25
+    logfc.cutoff = 0.5
+    
+    for(c in c( '5dpa', '8dpa', '11dpa', 'Stage40', 'Stage44'))
+    {
+      cluster1.markers <- FindMarkers(aa, ident.1 = c, ident.2 = '0dpa', min.pct = min.pct, logfc.threshold = logfc.cutoff)
+      kk = which(cluster1.markers$p_val_adj < fdr.cutoff)
+      cat(c, ' vs 0dpa \n')
+      cat(length(kk), ' DE genes found !\n')
+      degs = c(degs, rownames(cluster1.markers)[kk])
+      cat(length(unique(degs)), ' total DE genes \n')
+    }
+    
+    
+    cluster1.markers <- FindMarkers(aa, ident.1 = '11dpa', ident.2 = 'Stage40', min.pct = min.pct, logfc.threshold = logfc.cutoff)
+    kk = which(cluster1.markers$p_val_adj < fdr.cutoff)
+    cat(length(kk), ' DE genes found !\n')
+    degs = c(degs, rownames(cluster1.markers)[kk])
+    cat(length(unique(degs)), ' total DE genes \n')
+    
+    cluster1.markers <- FindMarkers(aa, ident.1 = '11dpa', ident.2 = 'Stage44', min.pct = min.pct, logfc.threshold = logfc.cutoff)
+    kk = which(cluster1.markers$p_val_adj < fdr.cutoff)
+    cat(length(kk), ' DE genes found !\n')
+    degs = c(degs, rownames(cluster1.markers)[kk])
+    cat(length(unique(degs)), ' total DE genes \n')
+    
+    degs = unique(degs)
+    
+    ggs = sapply(degs, function(x) {x = unlist(strsplit(as.character(x), '[-]')); return(x[length(x)])})
+    mm = match(ggs, hs)
+    length(which(!is.na(mm)))
+    
+    degs.sel = degs[is.na(mm)]
+    
+    DoHeatmap(aa, features = degs) + NoLegend()
+    ggsave(paste0(resDir, "/Gerber2018_Fluidigm.C1_mUA_regeneration_dev_DEgenes_minimal.timepoints.pdf"), width = 18, height = 14)
+    
+    ##########################################
+    # test metacells in  
+    ##########################################
+    Test.metacells = FALSE
+    if(Test.metacells){
+      library("metacell")
+      sce = Seurat::as.SingleCellExperiment(aa)
+      mat = scm_import_sce_to_mat(sce)
+      
+      print(dim(mat@mat))
+      
+      mcell_plot_umis_per_cell("tgScMat")
+      mcell_add_gene_stat(gstat_id="test", mat_id="test", force=T)
+      
+    }
+    
+    
+    ##########################################
+    # pooling logcounts within the same time points
+    ##########################################
+    DEgene.search.with.Pool.scRNAseq.pseudobulk = FALSE
+    if(DEgene.search.with.Pool.scRNAseq.pseudobulk){
+      
+      require(pheatmap)
+      require(RColorBrewer)
+      data = aa@assays$RNA@data
+      metadata = aa@meta.data
+      
+      conds = c('0dpa',  '5dpa', '8dpa', '11dpa', 'Stage40', 'Stage44')
+      pseudo = matrix(NA, ncol = length(conds), nrow = nrow(data))
+      colnames(pseudo) = conds
+      rownames(pseudo) = rownames(data)
+      
+      for(n in 1:length(conds))
+      {
+        cat(n, ' : ', conds[n], ' -- ')
+        jj = which(metadata$timepoint == conds[n])
+        
+        mm = match(metadata$cell_id[jj], colnames(data))
+        
+        if(length(which(is.na(mm)))>0) {
+          cat('some cells lost \n')
+        }else{
+          cat(length(mm), ' cell found \n')
+          xx = as.matrix(data[, mm])
+          xx[is.na(xx)] = 0
+          pseudo[,n] = apply(xx, 1, sum)
+        }
+      }
+      
+      
+      select = match(degs, rownames(pseudo))
+      yy = log2(pseudo[select, ] + 2^-2)
+      
+      plot.pair.comparison.plot(yy, linear.scale = FALSE)
+      
+      df = as.data.frame(conds)
+      colnames(df) = 'condition'
+      rownames(df) = colnames(yy)
+      
+      sample_colors = c('springgreen4', 'springgreen', 'springgreen2', 'springgreen3', 'gold2', 'red')
+      names(sample_colors) = conds
+      annot_colors = list(samples = sample_colors)
+      
+      pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+               color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(16), 
+               show_colnames = FALSE,
+               scale = 'none',
+               cluster_cols=FALSE, annotation_col=df,
+               annotation_colors = annot_colors,
+               width = 6, height = 12, 
+               filename = paste0(resDir, '/heatmap_DEgenes_mUA_regeneration_dev_pseudoBulk_v2.pdf')) 
+      
+      ##########################################
+      # highlight TF, eps and other 
+      ##########################################
+      ggs = rownames(yy)
+      ggs = sapply(ggs, function(x) unlist(strsplit(as.character(x), '_'))[1])
+      
+      print(intersect(ggs, tfs))
+      print(intersect(ggs, sps))
+      print(intersect(ggs, eps))
+      print(intersect(ggs, rbp))
+      
+      for(subg in c('tfs', 'eps', 'sps', 'rbp'))
+      {
+        
+        mm = eval(parse(text = paste0('match(ggs, unique(', subg, '))')))
+        
+        yy1 = yy[unique(c(which(!is.na(mm)))), ]
+        
+        pheatmap(yy1, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+                 color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
+                 show_colnames = FALSE,
+                 scale = 'row',
+                 cluster_cols=FALSE, annotation_col=df,
+                 annotation_colors = annot_colors,
+                 width = 8, height = 8, 
+                 filename = paste0(figureDir, '/heatmap_DEgenes_regeneration_fdr.0.01_log2fc.2_smartseq2_', subg, '.pdf'))
+        
+        #write.table(yy, file = paste0(resDir, '/DEtfs_mUA_regeneration_dev.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
+        
+      }
+      
+    }
+    
+  }
+  
+}
 
 
