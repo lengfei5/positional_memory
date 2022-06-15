@@ -486,11 +486,15 @@ plot_tf_network = function(link.list)
   pcs2 <- prcomp((matC), scale = TRUE)
   pcs2 = data.frame(pcs2$x)
   
-  nb_pcs = 5;
-  pcs.use = data.frame(pcs[, c(1:10)], pcs2[, c(1:nb_pcs)])
+  nb_pcs = 10; alpha = 0.;
+  dist = dist(pcs[, c(1:nb_pcs)])
+  dist2 = dist(pcs2[, c(1:nb_pcs)])
+  
+  dist_weighted = dist + alpha*dist2
+  #pcs.use = data.frame(pcs[, c(1:10)], pcs2[, c(1:5)])
   
   set.seed(1011)
-  weight_coex_umap <- uwot::umap(pcs.use, n_neighbors=5)
+  weight_coex_umap <- uwot::umap(dist_weighted, n_neighbors=5)
   rownames(weight_coex_umap) <- V(trn)$name
   colnames(weight_coex_umap) <- c('UMAP1', 'UMAP2')
   
