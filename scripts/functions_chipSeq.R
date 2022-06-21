@@ -407,32 +407,73 @@ find.samples.conditions = function(x, ID='samples')
 # Section: Differential Binding (DB) analysis after counting reads within peaks
 ########################################################
 ########################################################
-merge.peaks.macs2 = function(peak.list, pcutoff = 3, select.overlappingPeaks = FALSE, rm.chrM = TRUE, merge.dist = NULL)
+merge.peaks.macs2 = function(peak.list, select.overlappingPeaks.acrossRep = FALSE,  cc = NULL, pcutoff = 4, 
+                             select.overlappingPeaks = FALSE, rm.chrM = TRUE, merge.dist = NULL)
 {
   require(GenomicRanges)
+  # peak.list = peak.files; cc = design$condition;pcutoff = 6
   
-  # peak.list = peak.list[grep(prot, peak.list)]
-  for(n in 1:length(peak.list)){
-    cat(peak.list[n], "\n")
-    px = readPeakFile(peak.list[n] , as = "GRanges")
-    px <- px[mcols(px)[,"X.log10.pvalue."] > pcutoff]
-    
-    if(rm.chrM){seqlevels(px, pruning.mode="coarse") <- seqlevels(px)[seqlevels(px) != "chrM"]; }
-    
-    if(n == 1){
-      peaks.merged <- px
-    }else{
-      if(!select.overlappingPeaks){
-        peaks.merged = GenomicRanges::union(peaks.merged, px, ignore.strand=TRUE)
+  if(select.overlappingPeaks.acrossRep == TRUE & !is.null(cc)){
+    cat('select overlapping peaks between replicates \n')
+    cc.unique = unique(cc)
+    for(n in 1:length(cc.unique))
+    {
+      jj = which(cc == cc.unique[n])
+      cat(n, '--', cc.unique[n], ': ', length(jj),  'rep \n')
+      
+      ### find overlapping peaks between replicates
+      px = readPeakFile(peak.list[jj[1]] , as = "GRanges")
+      px <- px[mcols(px)[,"X.log10.pvalue."] > pcutoff]
+      cat(length(px), 'peaks in one rep \n')
+      
+      if(length(jj) > 1){
+        for(m in 2:length(jj))
+        {
+          pxx = readPeakFile(peak.list[jj[m]] , as = "GRanges")
+          pxx <- pxx[mcols(pxx)[,"X.log10.pvalue."] > pcutoff]
+          cat(length(pxx), 'peaks in one rep \n')
+          #px = px[overlapsAny(px, pxx, type = 'any', ignore.strand=TRUE)]
+          px = GenomicRanges::intersect(px, pxx, ignore.strand=TRUE)
+        }
+      }
+      cat(length(px), ' peaks found across rep \n')
+      
+      if(rm.chrM){seqlevels(px, pruning.mode="coarse") <- seqlevels(px)[seqlevels(px) != "chrM"]; }
+      
+      # union of peaks from different conditions
+      if(n == 1){
+        peaks.merged <- px
       }else{
-        peaks.merged = peaks.merged[overlapsAny(peaks.merged, px, type= 'any', ignore.strand=TRUE)]
-        px = px[overlapsAny(px, peaks.merged, type = 'any', ignore.strand=TRUE)]
-        peaks.merged = GenomicRanges::union(peaks.merged, px, ignore.strand = TRUE)
-        peaks.merged = reduce(peaks.merged)
+        peaks.merged = GenomicRanges::union(peaks.merged, px, ignore.strand=TRUE)
+      }
+    }
         
+  }else{
+    cat('merge all peaks \n')
+    
+    for(n in 1:length(peak.list)){
+      cat(peak.list[n], "\n")
+      px = readPeakFile(peak.list[n] , as = "GRanges")
+      px <- px[mcols(px)[,"X.log10.pvalue."] > pcutoff]
+      
+      if(rm.chrM){seqlevels(px, pruning.mode="coarse") <- seqlevels(px)[seqlevels(px) != "chrM"]; }
+      
+      if(n == 1){
+        peaks.merged <- px
+      }else{
+        if(!select.overlappingPeaks){
+          peaks.merged = GenomicRanges::union(peaks.merged, px, ignore.strand=TRUE)
+        }else{
+          peaks.merged = peaks.merged[overlapsAny(peaks.merged, px, type= 'any', ignore.strand=TRUE)]
+          px = px[overlapsAny(px, peaks.merged, type = 'any', ignore.strand=TRUE)]
+          peaks.merged = GenomicRanges::union(peaks.merged, px, ignore.strand = TRUE)
+          peaks.merged = reduce(peaks.merged)
+          
+        }
       }
     }
   }
+  
   
   if(!is.null(merge.dist)){
     peaks.merged <- mergeWindows(peaks.merged, tol=merge.dist, ignore.strand = TRUE)
