@@ -716,43 +716,37 @@ make.bed.file.from.fimo.out = function()
 ##########################################
 # after running FIMO, make motif occurrency matrix 
 ##########################################
-make.motif.oc.matrix.from.fimo.output = function(fimo.out, pval = 0.0001, saveDir = '../results/motif_analysis')
+make.motif.oc.matrix.from.fimo.output = function(fimo.out, 
+                                                 pval = c(0.0001), 
+                                                 prefix = '../results/motif_analysis/motif_oc_fimo')
 {
   library(data.table)
   
+  saveDir = dirname(prefix)
+  if(!dir.exists(saveDir)) dir.create(saveDir)
+  
   #motif.tf = readRDS( '../data/motifs_tfs/motif_tf_mapping.rds')
-  fimo.out = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/',
-  'motif_analysis/FIMO_atacPeak_tss_mediumQ_core.unvalided_64Gmem/fimo_out/fimo.tsv')
+  #fimo.out = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/',
+  #'motif_analysis/FIMO_atacPeak_tss_mediumQ_core.unvalided_64Gmem/fimo_out/fimo.tsv')
   
   fimo = fread(fimo.out, header = TRUE)
   
   motif.oc = table(fimo$motif_id, fimo$sequence_name, useNA = 'ifany')
   motif.oc = t(motif.oc)
   
-  print(head(rownames(motif.oc), 20))
-  
-  saveRDS(motif.oc, file = '../results/motif_analysis/motif_oc_fimo_atacPeaks.2kbTSS_jaspar2022.core.unvalided_pval.0.0001_v1.rds')
-  
-  jj = which(fimo$`p-value`<10^-5)
-  cat(length(jj)/nrow(fimo)*100, '% motifs \n')
-  
-  motif.oc = table(fimo$motif_id[jj], fimo$sequence_name[jj], useNA = 'ifany')
-  motif.oc = t(motif.oc)
-  
-  print(head(rownames(motif.oc), 20))
-  
-  saveRDS(motif.oc, file = '../results/motif_analysis/motif_oc_fimo_atacPeaks.2kbTSS_jaspar2022.core.unvalided_pval.0.00001_v1.rds')
-  
-  
-  jj = which(fimo$`p-value`<10^-6)
-  cat(length(jj)/nrow(fimo)*100, '% motifs \n')
-  
-  motif.oc = table(fimo$motif_id[jj], fimo$sequence_name[jj], useNA = 'ifany')
-  motif.oc = t(motif.oc)
-  
-  print(head(rownames(motif.oc), 20))
-  
-  saveRDS(motif.oc, file = '../results/motif_analysis/motif_oc_fimo_atacPeaks.2kbTSS_jaspar2022.core.unvalided_pval.0.000001_v1.rds')
+  for(p in pval){
+    
+    jj = which(fimo$`p-value`< p)
+    cat(length(jj), '% motifs with pval', p, ' \n')
+    
+    motif.oc = table(fimo$motif_id[jj], fimo$sequence_name[jj], useNA = 'ifany')
+    motif.oc = t(motif.oc)
+    
+    options(scipen=999)
+    saveRDS(motif.oc, file = paste0(prefix, '_pval_', p, '.rds'))
+    options(scipen=0)
+    
+  }
   
   ##########################################
   # associate the scanned regions with gene
@@ -828,18 +822,6 @@ make.motif.oc.matrix.from.fimo.output = function(fimo.out, pval = 0.0001, saveDi
     remove(mocc)
     
   }
-  # else{
-  #   load(file = '../data/Hashimsholy_et_al/annotMapping_ensID_Wormbase_GeneName.Rdata')
-  #   
-  #   mm = match(rownames(motif.oc), geneMapping$Wormbase)
-  #   rownames(motif.oc) = geneMapping$Gene.name[mm]
-  #   #kk = match(rownames(motif.oc, ))
-  #   
-  #   ss1 = apply(motif.oc, 1, sum)
-  #   cat(length(which(ss1 == 0)), 'genes without scanned motifs \n')
-  #   ss2 = apply(motif.oc, 2, sum)
-  #   
-  # }
   
   ##########################################
   # remove motif redundancy by merging occurrence for motifs in the same cluster
@@ -1379,7 +1361,7 @@ run.MARA.atac.spatial = function(keep, cc)
 # 
 ########################################################
 ########################################################
-run.MARA.atac.temporal = function(keep, method = c('Bayesian.ridge'))
+run.MARA.atac.temporal = function(motif.oc, Y, method = c('Bayesian.ridge'))
 {
   require(ggplot2)
   require(tidyverse)
@@ -1413,9 +1395,11 @@ run.MARA.atac.temporal = function(keep, method = c('Bayesian.ridge'))
   cat(nrow(Y), ' genomeic regions will be used after filtering \n')
   
   if(method == 'Bayesian.ridge'){ 
-   
+    
+    cat('--start Bayesian ridge -- \n')
+    
     library(scchicFuncs)
-  
+    
     # the original code from Jake 
     # https://github.com/jakeyeung/scchic-functions/blob/master/scripts/motevo_scripts/lib/run_ridge_regression2.R
     E = as.matrix(Y) # exp: matrix of expression, row centered.
@@ -1820,11 +1804,110 @@ run.MARA.atac.temporal = function(keep, method = c('Bayesian.ridge'))
     
     pheatmap(aa[which(ss>0), ], cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE, breaks = NA,
              scale = 'none', cluster_cols=FALSE, main = paste0("motif activity by MARA"), 
-             na_col = "white", fontsize_col = 12) 
+             na_col = "white", fontsize_col = 12)
+  }
+}
+
+##########################################
+# General function of MARA
+##########################################
+run.MARA.atac = function(motif.oc, Y, method = c('Bayesian.ridge'))
+{
+  require(ggplot2)
+  require(tidyverse)
+  library(ggrepel)
+  library(pheatmap)
+  library(RColorBrewer)
+  source('Functions_atac.R')
+  
+  ## prepare reponse matrix with selected dynamic peaks
+  Y = as.matrix(Y)
+  
+  # prepare X matrix from motif occurrency matrix
+  #motif.oc = readRDS(file = '../results/motif_analysis/motif_oc_fimo_jaspar2022_pval.0.0001_v1.rds')
+  
+  mm = match(rownames(motif.oc), rownames(Y))
+  cat(length(which(!is.na(mm))), ' peaks found with peak name matching \n')
+  
+  motif.oc = motif.oc[!is.na(mm), ]
+  
+  ss.m = apply(motif.oc, 2, sum)
+  motif.oc = motif.oc[ , which(ss.m>0)]
+  
+  ss.p = apply(motif.oc, 1, sum)
+  motif.oc = motif.oc[which(ss.p>0), ]
+  grep('RUNX1', colnames(motif.oc))
+  
+  kk = match(rownames(motif.oc), rownames(Y))
+  Y = Y[kk, ]
+  
+  X = as.matrix(motif.oc)
+  Y = as.matrix(Y)
+  
+  grep('RUNX1', colnames(X))
+  
+  cat(nrow(Y), ' genomeic regions will be used after filtering \n')
+  
+  if(method == 'Bayesian.ridge'){ 
+    
+    library(scchicFuncs)
+    cat('--start Bayesian ridge -- \n')
+    
+    # the original code from Jake 
+    # https://github.com/jakeyeung/scchic-functions/blob/master/scripts/motevo_scripts/lib/run_ridge_regression2.R
+    E = as.matrix(Y) # exp: matrix of expression, row centered.
+    N = as.matrix(X)
+    
+    E = t(apply(E, 1, scale, center = TRUE, scale = FALSE))
+    colnames(E) = colnames(Y)
+    
+    ## use mUA as background 
+    #for(ii in 1:ncol(E)) E[, ii] = E[,ii] - E[, 1]
+    #E = E[, -1]
+    
+    # run lambda optimization and regression
+    opt =  scchicFuncs::optimize.lambda(N, E)
+    r = ridge.regression(N, E, opt$lambda.opt)
+    
+    zz = r$Zscore
+    zz = apply(as.matrix(zz), 1, function(x){x.abs = abs(x); return(x[which(x.abs == max(x.abs))][1]); })
+    r$max.Zscore = abs(zz)
+    
+    # = sort(r$combined.Zscore, decreasing=TRUE)[1:50]
+    sort(r$combined.Zscore, decreasing=TRUE)[1:50]
+    #sort(r$max.Zscore, decreasing=TRUE)[1:20]
+    #sort(r$max.Zscore, decreasing=TRUE)[1:30]
+    #sort(r$max.Zscore, decreasing=TRUE)[1:40]
+    sort(r$max.Zscore, decreasing=TRUE)[1:50]
+    
+    #saveRDS(r, file = paste0(RdataDir, '/Bayesian_Ridge_output_fdr0.05_log2FC.1.rds'))
+    
+    cat('-- save the result -- \n')
+    ## load the Bayesian ridge result
+    #r = readRDS(file = paste0(RdataDir, '/Bayesian_Ridge_output_fdr0.05_log2FC.1.rds'))
+    topMotifs = r$max.Zscore
+    grep('RUNX', names(topMotifs))
+    
+    # topMotifs = topMotifs[which(topMotifs>=2.0)]
+    
+    motif.names = rownames(r$Zscore)
+    bb = r$Zscore[match(names(topMotifs), motif.names), ]
+    
+    bb =data.frame(bb, stringsAsFactors = FALSE)
+    bb$motifs = rownames(bb)
+    bb$combine.Zscore = r$combined.Zscore[match(rownames(bb), names(r$combined.Zscore))]
+    bb$rank = order(bb$combine.Zscore)
+    bb$maxZscore = r$max.Zscore[match(rownames(bb), names(r$max.Zscore))]
+    bb$gene = sapply(rownames(bb), 
+                     function(x) {x = unlist(strsplit(as.character(x), '_')); x = x[-length(x)]; paste0(x, collapse = '_')})
     
   }
   
+  return(bb)
+  
 }
+
+
 ########################################################
 ########################################################
 # Section : ## post-MARA analysis
@@ -1874,5 +1957,5 @@ select_topMotifs_footprinting.analysis = function()
       cat('NOT FOUND \n')
     }
   }
-  
 }
+

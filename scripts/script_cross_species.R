@@ -219,12 +219,27 @@ res = data.frame(res, res.ii[, c(2, 5, 6)])
 res = data.frame(fpm, res, stringsAsFactors = FALSE)
 saveRDS(res, file = paste0(RdataDir, '/fpm_DE_binding_lfcShrink_res.rds'))
 
+########################################################
+########################################################
+# Section : Motif analysis with MARA
+# 
+########################################################
+########################################################
+## process fimo output 
+fimo.out = paste0(dataDir, '/FIMO_atacPeak/fimo_out/fimo.tsv')
+source('Functions_MARA.R')
+
+prefix = paste0(RdataDir, '/motif_oc_fimo_atacPeaks_jaspar2022.core')
+make.motif.oc.matrix.from.fimo.output(fimo.out = fimo.out, 
+                                      pval = c(10^-4, 10^-5, 10^-6), 
+                                      prefix = prefix)
+
 ##########################################
 # select DE peaks
 ##########################################
 res = readRDS(file = paste0(RdataDir, '/fpm_DE_binding_lfcShrink_res.rds'))
 
-fdr.cutoff = 0.01; logfc.cutoff = 1
+fdr.cutoff = 0.05; logfc.cutoff = 1
 
 jj = which((res$padj_sp7ne_4dpa.vs.0dpa < fdr.cutoff & abs(res$log2FoldChange_sp7ne_4dpa.vs.0dpa) > logfc.cutoff) |
              (res$padj_sp7po_4dpa.vs.0dpa < fdr.cutoff & abs(res$log2FoldChange_sp7po_4dpa.vs.0dpa) > logfc.cutoff)
@@ -238,42 +253,94 @@ res = data.frame(res, pp.annots[mm, ], stringsAsFactors = FALSE)
 
 saveRDS(res, file = paste0(RdataDir, '/DE_atacPeaks_fpm_annotatation.rds'))
 
-########################################################
-########################################################
-# Section : Motif analysis with MARA
-# 
-########################################################
-########################################################
+
+##########################################
+# ## prepare the motif oc matrix and response matrix
+##########################################
+motif.oc = readRDS(file = paste0(RdataDir, '/motif_oc_fimo_atacPeaks_jaspar2022.core_pval_0.0001.rds'))
+grep('RUNX', colnames(motif.oc))
+
 res = readRDS(file = paste0(RdataDir, '/DE_atacPeaks_fpm_annotatation.rds'))
 
 cat(nrow(res), 'DE peaks found !\n')
 
 res = res[order(-res$log2FoldChange_sp7po_4dpa.vs.0dpa), ]
 
+## prepare the response matrix
 keep = as.matrix(res[, c(1:8)])
-
 conds = unique(design$condition)
 
 # select samples to use
 #keep = keep[, sample.sels]
-keep = cal_sample_means(keep, conds = conds)
-#rownames(keep) = gsub('_', '-', rownames(keep))
+Y = cal_sample_means(keep, conds = conds)
+rownames(Y) = sapply(rownames(Y), function(x) {x = unlist(strsplit(gsub(':', '-', as.character(x)), '-'));
+paste0(x[1], ':', (as.numeric(x[2]) -1), '-', x[3])}) 
+mm = match(rownames(Y), rownames(motif.oc))
 
-### process fimo output 
-fimoDir = paste0(dataDir, '/FIMO_atacPeak/fimo_out')
-
-
+cat(length(which(is.na(mm))), ' missed peaks in ater fimo scanning \n')
+Y = Y[which(!is.na(mm)), ]
+motif.oc = motif.oc[mm[which(!is.na(mm))], ]
+grep('RUNX1', colnames(motif.oc))
 
 ### run MARA analysis
+source('Functions_MARA.R')
+aa1 = run.MARA.atac(motif.oc, Y[ ,c(3,4)],  method = 'Bayesian.ridge')
+aa2 = run.MARA.atac(motif.oc, Y[ ,c(1,2)],  method = 'Bayesian.ridge')
 
+aa = data.frame(aa1[, c(1:2)], aa2[, c(1:2)], aa1[, c(3:7)], stringsAsFactors = FALSE)
+aa$combine.Zscore = apply(as.matrix(aa[, c(1:4)]), 1, function(x) sqrt(mean(x^2)))
+aa$maxZscore = apply(as.matrix(aa[, c(1:4)]), 1, function(x){x.abs = abs(x); return(max(x.abs))})
+aa$rank = order(aa$combine.Zscore)
+aa = aa[order(-aa$combine.Zscore), ]
+grep('RUNX', rownames(aa))
+
+saveRDS(aa, file = paste0(RdataDir, '/MARA_output_sorted.rds'))
 
 ##########################################
-# footprint analysis  
+# plot the results 
 ##########################################
-Run_footprint_analysis = FALSE
-if(Run_footprint_analysis){
-  
+bb = readRDS(file = paste0(RdataDir, '/MARA_output_sorted.rds'))
+kk = which(bb[, 2]> bb[, 1] | bb[, 4]>bb[, 3] )
+bb = bb[kk, ]
+
+kk = which(abs(bb[, 2]) >2| abs(bb[, 4])>2)
+bb = bb[kk, ]
+
+test = as.matrix(bb[, c(1:4)])
+rownames(test) = bb$gene
+
+range <- 5; breaks = 10
+test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
+
+df <- data.frame(colnames(test))
+rownames(df) = colnames(test)
+colnames(df) = 'samples'
+
+
+cool = rainbow(50, start=rgb2hsv(col2rgb('cyan'))[1], end=rgb2hsv(col2rgb('blue'))[1])
+warm = rainbow(50, start=rgb2hsv(col2rgb('red'))[1], end=rgb2hsv(col2rgb('yellow'))[1])
+cols = c(rev(cool), rev(warm))
+cols <- colorRampPalette(cols)(breaks)
+
+callback = function(hc, mat){
+  sv = svd(t(mat))$v[,1]
+  dend = reorder(as.dendrogram(hc), wts = sv)
+  as.hclust(dend)
 }
+
+plt = pheatmap(test, show_rownames=TRUE, show_colnames = FALSE, 
+               color = cols,
+               scale = 'none', cluster_cols=FALSE, main = '', 
+               na_col = "white", #fontsize_row = 10, 
+               breaks = seq(-range, range, length.out = breaks), 
+               annotation_col = df, 
+               cluster_rows=TRUE,
+               treeheight_row = 20,
+               #clustering_method = 'complete', cutree_rows = 6, 
+               annotation_legend = TRUE,
+               clustering_callback = callback,
+               filename = paste0(figureDir, 'MARA_bayesianRidge_Jaspar2022_', species,'.pdf'), 
+               width = 6, height = 12)
 
 ########################################################
 ########################################################
@@ -281,5 +348,21 @@ if(Run_footprint_analysis){
 # 
 ########################################################
 ########################################################
+
+
+
+########################################################
+########################################################
+# Section : footprint analysis  
+# 
+########################################################
+########################################################
+Run_footprint_analysis = FALSE
+if(Run_footprint_analysis){
+  cat(' star the footprinting analysis \n')
+  
+}
+
+
 
 
