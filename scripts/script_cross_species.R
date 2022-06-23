@@ -55,6 +55,7 @@ rnaDir = paste0(dataDir, '/rna_seq')
 
 atacMetadata = paste0(atacDir, '/PRJNA523011_atacseq_metadata.txt')
 gtf.file = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/zebrafish/GRCz11/Danio_rerio.GRCz11.106.gtf'
+annot.file = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/zebrafish/GRCz11/annotation_ens_biomart.txt'
 
 ########################################################
 ########################################################
@@ -348,6 +349,90 @@ plt = pheatmap(test, show_rownames=TRUE, show_colnames = FALSE,
 # 
 ########################################################
 ########################################################
+tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
+tfs = unique(tfs$`HGNC symbol`)
+
+count.file = paste0(rnaDir, '/GSE126701_RNA_finRegen_featureCounts.txt')
+counts = read.table(count.file, sep = '\t', header = TRUE)
+annot = read.delim(annot.file)
+
+mm = match(counts$Geneid, annot$Gene.stable.ID)
+jj = which(annot$Human.gene.name[mm] != '' & !is.na(mm))
+mm = mm[jj]
+ggs = paste0(annot$Human.gene.name[mm], '_',  annot$Gene.stable.ID[mm])
+rownames(counts) = counts$Geneid
+rownames(counts)[jj] = ggs
+counts = counts[, -1]
+
+conds = colnames(counts)
+conds = gsub('_rep1|_rep2', '', conds)
+conds = data.frame(condition = conds)
+dds <- DESeqDataSetFromMatrix(counts, DataFrame(conds), design = ~ condition)
+
+ss = rowSums(counts(dds))
+
+hist(log10(ss), breaks = 100);abline(v = log10(20), lwd = 2.0, col = 'red')
+cat(length(which(ss>10)), ' gene selected \n')
+
+dds = dds[which(ss>10), ]
+
+dds = estimateSizeFactors(dds)
+
+vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
+
+pca=plotPCA(vsd, intgroup = c('condition'), returnData = FALSE)
+print(pca)
+
+##########################################
+# DE test
+##########################################
+dds$condition = droplevels(dds$condition)
+dds$condition <- relevel(dds$condition, ref = "sp7po0dpa")
+
+dds <- DESeq(dds, test="Wald", fitType = c("parametric"))
+
+plotDispEsts(dds, ymin = 10^-3)
+resultsNames(dds)
+
+fpm = log2(fpm(dds) + 2^-6)
+
+res = results(dds, name="condition_sp7po4dpa_vs_sp7po0dpa", test = 'Wald')
+res <- lfcShrink(dds, coef="condition_sp7po4dpa_vs_sp7po0dpa")
+colnames(res) = paste0(colnames(res), "_sp7po_4dpa.vs.0dpa")
+res = data.frame(res[, c(2, 5, 6)])
+
+res.ii = results(dds, contrast = c('condition', 'sp7ne4dpa', 'sp7ne0dpa'), test = 'Wald')
+res.ii <- lfcShrink(dds, contrast = c('condition', 'sp7ne4dpa', 'sp7ne0dpa'))
+colnames(res.ii) = paste0(colnames(res.ii), "_sp7ne_4dpa.vs.0dpa")
+res = data.frame(res, res.ii[, c(2, 5, 6)])
+
+res = data.frame(fpm, res, stringsAsFactors = FALSE)
+
+saveRDS(res, file = paste0(RdataDir, '/RNAseq_fpm_DEgenes_lfcShrink_res.rds'))
+
+##########################################
+# select significant TFs  
+##########################################
+res = readRDS(file = paste0(RdataDir, '/RNAseq_fpm_DEgenes_lfcShrink_res.rds'))
+
+fdr.cutoff = 0.05; logfc.cutoff = 1 # select only activated genes in regeneration
+jj = which((res$padj_sp7ne_4dpa.vs.0dpa < fdr.cutoff & res$log2FoldChange_sp7ne_4dpa.vs.0dpa > logfc.cutoff) |
+             (res$padj_sp7po_4dpa.vs.0dpa < fdr.cutoff & (res$log2FoldChange_sp7po_4dpa.vs.0dpa) > logfc.cutoff)
+)
+cat(length(jj), '\n')
+
+res = res[jj, ]
+
+ggs = get_geneName(rownames(res))
+print(intersect(ggs, tfs))
+
+mm = match(ggs, tfs)
+yy = res[unique(c(which(!is.na(mm)))), ]
+cat(nrow(yy), ' DE TFs found \n')
+yy = yy[order(yy$padj_sp7ne_4dpa.vs.0dpa), ]
+
+grep('RUNX', rownames(yy))
+yy[grep('RUNX', rownames(yy)), ]
 
 
 
@@ -362,7 +447,4 @@ if(Run_footprint_analysis){
   cat(' star the footprinting analysis \n')
   
 }
-
-
-
 
