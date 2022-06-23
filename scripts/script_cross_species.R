@@ -62,6 +62,97 @@ gtf.file = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/zebrafish/GRCz1
 annot.file = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/zebrafish/GRCz11/annotation_ens_biomart.txt'
 annot = read.delim(annot.file)
 
+tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
+tfs = unique(tfs$`HGNC symbol`)
+
+########################################################
+########################################################
+# Section : RNA-seq analysis
+# 
+########################################################
+########################################################
+count.file = paste0(rnaDir, '/GSE126701_RNA_finRegen_featureCounts.txt')
+counts = read.table(count.file, sep = '\t', header = TRUE)
+
+mm = match(counts$Geneid, annot$Gene.stable.ID)
+jj = which(annot$Human.gene.name[mm] != '' & !is.na(mm))
+mm = mm[jj]
+ggs = paste0(annot$Human.gene.name[mm], '_',  annot$Gene.stable.ID[mm])
+rownames(counts) = counts$Geneid
+rownames(counts)[jj] = ggs
+counts = counts[, -1]
+
+conds = colnames(counts)
+conds = gsub('_rep1|_rep2', '', conds)
+conds = data.frame(condition = conds)
+dds <- DESeqDataSetFromMatrix(counts, DataFrame(conds), design = ~ condition)
+
+ss = rowSums(counts(dds))
+
+hist(log10(ss), breaks = 100);abline(v = log10(20), lwd = 2.0, col = 'red')
+cat(length(which(ss>10)), ' gene selected \n')
+
+dds = dds[which(ss>10), ]
+
+dds = estimateSizeFactors(dds)
+
+vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
+
+pca=plotPCA(vsd, intgroup = c('condition'), returnData = FALSE)
+print(pca)
+
+##########################################
+# DE test
+##########################################
+dds$condition = droplevels(dds$condition)
+dds$condition <- relevel(dds$condition, ref = "sp7po0dpa")
+
+dds <- DESeq(dds, test="Wald", fitType = c("parametric"))
+
+plotDispEsts(dds, ymin = 10^-3)
+resultsNames(dds)
+
+fpm = log2(fpm(dds) + 2^-6)
+
+res = results(dds, name="condition_sp7po4dpa_vs_sp7po0dpa", test = 'Wald')
+res <- lfcShrink(dds, coef="condition_sp7po4dpa_vs_sp7po0dpa")
+colnames(res) = paste0(colnames(res), "_sp7po_4dpa.vs.0dpa")
+res = data.frame(res[, c(2, 5, 6)])
+
+res.ii = results(dds, contrast = c('condition', 'sp7ne4dpa', 'sp7ne0dpa'), test = 'Wald')
+res.ii <- lfcShrink(dds, contrast = c('condition', 'sp7ne4dpa', 'sp7ne0dpa'))
+colnames(res.ii) = paste0(colnames(res.ii), "_sp7ne_4dpa.vs.0dpa")
+res = data.frame(res, res.ii[, c(2, 5, 6)])
+
+res = data.frame(fpm, res, stringsAsFactors = FALSE)
+
+saveRDS(res, file = paste0(RdataDir, '/RNAseq_fpm_DEgenes_lfcShrink_res.rds'))
+
+##########################################
+# select significant TFs  
+##########################################
+res = readRDS(file = paste0(RdataDir, '/RNAseq_fpm_DEgenes_lfcShrink_res.rds'))
+
+fdr.cutoff = 0.05; logfc.cutoff = 1 # select only activated genes in regeneration
+jj = which((res$padj_sp7ne_4dpa.vs.0dpa < fdr.cutoff & res$log2FoldChange_sp7ne_4dpa.vs.0dpa > logfc.cutoff) |
+             (res$padj_sp7po_4dpa.vs.0dpa < fdr.cutoff & (res$log2FoldChange_sp7po_4dpa.vs.0dpa) > logfc.cutoff)
+)
+cat(length(jj), '\n')
+
+res = res[jj, ]
+
+ggs = get_geneName(rownames(res))
+print(intersect(ggs, tfs))
+
+mm = match(ggs, tfs)
+yy = res[unique(c(which(!is.na(mm)))), ]
+cat(nrow(yy), ' DE TFs found \n')
+yy = yy[order(yy$padj_sp7ne_4dpa.vs.0dpa), ]
+
+grep('RUNX', rownames(yy))
+yy[grep('RUNX', rownames(yy)), ]
+ggs = as.character(get_geneName(rownames(yy)))
+
 ########################################################
 ########################################################
 # Section : ATAC-seq data processing
@@ -210,10 +301,6 @@ dds <- DESeq(dds, test="Wald", fitType = c("parametric"))
 plotDispEsts(dds, ymin = 10^-3)
 resultsNames(dds)
 
-#res <- results(dds)
-#res = data.frame(res[, c(2, 5, 6)])
-#colnames(res) = paste0(colnames(res), '_LRT')
-
 res = results(dds, name="condition_ATAC_sp7ne4dpa_vs_ATAC_sp7ne0dpa", test = 'Wald')
 res <- lfcShrink(dds, coef="condition_ATAC_sp7ne4dpa_vs_ATAC_sp7ne0dpa")
 colnames(res) = paste0(colnames(res), "_sp7ne_4dpa.vs.0dpa")
@@ -247,7 +334,7 @@ make.motif.oc.matrix.from.fimo.output(fimo.out = fimo.out,
 ##########################################
 res = readRDS(file = paste0(RdataDir, '/fpm_DE_binding_lfcShrink_res.rds'))
 
-fdr.cutoff = 0.05; logfc.cutoff = 1
+fdr.cutoff = 0.01; logfc.cutoff = 1
 
 jj = which((res$padj_sp7ne_4dpa.vs.0dpa < fdr.cutoff & abs(res$log2FoldChange_sp7ne_4dpa.vs.0dpa) > logfc.cutoff) |
              (res$padj_sp7po_4dpa.vs.0dpa < fdr.cutoff & abs(res$log2FoldChange_sp7po_4dpa.vs.0dpa) > logfc.cutoff)
@@ -260,7 +347,6 @@ mm = match(rownames(res), rownames(pp.annots))
 res = data.frame(res, pp.annots[mm, ], stringsAsFactors = FALSE)
 
 saveRDS(res, file = paste0(RdataDir, '/DE_atacPeaks_fpm_annotatation.rds'))
-
 
 ##########################################
 # ## prepare the motif oc matrix and response matrix
@@ -398,7 +484,7 @@ plt = pheatmap(test, show_rownames=TRUE, show_colnames = FALSE,
                annotation_legend = TRUE,
                clustering_callback = callback,
                filename = paste0(figureDir, 'MARA_bayesianRidge_Jaspar2022_', species,'.pdf'), 
-               width = 6, height = 8)
+               width = 6, height = 10)
 
 ### plot associated TF expression
 test = xx[plt$tree_row$order, c(14:18)]
@@ -407,14 +493,17 @@ test$tfs.speciees = as.character(test$tfs.speciees)
 rownames(test) = test$tfs.speciees
 
 grep('ctcf|fosl2', test$tfs.speciees)
-test$tfs.speciees[40] = 'ctcf.2'
-test$tfs.speciees[25] = 'fosl2.2'
+test$tfs.speciees[grep('ctcf|fosl2', test$tfs.speciees)]
+
+test$tfs.speciees[41] = 'ctcf.2'
+test$tfs.speciees[26] = 'fosl2.2'
 rownames(test) = test$tfs.speciees
 
 test = test[, -1]
 test = t(apply(test, 1, cal_centering))
 
-range <- 2
+cat('range of centered TF expression --',  range(test), '\n')
+range <- 2.5
 test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
 cols = rev(colour('PRGn')(5))
 df <- data.frame(colnames(test))
@@ -433,97 +522,7 @@ pheatmap(test, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = FALSE,
          annotation_legend = TRUE,
          #clustering_callback = callback,
          filename = paste0(figureDir, 'TFs_associatedMotifs_regeneration_', species, '.pdf'), 
-         width = 5, height = 8)
-
-########################################################
-########################################################
-# Section : RNA-seq analysis
-# 
-########################################################
-########################################################
-tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
-tfs = unique(tfs$`HGNC symbol`)
-
-count.file = paste0(rnaDir, '/GSE126701_RNA_finRegen_featureCounts.txt')
-counts = read.table(count.file, sep = '\t', header = TRUE)
-
-mm = match(counts$Geneid, annot$Gene.stable.ID)
-jj = which(annot$Human.gene.name[mm] != '' & !is.na(mm))
-mm = mm[jj]
-ggs = paste0(annot$Human.gene.name[mm], '_',  annot$Gene.stable.ID[mm])
-rownames(counts) = counts$Geneid
-rownames(counts)[jj] = ggs
-counts = counts[, -1]
-
-conds = colnames(counts)
-conds = gsub('_rep1|_rep2', '', conds)
-conds = data.frame(condition = conds)
-dds <- DESeqDataSetFromMatrix(counts, DataFrame(conds), design = ~ condition)
-
-ss = rowSums(counts(dds))
-
-hist(log10(ss), breaks = 100);abline(v = log10(20), lwd = 2.0, col = 'red')
-cat(length(which(ss>10)), ' gene selected \n')
-
-dds = dds[which(ss>10), ]
-
-dds = estimateSizeFactors(dds)
-
-vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
-
-pca=plotPCA(vsd, intgroup = c('condition'), returnData = FALSE)
-print(pca)
-
-##########################################
-# DE test
-##########################################
-dds$condition = droplevels(dds$condition)
-dds$condition <- relevel(dds$condition, ref = "sp7po0dpa")
-
-dds <- DESeq(dds, test="Wald", fitType = c("parametric"))
-
-plotDispEsts(dds, ymin = 10^-3)
-resultsNames(dds)
-
-fpm = log2(fpm(dds) + 2^-6)
-
-res = results(dds, name="condition_sp7po4dpa_vs_sp7po0dpa", test = 'Wald')
-res <- lfcShrink(dds, coef="condition_sp7po4dpa_vs_sp7po0dpa")
-colnames(res) = paste0(colnames(res), "_sp7po_4dpa.vs.0dpa")
-res = data.frame(res[, c(2, 5, 6)])
-
-res.ii = results(dds, contrast = c('condition', 'sp7ne4dpa', 'sp7ne0dpa'), test = 'Wald')
-res.ii <- lfcShrink(dds, contrast = c('condition', 'sp7ne4dpa', 'sp7ne0dpa'))
-colnames(res.ii) = paste0(colnames(res.ii), "_sp7ne_4dpa.vs.0dpa")
-res = data.frame(res, res.ii[, c(2, 5, 6)])
-
-res = data.frame(fpm, res, stringsAsFactors = FALSE)
-
-saveRDS(res, file = paste0(RdataDir, '/RNAseq_fpm_DEgenes_lfcShrink_res.rds'))
-
-##########################################
-# select significant TFs  
-##########################################
-res = readRDS(file = paste0(RdataDir, '/RNAseq_fpm_DEgenes_lfcShrink_res.rds'))
-
-fdr.cutoff = 0.05; logfc.cutoff = 1 # select only activated genes in regeneration
-jj = which((res$padj_sp7ne_4dpa.vs.0dpa < fdr.cutoff & res$log2FoldChange_sp7ne_4dpa.vs.0dpa > logfc.cutoff) |
-             (res$padj_sp7po_4dpa.vs.0dpa < fdr.cutoff & (res$log2FoldChange_sp7po_4dpa.vs.0dpa) > logfc.cutoff)
-)
-cat(length(jj), '\n')
-
-res = res[jj, ]
-
-ggs = get_geneName(rownames(res))
-print(intersect(ggs, tfs))
-
-mm = match(ggs, tfs)
-yy = res[unique(c(which(!is.na(mm)))), ]
-cat(nrow(yy), ' DE TFs found \n')
-yy = yy[order(yy$padj_sp7ne_4dpa.vs.0dpa), ]
-
-grep('RUNX', rownames(yy))
-yy[grep('RUNX', rownames(yy)), ]
+         width = 5, height = 10)
 
 
 ########################################################
