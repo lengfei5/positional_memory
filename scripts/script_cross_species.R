@@ -33,13 +33,17 @@ require(GenomicRanges)
 require(pheatmap)
 library(tictoc)
 require(rtracklayer)
-
 library(tidyr)
 library(dplyr)
 require(ggplot2)
 library("gridExtra")
 library("cowplot")
 require(ggpubr)
+library(tidyverse)
+library(ggdendro)
+library(cowplot)
+library(ggtree)
+library(patchwork) 
 
 species = 'zebrafish_fin'
 
@@ -56,6 +60,7 @@ rnaDir = paste0(dataDir, '/rna_seq')
 atacMetadata = paste0(atacDir, '/PRJNA523011_atacseq_metadata.txt')
 gtf.file = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/zebrafish/GRCz11/Danio_rerio.GRCz11.106.gtf'
 annot.file = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/zebrafish/GRCz11/annotation_ens_biomart.txt'
+annot = read.delim(annot.file)
 
 ########################################################
 ########################################################
@@ -132,6 +137,7 @@ counts = process.countTable(all=all, design = design[, c(1, 3)])
 
 save(design, counts, file = paste0(RdataDir, '/samplesDesign_readCounts.within_peakConsensus.Rdata'))
 
+
 ss = apply(as.matrix(counts[, -1]), 1, mean)
 
 par(mfrow=c(1,2))
@@ -173,6 +179,7 @@ print(pca)
 #   geom_text(hjust = 0.2, nudge_y = 0.5, size=3)
 # 
 # plot(ggp)
+
 ggsave(paste0(resDir, "/PCA_allatacseq_new.old.merged_ntop3000_allSamples.pdf"), width = 10, height = 6)
 
 
@@ -193,7 +200,7 @@ pp.annots = as.data.frame(pp.annots) # sometimes there are less peaks annotated
 rownames(pp.annots) = paste0(pp.annots$seqnames, ':', pp.annots$start, '-', pp.annots$end)
 
 ##########################################
-# DE test
+# DE peak test
 ##########################################
 dds$condition = droplevels(dds$condition)
 dds$condition <- relevel(dds$condition, ref = "ATAC_sp7ne0dpa")
@@ -298,7 +305,7 @@ grep('RUNX', rownames(aa))
 saveRDS(aa, file = paste0(RdataDir, '/MARA_output_sorted.rds'))
 
 ##########################################
-# plot the results 
+# select motif of interest and add associated TF expressed 
 ##########################################
 bb = readRDS(file = paste0(RdataDir, '/MARA_output_sorted.rds'))
 kk = which(bb[, 2]> bb[, 1] | bb[, 4]>bb[, 3] ) ## motif activated in regeneration
@@ -307,21 +314,20 @@ bb = bb[kk, ]
 kk = which(abs(bb[, 2]) >2| abs(bb[, 4])>2) # 
 bb = bb[kk, ]
 
-test = as.matrix(bb[, c(1:4)])
-rownames(test) = bb$gene
+## import processed RNAseq data
+cpm = readRDS(file = paste0(RdataDir, '/RNAseq_fpm_DEgenes_lfcShrink_res.rds'))
+cpm = cpm[, c(1:8)]
+cpm = cal_sample_means(cpm, conds = c("sp7po0dpa", "sp7po4dpa", "sp7ne0dpa", "sp7ne4dpa"))
+ss = apply(cpm, 1, max)
 
-res = readRDS(file = paste0('../results/RNAseq_data_used/Rdata/', 
-                            'smartseq2_R10724_R11635_cpm.batchCorrect_DESeq2.test.withbatch.log2FC.shrinked_RNAseq_data_used_20220408.rds'))
-cpm = res[, c(1:12)]
-#cpm = res[, grep('log2FoldChange_d', colnames(res))]
-cpm = cal_sample_means(cpm, conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal",  "BL_UA_13days_distal"))
+ss[grep('RUNX', names(ss))]
+
+cpm = cpm[which(ss > 0), ]
 ggs = get_geneName(rownames(cpm))
 
 ## find expression of associated TFs
 bb$index = NA
-bb$corr.tfs = NA
 for(n in 1:nrow(bb)){
-  
   tfs = unique(unlist(strsplit(as.character(bb$gene[n]), '_')))
   if(length(tfs) == 1){
     if(tfs == 'SNAI3') tfs = 'SNAI2'
@@ -333,10 +339,10 @@ for(n in 1:nrow(bb)){
   
   if(length(jj) == 1) {
     bb$index[n] = jj
-    bb$corr.tfs[n] = cor(as.numeric(bb[n, c(1:5)]), cpm[jj, ])
+    bb$corr.tfs[n] = cor(as.numeric(bb[n, c(1:4)]), cpm[jj, ])
   }
   if(length(jj) >=2){
-    correlation = cor(as.numeric(bb[n, c(1:5)]), t(cpm[jj,]), method = 'pearson')
+    correlation = cor(as.numeric(bb[n, c(1:4)]), t(cpm[jj,]), method = 'pearson')
     bb$index[n] = jj[which.max(abs(correlation))]
     bb$corr.tfs[n] = correlation[which.max(abs(correlation))]
   }
@@ -350,10 +356,17 @@ bb$tfs = ggs[bb$index]
 bb$tf_ids = rownames(cpm)[bb$index]
 
 xx = bb[which(!is.na(bb$tfs)), ]
+xx$tfs.speciees = annot$Gene.name[match(get_geneID(xx$tf_ids), annot$Gene.stable.ID)]
 xx = data.frame(xx, cpm[xx$index,])
 
-saveRDS(xx, file =  paste0(RdataDir, '/MARA_output_Motifs_maxZscore_filteredTFsExpr_top', ntop, '.rds'))
+saveRDS(xx, file =  paste0(RdataDir, '/MARA_output_Motifs_filteredTFsExpr.rds'))
 
+##########################################
+# plot the motif activity and associated TF expression
+##########################################
+xx = readRDS(file =  paste0(RdataDir, '/MARA_output_Motifs_filteredTFsExpr.rds'))
+test = as.matrix(xx[, c(1:4)])
+rownames(test) = xx$gene
 
 range <- 5; breaks = 10
 test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
@@ -361,7 +374,6 @@ test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (
 df <- data.frame(colnames(test))
 rownames(df) = colnames(test)
 colnames(df) = 'samples'
-
 
 cool = rainbow(50, start=rgb2hsv(col2rgb('cyan'))[1], end=rgb2hsv(col2rgb('blue'))[1])
 warm = rainbow(50, start=rgb2hsv(col2rgb('red'))[1], end=rgb2hsv(col2rgb('yellow'))[1])
@@ -386,25 +398,23 @@ plt = pheatmap(test, show_rownames=TRUE, show_colnames = FALSE,
                annotation_legend = TRUE,
                clustering_callback = callback,
                filename = paste0(figureDir, 'MARA_bayesianRidge_Jaspar2022_', species,'.pdf'), 
-               width = 6, height = 12)
+               width = 6, height = 8)
 
-# original code from https://davemcg.github.io/post/lets-plot-scrna-dotplots/
-library(tidyverse)
-library(ggdendro)
-library(cowplot)
-library(ggtree)
-library(patchwork) 
+### plot associated TF expression
+test = xx[plt$tree_row$order, c(14:18)]
+test$tfs.speciees = as.character(test$tfs.speciees)
 
-test = bb[match(o1, rownames(test)), c(13, 15:19)]
+rownames(test) = test$tfs.speciees
 
-test$tfs[31] = 'MAFK.1'
+grep('ctcf|fosl2', test$tfs.speciees)
+test$tfs.speciees[40] = 'ctcf.2'
+test$tfs.speciees[25] = 'fosl2.2'
+rownames(test) = test$tfs.speciees
 
-rownames(test) = test$tfs
 test = test[, -1]
-colnames(test) = c('mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d')
-
 test = t(apply(test, 1, cal_centering))
-range <- 3
+
+range <- 2
 test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
 cols = rev(colour('PRGn')(5))
 df <- data.frame(colnames(test))
@@ -414,15 +424,16 @@ colnames(df) = 'samples'
 pheatmap(test, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = FALSE, 
          color = cols,
          scale = 'none', cluster_cols=FALSE, main = '', 
-         na_col = "white", #fontsize_row = 10, 
+         na_col = "white",
+         #fontsize_row = 10, 
          #breaks = seq(-8, 8, length.out = 8), 
          annotation_col = df, 
          #treeheight_row = 20,
          #clustering_method = 'complete', cutree_rows = 6, 
-         annotation_legend = FALSE,
+         annotation_legend = TRUE,
          #clustering_callback = callback,
-         filename = paste0(figureDir, 'TFs_associatedMotifs_regeneration.pdf'), 
-         width = 3, height = 10)
+         filename = paste0(figureDir, 'TFs_associatedMotifs_regeneration_', species, '.pdf'), 
+         width = 5, height = 8)
 
 ########################################################
 ########################################################
@@ -435,7 +446,6 @@ tfs = unique(tfs$`HGNC symbol`)
 
 count.file = paste0(rnaDir, '/GSE126701_RNA_finRegen_featureCounts.txt')
 counts = read.table(count.file, sep = '\t', header = TRUE)
-annot = read.delim(annot.file)
 
 mm = match(counts$Geneid, annot$Gene.stable.ID)
 jj = which(annot$Human.gene.name[mm] != '' & !is.na(mm))
