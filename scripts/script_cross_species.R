@@ -301,14 +301,59 @@ saveRDS(aa, file = paste0(RdataDir, '/MARA_output_sorted.rds'))
 # plot the results 
 ##########################################
 bb = readRDS(file = paste0(RdataDir, '/MARA_output_sorted.rds'))
-kk = which(bb[, 2]> bb[, 1] | bb[, 4]>bb[, 3] )
+kk = which(bb[, 2]> bb[, 1] | bb[, 4]>bb[, 3] ) ## motif activated in regeneration
 bb = bb[kk, ]
 
-kk = which(abs(bb[, 2]) >2| abs(bb[, 4])>2)
+kk = which(abs(bb[, 2]) >2| abs(bb[, 4])>2) # 
 bb = bb[kk, ]
 
 test = as.matrix(bb[, c(1:4)])
 rownames(test) = bb$gene
+
+res = readRDS(file = paste0('../results/RNAseq_data_used/Rdata/', 
+                            'smartseq2_R10724_R11635_cpm.batchCorrect_DESeq2.test.withbatch.log2FC.shrinked_RNAseq_data_used_20220408.rds'))
+cpm = res[, c(1:12)]
+#cpm = res[, grep('log2FoldChange_d', colnames(res))]
+cpm = cal_sample_means(cpm, conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal",  "BL_UA_13days_distal"))
+ggs = get_geneName(rownames(cpm))
+
+## find expression of associated TFs
+bb$index = NA
+bb$corr.tfs = NA
+for(n in 1:nrow(bb)){
+  
+  tfs = unique(unlist(strsplit(as.character(bb$gene[n]), '_')))
+  if(length(tfs) == 1){
+    if(tfs == 'SNAI3') tfs = 'SNAI2'
+    if(tfs == 'ZNF701') tfs = 'ZNF419' 
+  }
+  
+  jj = c()
+  for(tf in tfs) jj = c(jj, which(ggs == tf))
+  
+  if(length(jj) == 1) {
+    bb$index[n] = jj
+    bb$corr.tfs[n] = cor(as.numeric(bb[n, c(1:5)]), cpm[jj, ])
+  }
+  if(length(jj) >=2){
+    correlation = cor(as.numeric(bb[n, c(1:5)]), t(cpm[jj,]), method = 'pearson')
+    bb$index[n] = jj[which.max(abs(correlation))]
+    bb$corr.tfs[n] = correlation[which.max(abs(correlation))]
+  }
+  if(length(jj) == 0){
+    cat(n, '--', tfs, ': ')
+    cat(length(jj), 'tfs found \n')
+  }
+}
+
+bb$tfs = ggs[bb$index]
+bb$tf_ids = rownames(cpm)[bb$index]
+
+xx = bb[which(!is.na(bb$tfs)), ]
+xx = data.frame(xx, cpm[xx$index,])
+
+saveRDS(xx, file =  paste0(RdataDir, '/MARA_output_Motifs_maxZscore_filteredTFsExpr_top', ntop, '.rds'))
+
 
 range <- 5; breaks = 10
 test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
@@ -342,6 +387,42 @@ plt = pheatmap(test, show_rownames=TRUE, show_colnames = FALSE,
                clustering_callback = callback,
                filename = paste0(figureDir, 'MARA_bayesianRidge_Jaspar2022_', species,'.pdf'), 
                width = 6, height = 12)
+
+# original code from https://davemcg.github.io/post/lets-plot-scrna-dotplots/
+library(tidyverse)
+library(ggdendro)
+library(cowplot)
+library(ggtree)
+library(patchwork) 
+
+test = bb[match(o1, rownames(test)), c(13, 15:19)]
+
+test$tfs[31] = 'MAFK.1'
+
+rownames(test) = test$tfs
+test = test[, -1]
+colnames(test) = c('mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d')
+
+test = t(apply(test, 1, cal_centering))
+range <- 3
+test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
+cols = rev(colour('PRGn')(5))
+df <- data.frame(colnames(test))
+rownames(df) = colnames(test)
+colnames(df) = 'samples'
+
+pheatmap(test, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = FALSE, 
+         color = cols,
+         scale = 'none', cluster_cols=FALSE, main = '', 
+         na_col = "white", #fontsize_row = 10, 
+         #breaks = seq(-8, 8, length.out = 8), 
+         annotation_col = df, 
+         #treeheight_row = 20,
+         #clustering_method = 'complete', cutree_rows = 6, 
+         annotation_legend = FALSE,
+         #clustering_callback = callback,
+         filename = paste0(figureDir, 'TFs_associatedMotifs_regeneration.pdf'), 
+         width = 3, height = 10)
 
 ########################################################
 ########################################################
@@ -433,7 +514,6 @@ yy = yy[order(yy$padj_sp7ne_4dpa.vs.0dpa), ]
 
 grep('RUNX', rownames(yy))
 yy[grep('RUNX', rownames(yy)), ]
-
 
 
 ########################################################
