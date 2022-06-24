@@ -41,31 +41,30 @@ tableDir = paste0('/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akan
 saveTables = FALSE
 
 version.analysis = 'cross_species_20220621'
-resDir = paste0("../results/", version.analysis)
 species = 'zebrafish_fin'
+resDir = paste0("../results/", version.analysis, '/', species)
 
-resDir = paste0(resDir, '/', species)
 RdataDir = paste0(resDir, '/Rdata')
 if(!dir.exists(resDir)) dir.create(resDir)
 if(!dir.exists(RdataDir)) dir.create(RdataDir)
 
-dataDir = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/', 
-                 'other_species_atac_rnaseq/zebrafish_fin_Lee2020')
+dataDir = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/other_species_atac_rnaseq/', 
+                 'zebrafish_heart_Cao2022')
 
 atacDir = paste0(dataDir, '/atac_seq')
 rnaDir = paste0(dataDir, '/rna_seq')
+atacMetadata = paste0(atacDir, '/metadata_PRJNA352230.txt')
 
-atacMetadata = paste0(atacDir, '/PRJNA523011_atacseq_metadata.txt')
+## annotatations
 gtf.file = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/zebrafish/GRCz11/Danio_rerio.GRCz11.106.gtf'
 annot.file = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/zebrafish/GRCz11/annotation_ens_biomart.txt'
 annot = read.delim(annot.file)
-
 tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
 tfs = unique(tfs$`HGNC symbol`)
 
 ########################################################
 ########################################################
-# Section : RNA-seq analysis
+# Section I : RNA-seq analysis
 # 
 ########################################################
 ########################################################
@@ -153,15 +152,17 @@ ggs = as.character(get_geneName(rownames(yy)))
 
 ########################################################
 ########################################################
-# Section : ATAC-seq data processing
+# Section II : ATAC-seq data processing
 # 
 ########################################################
 ########################################################
 metadata = read.table(atacMetadata, sep = '\t', header = TRUE)
 
 ### manual selection of column of metadata
+metadata = metadata[grep('ATAC-seq', metadata$experiment_title), ]
 metadata = data.frame(SampleID = metadata$run_accession,  
                       sample = metadata$sample_title, stringsAsFactors = FALSE)
+
 metadata$condition = gsub('_rep1|_rep2', '', metadata$sample)
 
 design = metadata
