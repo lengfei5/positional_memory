@@ -163,7 +163,9 @@ metadata = metadata[grep('ATAC-seq', metadata$experiment_title), ]
 metadata = data.frame(SampleID = metadata$run_accession,  
                       sample = metadata$sample_title, stringsAsFactors = FALSE)
 
-metadata$condition = gsub('_rep1|_rep2', '', metadata$sample)
+metadata$condition = gsub(' ', '_', metadata$sample)
+#metadata$condition = gsub('-[:digit:]', '', metadata$condition)
+metadata$condition = rep(c('zebrah_0dpa', 'zebrah_3dpa', 'zebrah_7dpa'), each = 4)
 
 design = metadata
 rm(metadata)
@@ -188,7 +190,7 @@ peak.files = peak.files[index]
 
 source('functions_chipSeq.R')
 peak.consensus = merge.peaks.macs2(peak.files,  select.overlappingPeaks.acrossRep = TRUE,
-                                   cc = design$condition, pcutoff = 6)
+                                   cc = design$condition, pcutoff = 4)
 
 ## save bed for motif scanning and saf file for peak signal counting
 export(peak.consensus, format = 'bed', con = paste0(atacDir, '/peakConsensus_for_fimo.bed'))
