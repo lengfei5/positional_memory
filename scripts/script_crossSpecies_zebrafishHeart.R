@@ -41,7 +41,7 @@ tableDir = paste0('/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akan
 saveTables = FALSE
 
 version.analysis = 'cross_species_20220621'
-species = 'zebrafish_fin'
+species = 'zebrafish_heart'
 resDir = paste0("../results/", version.analysis, '/', species)
 
 RdataDir = paste0(resDir, '/Rdata')
@@ -230,12 +230,16 @@ counts = process.countTable(all=all, design = design[, c(1, 3)])
 save(design, counts, file = paste0(RdataDir, '/samplesDesign_readCounts.within_peakConsensus.Rdata'))
 
 
+##########################################
+# filter and normalize the atac-seq peaks
+##########################################
 ss = apply(as.matrix(counts[, -1]), 1, mean)
 
 par(mfrow=c(1,2))
 hist(log10(as.matrix(counts[, -1])), breaks = 50, xlab = 'log10(nb of reads within peaks)', main = 'distribution')
 plot(ecdf(log10(as.matrix(counts[, -1]) + 0.1)), xlab = 'log10(nb of reads within peaks)', main = 'cumulative distribution')
 
+par(mfrow=c(1,1))
 ss = apply(as.matrix(counts[, -1]), 1, max)
 cutoff = 50
 hist(log10(ss), breaks = 200)
@@ -266,14 +270,22 @@ vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
 pca=plotPCA(vsd, intgroup = colnames(design)[3], ntop = 3000, returnData = FALSE)
 print(pca)
 
-# ggp = ggplot(data=pca2save, aes(PC1, PC2, label = name, color=condition, shape = batch)) + 
-#   geom_point(size=3) + 
-#   geom_text(hjust = 0.2, nudge_y = 0.5, size=3)
-# 
-# plot(ggp)
+pca2save = plotPCA(vsd, intgroup = colnames(design)[3], ntop = 3000, returnData = TRUE)
+ggp = ggplot(data=pca2save, aes(PC1, PC2, label = name, color=condition)) +
+  geom_point(size=3) +
+  geom_text(hjust = 0.2, nudge_y = 0.1, size=3)
+
+plot(ggp)
 
 ggsave(paste0(resDir, "/PCA_allatacseq_new.old.merged_ntop3000_allSamples.pdf"), width = 10, height = 6)
 
+### select the samples from the same batch
+sels = grep('-3|-4', design$sample)
+design = design[sels, ]
+dds = dds[, sels]
+fpm = fpm[, sels]
+
+dds$condition = droplevels(dds$condition)
 
 ## quick peak annotation 
 require(ChIPpeakAnno)
@@ -295,21 +307,22 @@ rownames(pp.annots) = paste0(pp.annots$seqnames, ':', pp.annots$start, '-', pp.a
 # DE peak test
 ##########################################
 dds$condition = droplevels(dds$condition)
-dds$condition <- relevel(dds$condition, ref = "ATAC_sp7ne0dpa")
+dds$condition <- relevel(dds$condition, ref = "zebrah_0dpa")
 
-dds <- DESeq(dds, test="Wald", fitType = c("parametric"))
+dds <- estimateDispersions(dds, fitType = 'parametric')
+dds <- nbinomWaldTest(dds)
 
 plotDispEsts(dds, ymin = 10^-3)
 resultsNames(dds)
 
-res = results(dds, name="condition_ATAC_sp7ne4dpa_vs_ATAC_sp7ne0dpa", test = 'Wald')
-res <- lfcShrink(dds, coef="condition_ATAC_sp7ne4dpa_vs_ATAC_sp7ne0dpa")
-colnames(res) = paste0(colnames(res), "_sp7ne_4dpa.vs.0dpa")
+res = results(dds, name="condition_zebrah_3dpa_vs_zebrah_0dpa", test = 'Wald')
+# res <- lfcShrink(dds, coef="condition_zebrah_3dpa_vs_zebrah_0dpa")
+colnames(res) = paste0(colnames(res), "_zebrah_3dpa.vs.0dpa")
 res = data.frame(res[, c(2, 5, 6)])
 
-res.ii = results(dds, contrast = c('condition', 'ATAC_sp7po4dpa', 'ATAC_sp7po0dpa'), test = 'Wald')
-res.ii <- lfcShrink(dds, contrast = c('condition', 'ATAC_sp7po4dpa', 'ATAC_sp7po0dpa'))
-colnames(res.ii) = paste0(colnames(res.ii), "_sp7po_4dpa.vs.0dpa")
+res.ii = results(dds, contrast = c('condition', 'zebrah_7dpa', 'zebrah_0dpa'), test = 'Wald')
+# res.ii <- lfcShrink(dds, contrast = c('condition', 'zebrah_7dpa', 'zebrah_0dpa'))
+colnames(res.ii) = paste0(colnames(res.ii), "_zebrah_7dpa.vs.0dpa")
 res = data.frame(res, res.ii[, c(2, 5, 6)])
 
 res = data.frame(fpm, res, stringsAsFactors = FALSE)
@@ -335,12 +348,19 @@ make.motif.oc.matrix.from.fimo.output(fimo.out = fimo.out,
 ##########################################
 res = readRDS(file = paste0(RdataDir, '/fpm_DE_binding_lfcShrink_res.rds'))
 
-fdr.cutoff = 0.01; logfc.cutoff = 1
-
-jj = which((res$padj_sp7ne_4dpa.vs.0dpa < fdr.cutoff & abs(res$log2FoldChange_sp7ne_4dpa.vs.0dpa) > logfc.cutoff) |
-             (res$padj_sp7po_4dpa.vs.0dpa < fdr.cutoff & abs(res$log2FoldChange_sp7po_4dpa.vs.0dpa) > logfc.cutoff)
+fdr.cutoff = 0.10; logfc.cutoff = 0.5
+jj = which((res$padj_zebrah_3dpa.vs.0dpa < fdr.cutoff & abs(res$log2FoldChange_zebrah_3dpa.vs.0dpa) > logfc.cutoff) |
+             (res$padj_zebrah_7dpa.vs.0dpa < fdr.cutoff & abs(res$log2FoldChange_zebrah_7dpa.vs.0dpa) > logfc.cutoff)
 )
 cat(length(jj), '\n')
+
+# pval.cutoff = 0.01; logfc.cutoff = 0.0
+# jj = which((res$pvalue_zebrah_3dpa.vs.0dpa < pval.cutoff & abs(res$log2FoldChange_zebrah_3dpa.vs.0dpa) > logfc.cutoff) |
+#              (res$pvalue_zebrah_7dpa.vs.0dpa < pval.cutoff & abs(res$log2FoldChange_zebrah_7dpa.vs.0dpa) > logfc.cutoff)
+# )
+# cat(length(jj), '\n')
+
+#res = res[order(res$pvalue_zebrah_3dpa.vs.0dpa), ]
 
 res = res[jj, ]
 mm = match(rownames(res), rownames(pp.annots))
@@ -359,32 +379,34 @@ res = readRDS(file = paste0(RdataDir, '/DE_atacPeaks_fpm_annotatation.rds'))
 
 cat(nrow(res), 'DE peaks found !\n')
 
-res = res[order(-res$log2FoldChange_sp7po_4dpa.vs.0dpa), ]
+res = res[order(-res$log2FoldChange_zebrah_3dpa.vs.0dpa), ]
 
 ## prepare the response matrix
-keep = as.matrix(res[, c(1:8)])
+keep = as.matrix(res[, c(1:6)])
 conds = unique(design$condition)
+
+# make sure the response is logscale !!!
+keep = log2(keep)
 
 # select samples to use
 #keep = keep[, sample.sels]
 Y = cal_sample_means(keep, conds = conds)
 rownames(Y) = sapply(rownames(Y), function(x) {x = unlist(strsplit(gsub(':', '-', as.character(x)), '-'));
 paste0(x[1], ':', (as.numeric(x[2]) -1), '-', x[3])}) 
-mm = match(rownames(Y), rownames(motif.oc))
 
+mm = match(rownames(Y), rownames(motif.oc))
 cat(length(which(is.na(mm))), ' missed peaks in ater fimo scanning \n')
+
 Y = Y[which(!is.na(mm)), ]
 motif.oc = motif.oc[mm[which(!is.na(mm))], ]
 grep('RUNX1', colnames(motif.oc))
 
 ### run MARA analysis
 source('Functions_MARA.R')
-aa1 = run.MARA.atac(motif.oc, Y[ ,c(3,4)],  method = 'Bayesian.ridge')
-aa2 = run.MARA.atac(motif.oc, Y[ ,c(1,2)],  method = 'Bayesian.ridge')
+aa = run.MARA.atac(motif.oc, Y,  method = 'Bayesian.ridge')
 
-aa = data.frame(aa1[, c(1:2)], aa2[, c(1:2)], aa1[, c(3:7)], stringsAsFactors = FALSE)
-aa$combine.Zscore = apply(as.matrix(aa[, c(1:4)]), 1, function(x) sqrt(mean(x^2)))
-aa$maxZscore = apply(as.matrix(aa[, c(1:4)]), 1, function(x){x.abs = abs(x); return(max(x.abs))})
+aa$combine.Zscore = apply(as.matrix(aa[, c(1:3)]), 1, function(x) sqrt(mean(x^2)))
+aa$maxZscore = apply(as.matrix(aa[, c(1:3)]), 1, function(x){x.abs = abs(x); return(max(x.abs))})
 aa$rank = order(aa$combine.Zscore)
 aa = aa[order(-aa$combine.Zscore), ]
 grep('RUNX', rownames(aa))

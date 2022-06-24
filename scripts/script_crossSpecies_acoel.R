@@ -17,17 +17,6 @@ source('functions_chipSeq.R')
 source('Functions_atac.R')
 source('Functions_histM.R')
 #source('functions_chipSeq.R')
-
-version.analysis = 'cross_species_20220621'
-resDir = paste0("../results/", version.analysis)
-
-annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
-
-figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
-tableDir = paste0('/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/SupTables/')
-
-saveTables = FALSE
-
 require(DESeq2)
 require(GenomicRanges)
 require(pheatmap)
@@ -45,21 +34,30 @@ library(cowplot)
 library(ggtree)
 library(patchwork) 
 
-species = 'zebrafish_fin'
+annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
+figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
+tableDir = paste0('/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/SupTables/')
 
-resDir = paste0(resDir, '/', species)
+saveTables = FALSE
+
+version.analysis = 'cross_species_20220621'
+species = 'acoel'
+resDir = paste0("../results/", version.analysis, '/', species)
+
 RdataDir = paste0(resDir, '/Rdata')
 if(!dir.exists(resDir)) dir.create(resDir)
 if(!dir.exists(RdataDir)) dir.create(RdataDir)
 
-dataDir = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/', 
-                 'other_species_atac_rnaseq/zebrafish_fin_Lee2020')
+dataDir = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/other_species_atac_rnaseq/', 
+                 'acoel_Gehrke2019')
+
 atacDir = paste0(dataDir, '/atac_seq')
 rnaDir = paste0(dataDir, '/rna_seq')
+atacMetadata = paste0(atacDir, '/metadata_PRJNA512373.txt')
 
-atacMetadata = paste0(atacDir, '/PRJNA523011_atacseq_metadata.txt')
-gtf.file = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/zebrafish/GRCz11/Danio_rerio.GRCz11.106.gtf'
-annot.file = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/zebrafish/GRCz11/annotation_ens_biomart.txt'
+## annotatations
+gtf.file = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/acoel/Hmi_1.0/annotation/hmi_annotated_contig.gff'
+annot.file = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/acoel/Hmi_1.0/annotation/hmi_annotated_contig.gff'
 annot = read.delim(annot.file)
 
 tfs = readRDS(file = paste0('../results/motif_analysis/TFs_annot/curated_human_TFs_Lambert.rds'))
@@ -67,7 +65,7 @@ tfs = unique(tfs$`HGNC symbol`)
 
 ########################################################
 ########################################################
-# Section : RNA-seq analysis
+# Section I : RNA-seq analysis
 # 
 ########################################################
 ########################################################
@@ -155,16 +153,23 @@ ggs = as.character(get_geneName(rownames(yy)))
 
 ########################################################
 ########################################################
-# Section : ATAC-seq data processing
+# Section II : ATAC-seq data processing
 # 
 ########################################################
 ########################################################
 metadata = read.table(atacMetadata, sep = '\t', header = TRUE)
 
 ### manual selection of column of metadata
+metadata = metadata[grep('ATACseq', metadata$library_name), ]
+metadata = metadata[grep('RNAi', metadata$experiment_alias, invert = TRUE), ]
+
 metadata = data.frame(SampleID = metadata$run_accession,  
-                      sample = metadata$sample_title, stringsAsFactors = FALSE)
+                      sample = metadata$library_name, stringsAsFactors = FALSE)
+
 metadata$condition = gsub('_rep1|_rep2', '', metadata$sample)
+metadata$condition = gsub('_ATACseq', '', metadata$condition)
+#metadata$condition = gsub('-[:digit:]', '', metadata$condition)
+#metadata$condition = rep(c('zebrah_0dpa', 'zebrah_3dpa', 'zebrah_7dpa'), each = 4)
 
 design = metadata
 rm(metadata)
@@ -228,6 +233,12 @@ counts = process.countTable(all=all, design = design[, c(1, 3)])
 
 save(design, counts, file = paste0(RdataDir, '/samplesDesign_readCounts.within_peakConsensus.Rdata'))
 
+##########################################
+# normalized the data 
+##########################################
+load(file = paste0(RdataDir, '/samplesDesign_readCounts.within_peakConsensus.Rdata'))
+design$time = sapply(design$condition, function(x) unlist(strsplit(as.character(x), '_'))[2])
+design$tissue = sapply(design$condition, function(x) unlist(strsplit(as.character(x), '_'))[3])
 
 ss = apply(as.matrix(counts[, -1]), 1, mean)
 
@@ -235,12 +246,13 @@ par(mfrow=c(1,2))
 hist(log10(as.matrix(counts[, -1])), breaks = 50, xlab = 'log10(nb of reads within peaks)', main = 'distribution')
 plot(ecdf(log10(as.matrix(counts[, -1]) + 0.1)), xlab = 'log10(nb of reads within peaks)', main = 'cumulative distribution')
 
+par(mfrow=c(1,1))
 ss = apply(as.matrix(counts[, -1]), 1, max)
 cutoff = 50
 hist(log10(ss), breaks = 200)
 abline(v = log10(cutoff), col = 'red')
 kk = which(ss>cutoff)
-length(which(ss>cutoff))
+cat(length(kk), 'peaks after filtering with cutoff : ', cutoff, '\n')
 
 require(ggplot2)
 require(DESeq2)
@@ -249,9 +261,9 @@ rownames(counts) = counts$gene
 dds <- DESeqDataSetFromMatrix(as.matrix(counts[kk, -1]), DataFrame(design), design = ~ condition)
 
 ss = rowSums(counts(dds))
-length(which(ss > quantile(ss, probs = 0.6)))
+length(which(ss > quantile(ss, probs = 0.5)))
 
-dd0 = dds[ss > quantile(ss, probs = 0.6) , ]
+dd0 = dds[ss > quantile(ss, probs = 0.5) , ]
 dd0 = estimateSizeFactors(dd0)
 sizefactors.UQ = sizeFactors(dd0)
 
@@ -262,14 +274,15 @@ dds <- estimateDispersions(dds, fitType = 'parametric')
 
 vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
 
-pca=plotPCA(vsd, intgroup = colnames(design)[3], ntop = 3000, returnData = FALSE)
+pca=plotPCA(vsd, intgroup = c('tissue', 'time'), ntop = 3000, returnData = FALSE)
 print(pca)
 
-# ggp = ggplot(data=pca2save, aes(PC1, PC2, label = name, color=condition, shape = batch)) + 
-#   geom_point(size=3) + 
-#   geom_text(hjust = 0.2, nudge_y = 0.5, size=3)
-# 
-# plot(ggp)
+pca2save = plotPCA(vsd, intgroup = c('tissue', 'time'), ntop = 3000, returnData = TRUE)
+ggp = ggplot(data=pca2save, aes(PC1, PC2, label = name, color=time, shape = tissue)) +
+  geom_point(size=3) +
+  geom_text(hjust = 0.2, nudge_y = 0.5, size=3)
+
+plot(ggp)
 
 ggsave(paste0(resDir, "/PCA_allatacseq_new.old.merged_ntop3000_allSamples.pdf"), width = 10, height = 6)
 
@@ -362,10 +375,7 @@ res = res[order(-res$log2FoldChange_sp7po_4dpa.vs.0dpa), ]
 
 ## prepare the response matrix
 keep = as.matrix(res[, c(1:8)])
-conds = unique(sapply(colnames(keep), function(x) unlist(strsplit(as.character(x), '_'))[2]))
-
-## make sure response is logscale 
-keep = log2(keep + 2^-4)
+conds = unique(design$condition)
 
 # select samples to use
 #keep = keep[, sample.sels]
