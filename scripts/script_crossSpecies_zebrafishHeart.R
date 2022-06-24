@@ -17,17 +17,6 @@ source('functions_chipSeq.R')
 source('Functions_atac.R')
 source('Functions_histM.R')
 #source('functions_chipSeq.R')
-
-version.analysis = 'cross_species_20220621'
-resDir = paste0("../results/", version.analysis)
-
-annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
-
-figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
-tableDir = paste0('/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/SupTables/')
-
-saveTables = FALSE
-
 require(DESeq2)
 require(GenomicRanges)
 require(pheatmap)
@@ -45,6 +34,14 @@ library(cowplot)
 library(ggtree)
 library(patchwork) 
 
+annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
+figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
+tableDir = paste0('/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/SupTables/')
+
+saveTables = FALSE
+
+version.analysis = 'cross_species_20220621'
+resDir = paste0("../results/", version.analysis)
 species = 'zebrafish_fin'
 
 resDir = paste0(resDir, '/', species)
@@ -54,6 +51,7 @@ if(!dir.exists(RdataDir)) dir.create(RdataDir)
 
 dataDir = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/', 
                  'other_species_atac_rnaseq/zebrafish_fin_Lee2020')
+
 atacDir = paste0(dataDir, '/atac_seq')
 rnaDir = paste0(dataDir, '/rna_seq')
 
