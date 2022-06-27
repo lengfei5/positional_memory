@@ -237,6 +237,8 @@ save(design, counts, file = paste0(RdataDir, '/samplesDesign_readCounts.within_p
 ##########################################
 # filter and normalize the atac-seq peaks
 ##########################################
+load(file = paste0(RdataDir, '/samplesDesign_readCounts.within_peakConsensus.Rdata'))
+
 ss = apply(as.matrix(counts[, -1]), 1, mean)
 
 par(mfrow=c(1,2))
@@ -263,6 +265,8 @@ length(which(ss > quantile(ss, probs = 0.6)))
 dd0 = dds[ss > quantile(ss, probs = 0.6) , ]
 dd0 = estimateSizeFactors(dd0)
 sizefactors.UQ = sizeFactors(dd0)
+dds = estimateSizeFactors(dds)
+plot(sizeFactors(dds), sizeFactors(dd0));abline(0, 1, lwd = 2.0, col = 'red')
 
 sizeFactors(dds) <- sizefactors.UQ
 fpm = fpm(dds, robust = TRUE)
@@ -284,7 +288,7 @@ plot(ggp)
 ggsave(paste0(resDir, "/PCA_allatacseq_new.old.merged_ntop3000_allSamples.pdf"), width = 10, height = 6)
 
 ### select the samples from the same batch
-sels = grep('-3|-4', design$sample)
+sels = grep('-1|-2', design$sample)
 design = design[sels, ]
 dds = dds[, sels]
 fpm = fpm[, sels]
@@ -352,17 +356,17 @@ make.motif.oc.matrix.from.fimo.output(fimo.out = fimo.out,
 ##########################################
 res = readRDS(file = paste0(RdataDir, '/fpm_DE_binding_lfcShrink_res.rds'))
 
-fdr.cutoff = 0.10; logfc.cutoff = 0.5
-jj = which((res$padj_zebrah_3dpa.vs.0dpa < fdr.cutoff & abs(res$log2FoldChange_zebrah_3dpa.vs.0dpa) > logfc.cutoff) |
-             (res$padj_zebrah_7dpa.vs.0dpa < fdr.cutoff & abs(res$log2FoldChange_zebrah_7dpa.vs.0dpa) > logfc.cutoff)
-)
-cat(length(jj), '\n')
-
-# pval.cutoff = 0.01; logfc.cutoff = 0.0
-# jj = which((res$pvalue_zebrah_3dpa.vs.0dpa < pval.cutoff & abs(res$log2FoldChange_zebrah_3dpa.vs.0dpa) > logfc.cutoff) |
-#              (res$pvalue_zebrah_7dpa.vs.0dpa < pval.cutoff & abs(res$log2FoldChange_zebrah_7dpa.vs.0dpa) > logfc.cutoff)
+# fdr.cutoff = 0.15; logfc.cutoff = 0.5
+# jj = which((res$padj_zebrah_3dpa.vs.0dpa < fdr.cutoff & abs(res$log2FoldChange_zebrah_3dpa.vs.0dpa) > logfc.cutoff) |
+#              (res$padj_zebrah_7dpa.vs.0dpa < fdr.cutoff & abs(res$log2FoldChange_zebrah_7dpa.vs.0dpa) > logfc.cutoff)
 # )
 # cat(length(jj), '\n')
+
+pval.cutoff = 0.05; logfc.cutoff = 0.0
+jj = which((res$pvalue_zebrah_3dpa.vs.0dpa < pval.cutoff & abs(res$log2FoldChange_zebrah_3dpa.vs.0dpa) > logfc.cutoff) |
+             (res$pvalue_zebrah_7dpa.vs.0dpa < pval.cutoff & abs(res$log2FoldChange_zebrah_7dpa.vs.0dpa) > logfc.cutoff)
+)
+cat(length(jj), '\n')
 
 #res = res[order(res$pvalue_zebrah_3dpa.vs.0dpa), ]
 
@@ -390,7 +394,7 @@ keep = as.matrix(res[, c(1:6)])
 conds = c('0dpa', '3dpa', '7dpa')
 
 # make sure the response is logscale !!!
-keep = log2(keep)
+keep = log2(keep + 2^-2)
 
 # select samples to use
 #keep = keep[, sample.sels]
@@ -427,7 +431,7 @@ bb = bb[kk, ]
 
 zcutoff = 1.5
 
-kk = which(abs(bb[, 2]) >1.5| abs(bb[, 3])>1.5) # 
+kk = which(abs(bb[, 2]) >zcutoff| abs(bb[, 3])>zcutoff) # 
 bb = bb[kk, ]
 
 ## import processed RNAseq data
@@ -486,7 +490,7 @@ xx = readRDS(file =  paste0(RdataDir, '/MARA_output_Motifs_filteredTFsExpr.rds')
 test = as.matrix(xx[, c(1:3)])
 rownames(test) = xx$gene
 
-range <- 3.5; breaks = 10
+range <- 5; breaks = 10
 test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
 
 df <- data.frame(colnames(test))
@@ -524,11 +528,12 @@ test$tfs.speciees = as.character(test$tfs.speciees)
 
 rownames(test) = test$tfs.speciees
 
-index_dup = grep('fosab', test$tfs.speciees)
+index_dup = grep('fosab|jun$', test$tfs.speciees)
 test$tfs.speciees[index_dup]
 
-test$tfs.speciees[14] = 'fosab.2'
-test$tfs.speciees[22] = 'fosab.3'
+test$tfs.speciees[31] = 'jun.2'
+test$tfs.speciees[25] = 'fosab.2'
+test$tfs.speciees[27] = 'fosab.3'
 
 rownames(test) = test$tfs.speciees
 
@@ -536,8 +541,8 @@ test = test[, -1]
 test = t(apply(test, 1, cal_centering))
 
 cat('range of centered TF expression --',  range(test), '\n')
-range <- 2
-
+range <- 2.5
+require(khroma)
 test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
 cols = rev(colour('PRGn')(5))
 df <- data.frame(colnames(test))
@@ -569,4 +574,3 @@ if(Run_footprint_analysis){
   cat(' star the footprinting analysis \n')
   
 }
-
