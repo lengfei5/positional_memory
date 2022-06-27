@@ -416,6 +416,7 @@ ggs = get_geneName(rownames(cpm))
 
 ## find expression of associated TFs
 bb$index = NA
+bb$corr.tfs = NA
 for(n in 1:nrow(bb)){
   tfs = unique(unlist(strsplit(as.character(bb$gene[n]), '_')))
   if(length(tfs) == 1){
@@ -428,7 +429,7 @@ for(n in 1:nrow(bb)){
   
   if(length(jj) == 1) {
     bb$index[n] = jj
-    bb$corr.tfs[n] = cor(as.numeric(bb[n, c(1:4)]), cpm[jj, ])
+    bb$corr.tfs[n] = cor(as.numeric(bb[n, c(1:4)]), as.numeric(cpm[jj, ]))
   }
   if(length(jj) >=2){
     correlation = cor(as.numeric(bb[n, c(1:4)]), t(cpm[jj,]), method = 'pearson')
@@ -446,7 +447,10 @@ bb$tf_ids = rownames(cpm)[bb$index]
 
 xx = bb[which(!is.na(bb$tfs)), ]
 xx$tfs.speciees = annot$Gene.name[match(get_geneID(xx$tf_ids), annot$Gene.stable.ID)]
-xx = data.frame(xx, cpm[xx$index,])
+rnas = cpm[xx$index, ]
+colnames(rnas) = paste0(colnames(rnas), '_rna')
+
+xx = data.frame(xx, rnas, stringsAsFactors = FALSE)
 
 saveRDS(xx, file =  paste0(RdataDir, '/MARA_output_Motifs_filteredTFsExpr.rds'))
 
@@ -457,7 +461,9 @@ xx = readRDS(file =  paste0(RdataDir, '/MARA_output_Motifs_filteredTFsExpr.rds')
 test = as.matrix(xx[, c(1:4)])
 rownames(test) = xx$gene
 
-range <- 5; breaks = 10
+cat('range of motif activity -- ', range(test), '\n')
+
+range <- 6 ; breaks = 10
 test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
 
 df <- data.frame(colnames(test))
@@ -495,11 +501,11 @@ test$tfs.speciees = as.character(test$tfs.speciees)
 
 rownames(test) = test$tfs.speciees
 
-grep('ctcf|fosl2', test$tfs.speciees)
-test$tfs.speciees[grep('ctcf|fosl2', test$tfs.speciees)]
+grep('fosl2', test$tfs.speciees)
+test$tfs.speciees[grep('fosl2', test$tfs.speciees)]
 
-test$tfs.speciees[41] = 'ctcf.2'
-test$tfs.speciees[26] = 'fosl2.2'
+#test$tfs.speciees[41] = 'ctcf.2'
+test$tfs.speciees[58] = 'fosl2.2'
 rownames(test) = test$tfs.speciees
 
 test = test[, -1]

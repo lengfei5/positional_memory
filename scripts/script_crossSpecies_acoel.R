@@ -307,22 +307,38 @@ rownames(pp.annots) = paste0(pp.annots$seqnames, ':', pp.annots$start, '-', pp.a
 # DE peak test
 ##########################################
 dds$condition = droplevels(dds$condition)
-dds$condition <- relevel(dds$condition, ref = "ATAC_sp7ne0dpa")
+dds$condition <- relevel(dds$condition, ref = "hmia_0h_tail")
 
 dds <- DESeq(dds, test="Wald", fitType = c("parametric"))
 
 plotDispEsts(dds, ymin = 10^-3)
 resultsNames(dds)
 
-res = results(dds, name="condition_ATAC_sp7ne4dpa_vs_ATAC_sp7ne0dpa", test = 'Wald')
-res <- lfcShrink(dds, coef="condition_ATAC_sp7ne4dpa_vs_ATAC_sp7ne0dpa")
-colnames(res) = paste0(colnames(res), "_sp7ne_4dpa.vs.0dpa")
+res = results(dds, name="condition_hmia_3h_tail_vs_hmia_0h_tail", test = 'Wald')
+res <- lfcShrink(dds, coef="condition_hmia_3h_tail_vs_hmia_0h_tail")
+colnames(res) = paste0(colnames(res), "_3h.vs.0h")
 res = data.frame(res[, c(2, 5, 6)])
 
-res.ii = results(dds, contrast = c('condition', 'ATAC_sp7po4dpa', 'ATAC_sp7po0dpa'), test = 'Wald')
-res.ii <- lfcShrink(dds, contrast = c('condition', 'ATAC_sp7po4dpa', 'ATAC_sp7po0dpa'))
-colnames(res.ii) = paste0(colnames(res.ii), "_sp7po_4dpa.vs.0dpa")
+res.ii = results(dds, name="condition_hmia_6h_tail_vs_hmia_0h_tail", test = 'Wald')
+res.ii <- lfcShrink(dds, coef="condition_hmia_6h_tail_vs_hmia_0h_tail")
+colnames(res.ii) = paste0(colnames(res.ii), "_6h.vs.0h")
 res = data.frame(res, res.ii[, c(2, 5, 6)])
+
+res.ii = results(dds, name="condition_hmia_12h_tail_vs_hmia_0h_tail", test = 'Wald')
+res.ii <- lfcShrink(dds, coef="condition_hmia_12h_tail_vs_hmia_0h_tail")
+colnames(res.ii) = paste0(colnames(res.ii), "_12h.vs.0h")
+res = data.frame(res, res.ii[, c(2, 5, 6)])
+
+res.ii = results(dds, name="condition_hmia_24h_tail_vs_hmia_0h_tail", test = 'Wald')
+res.ii <- lfcShrink(dds, coef="condition_hmia_24h_tail_vs_hmia_0h_tail")
+colnames(res.ii) = paste0(colnames(res.ii), "_24h.vs.0h")
+res = data.frame(res, res.ii[, c(2, 5, 6)])
+
+res.ii = results(dds, name="condition_hmia_48h_tail_vs_hmia_0h_tail", test = 'Wald')
+res.ii <- lfcShrink(dds, coef="condition_hmia_48h_tail_vs_hmia_0h_tail")
+colnames(res.ii) = paste0(colnames(res.ii), "_48h.vs.0h")
+res = data.frame(res, res.ii[, c(2, 5, 6)])
+
 
 res = data.frame(fpm, res, stringsAsFactors = FALSE)
 saveRDS(res, file = paste0(RdataDir, '/fpm_DE_binding_lfcShrink_res.rds'))
@@ -347,17 +363,20 @@ make.motif.oc.matrix.from.fimo.output(fimo.out = fimo.out,
 ##########################################
 res = readRDS(file = paste0(RdataDir, '/fpm_DE_binding_lfcShrink_res.rds'))
 
-fdr.cutoff = 0.01; logfc.cutoff = 1
+fdr.cutoff = 0.05; logfc.cutoff = 1
 
-jj = which((res$padj_sp7ne_4dpa.vs.0dpa < fdr.cutoff & abs(res$log2FoldChange_sp7ne_4dpa.vs.0dpa) > logfc.cutoff) |
-             (res$padj_sp7po_4dpa.vs.0dpa < fdr.cutoff & abs(res$log2FoldChange_sp7po_4dpa.vs.0dpa) > logfc.cutoff)
+jj = which((res$padj_3h.vs.0h < fdr.cutoff & abs(res$log2FoldChange_3h.vs.0h) > logfc.cutoff) |
+             (res$padj_6h.vs.0h < fdr.cutoff & abs(res$log2FoldChange_6h.vs.0h) > logfc.cutoff) |
+             (res$padj_12h.vs.0h < fdr.cutoff & abs(res$log2FoldChange_12h.vs.0h) > logfc.cutoff) |
+             (res$padj_24h.vs.0h < fdr.cutoff & abs(res$log2FoldChange_24h.vs.0h) > logfc.cutoff) |
+             (res$padj_48h.vs.0h < fdr.cutoff & abs(res$log2FoldChange_48h.vs.0h) > logfc.cutoff) 
 )
 cat(length(jj), '\n')
 
 res = res[jj, ]
-mm = match(rownames(res), rownames(pp.annots))
 
-res = data.frame(res, pp.annots[mm, ], stringsAsFactors = FALSE)
+#mm = match(rownames(res), rownames(pp.annots))
+#res = data.frame(res, pp.annots[mm, ], stringsAsFactors = FALSE)
 
 saveRDS(res, file = paste0(RdataDir, '/DE_atacPeaks_fpm_annotatation.rds'))
 
@@ -371,11 +390,13 @@ res = readRDS(file = paste0(RdataDir, '/DE_atacPeaks_fpm_annotatation.rds'))
 
 cat(nrow(res), 'DE peaks found !\n')
 
-res = res[order(-res$log2FoldChange_sp7po_4dpa.vs.0dpa), ]
+#res = res[order(-res$log2FoldChange_sp7po_4dpa.vs.0dpa), ]
 
 ## prepare the response matrix
-keep = as.matrix(res[, c(1:8)])
-conds = unique(design$condition)
+keep = as.matrix(res[, c(1:20)])
+conds = unique(design$condition[grep('tail', design$condition)])
+conds = conds[c(5,3,1,6, 4,2)]
+keep = log2(keep + 2^-3)
 
 # select samples to use
 #keep = keep[, sample.sels]
@@ -391,15 +412,14 @@ grep('RUNX1', colnames(motif.oc))
 
 ### run MARA analysis
 source('Functions_MARA.R')
-aa1 = run.MARA.atac(motif.oc, Y[ ,c(3,4)],  method = 'Bayesian.ridge')
-aa2 = run.MARA.atac(motif.oc, Y[ ,c(1,2)],  method = 'Bayesian.ridge')
+aa = run.MARA.atac(motif.oc, Y,  method = 'Bayesian.ridge')
 
-aa = data.frame(aa1[, c(1:2)], aa2[, c(1:2)], aa1[, c(3:7)], stringsAsFactors = FALSE)
-aa$combine.Zscore = apply(as.matrix(aa[, c(1:4)]), 1, function(x) sqrt(mean(x^2)))
-aa$maxZscore = apply(as.matrix(aa[, c(1:4)]), 1, function(x){x.abs = abs(x); return(max(x.abs))})
-aa$rank = order(aa$combine.Zscore)
+#aa = data.frame(aa1[, c(1:2)], aa2[, c(1:2)], aa1[, c(3:7)], stringsAsFactors = FALSE)
+#aa$combine.Zscore = apply(as.matrix(aa[, c(1:4)]), 1, function(x) sqrt(mean(x^2)))
+#aa$maxZscore = apply(as.matrix(aa[, c(1:4)]), 1, function(x){x.abs = abs(x); return(max(x.abs))})
+#aa$rank = order(aa$combine.Zscore)
 aa = aa[order(-aa$combine.Zscore), ]
-grep('RUNX', rownames(aa))
+grep('RUNX1', rownames(aa))
 
 saveRDS(aa, file = paste0(RdataDir, '/MARA_output_sorted.rds'))
 

@@ -68,19 +68,22 @@ tfs = unique(tfs$`HGNC symbol`)
 # 
 ########################################################
 ########################################################
-count.file = paste0(rnaDir, '/GSE126701_RNA_finRegen_featureCounts.txt')
+count.file = paste0(rnaDir, '/GSE89444_RNAseq_raw_counts.txt')
 counts = read.table(count.file, sep = '\t', header = TRUE)
 
-mm = match(counts$Geneid, annot$Gene.stable.ID)
+mm = match(counts[, 1], annot$Gene.stable.ID)
 jj = which(annot$Human.gene.name[mm] != '' & !is.na(mm))
 mm = mm[jj]
 ggs = paste0(annot$Human.gene.name[mm], '_',  annot$Gene.stable.ID[mm])
 rownames(counts) = counts$Geneid
+
 rownames(counts)[jj] = ggs
 counts = counts[, -1]
 
+head(counts)
+
 conds = colnames(counts)
-conds = gsub('_rep1|_rep2', '', conds)
+conds = rep(c('0dpa', '3dpa', '7dpa'), each = 2)
 conds = data.frame(condition = conds)
 dds <- DESeqDataSetFromMatrix(counts, DataFrame(conds), design = ~ condition)
 
@@ -102,7 +105,7 @@ print(pca)
 # DE test
 ##########################################
 dds$condition = droplevels(dds$condition)
-dds$condition <- relevel(dds$condition, ref = "sp7po0dpa")
+dds$condition <- relevel(dds$condition, ref = "0dpa")
 
 dds <- DESeq(dds, test="Wald", fitType = c("parametric"))
 
@@ -111,14 +114,14 @@ resultsNames(dds)
 
 fpm = log2(fpm(dds) + 2^-6)
 
-res = results(dds, name="condition_sp7po4dpa_vs_sp7po0dpa", test = 'Wald')
-res <- lfcShrink(dds, coef="condition_sp7po4dpa_vs_sp7po0dpa")
-colnames(res) = paste0(colnames(res), "_sp7po_4dpa.vs.0dpa")
+res = results(dds, name="condition_3dpa_vs_0dpa", test = 'Wald')
+res <- lfcShrink(dds, coef="condition_3dpa_vs_0dpa")
+colnames(res) = paste0(colnames(res), "_3dpa.vs.0dpa")
 res = data.frame(res[, c(2, 5, 6)])
 
-res.ii = results(dds, contrast = c('condition', 'sp7ne4dpa', 'sp7ne0dpa'), test = 'Wald')
-res.ii <- lfcShrink(dds, contrast = c('condition', 'sp7ne4dpa', 'sp7ne0dpa'))
-colnames(res.ii) = paste0(colnames(res.ii), "_sp7ne_4dpa.vs.0dpa")
+res.ii = results(dds, name = 'condition_7dpa_vs_0dpa', test = 'Wald')
+res.ii <- lfcShrink(dds, coef = 'condition_7dpa_vs_0dpa')
+colnames(res.ii) = paste0(colnames(res.ii), "_7dpa.vs.0dpa")
 res = data.frame(res, res.ii[, c(2, 5, 6)])
 
 res = data.frame(fpm, res, stringsAsFactors = FALSE)
@@ -131,8 +134,8 @@ saveRDS(res, file = paste0(RdataDir, '/RNAseq_fpm_DEgenes_lfcShrink_res.rds'))
 res = readRDS(file = paste0(RdataDir, '/RNAseq_fpm_DEgenes_lfcShrink_res.rds'))
 
 fdr.cutoff = 0.05; logfc.cutoff = 1 # select only activated genes in regeneration
-jj = which((res$padj_sp7ne_4dpa.vs.0dpa < fdr.cutoff & res$log2FoldChange_sp7ne_4dpa.vs.0dpa > logfc.cutoff) |
-             (res$padj_sp7po_4dpa.vs.0dpa < fdr.cutoff & (res$log2FoldChange_sp7po_4dpa.vs.0dpa) > logfc.cutoff)
+jj = which((res$padj_3dpa.vs.0dpa < fdr.cutoff & res$log2FoldChange_3dpa.vs.0dpa > logfc.cutoff) |
+             (res$padj_7dpa.vs.0dpa < fdr.cutoff & (res$log2FoldChange_7dpa.vs.0dpa) > logfc.cutoff)
 )
 cat(length(jj), '\n')
 
@@ -144,7 +147,8 @@ print(intersect(ggs, tfs))
 mm = match(ggs, tfs)
 yy = res[unique(c(which(!is.na(mm)))), ]
 cat(nrow(yy), ' DE TFs found \n')
-yy = yy[order(yy$padj_sp7ne_4dpa.vs.0dpa), ]
+
+yy = yy[order(yy$padj_3dpa.vs.0dpa), ]
 
 grep('RUNX', rownames(yy))
 yy[grep('RUNX', rownames(yy)), ]
@@ -383,7 +387,7 @@ res = res[order(-res$log2FoldChange_zebrah_3dpa.vs.0dpa), ]
 
 ## prepare the response matrix
 keep = as.matrix(res[, c(1:6)])
-conds = unique(design$condition)
+conds = c('0dpa', '3dpa', '7dpa')
 
 # make sure the response is logscale !!!
 keep = log2(keep)
@@ -405,9 +409,10 @@ grep('RUNX1', colnames(motif.oc))
 source('Functions_MARA.R')
 aa = run.MARA.atac(motif.oc, Y,  method = 'Bayesian.ridge')
 
-aa$combine.Zscore = apply(as.matrix(aa[, c(1:3)]), 1, function(x) sqrt(mean(x^2)))
-aa$maxZscore = apply(as.matrix(aa[, c(1:3)]), 1, function(x){x.abs = abs(x); return(max(x.abs))})
-aa$rank = order(aa$combine.Zscore)
+# aa$combine.Zscore = apply(as.matrix(aa[, c(1:3)]), 1, function(x) sqrt(mean(x^2)))
+# aa$maxZscore = apply(as.matrix(aa[, c(1:3)]), 1, function(x){x.abs = abs(x); return(max(x.abs))})
+# aa$rank = order(aa$combine.Zscore)
+
 aa = aa[order(-aa$combine.Zscore), ]
 grep('RUNX', rownames(aa))
 
@@ -417,16 +422,19 @@ saveRDS(aa, file = paste0(RdataDir, '/MARA_output_sorted.rds'))
 # select motif of interest and add associated TF expressed 
 ##########################################
 bb = readRDS(file = paste0(RdataDir, '/MARA_output_sorted.rds'))
-kk = which(bb[, 2]> bb[, 1] | bb[, 4]>bb[, 3] ) ## motif activated in regeneration
+kk = which(bb[, 2]> bb[, 1] | bb[, 3]>bb[, 1] ) ## motif activated in regeneration
 bb = bb[kk, ]
 
-kk = which(abs(bb[, 2]) >2| abs(bb[, 4])>2) # 
+zcutoff = 
+
+kk = which(abs(bb[, 2]) >1.5| abs(bb[, 3])>1.5) # 
 bb = bb[kk, ]
 
 ## import processed RNAseq data
 cpm = readRDS(file = paste0(RdataDir, '/RNAseq_fpm_DEgenes_lfcShrink_res.rds'))
-cpm = cpm[, c(1:8)]
-cpm = cal_sample_means(cpm, conds = c("sp7po0dpa", "sp7po4dpa", "sp7ne0dpa", "sp7ne4dpa"))
+
+cpm = cpm[, c(1:6)]
+cpm = cal_sample_means(cpm, conds = c("uninjured", "3dpa", "7dpa"))
 ss = apply(cpm, 1, max)
 
 ss[grep('RUNX', names(ss))]
@@ -436,6 +444,7 @@ ggs = get_geneName(rownames(cpm))
 
 ## find expression of associated TFs
 bb$index = NA
+bb$corr.tfs = NA
 for(n in 1:nrow(bb)){
   tfs = unique(unlist(strsplit(as.character(bb$gene[n]), '_')))
   if(length(tfs) == 1){
@@ -448,10 +457,10 @@ for(n in 1:nrow(bb)){
   
   if(length(jj) == 1) {
     bb$index[n] = jj
-    bb$corr.tfs[n] = cor(as.numeric(bb[n, c(1:4)]), cpm[jj, ])
+    bb$corr.tfs[n] = cor(as.numeric(bb[n, c(1:3)]), as.numeric(cpm[jj, ]))
   }
   if(length(jj) >=2){
-    correlation = cor(as.numeric(bb[n, c(1:4)]), t(cpm[jj,]), method = 'pearson')
+    correlation = cor(as.numeric(bb[n, c(1:3)]), t(cpm[jj,]), method = 'pearson')
     bb$index[n] = jj[which.max(abs(correlation))]
     bb$corr.tfs[n] = correlation[which.max(abs(correlation))]
   }
@@ -474,10 +483,10 @@ saveRDS(xx, file =  paste0(RdataDir, '/MARA_output_Motifs_filteredTFsExpr.rds'))
 # plot the motif activity and associated TF expression
 ##########################################
 xx = readRDS(file =  paste0(RdataDir, '/MARA_output_Motifs_filteredTFsExpr.rds'))
-test = as.matrix(xx[, c(1:4)])
+test = as.matrix(xx[, c(1:3)])
 rownames(test) = xx$gene
 
-range <- 5; breaks = 10
+range <- 3.5; breaks = 10
 test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
 
 df <- data.frame(colnames(test))
@@ -507,26 +516,28 @@ plt = pheatmap(test, show_rownames=TRUE, show_colnames = FALSE,
                annotation_legend = TRUE,
                clustering_callback = callback,
                filename = paste0(figureDir, 'MARA_bayesianRidge_Jaspar2022_', species,'.pdf'), 
-               width = 6, height = 10)
+               width = 6, height = 6)
 
 ### plot associated TF expression
-test = xx[plt$tree_row$order, c(14:18)]
+test = xx[plt$tree_row$order, c(13:16)]
 test$tfs.speciees = as.character(test$tfs.speciees)
 
 rownames(test) = test$tfs.speciees
 
-grep('ctcf|fosl2', test$tfs.speciees)
-test$tfs.speciees[grep('ctcf|fosl2', test$tfs.speciees)]
+index_dup = grep('fosab', test$tfs.speciees)
+test$tfs.speciees[index_dup]
 
-test$tfs.speciees[41] = 'ctcf.2'
-test$tfs.speciees[26] = 'fosl2.2'
+test$tfs.speciees[14] = 'fosab.2'
+test$tfs.speciees[22] = 'fosab.3'
+
 rownames(test) = test$tfs.speciees
 
 test = test[, -1]
 test = t(apply(test, 1, cal_centering))
 
 cat('range of centered TF expression --',  range(test), '\n')
-range <- 2.5
+range <- 2
+
 test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
 cols = rev(colour('PRGn')(5))
 df <- data.frame(colnames(test))
@@ -545,8 +556,7 @@ pheatmap(test, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = FALSE,
          annotation_legend = TRUE,
          #clustering_callback = callback,
          filename = paste0(figureDir, 'TFs_associatedMotifs_regeneration_', species, '.pdf'), 
-         width = 5, height = 10)
-
+         width = 5, height = 6)
 
 ########################################################
 ########################################################
