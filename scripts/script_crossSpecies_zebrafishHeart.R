@@ -425,7 +425,7 @@ bb = readRDS(file = paste0(RdataDir, '/MARA_output_sorted.rds'))
 kk = which(bb[, 2]> bb[, 1] | bb[, 3]>bb[, 1] ) ## motif activated in regeneration
 bb = bb[kk, ]
 
-zcutoff = 
+zcutoff = 1.5
 
 kk = which(abs(bb[, 2]) >1.5| abs(bb[, 3])>1.5) # 
 bb = bb[kk, ]

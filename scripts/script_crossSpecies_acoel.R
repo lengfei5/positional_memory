@@ -363,7 +363,7 @@ make.motif.oc.matrix.from.fimo.output(fimo.out = fimo.out,
 ##########################################
 res = readRDS(file = paste0(RdataDir, '/fpm_DE_binding_lfcShrink_res.rds'))
 
-fdr.cutoff = 0.05; logfc.cutoff = 1
+fdr.cutoff = 0.05; logfc.cutoff = 0.7
 
 jj = which((res$padj_3h.vs.0h < fdr.cutoff & abs(res$log2FoldChange_3h.vs.0h) > logfc.cutoff) |
              (res$padj_6h.vs.0h < fdr.cutoff & abs(res$log2FoldChange_6h.vs.0h) > logfc.cutoff) |
@@ -395,8 +395,8 @@ cat(nrow(res), 'DE peaks found !\n')
 
 ## prepare the response matrix
 keep = as.matrix(res[, c(1:20)])
-conds = unique(design$condition[grep('tail', design$condition)])
-conds = conds[c(5,3,1,6, 4,2)]
+conds = unique(design$condition[c(grep('tail', design$condition), grep('head', design$condition))])
+conds = conds[c(5,3,1,6, 4,2, 9, 7, 10, 8)]
 keep = log2(keep + 2^-3)
 
 # select samples to use
@@ -413,14 +413,16 @@ grep('RUNX1', colnames(motif.oc))
 
 ### run MARA analysis
 source('Functions_MARA.R')
-aa = run.MARA.atac(motif.oc, Y,  method = 'Bayesian.ridge')
+aa1 = run.MARA.atac(motif.oc, Y[, c(1:6)],  method = 'Bayesian.ridge')
+aa2 = run.MARA.atac(motif.oc, Y[, c(7:10)],  method = 'Bayesian.ridge')
 
-#aa = data.frame(aa1[, c(1:2)], aa2[, c(1:2)], aa1[, c(3:7)], stringsAsFactors = FALSE)
-#aa$combine.Zscore = apply(as.matrix(aa[, c(1:4)]), 1, function(x) sqrt(mean(x^2)))
-#aa$maxZscore = apply(as.matrix(aa[, c(1:4)]), 1, function(x){x.abs = abs(x); return(max(x.abs))})
-#aa$rank = order(aa$combine.Zscore)
-aa = aa[order(-aa$combine.Zscore), ]
-grep('RUNX1', rownames(aa))
+aa = data.frame(aa1[, c(1:6)], aa2[, c(1:4)], aa1[, c(7:ncol(aa1))], stringsAsFactors = FALSE)
+aa$combine.Zscore = apply(as.matrix(aa[, c(1:10)]), 1, function(x) sqrt(mean(x^2)))
+aa$maxZscore = apply(as.matrix(aa[, c(1:10)]), 1, function(x){x.abs = abs(x); return(max(x.abs))})
+aa$rank = order(aa$combine.Zscore)
+aa = aa[order(-aa$maxZscore), ]
+
+grep('RUNX', rownames(aa))
 
 saveRDS(aa, file = paste0(RdataDir, '/MARA_output_sorted.rds'))
 
@@ -428,9 +430,12 @@ saveRDS(aa, file = paste0(RdataDir, '/MARA_output_sorted.rds'))
 # select motif of interest and add associated TF expressed 
 ##########################################
 bb = readRDS(file = paste0(RdataDir, '/MARA_output_sorted.rds'))
+bb = bb[order(-bb$maxZscore), ]
 
 ## motif activated in regeneration
-kk = apply(as.matrix(bb[, c(1:6)]), 1, function(x) which.max(x) > 1 & max(x) > 2)
+kk1 = apply(as.matrix(bb[, c(1:6)]), 1, function(x) which.max(x) > 1 & max(x) > 2)
+kk2 = apply(as.matrix(bb[, c(7:10)]), 1,  function(x) which.max(x) > 1 & max(x) > 2)
+kk = kk1 + kk2 > 0
 bb = bb[kk, ]
 
 #kk = which(abs(bb[, 2]) >2| abs(bb[, 4])>2) # 
@@ -490,6 +495,7 @@ xx = readRDS(file =  paste0(RdataDir, '/MARA_output_Motifs_filteredTFsExpr.rds')
 # xx = bb
 test = as.matrix(xx[, c(1:6)])
 rownames(test) = xx$gene
+cat('range of motif activity -- ', range(test), '\n')
 
 range <- 6; breaks = 10
 test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
