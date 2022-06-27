@@ -386,6 +386,7 @@ saveRDS(res, file = paste0(RdataDir, '/DE_atacPeaks_fpm_annotatation.rds'))
 motif.oc = readRDS(file = paste0(RdataDir, '/motif_oc_fimo_atacPeaks_jaspar2022.core_pval_0.0001.rds'))
 grep('RUNX', colnames(motif.oc))
 
+load(file = paste0(RdataDir, '/samplesDesign_readCounts.within_peakConsensus.Rdata'))
 res = readRDS(file = paste0(RdataDir, '/DE_atacPeaks_fpm_annotatation.rds'))
 
 cat(nrow(res), 'DE peaks found !\n')
@@ -427,11 +428,13 @@ saveRDS(aa, file = paste0(RdataDir, '/MARA_output_sorted.rds'))
 # select motif of interest and add associated TF expressed 
 ##########################################
 bb = readRDS(file = paste0(RdataDir, '/MARA_output_sorted.rds'))
-kk = which(bb[, 2]> bb[, 1] | bb[, 4]>bb[, 3] ) ## motif activated in regeneration
+
+## motif activated in regeneration
+kk = apply(as.matrix(bb[, c(1:6)]), 1, function(x) which.max(x) > 1 & max(x) > 2)
 bb = bb[kk, ]
 
-kk = which(abs(bb[, 2]) >2| abs(bb[, 4])>2) # 
-bb = bb[kk, ]
+#kk = which(abs(bb[, 2]) >2| abs(bb[, 4])>2) # 
+#bb = bb[kk, ]
 
 ## import processed RNAseq data
 cpm = readRDS(file = paste0(RdataDir, '/RNAseq_fpm_DEgenes_lfcShrink_res.rds'))
@@ -484,10 +487,11 @@ saveRDS(xx, file =  paste0(RdataDir, '/MARA_output_Motifs_filteredTFsExpr.rds'))
 # plot the motif activity and associated TF expression
 ##########################################
 xx = readRDS(file =  paste0(RdataDir, '/MARA_output_Motifs_filteredTFsExpr.rds'))
-test = as.matrix(xx[, c(1:4)])
+# xx = bb
+test = as.matrix(xx[, c(1:6)])
 rownames(test) = xx$gene
 
-range <- 5; breaks = 10
+range <- 6; breaks = 10
 test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
 
 df <- data.frame(colnames(test))
