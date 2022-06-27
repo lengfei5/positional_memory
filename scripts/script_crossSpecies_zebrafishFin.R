@@ -446,6 +446,7 @@ bb$tfs = ggs[bb$index]
 bb$tf_ids = rownames(cpm)[bb$index]
 
 xx = bb[which(!is.na(bb$tfs)), ]
+
 xx$tfs.speciees = annot$Gene.name[match(get_geneID(xx$tf_ids), annot$Gene.stable.ID)]
 rnas = cpm[xx$index, ]
 colnames(rnas) = paste0(colnames(rnas), '_rna')
