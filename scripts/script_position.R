@@ -935,7 +935,7 @@ if(saveTables){
 }
 
 ##########################################
-# #### highlight the enhancers, probably should improve again the peak-to-gene assignment
+# #### highlight the enhancers
 ##########################################
 peaks$targets = enhancers$targets[match(rownames(peaks), rownames(enhancers))]
 sels = intersect(grep('Intergenic|Intron', peaks$annotation), which(!is.na(peaks$targets)))
