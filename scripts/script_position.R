@@ -858,6 +858,14 @@ pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
 amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
 pp.annots = annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
 
+pdfname = paste0(figureDir, "Fig1_feature_distribution_positionalPeaks.pdf")
+pdf(pdfname, width = 6, height = 4)
+par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+
+plotPeakAnnot_piechart(pp.annots)
+
+dev.off()
+
 pp.annots = as.data.frame(pp.annots)
 rownames(pp.annots) = rownames(peaks)
 
@@ -871,13 +879,7 @@ saveRDS(peaks, file = paste0(RdataDir,
 # pp.annots = annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
 
 #plotAnnoBar(pp.annots)
-pdfname = paste0(figureDir, "feature_distribution_positionalPeaks.pdf")
-pdf(pdfname, width = 6, height = 4)
-par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
 
-plotPeakAnnot_piechart(pp.annots)
-
-dev.off()
 
 
 ##########################################

@@ -1040,6 +1040,7 @@ subclustering.postional.histM.postioinalAtacPeaks = function(test)
     seg = sample_colors)
   gaps.col = c(3, 6)
   col = colorRampPalette(c("navy", "white", "red3"))(8)
+  
   p1 = pheatmap(yy[new_order, ], #annotation_row = my_gene_col, 
                 annotation_col = df, show_rownames = FALSE, scale = 'none', 
                 color = col, 
@@ -1052,9 +1053,9 @@ subclustering.postional.histM.postioinalAtacPeaks = function(test)
                 gaps_col = gaps.col, 
                 treeheight_row = 20,
                 gaps_row = gaps.row,
-                annotation_legend = FALSE)
-  #filename = paste0(figureDir, '/positional_atacPeaks_fdr0.05_log2FC.1_rmHeadPeaks_reorder2.pdf'), 
-  #width = 4, height = 12)
+                annotation_legend = FALSE,
+  filename = paste0(figureDir, '/positional_atacPeaks_fdr0.05_log2FC.1_rmHeadPeaks_reorder_final.pdf'), 
+  width = 4, height = 12)
   
 }
 
