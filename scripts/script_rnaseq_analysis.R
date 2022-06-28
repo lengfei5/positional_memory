@@ -48,7 +48,6 @@ tfs = unique(tfs$`HGNC symbol`)
 sps = toupper(unique(sps$gene))
 sps = setdiff(sps, tfs)
 
-
 if(!dir.exists(resDir)){dir.create(resDir)}
 if(!dir.exists(tableDir)){dir.create(tableDir)}
 if(!dir.exists(RdataDir)){dir.create(RdataDir)}
@@ -141,7 +140,6 @@ saveRDS(res, file = paste0("../results/microarray/Rdata/",
 ##########################################
 res = readRDS(file = paste0("../results/microarray/Rdata/", 
 'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_limma.DE.stats.rds'))
-
 
 ggs = sapply(rownames(res), function(x){unlist(strsplit(as.character(x), '_'))[1]})
 
@@ -340,7 +338,7 @@ for(comp in c('mHand.vs.mUA', 'mHand.vs.mLA', 'mLA.vs.mUA'))
     ) +
     geom_vline(xintercept=c(-1, 1), col='gray') +
     geom_hline(yintercept=-log10(0.001), col="gray") +
-    labs(x = "log2FC (mHand/mUA)")
+    labs(x = "log2FC (mHand/mUA)", y = "-log10(p-val)")
   
   ggsave(paste0(figureDir, "Fig2C_VolcanoPlot_log2FC_pval_microarray_noLabels_", comp, ".pdf"), width=6, height = 4)
   
@@ -440,7 +438,6 @@ if(Test.mature.smartseq2){
   
   save(design, dds, file = paste0(RdataDir, 'design_dds_all_matureSamples_8selectedSamples.batch4_v47.hox.patch.Rdata'))
   
-  
   ##########################################
   # filering and normalization 
   ##########################################
@@ -516,13 +513,14 @@ if(Test.mature.smartseq2){
   saveRDS(data.frame(cpm, res, stringsAsFactors = FALSE), 
        file = paste0("../results/RNAseq_data_used/Rdata/matureSamples_cpm_DEgenes_8selectedSamples.batch4_v47.hox.patch.rds"))
   
-  # load results from microarray with limma to compare with 
+  # load results from microarray with limma to compare with
+  res = readRDS(file = paste0("../results/RNAseq_data_used/Rdata", 
+                              "/matureSamples_cpm_DEgenes_8selectedSamples.batch4_v47.hox.patch.rds"))
   res0 = readRDS(file = paste0("../results/microarray/Rdata/", 
-                               'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_limma.DE.stats.rds'))
+       'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_limma.DE.stats.rds'))
   
   res0$gene = sapply(rownames(res0), function(x) unlist(strsplit(as.character(x), '_'))[1])
   res0$geneID = sapply(rownames(res0), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
-  
   
   mm = match(res0$geneID, res$geneID)
   missed = which(is.na(mm))
@@ -531,7 +529,7 @@ if(Test.mature.smartseq2){
   
   res = res[mm, ]
   
-  select = which(res0$P.Value_mHand.vs.mUA<0.001)
+  select = which(res0$P.Value_mHand.vs.mUA<0.05)
   plot( res0$logFC_mHand.vs.mUA[select], res$log2FoldChange_mHand.vs.mUA[select], cex =0.4);
   abline(0, 1, lwd = 2.0, col = 'red')
   
