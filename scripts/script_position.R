@@ -535,6 +535,7 @@ if(Add_histMarkers_for_positionalATAC){
     
   }
   
+  
   ##########################################
   # plot segment-specific histone marks overlapped with segement-specific atac
   # and segment-specific histone marks overlapped with stable atac
@@ -660,6 +661,7 @@ if(Add_histMarkers_for_positionalATAC){
            filename = paste0(figureDir, '/heatmap_histoneMarker_DE_notoverlapped.with.atac.postionalPeaks.pdf'))
   
 }
+
 
 ##########################################
 # characterize the correlations between atac-seq changes and histone markers
