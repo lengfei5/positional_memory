@@ -372,6 +372,63 @@ subclustering.postional.histM.postioinalAtacPeaks = function(test)
                 filename = paste0(figureDir, '/positional_atacPeaks_fdr0.05_log2FC.1_rmHeadPeaks_reorder_final.pdf'), 
                 width = 4, height = 12)
   
+  ##########################################
+  # old version of histone mark heatmap without subclustering
+  ##########################################
+  # ## heatmaps of histM for segment-specific atacPeaks (centered signals)
+  # ## simiar plot to regeneration log2FC.sample.vs.mUA
+  # table(peaks$clusters)
+  # cluster_order = c(6, 1, 5, 3, 4, 2)
+  # gaps.row = c() 
+  # for(n in 1:(length(cluster_order)-1)) ## compute row gaps as atac-seq peaks
+  # {
+  #   if(n == 1)  {gaps.row = c(gaps.row, length(which(peaks$clusters == cluster_order[n])))
+  #   }else{
+  #     gaps.row = c(gaps.row,  gaps.row[n-1] + length(which(peaks$clusters == cluster_order[n])))
+  #   }
+  # }
+  # 
+  # plt = readRDS(file = paste0(RdataDir, '/postional_atacPeaks_heatmap_orderSaved.rds'))
+  # 
+  # for(n in 1:3)
+  # {
+  #   # n = 2
+  #   ii.test = grep(conds_histM[n], colnames(yy1))
+  #   test = yy1[, ii.test]
+  #   fc_sels = c('mUA', 'mLA', 'mHand')
+  #   jj.test = c()
+  #   for(fc in fc_sels) jj.test = c(jj.test, grep(fc, colnames(test)))
+  #   test = test[, jj.test]
+  #   #colnames(test) = fc_sels
+  #   
+  #   test =  cal_sample_means(test, conds = c('mUA', 'mLA', 'mHand'))
+  #   test = t(apply(test, 1, cal_centering))
+  #   #yy1[ ,jj] = t(apply(yy1[,jj], 1, cal_transform_histM, cutoff.min = 0, cutoff.max = 5, centering = FALSE, toScale = TRUE))
+  #   
+  #   range <- 2.0
+  #   test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
+  #   
+  #   nb_breaks = 8
+  #   sunset <- colour("sunset")
+  #   PRGn <- colour("PRGn")
+  #   #highcontrast <- colour("high contrast")
+  #   if(n == 1) cols = (sunset(nb_breaks))
+  #   if(n == 2) cols = rev(PRGn(nb_breaks-1)); # paletteer_d("colorBlindness::Blue2DarkRed18Steps") 
+  #   if(n == 3)   cols = colorRampPalette(rev((brewer.pal(n = 8, name ="BrBG"))))(7)
+  #   #cols =  colorRampPalette(colour("high contrast"))(nb_breaks)
+  #   #cols = rev(terrain.colors(10))
+  #   
+  #   pheatmap(test[plt$tree_row$order, ], cluster_rows = FALSE, cluster_cols = FALSE, show_rownames = FALSE, show_colnames = FALSE,
+  #            #color = c('darkgray', 'blue'), 
+  #            #color = colorRampPalette((brewer.pal(n = 7, name ="PRGn")))(nb_breaks),
+  #            color = cols, 
+  #            breaks = seq(-range, range, length.out = nb_breaks), 
+  #            gaps_row = gaps.row,
+  #            filename = paste0(figureDir, '/positional_histM_centerend_1246positionalATACpeaks_', conds_histM[n], '.pdf'), 
+  #            width = 3, height = 10)
+  #}
+  
+  
 }
 
 ##########################################
