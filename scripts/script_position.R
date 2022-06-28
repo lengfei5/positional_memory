@@ -883,11 +883,6 @@ peaks[, c(36:49)] = pp.annots
 saveRDS(peaks, file = paste0(RdataDir, 
                              '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters6_DEtest_peakSignals_peakAnnot.updated.rds'))
 
-# amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
-# pp.annots = annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
-
-#plotAnnoBar(pp.annots)
-
 
 ##########################################
 # Figure 1 promoter peaks and top enhancer peaks with atac-seq and histone markers
