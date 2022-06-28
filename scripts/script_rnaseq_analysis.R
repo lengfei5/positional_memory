@@ -136,6 +136,13 @@ saveRDS(res, file = paste0("../results/microarray/Rdata/",
                      'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_limma.DE.stats.rds'))
 
 
+##########################################
+# select DE genes and make plots 
+##########################################
+res = readRDS(file = paste0("../results/microarray/Rdata/", 
+'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_limma.DE.stats.rds'))
+
+
 ggs = sapply(rownames(res), function(x){unlist(strsplit(as.character(x), '_'))[1]})
 
 qv.cutoff = 0.05
@@ -287,12 +294,14 @@ write.csv(ego, file = paste0(tableDir, "GO_term_enrichmenet_for_positional_genes
 library(ggrepel)
 library(dplyr)
 library(tibble)
+res = readRDS(file = paste0("../results/microarray/Rdata/", 
+      'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_limma.DE.stats.rds'))
 
 res$gene = sapply(rownames(res), function(x) unlist(strsplit(as.character(x), '_'))[1])
 
 for(comp in c('mHand.vs.mUA', 'mHand.vs.mLA', 'mLA.vs.mUA'))
 {
-  # comp =  'mHand.vs.mUA'
+  comp =  'mHand.vs.mUA'
   
   res$fdr = eval(parse(text = paste0('-log10(res$adj.P.Val_', comp, ')')))
   res$pval = eval(parse(text = paste0('-log10(res$P.Value_', comp, ')')))
@@ -316,7 +325,8 @@ for(comp in c('mHand.vs.mUA', 'mHand.vs.mLA', 'mLA.vs.mUA'))
     geom_hline(yintercept=-log10(0.001), col="gray") +
     labs(x = "log2FC")
   
-  ggsave(paste0(figureDir, "Fig2C_VolcanoPlot_log2FC_pval_microarray_noLabels_", comp, ".pdf"), width=12, height = 8)
+  ggsave(paste0(figureDir, "Fig2C_VolcanoPlot_log2FC_pval_microarray_noLabels_", comp, ".pdf"), width=6, height = 4)
+  
   
 }
 
