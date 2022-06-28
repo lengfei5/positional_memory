@@ -889,7 +889,6 @@ saveRDS(peaks, file = paste0(RdataDir,
 #plotAnnoBar(pp.annots)
 
 
-
 ##########################################
 # Figure 1 promoter peaks and top enhancer peaks with atac-seq and histone markers
 ##########################################
@@ -1348,7 +1347,6 @@ as_tibble(stats) %>%  gather(group, freq,  2:ncol(stats)) %>%
   theme(axis.text.x = element_text(angle = 90, size = 10)) 
 
 ggsave(paste0(figureDir, "/Fig1E_positional_peak_feature_distribution_cluster_comparison.pdf"),  width = 12, height = 8)
-
 
 ##########################################
 # compare the ATAC-seq peaks and microarray data
