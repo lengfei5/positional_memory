@@ -23,7 +23,6 @@ source('Functions_atac.R')
 annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
 gtf.file =  paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf')
 
-
 ########################################################
 ########################################################
 # Figure 1: ATAC-seq positional peaks 
@@ -94,25 +93,6 @@ plotPeakAnnot_piechart(peakAnnots)
 
 dev.off()
 
-# Basic piechart
-# col3 <- c("#a6cee3", "#1f78b4", "#b2df8a",
-#           "#33a02c", "#fb9a99", "#e31a1c",
-#           "#fdbf6f", "#ff7f00", "#cab2d6",
-#           "#6a3d9a", "#ffff99", "#b15928")
-
-# anno.df = data
-# 
-# ndigit = 3
-# cex = 0.5
-# labels=paste(anno.df$Feature, " (",
-#              round(anno.df$Frequency/sum(anno.df$Frequency)*100, ndigit),
-#              "%)", sep="")
-# 
-# par(mai = c(0,0,0,0))
-# layout(matrix(c(1,2), ncol=2), widths=c(0.6,0.4))
-# pie(anno.df$Frequency, labels=NA, cex=cex, col=col3[1:nrow(anno.df)])
-# plot.new()
-# legend("center", legend = labels, fill = col3[1:nrow(anno.df)], bty = "n", cex = cex)
 
 ##########################################
 # compare ua, la, hd excluding hc
@@ -171,51 +151,6 @@ vennpie(peakAnnots)
 
 dev.off()
 
-
-# load(file = paste0(RdataDir, '/consensus_peaks_intersectReplicates_pval', pval.cutoff, 'version_', version.analysis, 'regeneration.Rdata'))
-# #ol.peaks <- makeVennDiagram(list(bld5, bld9, bld13.p, bld13.d), 
-# #                            NameOfPeaks=c('UA.BL.d5', 'UA.BL.d9', 'UA.BL.d13.p', 'UA.BL.d13.d'), connectedPeaks="keepAll", by = 'region', 
-# #                            plot = TRUE, fill = c("#999999", "#E69F00", "#56B4E9", "#009E73"))
-# 
-# #v <- venn_cnt2venn(ol.peaks$vennCounts)
-# #try(plot(v))
-# preg = union(bld5, bld9)
-# preg = union(preg, bld13.p)
-# preg = union(preg, bld13.d)
-# 
-# 
-# pdfname = paste0(figureDir, 'UA_BL_samples_peak_comparison.pdf')
-# pdf(pdfname, width = 10, height = 8)
-# par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
-# 
-# makeVennDiagram(list(bld5, bld9, bld13.p, bld13.d), 
-#                 NameOfPeaks=c('UA.BL.d5', 'UA.BL.d9', 'UA.BL.d13.p', 'UA.BL.d13.d'), connectedPeaks="keepAll", by = 'region', 
-#                 plot = TRUE, fill = c("#999999", "#E69F00", "#56B4E9", "#009E73"))
-# 
-# dev.off()
-# 
-# 
-# load(file = paste0(RdataDir, '/consensus_peaks_intersectReplicates_pval', pval.cutoff, 'version_', version.analysis, 
-#                     'embryoStage.Rdata'))
-# 
-# pemb = union(es40, es44.d)
-# pemb = union(pemb, es44.p)
-# 
-# ol.peaks <- makeVennDiagram(list(pmature, preg, pemb), NameOfPeaks=c('mature', 'reg', 'embryo'), connectedPeaks="keepAll", by = 'region', 
-#                             plot = TRUE)
-# 
-# v <- venn_cnt2venn(ol.peaks$vennCounts)
-# try(plot(v))
-# 
-# pdfname = paste0(figureDir, 'mature_regeneration_embryo_peak_comparison.pdf')
-# pdf(pdfname, width = 10, height = 8)
-# par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
-# 
-# v <- venn_cnt2venn(ol.peaks$vennCounts)
-# try(plot(v))
-# 
-# dev.off()
-# 
 
 ##########################################
 # Fig 1D: heatmap of positional peaks 

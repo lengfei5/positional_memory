@@ -482,64 +482,64 @@ if(Save.peak.groups.for.Deeptools){
 # histone marker with the same cluster order as atac-seq peaks 
 # 
 ##########################################
-Add_histMarkers_for_positionalATAC = FALSE
-if(Add_histMarkers_for_positionalATAC){
+Find.histonePeaks.overlapping.nonOverlapping.with.dynamicATACpeaks = FALSE
+if(Find.histonePeaks.overlapping.nonOverlapping.with.dynamicATACpeaks)
+{
+  # load keep object in which all histM peaks overlapping with atac-seq peaks and segement-specific test 
+  load(file = paste0('../results/CT_merged_20220328/Rdata', '/combined_4histMarkers_overlapped55kATACseq_DE_fdr0.05.Rdata'))
+  design = readRDS(file = paste0('../results/CT_merged_20220328/Rdata', '/histM_CT_design_info.rds'))
   
-  Find.histonePeaks.overlapping.nonOverlapping.with.dynamicATACpeaks = FALSE
-  if(Find.histonePeaks.overlapping.nonOverlapping.with.dynamicATACpeaks)
-  {
-    # load keep object in which all histM peaks overlapping with atac-seq peaks and segement-specific test 
-    load(file = paste0('../results/CT_merged_20220328/Rdata', '/combined_4histMarkers_overlapped55kATACseq_DE_fdr0.05.Rdata'))
-    design = readRDS(file = paste0('../results/CT_merged_20220328/Rdata', '/histM_CT_design_info.rds'))
-    
-    yy = keep[, c(53:60, 27:34, 1:8, 79:85)]
-    sampleID = sapply(colnames(yy), function(x) unlist(strsplit(as.character(x), '_'))[3])
-    mm = match(sampleID, design$sampleID)
-    colnames(yy) = paste0(design$condition[mm], '_', design$Batch[mm], '_', design$sampleID[mm])
-    #yy = yy[, grep('mRep1|mRep2', colnames(yy))]
-    
-    #peaks = read.csv(paste0(figureDir, 'positional_peaks_clusters_6/', 
-    #                        'position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters6.csv'))
-    peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rdata/', 
-                                  'position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters_6.rds'))
-    
-    pp_atac = data.frame(t(sapply(rownames(peaks), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
-    pp_atac$strand = '*'
-    pp_atac = makeGRangesFromDataFrame(pp_atac, seqnames.field=c("X1"),
-                                       start.field="X2", end.field="X3", strand.field="strand")
-    
-    pp_histM = data.frame(t(sapply(rownames(yy), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
-    pp_histM$strand = '*'
-    pp_histM = makeGRangesFromDataFrame(pp_histM, seqnames.field=c("X1"),
-                                        start.field="X2", end.field="X3", strand.field="strand")
-    
-    mapping = findOverlaps(pp_atac, pp_histM)
-    
-    ## peaks mapped to postional atac-peaks 
-    yy1 = yy[mapping@to, ]
-    
-    ## peaks not mapped to positional atac-peaks but overlapped wiht atac peaks
-    yy0 = yy[-unique(mapping@to), ]
-    
-    ss = apply(DE.locus[, c(1:3)], 1, sum)
-    mm = match(names(ss[which(ss>0)]), rownames(yy0))
-    length(which(!is.na(mm)))
-    
-    yy0 = yy0[mm[!is.na(mm)], ] ## histM overlapped with stable atacPeak but significantly changed
-    
-    #plot.pair.comparison.plot(yy1[, grep('H3K4me1_mUA_', colnames(yy1))], linear.scale = FALSE)
-    #plot.pair.comparison.plot(yy1[, grep('H3K4me3_mUA_', colnames(yy1))], linear.scale = FALSE)
-    #plot.pair.comparison.plot(yy1[, grep('H3K27me3_mUA_', colnames(yy1))], linear.scale = FALSE)
-    saveRDS(yy1, file = paste0(RdataDir, '/peak_signals_atac_4histM_positionalPeaks.rds'))
-    saveRDS(yy0, file = paste0(RdataDir, '/peak_signals_atac_4histM_notOverlapped.positionalPeaks.rds'))
-    
-  }
+  yy = keep[, c(53:60, 27:34, 1:8, 79:85)]
+  sampleID = sapply(colnames(yy), function(x) unlist(strsplit(as.character(x), '_'))[3])
+  mm = match(sampleID, design$sampleID)
+  colnames(yy) = paste0(design$condition[mm], '_', design$Batch[mm], '_', design$sampleID[mm])
+  #yy = yy[, grep('mRep1|mRep2', colnames(yy))]
   
+  #peaks = read.csv(paste0(figureDir, 'positional_peaks_clusters_6/', 
+  #                        'position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters6.csv'))
+  peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rdata/', 
+                                'position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters_6.rds'))
   
-  ##########################################
-  # plot segment-specific histone marks overlapped with segement-specific atac
-  # and segment-specific histone marks overlapped with stable atac
-  ##########################################
+  pp_atac = data.frame(t(sapply(rownames(peaks), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  pp_atac$strand = '*'
+  pp_atac = makeGRangesFromDataFrame(pp_atac, seqnames.field=c("X1"),
+                                     start.field="X2", end.field="X3", strand.field="strand")
+  
+  pp_histM = data.frame(t(sapply(rownames(yy), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  pp_histM$strand = '*'
+  pp_histM = makeGRangesFromDataFrame(pp_histM, seqnames.field=c("X1"),
+                                      start.field="X2", end.field="X3", strand.field="strand")
+  
+  mapping = findOverlaps(pp_atac, pp_histM)
+  
+  ## peaks mapped to postional atac-peaks 
+  yy1 = yy[mapping@to, ]
+  
+  ## peaks not mapped to positional atac-peaks but overlapped wiht atac peaks
+  yy0 = yy[-unique(mapping@to), ]
+  
+  ss = apply(DE.locus[, c(1:3)], 1, sum)
+  mm = match(names(ss[which(ss>0)]), rownames(yy0))
+  length(which(!is.na(mm)))
+  
+  yy0 = yy0[mm[!is.na(mm)], ] ## histM overlapped with stable atacPeak but significantly changed
+  
+  #plot.pair.comparison.plot(yy1[, grep('H3K4me1_mUA_', colnames(yy1))], linear.scale = FALSE)
+  #plot.pair.comparison.plot(yy1[, grep('H3K4me3_mUA_', colnames(yy1))], linear.scale = FALSE)
+  #plot.pair.comparison.plot(yy1[, grep('H3K27me3_mUA_', colnames(yy1))], linear.scale = FALSE)
+  saveRDS(yy1, file = paste0(RdataDir, '/peak_signals_atac_4histM_positionalPeaks.rds'))
+  saveRDS(yy0, file = paste0(RdataDir, '/peak_signals_atac_4histM_notOverlapped.positionalPeaks.rds'))
+  
+}
+
+##########################################
+# plot segment-specific histone marks overlapped with segement-specific atac
+# and segment-specific histone marks overlapped with stable atac
+# subclustering was performed 
+##########################################
+Plot_histMarkers_for_positionalATAC = FALSE
+if(Plot_histMarkers_for_positionalATAC){
+  
   library(gridExtra)
   library(grid)
   library(ggplot2)
@@ -547,8 +547,8 @@ if(Add_histMarkers_for_positionalATAC){
   require(pheatmap)
   require(RColorBrewer)
   library(khroma)
-  
   source('Functions_histM.R')
+  
   conds_histM = c('H3K4me3','H3K27me3', 'H3K4me1', 'H3K27ac')
   load(file = paste0('../results/CT_merged_20220328/Rdata', '/combined_4histMarkers_overlapped55kATACseq_DE_fdr0.05.Rdata'))
   design = readRDS(file = paste0('../results/CT_merged_20220328/Rdata', '/histM_CT_design_info.rds'))
@@ -567,59 +567,66 @@ if(Add_histMarkers_for_positionalATAC){
   # not consider H3K27ac in the main figure
   yy1 = yy1[, grep('H3K27ac', colnames(yy1), invert = TRUE)]
   
-  ## heatmaps of histM for segment-specific atacPeaks (centered signals)
-  ## simiar plot to regeneration log2FC.sample.vs.mUA
-  table(peaks$clusters)
-  cluster_order = c(6, 1, 5, 3, 4, 2)
-  gaps.row = c() 
-  for(n in 1:(length(cluster_order)-1)) ## compute row gaps as atac-seq peaks
-  {
-    if(n == 1)  {gaps.row = c(gaps.row, length(which(peaks$clusters == cluster_order[n])))
-    }else{
-      gaps.row = c(gaps.row,  gaps.row[n-1] + length(which(peaks$clusters == cluster_order[n])))
-    }
-  }
   
-  plt = readRDS(file = paste0(RdataDir, '/postional_atacPeaks_heatmap_orderSaved.rds'))
+  ## call function for heamtap 
+  source('Functions_plots.R')
+  subclustering.postional.histM.postioinalAtacPeaks()
   
-  for(n in 1:3)
-  {
-    # n = 2
-    ii.test = grep(conds_histM[n], colnames(yy1))
-    test = yy1[, ii.test]
-    fc_sels = c('mUA', 'mLA', 'mHand')
-    jj.test = c()
-    for(fc in fc_sels) jj.test = c(jj.test, grep(fc, colnames(test)))
-    test = test[, jj.test]
-    #colnames(test) = fc_sels
-    
-    test =  cal_sample_means(test, conds = c('mUA', 'mLA', 'mHand'))
-    test = t(apply(test, 1, cal_centering))
-    #yy1[ ,jj] = t(apply(yy1[,jj], 1, cal_transform_histM, cutoff.min = 0, cutoff.max = 5, centering = FALSE, toScale = TRUE))
-    
-    range <- 2.0
-    test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
-    
-    nb_breaks = 8
-    sunset <- colour("sunset")
-    PRGn <- colour("PRGn")
-    #highcontrast <- colour("high contrast")
-    if(n == 1) cols = (sunset(nb_breaks))
-    if(n == 2) cols = rev(PRGn(nb_breaks-1)); # paletteer_d("colorBlindness::Blue2DarkRed18Steps") 
-    if(n == 3)   cols = colorRampPalette(rev((brewer.pal(n = 8, name ="BrBG"))))(7)
-    #cols =  colorRampPalette(colour("high contrast"))(nb_breaks)
-    #cols = rev(terrain.colors(10))
-    
-    pheatmap(test[plt$tree_row$order, ], cluster_rows = FALSE, cluster_cols = FALSE, show_rownames = FALSE, show_colnames = FALSE,
-             #color = c('darkgray', 'blue'), 
-             #color = colorRampPalette((brewer.pal(n = 7, name ="PRGn")))(nb_breaks),
-             color = cols, 
-             breaks = seq(-range, range, length.out = nb_breaks), 
-             gaps_row = gaps.row,
-             filename = paste0(figureDir, '/positional_histM_centerend_1246positionalATACpeaks_', conds_histM[n], '.pdf'), 
-             width = 3, height = 10)
-    
-  }
+  ##########################################
+  # old version of histone mark heatmap without subclustering
+  ##########################################
+  # ## heatmaps of histM for segment-specific atacPeaks (centered signals)
+  # ## simiar plot to regeneration log2FC.sample.vs.mUA
+  # table(peaks$clusters)
+  # cluster_order = c(6, 1, 5, 3, 4, 2)
+  # gaps.row = c() 
+  # for(n in 1:(length(cluster_order)-1)) ## compute row gaps as atac-seq peaks
+  # {
+  #   if(n == 1)  {gaps.row = c(gaps.row, length(which(peaks$clusters == cluster_order[n])))
+  #   }else{
+  #     gaps.row = c(gaps.row,  gaps.row[n-1] + length(which(peaks$clusters == cluster_order[n])))
+  #   }
+  # }
+  # 
+  # plt = readRDS(file = paste0(RdataDir, '/postional_atacPeaks_heatmap_orderSaved.rds'))
+  # 
+  # for(n in 1:3)
+  # {
+  #   # n = 2
+  #   ii.test = grep(conds_histM[n], colnames(yy1))
+  #   test = yy1[, ii.test]
+  #   fc_sels = c('mUA', 'mLA', 'mHand')
+  #   jj.test = c()
+  #   for(fc in fc_sels) jj.test = c(jj.test, grep(fc, colnames(test)))
+  #   test = test[, jj.test]
+  #   #colnames(test) = fc_sels
+  #   
+  #   test =  cal_sample_means(test, conds = c('mUA', 'mLA', 'mHand'))
+  #   test = t(apply(test, 1, cal_centering))
+  #   #yy1[ ,jj] = t(apply(yy1[,jj], 1, cal_transform_histM, cutoff.min = 0, cutoff.max = 5, centering = FALSE, toScale = TRUE))
+  #   
+  #   range <- 2.0
+  #   test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
+  #   
+  #   nb_breaks = 8
+  #   sunset <- colour("sunset")
+  #   PRGn <- colour("PRGn")
+  #   #highcontrast <- colour("high contrast")
+  #   if(n == 1) cols = (sunset(nb_breaks))
+  #   if(n == 2) cols = rev(PRGn(nb_breaks-1)); # paletteer_d("colorBlindness::Blue2DarkRed18Steps") 
+  #   if(n == 3)   cols = colorRampPalette(rev((brewer.pal(n = 8, name ="BrBG"))))(7)
+  #   #cols =  colorRampPalette(colour("high contrast"))(nb_breaks)
+  #   #cols = rev(terrain.colors(10))
+  #   
+  #   pheatmap(test[plt$tree_row$order, ], cluster_rows = FALSE, cluster_cols = FALSE, show_rownames = FALSE, show_colnames = FALSE,
+  #            #color = c('darkgray', 'blue'), 
+  #            #color = colorRampPalette((brewer.pal(n = 7, name ="PRGn")))(nb_breaks),
+  #            color = cols, 
+  #            breaks = seq(-range, range, length.out = nb_breaks), 
+  #            gaps_row = gaps.row,
+  #            filename = paste0(figureDir, '/positional_histM_centerend_1246positionalATACpeaks_', conds_histM[n], '.pdf'), 
+  #            width = 3, height = 10)
+  #}
   
   ##########################################
   # dynamic histM peaks overlapped with stable atac peaks;
@@ -659,9 +666,8 @@ if(Add_histMarkers_for_positionalATAC){
            #annotation_colors = annot_colors,
            width = 6, height = 10, 
            filename = paste0(figureDir, '/heatmap_histoneMarker_DE_notoverlapped.with.atac.postionalPeaks.pdf'))
-  
+    
 }
-
 
 ##########################################
 # characterize the correlations between atac-seq changes and histone markers
