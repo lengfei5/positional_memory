@@ -578,28 +578,46 @@ if(Plot_histMarkers_for_positionalATAC){
   ##########################################
   yy0 = readRDS(file = paste0(RdataDir, '/peak_signals_atac_4histM_notOverlapped.positionalPeaks.rds'))
   yy0 = yy0[, grep('mRep', colnames(yy0))]
+  
+  conds_histM = c('H3K4me3', 'H3K27me3', 'H3K4me1', 'H3K27ac')
   range <- 3.0
+  
+  yy = matrix(NA, nrow = nrow(yy0), ncol = length(conds_histM)*3)
+  rownames(yy) = rownames(yy0)
+  nms = c()
   for(n in 1:length(conds_histM)) # transform the data
   {
     jj0 = grep(conds_histM[n], colnames(yy0))
     
     test = yy0[, jj0]
+    
+    test = cal_sample_means(test, conds = paste0(conds_histM[n], c('_mUA', '_mLA', '_mHand')))
     test = t(apply(test, 1, cal_centering))
     test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
-    yy0[,jj0] = test
+    yy[, c((3*n-2):(3*n))] = test
+    nms = c(nms, paste0(conds_histM[n], c('_mUA', '_mLA', '_mHand')))
     #yy0[ ,jj0] = t(apply(yy0[,jj0], 1, cal_transform_histM, cutoff.min = 0, cutoff.max = 5, centering = FALSE, toScale = TRUE))
     
   }
+  colnames(yy) = nms
   
-  df = as.data.frame(sapply(colnames(yy0), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[2])}))
+  df = as.data.frame(sapply(colnames(yy), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[2])}))
   colnames(df) = 'segments'
-  rownames(df) = colnames(yy0)
+  rownames(df) = colnames(yy)
   
   sample_colors = c('springgreen4', 'steelblue2', 'gold2')
   annot_colors = list(segments = sample_colors)
   
-  gaps_col = c(6, 12, 18)
-  pheatmap(yy0, cluster_rows=TRUE, 
+  gaps_col = c(3, 6, 9)
+  
+  callback = function(hc, mat){
+    sv = svd(t(mat))$v[,8]
+    dend = reorder(as.dendrogram(hc), wts = sv)
+    as.hclust(dend)
+  }
+  
+  pheatmap(yy, cluster_rows=TRUE,
+           #cutree_rows = 4,
            show_rownames=FALSE, fontsize_row = 5,
            color = colorRampPalette(rev(brewer.pal(n = 8, name ="RdBu")))(7), 
            show_colnames = FALSE,
@@ -608,8 +626,10 @@ if(Plot_histMarkers_for_positionalATAC){
            gaps_col = gaps_col,
            legend = TRUE,
            treeheight_row = 20,
+           annotation_legend = FALSE, 
            #annotation_colors = annot_colors,
-           width = 6, height = 10, 
+           clustering_callback = callback,
+           width = 4, height = 12, 
            filename = paste0(figureDir, '/heatmap_histoneMarker_DE_notoverlapped.with.atac.postionalPeaks.pdf'))
     
 }
