@@ -914,54 +914,56 @@ pheatmap(yy, annotation_row = my_gene_col,
 ##########################################
 # save the gene expression clustesrs
 ##########################################
-geneClusters = my_gene_col
-geneClusters$groups = NA
-geneClusters$groups[which(geneClusters$cluster == 'G4')] = 'earlyTransient'
-geneClusters$groups[which(geneClusters$cluster == 'G5')] = 'earlyContinue'
-geneClusters$groups[which(geneClusters$cluster == 'G6')] = 'lateResp'
-
-mm = match(rownames(geneClusters), rownames(sample.means))
-
-geneClusters = data.frame(geneClusters, sample.means[mm, ], stringsAsFactors = FALSE)
-colnames(geneClusters)[-c(1:2)] = newcc
-
-mm = match(rownames(geneClusters), rownames(res))
-geneClusters = data.frame(geneClusters, res[mm, ], stringsAsFactors = FALSE)
-
-geneClusters = geneClusters[order(-geneClusters$log2fc), ]
-
-saveRDS(geneClusters, file = paste0(RdataDir, 'regeneration_geneClusters.rds'))
-
-mm = match(rownames(sample.means), rownames(res))
-colnames(sample.means) = newcc
-
-xx = data.frame(sample.means, res[mm, ], stringsAsFactors = FALSE)
-
-xx$cluster = NA
-mm = match(rownames(xx), rownames(geneClusters))
-xx$cluster[which(!is.na(mm))] = geneClusters$cluster[mm[!is.na(mm)]]
-
-saveRDS(xx, file = paste0(RdataDir, 'regeneration_dynamicGeneClusters_allGenes.rds'))
-
-geneClusters = readRDS(file = paste0(RdataDir, 'regeneration_geneClusters.rds'))
-
-xx = geneClusters[!is.na(geneClusters$groups), ]
-
-
-
-#gaps_row =  gaps.row, 
-#filename = paste0(saveDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
-#width = 6, height = 12)
-
-# gaps.col = c(3, 6)
-# pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
-#          color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
-#          show_colnames = FALSE,
-#          scale = 'row',
-#          cluster_cols=FALSE, annotation_col=df,
-#          annotation_colors = annot_colors,
-#          width = 6, height = 12, 
-#          filename = paste0(figureDir, '/heatmap_DEgenes_regeneration_fdr.0.01_log2fc.1_RNAseq_filtered.R10724.R11635.pdf')) 
+Save.regeneration.gene.clusters = FALSE
+if(Save.regeneration.gene.clusters){
+  geneClusters = my_gene_col
+  geneClusters$groups = NA
+  geneClusters$groups[which(geneClusters$cluster == 'G4')] = 'earlyTransient'
+  geneClusters$groups[which(geneClusters$cluster == 'G5')] = 'earlyContinue'
+  geneClusters$groups[which(geneClusters$cluster == 'G6')] = 'lateResp'
+  
+  mm = match(rownames(geneClusters), rownames(sample.means))
+  
+  geneClusters = data.frame(geneClusters, sample.means[mm, ], stringsAsFactors = FALSE)
+  colnames(geneClusters)[-c(1:2)] = newcc
+  
+  mm = match(rownames(geneClusters), rownames(res))
+  geneClusters = data.frame(geneClusters, res[mm, ], stringsAsFactors = FALSE)
+  
+  geneClusters = geneClusters[order(-geneClusters$log2fc), ]
+  
+  saveRDS(geneClusters, file = paste0(RdataDir, 'regeneration_geneClusters.rds'))
+  
+  mm = match(rownames(sample.means), rownames(res))
+  colnames(sample.means) = newcc
+  
+  xx = data.frame(sample.means, res[mm, ], stringsAsFactors = FALSE)
+  
+  xx$cluster = NA
+  mm = match(rownames(xx), rownames(geneClusters))
+  xx$cluster[which(!is.na(mm))] = geneClusters$cluster[mm[!is.na(mm)]]
+  
+  saveRDS(xx, file = paste0(RdataDir, 'regeneration_dynamicGeneClusters_allGenes.rds'))
+  
+  geneClusters = readRDS(file = paste0(RdataDir, 'regeneration_geneClusters.rds'))
+  
+  xx = geneClusters[!is.na(geneClusters$groups), ]
+  
+  #gaps_row =  gaps.row, 
+  #filename = paste0(saveDir, '/heatmap_positionalPeaks_fdr0.01_log2FC.1_rmPeaks.head.pdf'), 
+  #width = 6, height = 12)
+  
+  # gaps.col = c(3, 6)
+  # pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+  #          color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
+  #          show_colnames = FALSE,
+  #          scale = 'row',
+  #          cluster_cols=FALSE, annotation_col=df,
+  #          annotation_colors = annot_colors,
+  #          width = 6, height = 12, 
+  #          filename = paste0(figureDir, '/heatmap_DEgenes_regeneration_fdr.0.01_log2fc.1_RNAseq_filtered.R10724.R11635.pdf')) 
+  
+}
 
 ##########################################
 # highlight TF, eps and other 
@@ -979,12 +981,18 @@ print(intersect(ggs, rbp))
 for(subg in c('tfs', 'eps', 'sps', 'rbp'))
 {
   
-  # subg = 'tfs'
+  # subg = 'rbp'
   mm = eval(parse(text = paste0('match(ggs, unique(', subg, '))')))
   yy1 = yy[unique(c(which(!is.na(mm)))), ]
   cat(nrow(yy1), ' ', subg, ' found \n')
   
   h = nrow(yy1)*0.1
+  
+  callback = function(hc, mat){
+    sv = svd(t(mat))$v[,2]
+    dend = reorder(as.dendrogram(hc), wts = sv)
+    as.hclust(dend)
+  }
   
   pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, fontsize_row = 5,
            color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
@@ -995,6 +1003,8 @@ for(subg in c('tfs', 'eps', 'sps', 'rbp'))
            width = 5, height = h, 
            clustering_callback = callback,
            treeheight_row = 15,
+           annotation_legend = FALSE,
+           
            filename = paste0(figureDir, '/heatmap_DEgenes_regeneration_fdr.0.01_log2fc.2_smartseq2_', subg, '.pdf'))
   
   #write.table(yy, file = paste0(resDir, '/DEtfs_mUA_regeneration_dev.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)

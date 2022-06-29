@@ -623,10 +623,12 @@ if(PLOT.global.dynamic.parameters.for.histM){
   conds_histM = c('H3K4me3','H3K27me3', 'H3K4me1', 'H3K27ac')
   conds = c("mUA", "BL5days", "BL9days", 'BL13days.prox', 'BL13days.dist')
   
-  ## heatmap of test significance for 4 histone marks
-  pheatmap(hde, cluster_rows = FALSE, cluster_cols = FALSE, show_rownames = FALSE, show_colnames = FALSE,
+  ## heatmap of test significance for 3 histone marks without H3K27ac
+  pheatmap(hde[, c(1:3)], cluster_rows = FALSE, cluster_cols = FALSE, show_rownames = FALSE, show_colnames = FALSE,
            color = c('darkgray', 'red'), 
            gaps_row = gaps.row,
+           legend = FALSE,
+           gaps_col = c(1,2),
            filename = paste0(figureDir, '/regeneration_histM_dynamics_for_dynamicATACpeaks.pdf'), 
            width = 4, height = 12)
   
@@ -984,43 +986,6 @@ if(Peak.annotation_feature.distribution){
     labs( x = '', y = 'percentage (%)') 
   
   ggsave(paste0(figureDir, "feature_distribution_regenerationPeaks.pdf"),  width = 8, height = 6)
-  
-  # for(m in 1:nb_clusters)
-  # {
-  #   # m = 1
-  #   cat('cluster - ',  m, '\n')
-  #   # pp.annots = annotatePeak(pp[which(xx$cluster == m)], TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
-  #   
-  #   # pdfname = paste0(saveDir, "/Fig1E_positional_peak_feature_distribution_cluster_", m, ".pdf")
-  #   # pdf(pdfname, width = 8, height = 6)
-  #   # par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
-  #   
-  #   stats = data.frame(stats,  plotPeakAnnot_piechart(pp.annots)[, 2])
-  #   colnames(stats)[ncol(stats)] = paste0('cluster', m, '_', pp.annots@peakNum)
-  #   
-  #   test = c()
-  #   test2 = c()
-  #   for(i in 1:nrow(stats))
-  #   {
-  #     total = length(pp); 
-  #     mm = round(total * stats[i, 2]/100)
-  #     nn = total - mm
-  #     qq = round(pp.annots@peakNum * stats[i, ncol(stats)]/100)
-  #     test = c(test, phyper(qq-1, mm, nn, pp.annots@peakNum, lower.tail = FALSE, log.p = FALSE))
-  #     test2 = c(test2, phyper(qq+1, mm, nn, pp.annots@peakNum, lower.tail = TRUE, log.p = FALSE))
-  #   }
-  #   scores = cbind(scores, test, test2)
-  #   colnames(scores)[c(ncol(scores)-1, ncol(scores))] = c(paste0('enrich.pval.cluster', m), paste0('depelet.pval.cluster', m))
-  #   
-  #   dev.off()
-  # }
-  # rownames(scores) = rownames(scores)
-  # 
-  # stats = data.frame(stats, scores, stringsAsFactors = FALSE)
-  # 
-  # write.csv(stats, file = paste0(saveDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters', 
-  #                                nb_clusters, '_feature.Enrichment.depeletion.csv'), quote = FALSE, row.names = TRUE)
-  
   
 }
 
@@ -2024,7 +1989,6 @@ xx = rna[, grep('rna_', colnames(rna))]
 xx = xx[, -c(1:2)]
 xx <- t(apply(xx, 1, cal_z_score))
 colnames(xx) = gsub('rna_', '', colnames(yy))
-
 
 gaps.row = cal_clusterGaps(plt, nb_clusters = 6)
 pheatmap(xx[plt$tree_row$order, ], 
