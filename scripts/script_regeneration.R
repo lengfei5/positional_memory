@@ -1402,10 +1402,13 @@ pheatmap(test,
          width = 3, height = 12)
 
 
-##########################################
-# co-localization of H3K27me3 and H3K4me3 at the promoters
+########################################################
+########################################################
+# Section :  co-localization of H3K27me3 and H3K4me3 at the promoters
 # probably together with other chromatin states
-##########################################
+# 
+########################################################
+########################################################
 source('Functions_histM.R')
 library(ggrepel)
 library(dplyr)
@@ -1442,6 +1445,10 @@ examples.sel = examples.sel[which(rownames(res)[examples.sel] != 'MEIS1_AMEX60DD
 
 matures.sel = unique(grep(paste0(mature.example, collapse = '|'), rownames(res)))
 
+
+##########################################
+# plot the bivalent TSS in mUA
+##########################################
 jj = which(res$x>1 & res$y > 0)
 length(jj)
 #tfs.sel = unique(grep(paste0(tfs, collapse = '|'), res$gene))
@@ -1498,7 +1505,7 @@ ggplot(data=res, aes(x=x, y=y, label = gene)) +
         axis.text.y = element_text(size = 12)) +
   geom_point(data=res[res$groups == 'house_keep', ], aes(x=x, y=y),  size=0.3, color = 'red') +
   geom_point(data=res[res$groups == 'non_expr', ], aes(x=x, y=y),  size=0.3, color = 'darkorange') +
-  geom_point(data=res[examples.sel, ], aes(x=x, y=y),  size=1.5, color = 'black') +
+  geom_point(data=res[examples.sel, ], aes(x=x, y=y),  size=2.0, color = 'black') +
   #geom_text_repel(data= res[examples.sel, ], size = 4.0, color = 'blue') +
   #geom_point(data=res[matures.sel, ], aes(x=x, y=y),  size=1.5, color = 'black') +
   geom_text_repel(data= res[c(examples.sel), ], 
@@ -1512,9 +1519,9 @@ ggplot(data=res, aes(x=x, y=y, label = gene)) +
                   # Add extra padding around each data point.
                   point.padding = unit(1.6, 'lines')) +
   theme_classic() +
-  theme(axis.text.x = element_text(angle = 0, size = 14), 
-        axis.text.y = element_text(angle = 0, size = 14), 
-        axis.title =  element_text(size = 14),
+  theme(axis.text.x = element_text(angle = 0, size = 15), 
+        axis.text.y = element_text(angle = 0, size = 15), 
+        axis.title =  element_text(size = 18),
         legend.text = element_text(size=12),
         legend.title = element_text(size = 14)) + 
   geom_abline(slope = 1, intercept = 0, col = 'black') +
@@ -1523,26 +1530,35 @@ ggplot(data=res, aes(x=x, y=y, label = gene)) +
   labs(x = "gene expression in mUA (log2 cpm)", y= 'gene expression in 9dpa (log2 cpm)') +
   guides(colour = guide_legend(override.aes = list(size=2)))
 
-ggsave(paste0(figureDir, "geneExpression_comparison_mUA_BLday9.pdf"),  width = 10, height = 8)
+ggsave(paste0(figureDir, "geneExpression_comparison_mUA_BLday9.pdf"),  width = 8, height = 6)
 
-tss = readRDS(file = paste0(RdataDir, '/regeneration_matureSamples_tss_perGene_smartseq2_atac_histM_v4.rds'))
 
-## examples
-tss$gene[which(rownames(tss) == 'AMEX60DD028208')] = 'PROD1'
-tss$gene[which(rownames(tss) == 'AMEX60DD024424')] = NA
-
-kk = which(!is.na(tss$gene))
-rownames(tss)[kk] = paste0(tss$gene[kk], '_', rownames(tss)[kk])
-tss$gene[-kk] = rownames(tss)[-kk]
-
-dev.genes = c('SHH', 'FGF8', 'FGF10', 'HAND2', 'BMP4', 'ALX1',
-              'ALX4', 'PRRX1', 'GREM1', 'LHX2', 'LHX9', 'TBX2_', 'TBX4', 'SALL4')
-
-outDir = "/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/Gene_Examples"   
-
-source('Functions_atac.R')
-
-plot_rna_chromainFeatures_geneExamples(tss, geneList = dev.genes, outDir = outDir, incl_Mature = FALSE)
+##########################################
+# plot RNA and chromatin features for gene examples 
+##########################################
+PLOT.rna.chromatinFeatures_geneExample = FALSE
+if(PLOT.rna.chromatinFeatures_geneExample)
+{
+  tss = readRDS(file = paste0(RdataDir, '/regeneration_matureSamples_tss_perGene_smartseq2_atac_histM_v4.rds'))
+  
+  ## examples
+  tss$gene[which(rownames(tss) == 'AMEX60DD028208')] = 'PROD1'
+  tss$gene[which(rownames(tss) == 'AMEX60DD024424')] = NA
+  
+  kk = which(!is.na(tss$gene))
+  rownames(tss)[kk] = paste0(tss$gene[kk], '_', rownames(tss)[kk])
+  tss$gene[-kk] = rownames(tss)[-kk]
+  
+  dev.genes = c('SHH', 'FGF8', 'FGF10', 'HAND2', 'BMP4', 'ALX1',
+                'ALX4', 'PRRX1', 'GREM1', 'LHX2', 'LHX9', 'TBX2_', 'TBX4', 'SALL4')
+  
+  outDir = "/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/Gene_Examples"   
+  
+  source('Functions_atac.R')
+  
+  plot_rna_chromainFeatures_geneExamples(tss, geneList = dev.genes, outDir = outDir, incl_Mature = FALSE)
+  
+}
 
 ##########################################
 # check the gene expression of those bivalent promoters 
@@ -1570,6 +1586,8 @@ rna$mUA[which(is.na(rna$mUA))] = -6
 
 library(khroma)
 rna = data.frame(rna)
+
+## gene expression distribution in  boxplot
 rna%>%
   mutate(groups = factor(groups, levels = c('active', 'both', 'absent', 'repressive'))) %>%
   ggplot(aes(x = groups, y=mUA, fill= groups)) + 
@@ -1585,6 +1603,7 @@ rna%>%
         legend.position=c(0.9, 0.8)) +
   labs(x = "", y= 'normalized gene expression (log2 cpm)')
 
+## gene expression distribution in histogram
 rna%>%
   mutate(groups = factor(groups, levels = c('active', 'both', 'absent', 'repressive'))) %>%
   ggplot(aes(x = mUA)) +
@@ -1680,7 +1699,8 @@ dev.off()
 
 
 ##########################################
-# check if bivalent genes keep their bivalent state or transit into active or repressive states during regeneration 
+# Check if bivalent genes keep their bivalent state 
+# or transit into active or repressive states during regeneration 
 ##########################################
 conds_histM = c('H3K4me3','H3K27me3')
 conds = c("mUA", "BL5days", "BL9days", 'BL13days.prox', 'BL13days.dist')
@@ -1788,6 +1808,7 @@ pheatmap(as.matrix(states),
          gaps_row = gaps.row,
          filename = paste0(figureDir, 'chromatinStates_bivalency_regenerations.pdf'), 
          width = 4, height = 10)
+
 
 ##########################################
 # check the chromatin features that are relevant to predict gene expression patterns (gene groups defined by smartseq2)
