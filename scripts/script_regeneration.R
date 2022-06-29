@@ -1224,8 +1224,10 @@ ss = apply(DEs, 1, sum)
 jj = which(ss==1 & DEs$H3K27me3 == 1)
 ids = get_geneID(rownames(DEs)[jj])
 
-test = tss[match(ids, rownames(tss)), grep('H3K27me3_logFC_', colnames(tss))]
-range <- 3
+test = tss[match(ids, tss$geneID), grep('H3K27me3_logFC_', colnames(tss))]
+range(test)
+
+range <- 3.5
 test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
 rownames(test) = rownames(DEs)[jj]
 
@@ -1233,7 +1235,7 @@ library(khroma)
 nb_breaks = 7
 sunset <- colour("sunset")
 PRGn <- colour("PRGn")
-cols = rev(PRGn(nb_breaks-1))
+cols = rev(PRGn(nb_breaks))
 
 callback = function(hc, mat){
   sv = svd(t(mat))$v[,1]
@@ -1247,7 +1249,7 @@ pheatmap(test,
          cluster_cols = FALSE, 
          show_rownames = FALSE, 
          show_colnames = FALSE,
-         treeheight_row = 20,
+         treeheight_row = 15,
          #color = c('darkgray', 'blue'), 
          #color = colorRampPalette((brewer.pal(n = 7, name ="PRGn")))(nb_breaks),
          color = cols,
@@ -1268,9 +1270,13 @@ plt = pheatmap(test,
                color = cols,
                clustering_callback = callback)
 
-## check  the H3K4me3
-test = tss[match(ids, rownames(tss)), grep('H3K4me3_logFC_', colnames(tss))]
-range <- 3
+## check  the H3K4me3 changes/ levels
+kk = intersect(grep('H3K4me3_', colnames(tss)), grep('rRep', colnames(tss)))
+test = tss[match(ids, tss$geneID), kk]
+test = cal_sample_means(test, conds = paste0('H3K4me3_', c('mUA', 'BL5days', 'BL9days', 'BL13days.prox', 'BL13days.dist')))
+
+quantile(test, c(0, 0.05, 0.1, 0.15, 0.25, 0.5, 0.75, 0.8, 0.85,  0.90,  0.95, 0.99, 1))
+range <- 6
 test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
 rownames(test) = rownames(DEs)[jj]
 
@@ -1283,7 +1289,7 @@ pheatmap(test[plt$tree_row$order, ],
          cluster_cols = FALSE, 
          show_rownames = FALSE, 
          show_colnames = FALSE,
-         treeheight_row = 20,
+         #treeheight_row = ,
          #color = c('darkgray', 'blue'), 
          #color = colorRampPalette((brewer.pal(n = 7, name ="PRGn")))(nb_breaks),
          color = cols,
@@ -1291,6 +1297,57 @@ pheatmap(test[plt$tree_row$order, ],
          #gaps_row = gaps.row,
          clustering_callback = callback,
          filename = paste0(figureDir, '/regeneration_H3K4me3_dynamics_log2fc.vs.mUA_upregulatedGenes.pdf'), 
+         width = 3, height = 12)
+
+# check their enhancer H3K4me1
+enhancers = readRDS(file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1_chipseekerAnnot_manual.rds'))
+mm = match(enhancers$targets, ids)
+mm = which(!is.na(mm))
+mm = mm[which(enhancers$annotation_chipseeker[mm] != 'Promoter')]
+targets = enhancers$targets[mm]
+
+kk = intersect(grep('H3K4me1_', colnames(enhancers)), grep('rRep', colnames(enhancers)))
+test = enhancers[mm, kk]
+test = cal_sample_means(test, conds = paste0('H3K4me1_', c('mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d')))
+test = test[, c(2:5)] - test[, 1]
+
+xx = test
+test = matrix(NA, nrow = length(ids), ncol = ncol(test))
+colnames(test) = colnames(xx)
+for(n in 1:length(ids))
+{
+  # n = 1
+  kk = which(targets == ids[n])
+  if(length(kk) == 1) {
+    test[n, ] = xx[kk,]
+  }
+  if(length(kk) >1) {
+    test[n, ] = apply(xx[kk, ], 2, max)
+  }
+}
+
+quantile(test, c(0.05, 0.1,  0.90,  0.95, 0.99), na.rm = TRUE)
+range <- 3
+test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
+
+
+nb_breaks = 7
+cols = (sunset(nb_breaks))
+
+pheatmap(test[plt$tree_row$order, ], 
+         #scale = 'row',
+         cluster_rows = FALSE, 
+         cluster_cols = FALSE, 
+         show_rownames = FALSE, 
+         show_colnames = FALSE,
+         #treeheight_row = ,
+         #color = c('darkgray', 'blue'), 
+         #color = colorRampPalette((brewer.pal(n = 7, name ="PRGn")))(nb_breaks),
+         color = cols,
+         #breaks = seq(-range, range, length.out = nb_breaks), 
+         #gaps_row = gaps.row,
+         clustering_callback = callback,
+         filename = paste0(figureDir, '/regeneration_H3K4me1_enhancers_log2fc.vs.mUA_upregulatedGenes.pdf'), 
          width = 3, height = 12)
 
 
@@ -1345,9 +1402,8 @@ pheatmap(test,
          width = 3, height = 12)
 
 
-
 ##########################################
-# co-localization of H3K27me3 and H3K4me3
+# co-localization of H3K27me3 and H3K4me3 at the promoters
 # probably together with other chromatin states
 ##########################################
 source('Functions_histM.R')
