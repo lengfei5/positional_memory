@@ -2025,6 +2025,7 @@ xx = xx[, -c(1:2)]
 xx <- t(apply(xx, 1, cal_z_score))
 colnames(xx) = gsub('rna_', '', colnames(yy))
 
+
 gaps.row = cal_clusterGaps(plt, nb_clusters = 6)
 pheatmap(xx[plt$tree_row$order, ], 
          #annotation_row = my_gene_col, 
