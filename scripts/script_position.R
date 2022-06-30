@@ -1020,60 +1020,59 @@ pheatmap(test,
 ##########################################
 # distance distribution of between positional peaks and positional genes
 ##########################################
-peaks = readRDS(paste0(RdataDir, 
-    '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters6_DEtest_peakSignals_peakAnnot.updated.rds'))
-
-pp = data.frame(t(sapply(rownames(peaks), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
-pp$strand = '*'
-pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
-                              start.field="X2", end.field="X3", strand.field="strand")
-
-gtf.file =  '../data/AmexT_v47_Hox.patch_limb.fibroblast.expressing.23585.genes.dev.mature.regeneration.gtf'
-aa = import(gtf.file)
-
-# load the positional gene list
-genes = readRDS(file = '../data/positional_genes.716_microarray.rds')
-ids = sapply(rownames(genes), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
-kk = unique(c(grep('^HOX', aa$gene_id), which(!is.na(match(aa$gene_id, ids)))))
-
-aa = aa[kk, ]
-
-amex = GenomicFeatures::makeTxDbFromGRanges(aa)
-pp.annots = annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
-
-pp.annots = as.data.frame(pp.annots)
-rownames(pp.annots) = rownames(peaks)
-
-dists = data.frame(peak.to.expr = peaks$distanceToTSS, peak.to.positional = pp.annots$distanceToTSS, stringsAsFactors = FALSE)
-
-dists = apply(dists, 2, function(x) {sign(x) * log10(abs(x)+1)})
-
-library(tidyr)
-library(dplyr)
-require(ggplot2)
-library(gridExtra)
-library(grid)
-library(lattice)
-library(ggpubr)
-library("cowplot")
-as_tibble(dists) %>% 
-  gather(geneGroup, dist, 1:2) %>%
-  ggplot(aes(x=dist, color = geneGroup)) + 
-  geom_density(size = 1.) +
-  theme_classic() +
-  scale_color_brewer(palette="Dark2") +
-  labs(x = 'distance to closest TSS (log10 bp)') +
-  geom_vline(xintercept=c(-7, -5.5, 5.5, 7), col='gray', size = 1.) +
-  theme(legend.text = element_text(size=10),
-        legend.title = element_text(size = 10),
-        legend.position=c(0.5, 0.8),
-        plot.margin = margin()
-        #legend.key.size = unit(1, 'cm')
-        #legend.key.width= unit(1, 'cm')
-  )
-
-ggsave(paste0(figureDir, "distance_to_closest_genes_positionalPeaks.pdf"), width=4, height = 3)
-
+# peaks = readRDS(paste0(RdataDir, 
+#     '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters6_DEtest_peakSignals_peakAnnot.updated.rds'))
+# 
+# pp = data.frame(t(sapply(rownames(peaks), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+# pp$strand = '*'
+# pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+#                               start.field="X2", end.field="X3", strand.field="strand")
+# 
+# gtf.file =  '../data/AmexT_v47_Hox.patch_limb.fibroblast.expressing.23585.genes.dev.mature.regeneration.gtf'
+# aa = import(gtf.file)
+# 
+# # load the positional gene list
+# genes = readRDS(file = '../data/positional_genes.716_microarray.rds')
+# ids = sapply(rownames(genes), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
+# kk = unique(c(grep('^HOX', aa$gene_id), which(!is.na(match(aa$gene_id, ids)))))
+# 
+# aa = aa[kk, ]
+# 
+# amex = GenomicFeatures::makeTxDbFromGRanges(aa)
+# pp.annots = annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+# 
+# pp.annots = as.data.frame(pp.annots)
+# rownames(pp.annots) = rownames(peaks)
+# 
+# dists = data.frame(peak.to.expr = peaks$distanceToTSS, peak.to.positional = pp.annots$distanceToTSS, stringsAsFactors = FALSE)
+# 
+# dists = apply(dists, 2, function(x) {sign(x) * log10(abs(x)+1)})
+# 
+# library(tidyr)
+# library(dplyr)
+# require(ggplot2)
+# library(gridExtra)
+# library(grid)
+# library(lattice)
+# library(ggpubr)
+# library("cowplot")
+# as_tibble(dists) %>% 
+#   gather(geneGroup, dist, 1:2) %>%
+#   ggplot(aes(x=dist, color = geneGroup)) + 
+#   geom_density(size = 1.) +
+#   theme_classic() +
+#   scale_color_brewer(palette="Dark2") +
+#   labs(x = 'distance to closest TSS (log10 bp)') +
+#   geom_vline(xintercept=c(-7, -5.5, 5.5, 7), col='gray', size = 1.) +
+#   theme(legend.text = element_text(size=10),
+#         legend.title = element_text(size = 10),
+#         legend.position=c(0.5, 0.8),
+#         plot.margin = margin()
+#         #legend.key.size = unit(1, 'cm')
+#         #legend.key.width= unit(1, 'cm')
+#   )
+# 
+# ggsave(paste0(figureDir, "distance_to_closest_genes_positionalPeaks.pdf"), width=4, height = 3)
 
 ########################################################
 ########################################################
