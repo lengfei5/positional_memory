@@ -2371,8 +2371,9 @@ as_tibble(xx) %>%
   #geom_line(aes(linetype=sample, color = sample), size = 0) +
   geom_smooth(span = 0.05, method = 'loess', se = FALSE, size =1.5) + 
   theme_classic() +
-  theme(axis.text.y = element_text(angle = 0, size = 14), 
-        axis.text.x = element_text(angle = 0, size = 14),
+  theme(axis.text.y = element_text(angle = 0, size = 16), 
+        axis.text.x = element_text(angle = 0, size = 16),
+        axis.title = element_text(angle = 0, size = 16),
         legend.position = c(0.8, 0.9),
         legend.text = element_text(size=14),
         legend.title = element_text(size = 14)
@@ -2415,8 +2416,9 @@ as_tibble(xx) %>%
   #geom_line(aes(linetype=sample, color = sample), size = 0) +
   geom_smooth(span = 0.1, method = 'loess', se = FALSE, size =1.5) + 
   theme_classic() +
-  theme(axis.text.y = element_text(angle = 0, size = 14), 
-        axis.text.x = element_text(angle = 0, size = 14),
+  theme(axis.text.y = element_text(angle = 0, size = 16), 
+        axis.text.x = element_text(angle = 0, size = 16),
+        axis.title = element_text(angle = 0, size = 16),
         legend.position = 'none',
         legend.text = element_text(size=14),
         legend.title = element_text(size = 14)
@@ -2432,5 +2434,4 @@ as_tibble(xx) %>%
   )
 
 ggsave(paste0(figureDir, "Footprint_Motif_", motif, ".pdf"),  width = 6, height = 4)
-
 
