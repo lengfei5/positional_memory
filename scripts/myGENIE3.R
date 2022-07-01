@@ -231,10 +231,11 @@ GENIE3 <- function(expr.matrix, priorRegulators = NULL,
 	      these.input.gene.names = intersect(these.input.gene.names, preSels_regulators)
 	      #cat('nb of prior regulators : ', length(these.input.gene.names), '\n')
 	    }
+	    
 	    num.input.genes <- length(these.input.gene.names)
 	    
-	    x <- expr.matrix[,these.input.gene.names]
-	    y <- expr.matrix[,target.gene.name]
+	    x <- expr.matrix[ ,these.input.gene.names]
+	    y <- expr.matrix[ ,target.gene.name]
 	    
 	    # normalize output data
 	    y <- y / sd(y)
@@ -387,6 +388,49 @@ read.expr.matrix <- function(filename, form="", sep="", default.gene.label="gene
     return(m)
 }
 
+
+##########################################
+# construct the target-regulatory region matrix for target genes 
+##########################################
+build_target_CRE_matrix = function(targets.ids)
+{
+  bed = read.table(file = 
+                     paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/motif_analysis/', 
+                            'FIMO_atacPeak_tss_mediumQ_core.unvalided_64Gmem/peaks_for_fimo_sorted.bed'), header = FALSE)
+  
+  kk = match(bed$V4, targets.ids)
+  mm = which(!is.na(kk))
+  targets = data.frame(geneID = bed$V4[mm], CREs = paste0(bed$V1[mm], ':', bed$V2[mm], '-', bed$V3[mm]), stringsAsFactors = FALSE)
+  
+  enhancers = readRDS(file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1_chipseekerAnnot_manual.rds'))
+  mm = match(enhancers$targets, targets.ids)
+  mm = which(!is.na(mm))
+  
+  targets2 = data.frame(geneID = enhancers$targets[mm], CREs = rownames(enhancers)[mm], stringsAsFactors = FALSE)
+  
+  # shift one bp due to the bed format and fasta formation
+  targets2$CREs = sapply(targets2$CREs, function(x) {x = unlist(strsplit(gsub(':', '-', as.character(x)), '-'));
+  paste0(x[1], ':', (as.numeric(x[2]) -1), '-', x[3])}) 
+  
+  targets = rbind(targets, targets2)
+  rm(targets2)
+  
+  targets = targets[match(unique(targets$CREs), targets$CREs), ]
+  targets$geneID = as.character(droplevels(targets$geneID))
+  #targets$CREs =droplevels(targets$CREs)
+  
+  xx = table(targets$geneID, targets$CREs) ## target-CRE matrix: each row is tf and each column is associated tss and enhancer peaks
+  ss = apply(xx, 1, sum)
+  xx = xx[which(ss>0), ]
+  
+  mm = match(rownames(xx), targets.ids)
+  rownames(xx) = targets.ids
+  
+  return(xx)
+  
+}
+
+
 ##########################################
 # plot the GRN graph 
 # some original code from https://mr.schochastics.net/material/netvizr/
@@ -419,7 +463,7 @@ plot_tf_network = function(link.list)
   V(trn)$name
   V(trn)$weight
   # compute a clustering for node colors
-  V(trn)$cluster <- as.character(membership(cluster_louvain(graph_from_data_frame(link.list, directed = FALSE))))
+  V(trn)$module <- as.character(membership(cluster_louvain(graph_from_data_frame(link.list, directed = FALSE))))
   # compute degree as node size
   V(trn)$size <- degree(trn)
   
@@ -454,7 +498,7 @@ plot_tf_network = function(link.list)
   
   # define a custom color palette
   V(trn)$cluster <- as.character(membership(cluster_louvain(graph_from_data_frame(link.list, directed = FALSE), 
-                                                            resolution = 1.2)))
+                                                            resolution = 1)))
   nb_clusters = length(unique(V(trn)$cluster))
   cat(nb_clusters, ' clusters used here \n')
   
@@ -493,44 +537,79 @@ plot_tf_network = function(link.list)
   dist_weighted = dist + alpha*dist2
   #pcs.use = data.frame(pcs[, c(1:10)], pcs2[, c(1:5)])
   
-  set.seed(1011)
-  weight_coex_umap <- uwot::umap(dist_weighted, n_neighbors=5)
+  
+  set.seed(7)
+  #weight_coex_umap <- uwot::umap(dist_weighted, n_neighbors=5)
+  nb_pcs = 10;
+  weight_coex_umap <- uwot::umap(pcs[, c(1:nb_pcs)], n_neighbors=5, min_dist = 0.01)
+  #weight_coex_umap <- uwot::umap(, n_neighbors=5)
   rownames(weight_coex_umap) <- V(trn)$name
   colnames(weight_coex_umap) <- c('UMAP1', 'UMAP2')
   
   V(trn)$umap1 <-weight_coex_umap[,1]
   V(trn)$umap2 <-weight_coex_umap[,2]
   
-  set.seed(2022)
+  #set.seed(2022)
   ggraph(trn, x=umap1, y=umap2) +
-    geom_edge_link(aes(edge_width = weight), 
-                   edge_colour = "grey90"       
-                   ) +
-    geom_node_point(aes(fill = cluster, size = degreeOut), shape = 21) +
+    geom_edge_link(aes(edge_width = weight), edge_colour = "gray80" ) +
+    #geom_edge_diagonal(color='darkgray', width=0.2) +
+    geom_node_point(aes(fill = module, size = degreeOut), shape = 21) +
+    scale_size_continuous(range = c(1, 7)) +
     #geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
-    geom_node_text(aes(filter = size >= 30, label=name), size=8/ggplot2::.pt, repel=T, family = "serif")+
-    scale_edge_width_continuous(range = c(0.01, 0.05)) +
-    scale_edge_alpha_continuous(range=c(0.01,0.4), limits=c(2,20)) +
-    scale_size_continuous(range = c(1, 10)) +
-    scale_fill_manual(values = pal) +
+    geom_node_text(aes(filter = size >= 20, label=name), size=6/ggplot2::.pt, repel=T, family = "serif")+
+    scale_edge_width_continuous(range = c(0.05, 0.2)) +
+    scale_edge_color_gradientn(colors=rev(brewer.pal(n=11, name="RdBu")), limits=c(0.01, 0.6)) +
+    #scale_edge_alpha_continuous(range=c(0.05, 0.4), limits=c(2,20)) +
+    scale_edge_alpha_continuous(range=c(0.01,0.8), limits=c(2,20)) + 
+    scale_fill_manual(values = got_palette) +
+    #scale_fill_viridis(option='magma') + 
+    #scale_fill_manual(values = pal) +
     coord_fixed() +
     theme_graph() +
-    #theme(legend.position = "bottom")
-    theme(legend.position = "none")
+    #theme(legend.position = "bottom") 
+    theme(legend.position = "none") 
   
-  ggsave(paste0(figureDir, "TRN_tfExpr.umap_connectivity.clusters_v4.pdf"), width=15, height = 12)
+  ggsave(paste0(figureDir, "TRN_tfExpr.umap_connectivity.clusters_v5.pdf"), width=10, height = 8)
   
-  # # basic graph
-  ggraph(trn, layout = "stress") +
-    geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
-    geom_node_point(aes(fill = cluster, size = size), shape = 21) +
-    geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
-    scale_fill_manual(values = c(got_palette, 'red', 'blue')) +
-    scale_edge_width(range = c(0.2, 3)) +
-    scale_size(range = c(1, 6)) +
+  ggraph(trn, x=umap1, y=umap2) +
+    geom_edge_link(aes(edge_width = weight), edge_colour = "gray80" ) +
+    #geom_edge_diagonal(color='darkgray', width=0.2) +
+    geom_node_point(aes(fill = module, size = degreeOut), shape = 21) +
+    scale_size_continuous(range = c(1, 7)) +
+    #geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
+    geom_node_text(aes(filter = size >= 20, label=name), size=6/ggplot2::.pt, repel=T, family = "serif")+
+    scale_edge_width_continuous(range = c(0.05, 0.2)) +
+    scale_edge_color_gradientn(colors=rev(brewer.pal(n=11, name="RdBu")), limits=c(0.01, 0.6)) +
+    #scale_edge_alpha_continuous(range=c(0.05, 0.4), limits=c(2,20)) +
+    scale_edge_alpha_continuous(range=c(0.01,0.8), limits=c(2,20)) + 
+    scale_fill_manual(values = got_palette) +
+    #scale_fill_viridis(option='magma') + 
+    #scale_fill_manual(values = pal) +
+    coord_fixed() +
     theme_graph() +
-    theme(legend.position = "none")
+    theme(legend.position = "right") 
+    #theme(legend.position = "none") 
+  ggsave(paste0(figureDir, "TRN_tfExpr.umap_connectivity.clusters_withLegends_v5.png"), width=10, height = 10)
   
+  #plot(p1)
+  # pdf(paste0(figureDir, "/GRN_UMPA_Test_v3.pdf"),  width = 14, height = 10) # Open a new pdf file
+  # for(n in c(1:25, 1011, 2022))
+  # {
+  #   cat(n, '\n')
+  # }
+  # dev.off()
+  
+  # # # basic graph
+  # ggraph(trn, layout = "stress") +
+  #   geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
+  #   geom_node_point(aes(fill = cluster, size = size), shape = 21) +
+  #   geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
+  #   scale_fill_manual(values = c(got_palette, 'red', 'blue')) +
+  #   scale_edge_width(range = c(0.2, 3)) +
+  #   scale_size(range = c(1, 6)) +
+  #   theme_graph() +
+  #   theme(legend.position = "none")
+  # 
   # centrality layout
   # https://github.com/schochastics/graphlayouts
   
@@ -564,7 +643,6 @@ plot_tf_network = function(link.list)
     as_tibble(rownames='gene') 
   
   gene_scores <- inner_join(region_summary_df, subclass_summary_df)
-  
   
   ### Get coex and umap ####
   gene_cor <- Pando::sparse_cor(rna_expr[, union(grn_net$tf, grn_net$target)])

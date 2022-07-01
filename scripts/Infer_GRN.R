@@ -328,68 +328,39 @@ if(Manual_correction_motif_tf_association){
 ##########################################
 # construct the gene-regulator matrix by matrix multiplication 
 ##########################################
-### single cell expression matrix
+
+### single cell expression matrix 
 E = readRDS(file = paste0(RdataDir, '/GRNinference_scExprMatrix_v3_347geneID_290TFsymbols.rds'))
 targets.ids = get_geneID(rownames(E))
+cat(length(targets.ids), ' genes to consider in the GRN inference \n')
 
-
-
-
-bed = read.table(file = 
-    paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/motif_analysis/', 
-           'FIMO_atacPeak_tss_mediumQ_core.unvalided_64Gmem/peaks_for_fimo_sorted.bed'), header = FALSE)
-kk = match(bed$V4, targets.ids)
-mm = which(!is.na(kk))
-targets = data.frame(geneID = bed$V4[mm], CREs = paste0(bed$V1[mm], ':', bed$V2[mm], '-', bed$V3[mm]), stringsAsFactors = FALSE)
-
-enhancers = readRDS(file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1_chipseekerAnnot_manual.rds'))
-
-mm = match(enhancers$targets, targets.ids)
-mm = which(!is.na(mm))
-
-targets2 = data.frame(geneID = enhancers$targets[mm], CREs = rownames(enhancers)[mm], stringsAsFactors = FALSE)
-targets2$CREs = sapply(targets2$CREs, function(x) {x = unlist(strsplit(gsub(':', '-', as.character(x)), '-'));
- paste0(x[1], ':', (as.numeric(x[2]) -1), '-', x[3])}) 
-# shift one bp due to the bed format and fasta formation
-
-targets = rbind(targets, targets2)
-rm(targets2)
-
-targets = targets[match(unique(targets$CREs), targets$CREs), ]
-targets$geneID = as.character(droplevels(targets$geneID))
-#targets$CREs =droplevels(targets$CREs)
-
-xx = table(targets$geneID, targets$CREs) ## target-CRE matrix: each row is tf and each column is associated tss and enhancer peaks
-ss = apply(xx, 1, sum)
-
-xx = xx[which(ss>0), ]
-mm = match(rownames(xx), targets.ids)
-rownames(xx) = rownames(E)[mm]
+###  construct target-CRE matrix
+source("myGENIE3.R")
+mat_gcre = build_target_CRE_matrix(targets.ids)
+mm = match(rownames(mat_gcre), targets.ids)
+rownames(mat_gcre) = rownames(E)[mm]
 
 ### CRE-motif-occurence matrix (regulaory regions * motif occurrence)
 mocs = readRDS(file = '../results/motif_analysis/motif_oc_fimo_atacPeaks.2kbTSS_jaspar2022.core.unvalided_pval.0.00001_v1.rds')
 cres = unique(rownames(mocs))
 
-
 ## match the tf-CRE
-jj = match(colnames(xx), rownames(mocs))
+jj = match(colnames(mat_gcre), rownames(mocs))
 missed = which(is.na(jj))
 cat(length(missed), ' CRE missed \n')
-
 ii = which(!is.na(jj))
 jj = jj[ii]
 
-xx = xx[,ii]
+mat_gcre = mat_gcre[,ii]
 mocs = mocs[jj, ]
 
-target.moc = xx %*% mocs
+target.moc = mat_gcre %*% mocs 
+
 ss = apply(target.moc, 2, sum)
 length(which(ss==0))
 
-## motif to TF association matrix
+### motif-TF-association matrix
 mapping =readRDS(file = '../data/JASPAR2022_CORE_UNVALIDED_vertebrates_nonRedundant_metadata_manual_rmRedundantUNVALIDED.rds')
-# mapping = mapping[, c(3, 2)]
-
 mm = match(colnames(target.moc), mapping$name)
 target.moc = target.moc[,which(!is.na(mm))] # filter the unvalided motifs if core motifs are present
 
@@ -405,13 +376,11 @@ for(n in 1:nrow(atm))
   tfs = unlist(strsplit(as.character(mapping$tfs[which(mapping$name == rownames(atm)[n])]), '_'))
   for(tf in tfs)
   {
-    
     jj = which(genes == tf)
     if(length(jj)>0){
       cat(n, '--', rownames(atm)[n], ' -- tfs --', tf, '\n')
       atm[n, jj] = 1
     }
-    
   }
 }
 
@@ -420,11 +389,19 @@ target.tfs = target.moc %*% atm
 x = target.tfs[grep('HOXA13', rownames(target.tfs)), ];
 x[which(x>0)]
 
-ss1 = apply(target.tfs, 2, sum) # due to missing motif for associated TFs
-#target.tfs = target.tfs[, which(ss>0)]
-ss2 = apply(target.tfs>0, 1, sum)
+# check if some targets have no regulators
+ss1 = apply(target.tfs, 1, sum)
+cat(length(which(ss1==0)), 'targets with no regulators \n')
+target.tfs = target.tfs[which(ss1>0), ]
 
-#target.tfs = target.tfs[which(ss>0), ]
+# check if some regulators don't have any targets due to missing motifs 
+ss2 = apply(target.tfs, 2, sum)
+cat(length(which(ss2==0)), 'regulators with no targets found \n')
+
+target.tfs = target.tfs[, which(ss2>0)]
+
+cat(nrow(target.tfs), ' targets by ', ncol(target.tfs), ' TFs \n')
+
 
 saveRDS(target.tfs, file = paste0(RdataDir, '/GRN_priorNetwork_target_TFs.rds'))
 
@@ -449,14 +426,16 @@ E = as.matrix(E)
 sds = apply(E, 1, sd)
 sels = which(sds>10^-4)
 E = E[sels, ]
-target.tfs = target.tfs[sels, sels]
+
+target.tfs = target.tfs[!is.na(match(rownames(target.tfs), rownames(E))), 
+                        !is.na(match(colnames(target.tfs), rownames(E)))]
 
 grep('ZNF281', rownames(E))
 grep('ZNF281', rownames(target.tfs))
 
-
 tic()
-wtm = GENIE3(expr.matrix = E, priorRegulators =  target.tfs, ncore = 8)
+source('myGENIE3.R')
+wtm = GENIE3(expr.matrix = E, priorRegulators = target.tfs, ncore = 8)
 saveRDS(wtm, file = paste0(RdataDir, '/first_test_Genie3_v3.rds'))
 
 toc()
