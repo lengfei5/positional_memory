@@ -495,10 +495,10 @@ plot_tf_network = function(link.list)
     theme_classic() +
     #theme(axis.text.x = element_text(angle = 90, size = 10)) +
     scale_fill_viridis_d(option = 'magma', direction = -1) +
-    labs(x = '', y = 'centrality') +
-    theme(axis.text.x = element_text(angle = 90, size = 14), 
-        axis.text.y = element_text(angle = 0, size = 14), 
-        axis.title =  element_text(size = 14),
+    labs(x = '', y = 'number of connections') +
+    theme(axis.text.x = element_text(angle = 60, size = 12, hjust = 1), 
+        axis.text.y = element_text(angle = 0, size = 12), 
+        axis.title =  element_text(size = 12),
         legend.text = element_text(size=12),
         legend.title = element_text(size = 14),
         legend.position='none',
@@ -506,7 +506,7 @@ plot_tf_network = function(link.list)
         #legend.key.size = unit(1, 'cm')
         #legend.key.width= unit(1, 'cm')
   )
-  ggsave(paste0(figureDir, "GRN_centrality_all.pdf"),  width = 10, height = 4)
+  ggsave(paste0(figureDir, "GRN_centrality_all.pdf"),  width = 10, height = 6)
   
   xx = data.frame(degree = V(trn)$degreeOut, gene = V(trn)$name)
   xx = xx[order(-xx$degree), ]
@@ -530,8 +530,8 @@ plot_tf_network = function(link.list)
           #legend.key.width= unit(1, 'cm')
     )
   ggsave(paste0(figureDir, "GRN_centrality_outDegree.pdf"),  width = 10, height = 4)
-    
   
+    
   #2. Eigenvector centrality
   V(trn)$Eigen<-evcent(trn)$vector
   V(trn)$Eigen
