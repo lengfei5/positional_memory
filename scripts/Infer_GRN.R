@@ -177,6 +177,7 @@ if(Prepare.enhancer.tss.4fimo.scanning)
   
   # tss used in the analysis
   tss = readRDS(file =paste0(RdataDir, '/regeneration_matureSamples_tss_perGene_smartseq2_atac_histM_v5.rds'))
+  
   tss = data.frame(geneID = tss$geneID, coords = tss$coords)
   rownames(tss) = tss$geneID
   missed = which(is.na(match(geneID, tss$geneID)))
@@ -469,6 +470,16 @@ length(unique(get_geneName(rownames(wtm))))
 link.list = get.link.list(wtm, threshold = cutoff)
 dim(link.list)
 head(link.list)
+
+
+########################################################
+########################################################
+# Section : prune the GRN based on time-specific ATAC-seq peaks
+# 
+########################################################
+########################################################
+
+
 
 ##########################################
 # TF expression 

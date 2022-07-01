@@ -482,55 +482,6 @@ plot_tf_network = function(link.list)
   V(trn)$name[which.max(V(trn)$degreeOut)]
   
   V(trn)$degree[which(V(trn)$name == 'ZNF281')]
-  
-  ## total centrality is not very informative
-  library(viridis)
-  xx = data.frame(degree = V(trn)$degree, gene = V(trn)$name)
-  xx = xx[order(-xx$degree), ]
-  xx = xx[c(1:50), ]
-  xx$gene = sapply(xx$gene, function(x) unlist(strsplit(as.character(x), '_'))[1])
-  as_tibble(xx) %>% 
-    ggplot(aes(y=degree, x=reorder(gene, -degree), fill = reorder(gene, -degree))) + 
-    geom_bar(position="dodge", stat="identity") +
-    theme_classic() +
-    #theme(axis.text.x = element_text(angle = 90, size = 10)) +
-    scale_fill_viridis_d(option = 'magma', direction = -1) +
-    labs(x = '', y = 'number of connections') +
-    theme(axis.text.x = element_text(angle = 60, size = 12, hjust = 1), 
-        axis.text.y = element_text(angle = 0, size = 12), 
-        axis.title =  element_text(size = 12),
-        legend.text = element_text(size=12),
-        legend.title = element_text(size = 14),
-        legend.position='none',
-        #plot.margin = margin()
-        #legend.key.size = unit(1, 'cm')
-        #legend.key.width= unit(1, 'cm')
-  )
-  ggsave(paste0(figureDir, "GRN_centrality_all.pdf"),  width = 10, height = 6)
-  
-  xx = data.frame(degree = V(trn)$degreeOut, gene = V(trn)$name)
-  xx = xx[order(-xx$degree), ]
-  xx = xx[c(1:50), ]
-  xx$gene = sapply(xx$gene, function(x) unlist(strsplit(as.character(x), '_'))[1])
-  as_tibble(xx) %>% 
-    ggplot(aes(y=degree, x=reorder(gene, -degree), fill = reorder(gene, -degree))) + 
-    geom_bar(position="dodge", stat="identity") +
-    theme_classic() +
-    #theme(axis.text.x = element_text(angle = 90, size = 10)) +
-    scale_fill_viridis_d(option = 'magma', direction = -1) +
-    labs(x = '', y = 'centrality') +
-    theme(axis.text.x = element_text(angle = 90, size = 14), 
-          axis.text.y = element_text(angle = 0, size = 14), 
-          axis.title =  element_text(size = 14),
-          legend.text = element_text(size=12),
-          legend.title = element_text(size = 14),
-          legend.position='none',
-          #plot.margin = margin()
-          #legend.key.size = unit(1, 'cm')
-          #legend.key.width= unit(1, 'cm')
-    )
-  ggsave(paste0(figureDir, "GRN_centrality_outDegree.pdf"),  width = 10, height = 4)
-  
     
   #2. Eigenvector centrality
   V(trn)$Eigen<-evcent(trn)$vector
@@ -641,6 +592,56 @@ plot_tf_network = function(link.list)
     #theme(legend.position = "none") 
   ggsave(paste0(figureDir, "TRN_tfExpr.umap_connectivity.clusters_withLegends_v5.png"), width=10, height = 10)
   
+  ##########################################
+  # summary of centrality
+  ##########################################
+  library(viridis)
+  xx = data.frame(degree = V(trn)$degree, gene = V(trn)$name)
+  xx = xx[order(-xx$degree), ]
+  xx = xx[c(1:50), ]
+  xx$gene = sapply(xx$gene, function(x) unlist(strsplit(as.character(x), '_'))[1])
+  as_tibble(xx) %>% 
+    ggplot(aes(y=degree, x=reorder(gene, -degree), fill = reorder(gene, -degree))) + 
+    geom_bar(position="dodge", stat="identity") +
+    theme_classic() +
+    #theme(axis.text.x = element_text(angle = 90, size = 10)) +
+    scale_fill_viridis_d(option = 'magma', direction = -1) +
+    labs(x = '', y = 'number of connections') +
+    theme(axis.text.x = element_text(angle = 60, size = 12, hjust = 1), 
+          axis.text.y = element_text(angle = 0, size = 12), 
+          axis.title =  element_text(size = 12),
+          legend.text = element_text(size=12),
+          legend.title = element_text(size = 14),
+          legend.position='none',
+          #plot.margin = margin()
+          #legend.key.size = unit(1, 'cm')
+          #legend.key.width= unit(1, 'cm')
+    )
+  ggsave(paste0(figureDir, "GRN_centrality_all.pdf"),  width = 10, height = 6)
+  
+  xx = data.frame(degree = V(trn)$degreeOut, gene = V(trn)$name)
+  xx = xx[order(-xx$degree), ]
+  xx = xx[c(1:50), ]
+  xx$gene = sapply(xx$gene, function(x) unlist(strsplit(as.character(x), '_'))[1])
+  as_tibble(xx) %>% 
+    ggplot(aes(y=degree, x=reorder(gene, -degree), fill = reorder(gene, -degree))) + 
+    geom_bar(position="dodge", stat="identity") +
+    theme_classic() +
+    #theme(axis.text.x = element_text(angle = 90, size = 10)) +
+    scale_fill_viridis_d(option = 'magma', direction = -1) +
+    labs(x = '', y = 'centrality') +
+    theme(axis.text.x = element_text(angle = 90, size = 14), 
+          axis.text.y = element_text(angle = 0, size = 14), 
+          axis.title =  element_text(size = 14),
+          legend.text = element_text(size=12),
+          legend.title = element_text(size = 14),
+          legend.position='none',
+          #plot.margin = margin()
+          #legend.key.size = unit(1, 'cm')
+          #legend.key.width= unit(1, 'cm')
+    )
+  ggsave(paste0(figureDir, "GRN_centrality_outDegree.pdf"),  width = 10, height = 4)
+  
   
   #plot(p1)
   # pdf(paste0(figureDir, "/GRN_UMPA_Test_v3.pdf"),  width = 14, height = 10) # Open a new pdf file
@@ -651,15 +652,15 @@ plot_tf_network = function(link.list)
   # dev.off()
   
   # # basic graph
-  ggraph(trn, layout = "stress") +
-    geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
-    geom_node_point(aes(fill = cluster, size = size), shape = 21) +
-    geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
-    scale_fill_manual(values = c(got_palette, 'red', 'blue')) +
-    scale_edge_width(range = c(0.2, 3)) +
-    scale_size(range = c(1, 6)) +
-    theme_graph() +
-    theme(legend.position = "none")
+  # ggraph(trn, layout = "stress") +
+  #   geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
+  #   geom_node_point(aes(fill = cluster, size = size), shape = 21) +
+  #   geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
+  #   scale_fill_manual(values = c(got_palette, 'red', 'blue')) +
+  #   scale_edge_width(range = c(0.2, 3)) +
+  #   scale_size(range = c(1, 6)) +
+  #   theme_graph() +
+  #   theme(legend.position = "none")
 
   # trn.undirected = graph_from_data_frame(link.list, directed = FALSE)
   # bb <- layout_as_backbone(trn.undirected,keep=0.4)
@@ -677,21 +678,21 @@ plot_tf_network = function(link.list)
   # centrality layout
   # https://github.com/schochastics/graphlayouts
   
-  set.seed(2022)
-  ggraph(trn, layout = "centrality", cent = graph.strength(trn)) +
-    geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
-    geom_node_point(aes(fill = cluster, size = size), shape = 21) +
-    geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
-    scale_edge_width_continuous(range = c(0.02, 0.1)) +
-    scale_size_continuous(range = c(1, 10)) +
-    scale_fill_manual(values = got_palette) +
-    coord_fixed() +
-    theme_graph() +
-    #theme(legend.position = "bottom")
-    theme(legend.position = "none")
-  
-  ggsave(paste0(resDir, "/TRN_secondTest.pdf"), width=12, height = 10)
-  
+  # set.seed(2022)
+  # ggraph(trn, layout = "centrality", cent = graph.strength(trn)) +
+  #   geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
+  #   geom_node_point(aes(fill = cluster, size = size), shape = 21) +
+  #   geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
+  #   scale_edge_width_continuous(range = c(0.02, 0.1)) +
+  #   scale_size_continuous(range = c(1, 10)) +
+  #   scale_fill_manual(values = got_palette) +
+  #   coord_fixed() +
+  #   theme_graph() +
+  #   #theme(legend.position = "bottom")
+  #   theme(legend.position = "none")
+  # 
+  # ggsave(paste0(resDir, "/TRN_secondTest.pdf"), width=12, height = 10)
+  # 
   ######################################################################
   ## following code from https://github.com/lengfei5/pallium_evo/blob/main/analysis/GRN_analysis/moo_graph_layout.R
   ######################################################################
