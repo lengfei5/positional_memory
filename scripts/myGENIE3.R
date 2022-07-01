@@ -483,6 +483,55 @@ plot_tf_network = function(link.list)
   
   V(trn)$degree[which(V(trn)$name == 'ZNF281')]
   
+  ## total centrality is not very informative
+  library(viridis)
+  xx = data.frame(degree = V(trn)$degree, gene = V(trn)$name)
+  xx = xx[order(-xx$degree), ]
+  xx = xx[c(1:50), ]
+  xx$gene = sapply(xx$gene, function(x) unlist(strsplit(as.character(x), '_'))[1])
+  as_tibble(xx) %>% 
+    ggplot(aes(y=degree, x=reorder(gene, -degree), fill = reorder(gene, -degree))) + 
+    geom_bar(position="dodge", stat="identity") +
+    theme_classic() +
+    #theme(axis.text.x = element_text(angle = 90, size = 10)) +
+    scale_fill_viridis_d(option = 'magma', direction = -1) +
+    labs(x = '', y = 'centrality') +
+    theme(axis.text.x = element_text(angle = 90, size = 14), 
+        axis.text.y = element_text(angle = 0, size = 14), 
+        axis.title =  element_text(size = 14),
+        legend.text = element_text(size=12),
+        legend.title = element_text(size = 14),
+        legend.position='none',
+        #plot.margin = margin()
+        #legend.key.size = unit(1, 'cm')
+        #legend.key.width= unit(1, 'cm')
+  )
+  ggsave(paste0(figureDir, "GRN_centrality_all.pdf"),  width = 10, height = 4)
+  
+  xx = data.frame(degree = V(trn)$degreeOut, gene = V(trn)$name)
+  xx = xx[order(-xx$degree), ]
+  xx = xx[c(1:50), ]
+  xx$gene = sapply(xx$gene, function(x) unlist(strsplit(as.character(x), '_'))[1])
+  as_tibble(xx) %>% 
+    ggplot(aes(y=degree, x=reorder(gene, -degree), fill = reorder(gene, -degree))) + 
+    geom_bar(position="dodge", stat="identity") +
+    theme_classic() +
+    #theme(axis.text.x = element_text(angle = 90, size = 10)) +
+    scale_fill_viridis_d(option = 'magma', direction = -1) +
+    labs(x = '', y = 'centrality') +
+    theme(axis.text.x = element_text(angle = 90, size = 14), 
+          axis.text.y = element_text(angle = 0, size = 14), 
+          axis.title =  element_text(size = 14),
+          legend.text = element_text(size=12),
+          legend.title = element_text(size = 14),
+          legend.position='none',
+          #plot.margin = margin()
+          #legend.key.size = unit(1, 'cm')
+          #legend.key.width= unit(1, 'cm')
+    )
+  ggsave(paste0(figureDir, "GRN_centrality_outDegree.pdf"),  width = 10, height = 4)
+    
+  
   #2. Eigenvector centrality
   V(trn)$Eigen<-evcent(trn)$vector
   V(trn)$Eigen
@@ -499,6 +548,8 @@ plot_tf_network = function(link.list)
   # define a custom color palette
   V(trn)$cluster <- as.character(membership(cluster_louvain(graph_from_data_frame(link.list, directed = FALSE), 
                                                             resolution = 1)))
+  V(trn)$module = V(trn)$cluster
+  
   nb_clusters = length(unique(V(trn)$cluster))
   cat(nb_clusters, ' clusters used here \n')
   
@@ -516,9 +567,9 @@ plot_tf_network = function(link.list)
  
   pal<-brewer.pal(nb_clusters, "Set3") # Vertex color assigned per each class number
   
-  #########
+  ###################
   ## test umap layout
-  #########
+  ###################
   kk = match(gnames$gnames[match(V(trn)$name, gnames$node)], rownames(E))
   matE = E[kk, ]
   pcs <- prcomp((matE), scale = TRUE)
@@ -599,17 +650,33 @@ plot_tf_network = function(link.list)
   # }
   # dev.off()
   
-  # # # basic graph
-  # ggraph(trn, layout = "stress") +
-  #   geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
-  #   geom_node_point(aes(fill = cluster, size = size), shape = 21) +
-  #   geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
-  #   scale_fill_manual(values = c(got_palette, 'red', 'blue')) +
-  #   scale_edge_width(range = c(0.2, 3)) +
-  #   scale_size(range = c(1, 6)) +
-  #   theme_graph() +
-  #   theme(legend.position = "none")
-  # 
+  
+  
+  
+  # # basic graph
+  ggraph(trn, layout = "stress") +
+    geom_edge_link0(aes(edge_width = weight), edge_colour = "grey66") +
+    geom_node_point(aes(fill = cluster, size = size), shape = 21) +
+    geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
+    scale_fill_manual(values = c(got_palette, 'red', 'blue')) +
+    scale_edge_width(range = c(0.2, 3)) +
+    scale_size(range = c(1, 6)) +
+    theme_graph() +
+    theme(legend.position = "none")
+
+  # trn.undirected = graph_from_data_frame(link.list, directed = FALSE)
+  # bb <- layout_as_backbone(trn.undirected,keep=0.4)
+  # E(g)$col <- F
+  # E(g)$col[bb$backbone] <- T
+  
+  ggraph(g,layout="manual",x=bb$xy[,1],y=bb$xy[,2])+
+    geom_edge_link0(aes(col=col),width=0.1)+
+    geom_node_point(aes(col=grp))+
+    scale_color_brewer(palette = "Set1")+
+    scale_edge_color_manual(values=c(rgb(0,0,0,0.3),rgb(0,0,0,1)))+
+    theme_graph()+
+    theme(legend.position = "none")
+  
   # centrality layout
   # https://github.com/schochastics/graphlayouts
   
