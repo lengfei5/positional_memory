@@ -1108,11 +1108,15 @@ positional.genes = c('HOXA13','PROD1', 'RARRES1', 'MEIS1', 'MEIS2', 'SHOX', 'SHO
 ##########################################
 # plot individual gene examples of different features, RNAseq, atac, histone marks around TSS 
 ##########################################
-outDir = "/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/Gene_Examples"   
-source('Functions_Integration.matureReg.R')
-if(!dir.exists(outDir)) dir.create(outDir)
-
-plot_rna_chromainFeatures_geneExamples(tss, geneList = positional.genes, outDir = outDir, incl_Mature = TRUE, log2fc = TRUE)
+Plot.gene.examples = FALSE
+if(Plot.gene.examples){
+  outDir = "/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/Gene_Examples"   
+  source('Functions_Integration.matureReg.R')
+  if(!dir.exists(outDir)) dir.create(outDir)
+  
+  plot_rna_chromainFeatures_geneExamples(tss, geneList = positional.genes, outDir = outDir, incl_Mature = TRUE, log2fc = TRUE)
+  
+}
 
 ##########################################
 # TSS of positional genes (known and from microarray data) in mature and regeneration samples 
@@ -1188,7 +1192,6 @@ df = as.data.frame(sapply(colnames(yy), function(x) {x = unlist(strsplit(as.char
 colnames(df) = 'samples'
 rownames(df) = colnames(yy)
 
-
 source('Functions_histM.R')
 gaps.row = cal_clusterGaps(plt, nb_clusters = 8)
 
@@ -1221,10 +1224,162 @@ plot_rna_chromainFeatures_geneExamples(tss, geneList = c('LHX2', 'COL9A2', 'GDF5
                                        outDir = outDir, incl_Mature = TRUE, log2fc = TRUE)
 
 ##########################################
+# Search for potential positional genes that are not expressed in mature samples,
+# but with positional chromatin features; e.g. SHH in A-P position
+# a few criterion should be met:
+# 1) Regeneration-response genes
+# 2) showing difference in chromatin features (ATAC, histone marks) in mature samples or dpa13 proximal and distal
+##########################################
+source('Functions_Integration.matureReg.R')
+source('Functions_histM.R')
+
+# start with regeneration RNA-seq analysis
+geneClusters = readRDS(file = paste0("../results/RNAseq_data_used/Rdata/", 'regeneration_geneClusters.rds'))
+geneClusters$gene = rownames(geneClusters)
+geneClusters$geneID = sapply(rownames(geneClusters), 
+                             function(x) {test = unlist(strsplit(as.character(x), '_')); return(test[length(test)])})
+
+dpcompare = readRDS(file = paste0("../results/RNAseq_data_used/Rdata/", 
+                            'smartseq2_regeneration_dpa13dist.vs.dpa13prox.rds'))
+
+ggs = rownames(dpcompare)[which(abs(dpcompare$log2FoldChange)> 1 & dpcompare$padj <0.05)]
+ggs = get_geneID(ggs)
+
+genelists = intersect(geneClusters$geneID[which(geneClusters$mUA< (-1))], ggs)
+
+genelist2 = readRDS(file = paste0('../results/RNAseq_data_used/Rdata/', 
+                                    'microarray_positionalGenes_data.rds'))
+ids = get_geneID(rownames(genelist2))
+genelists = unique(setdiff(genelists, ids))
+genelists = genelists[grep('HOXA|HOXB|HOXC|HOXD', genelists, invert = TRUE)]
+
+rm(genelist2)
+cat(length(genelists), ' gene candidates to search \n')
+
+mm = match(genelists, geneClusters$geneID)
+as.character(get_geneName(rownames(geneClusters)[mm]))
+
+fdr.cutoff= 0.01
+select = which(tss$atac.M_adj.P.Val.mHand.vs.mLA < fdr.cutoff |
+                 tss$atac.M_adj.P.Val.mHand.vs.mUA < fdr.cutoff |
+                 tss$H3K4me3.M_adj.P.Val.mLA.vs.mUA < fdr.cutoff |
+                 tss$H3K4me3.M_adj.P.Val.mHand.vs.mUA < fdr.cutoff |
+                 tss$H3K27me3.M_adj.P.Val.mLA.vs.mUA < fdr.cutoff |
+                 tss$H3K27me3.M_adj.P.Val.mHand.vs.mUA < fdr.cutoff |
+                 tss$H3K4me1.M_adj.P.Val.mHand.vs.mUA < fdr.cutoff |
+                 tss$H3K4me1.M_adj.P.Val.mLA.vs.mUA < fdr.cutoff
+                 )
+ids = tss$geneID[select]
+genelists = intersect(genelists, ids)
+
+mm = match(genelists, geneClusters$geneID)
+as.character(get_geneName(rownames(geneClusters)[mm]))
+
+source('Functions_Integration.matureReg.R')
+
+test = Analysis_TSS_positionalGenes_in_mature_regeneration(tss = tss, ids = genelists)
+  
+#test = Analysis_TSS_positionalGenes_in_mature_regeneration(tss, ids)
+#test = readRDS(file = paste0(RdataDir, '/positional_gene_TSS_chromatinFeatures.rds'))
+#test = readRDS(file = paste0(RdataDir, '/positional_gene_TSS_chromatinFeatures_smartseq2_mature.reg.rds'))
+xx = as.matrix(test[,c(1:35)])
+yy = as.matrix(test[, c(38:ncol(test))])
+rownames(xx) = test$gene
+rownames(yy) = rownames(xx)
+
+quantile(xx, c(0.05, 0.1,  0.90,  0.95, 0.99), na.rm = TRUE)
+range <- 2
+xx = t(apply(xx, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
+
+quantile(yy, c(0.05, 0.1,  0.90,  0.95, 0.99), na.rm = TRUE)
+range = 5
+yy = t(apply(yy, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
+
+kk = which(rownames(xx) == 'AMEX60DD050556')
+xx = xx[-kk, ]
+yy = yy[-kk, ]
+
+yy[which(is.na(yy[, 1])), 1] = 0
+yy[which(is.na(yy[, 2])), 2] = 0
+
+kk = apply(xx, 1, function(x){return(all(!is.na(x)))})
+xx = xx[kk, ]
+yy = yy[kk, ]
+
+df = as.data.frame(sapply(colnames(xx), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[2])}))
+colnames(df) = 'samples'
+rownames(df) = colnames(xx)
+
+sample_colors = c('gold2',  'steelblue2', 'springgreen4',   'springgreen3', 'magenta', 'darkblue', 'red')
+names(sample_colors) = unique(df$samples)
+annot_colors = list(samples = sample_colors)
+
+plt = pheatmap(xx, 
+               annotation_col = df, 
+               show_rownames = FALSE, scale = 'none', 
+               color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(7),
+               show_colnames = FALSE,
+               cluster_rows = TRUE, 
+               cluster_cols = FALSE, 
+               annotation_colors = annot_colors, 
+               gaps_col = seq(7, 35, by = 7), 
+               fontsize_row = 7,
+               treeheight_row = 20,
+               cutree_rows = 4,
+               #gaps_row =  gaps.row, 
+               legend = FALSE,
+               annotation_legend = FALSE,
+               filename = paste0(figureDir, '/heatmap_positionalGens_notExprmUA_TSS_mature_regeneration_log2FC.2.pdf'), 
+               width = 6, height = 5)
+
+
+pheatmap(xx, 
+         annotation_col = df, 
+         show_rownames = FALSE, scale = 'none', 
+         color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(7),
+         show_colnames = FALSE,
+         cluster_rows = TRUE, 
+         cluster_cols = FALSE, 
+         annotation_colors = annot_colors, 
+         gaps_col = seq(7, 35, by = 7), 
+         fontsize_row = 7,
+         treeheight_row = 20,
+         cutree_rows = 4,
+         #gaps_row =  gaps.row, 
+         legend = TRUE,
+         annotation_legend = FALSE,
+         filename = paste0(figureDir, '/heatmap_positionalGens_notExprmUA_TSS_mature_regeneration_log2FC.2_lenged.pdf'), 
+         width = 6, height = 5)
+
+df = as.data.frame(sapply(colnames(yy), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[2])}))
+colnames(df) = 'samples'
+rownames(df) = colnames(yy)
+
+source('Functions_histM.R')
+gaps.row = cal_clusterGaps(plt, nb_clusters = 4)
+
+pheatmap(yy[plt$tree_row$order, ], 
+         annotation_col = df, 
+         show_rownames = TRUE, 
+         scale = 'none', 
+         color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(12),
+         show_colnames = FALSE,
+         cluster_rows = FALSE, 
+         cluster_cols = FALSE, 
+         annotation_colors = annot_colors, 
+         #gaps_col = seq(7, 35, by = 7), 
+         fontsize_row = 7,
+         #treeheight_row = 40,
+         #cutree_rows = 8,
+         gaps_row =  gaps.row, 
+         filename = paste0(figureDir, '/heatmap_positionalGens_notExprmUA_smartseq2_mature_regeneration_log2FC.2.pdf'), 
+         width = 3.5, height = 5)
+
+
+##########################################
 # positional enhancers in mature and regeneration 
 # not sure if it is necessary
 ##########################################
-
 
 ########################################################
 ########################################################

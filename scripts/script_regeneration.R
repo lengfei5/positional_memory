@@ -2067,6 +2067,70 @@ ggsave(paste0(figureDir, "CpGscores_geneGroups.pdf"),  width = 6, height = 4)
 ########################################################
 
 ##########################################
+# peak-to-gene assignment method and characterization
+# Compare the corrections between features and rna and it turns out that 
+# atac-seq data have the best correlation with RNA-seq data
+##########################################
+load(file = paste0(RdataDir, '/peak_to_gene_assignment_atacseqPeaks_all.Rdata'))
+
+as_tibble(corrMax) %>% 
+  gather(features, corr, 1:5) %>%
+  ggplot(aes(x = corr, color = features)) +
+  geom_density(size = 1.) +
+  scale_color_manual(values = c("#117733",  "blue", 'red', 'cyan', 'black')) +
+  #scale_color_brewer(palette="Dark2") +
+  #scale_fill_manual(values=c("#117733",  "blue", 'cyan',  'magenta')) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 0, size = 16), 
+        axis.text.y = element_text(angle = 0, size = 16), 
+        axis.title =  element_text(size = 16),
+        legend.text = element_text(size=12),
+        legend.title = element_text(size = 14),
+        legend.position=c(0.4, 0.8)) +
+  labs(x = "Correlation between features and expression", y= 'density')
+
+ggsave(paste0(figureDir, "peak_to_gene_assignmenet_correlation_chromatinFeatures_rna_minus_H3K27me3.pdf"), 
+       width = 6, height = 4)
+
+check.plot.distance.to.TSS = FALSE
+if(check.plot.distance.to.TSS){
+  xx = readRDS(file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1_chipseekerAnnot_manual_targets.rds'))
+  #xx = data.frame(xx[, c(54:64)], stringsAsFactors = FALSE)
+  #xx = xx[, c(1:2, 9:11)]
+  xx = data.frame(chipseeker = xx$distanceToTSS_chipseeker,  manual = xx$distanceToTSS)
+  xx = xx[which(!is.na(xx$manual)), ]
+  
+  for(n in 1:ncol(xx))
+  {
+    xx[,n] = sign(xx[,n]) * log10(abs(xx[,n] + 1))
+  }
+  
+  as_tibble(xx) %>%
+    gather(cond, dist, 1:2) %>%
+    ggplot(aes(x=dist, color = cond)) + 
+    geom_density(size = 1.) +
+    #geom_histogram(size = 1.) +
+    theme_classic() +
+    scale_color_brewer(palette="Dark2") +
+    labs(x = 'distance between peak to gene (bp in log10)') +
+    #geom_vline(xintercept=c(-6, -3,  3, 6), col='gray', size = 1.) +
+    theme(legend.text = element_text(size=14),
+          legend.title = element_blank(),
+          legend.position=c(0.3, 0.8),
+          plot.margin = margin(),
+          axis.text.x = element_text(angle = 0, size = 14), 
+          axis.text.y = element_text(angle = 0, size = 14),
+          axis.title =  element_text(size = 16),
+          #legend.key.size = unit(1, 'cm')
+          #legend.key.width= unit(1, 'cm')
+    ) + 
+    scale_x_continuous(breaks=seq(-7,7, by = 1))
+  
+  ggsave(paste0(figureDir, "distance_peak_to_target.pdf"), width=6, height = 4)
+  
+}
+
+##########################################
 # regeneration dynamic peaks and gene expressoin of targets 
 ##########################################
 source('Functions_histM.R')
@@ -2165,7 +2229,6 @@ pheatmap(xx[plt$tree_row$order, ],
          gaps_row = gaps.row,
          filename = paste0(figureDir, '/putative_targets_dynamic_regeneration_peaks.pdf'))
 
-
 ##########################################
 # MARA motif activity analysis for temporally dynamic peaks 
 ##########################################
@@ -2240,7 +2303,6 @@ file.list = list.files(path = paste0('/Volumes/groups/tanaka/People/current/jiwa
 
 motif = 'RUNX2'
 
-
 f = file.list[grep(motif, file.list)]
 ff = read.table(f, as.is = c(1:3))
 xx = matrix(NA, nrow = nrow(ff), ncol = 500)
@@ -2282,3 +2344,48 @@ as_tibble(xx) %>%
   )
   
 ggsave(paste0(figureDir, "Footprint_RUNX.pdf"),  width = 6, height = 4)
+
+### motif NRF1
+motif = 'NRF1'
+f = file.list[grep(motif, file.list)]
+ff = read.table(f, as.is = c(1:3))
+xx = matrix(NA, nrow = nrow(ff), ncol = 500)
+for(n in 1:nrow(xx))
+{
+  xx[n, ] = sapply(ff[n, 3],  function(x) as.numeric(unlist(strsplit(as.character(x), ','))))
+}
+
+## scale the data according to 50bp in right/left sides
+ss = apply(xx[, c(1:50, 450:500)], 1, median)
+for(n in 1:nrow(xx)) xx[n,] = xx[n,] - ss[n]
+apply(xx[, c(1:50, 450:500)], 1, median)
+
+xx = data.frame(sample = c('mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d'), xx,  stringsAsFactors = FALSE)
+colnames(xx)[2:501] = as.factor(seq(1, 500, by = 1))
+
+as_tibble(xx) %>%
+  gather(bins, signals, 2:501) %>%
+  mutate(bins = factor(bins, levels=c(1:500))) %>% 
+  mutate(sample = factor(sample, levels = c('mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d'))) %>%
+  ggplot(aes(y=signals, x=bins, color = sample, group = sample)) + 
+  #geom_line(aes(linetype=sample, color = sample), size = 0) +
+  geom_smooth(span = 0.1, method = 'loess', se = FALSE, size =1.5) + 
+  theme_classic() +
+  theme(axis.text.y = element_text(angle = 0, size = 14), 
+        axis.text.x = element_text(angle = 0, size = 14),
+        legend.position = c(0.8, 0.9),
+        legend.text = element_text(size=14),
+        legend.title = element_text(size = 14)
+        #axis.text.x = element_blank(), 
+        #axis.ticks = element_blank()
+  ) +
+  #scale_color_manual(values=c('gray60', 'darkgreen', 'blue', 'gray70','gray80')) +
+  #scale_linetype_manual(values=c("dotted", "solid", "solid", "dotted", "dotted")) + 
+  labs( x = 'bp from center', y = 'Enrichment score') +
+  scale_x_discrete(
+    breaks=c(50, 150,  250, 350, 450),
+    labels=c("-200", '-100', "0", '100', "200")
+  )
+
+ggsave(paste0(figureDir, "Footprint_RUNX.pdf"),  width = 6, height = 4)
+

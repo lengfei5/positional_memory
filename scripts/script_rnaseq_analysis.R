@@ -772,6 +772,13 @@ saveRDS(res, file = paste0(RdataDir, 'smartseq2_R10724_R11635_cpm.batchCorrect_D
                            version.analysis, '.rds'))
 
 
+res = results(dds, contrast = c('condition', 'BL_UA_13days_distal', 'BL_UA_13days_proximal'), test = 'Wald')
+res <- lfcShrink(dds, contrast = c('condition', 'BL_UA_13days_distal', 'BL_UA_13days_proximal'))
+colnames(res) = paste0(colnames(res.ii), "_dpa13dist.vs.dpa13prox")
+res = data.frame(res)
+
+saveRDS(res, file = paste0(RdataDir, 'smartseq2_regeneration_dpa13dist.vs.dpa13prox.rds'))
+
 ##########################################
 # visualize the DE genes 
 ##########################################

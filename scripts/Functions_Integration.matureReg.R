@@ -663,29 +663,11 @@ peak_to_gene_assignment_TADs_correlation = function(enhancers)
   save(corrMax, enhancers, rna, file = paste0(RdataDir, '/peak_to_gene_assignment_atacseqPeaks_all.Rdata'))
   
   ##########################################
-  # compare the corrections between features and rna and it turns out that atac-seq data have the best correlation with RNA-seq data
+  # Compare the corrections between features and rna and it turns out that 
+  # atac-seq data have the best correlation with RNA-seq data
   ##########################################
   load(file = paste0(RdataDir, '/peak_to_gene_assignment_atacseqPeaks_all.Rdata'))
   corrMax[,3] = - corrMax[,3]
-  
-  as_tibble(corrMax) %>% 
-    gather(features, corr, 1:5) %>%
-    ggplot(aes(x = corr, color = features)) +
-    geom_density(size = 1.) +
-    scale_color_manual(values = c("#117733",  "blue", 'red', 'cyan', 'black')) +
-    #scale_color_brewer(palette="Dark2") +
-    #scale_fill_manual(values=c("#117733",  "blue", 'cyan',  'magenta')) +
-    theme_classic() +
-    theme(axis.text.x = element_text(angle = 0, size = 14), 
-          axis.text.y = element_text(angle = 0, size = 14), 
-          axis.title =  element_text(size = 14),
-          legend.text = element_text(size=12),
-          legend.title = element_text(size = 14),
-          legend.position=c(0.5, 0.8)) +
-    labs(x = "Pearson correlation with gene expression", y= 'density')
-  
-  ggsave(paste0(figureDir, "peak_to_gene_assignmenet_correlation_chromatinFeatures_rna_minus_H3K27me3.pdf"),  width = 6, height = 4)
-  
   
   ##########################################
   # generate the correlation distribution for random peak-to-gene assginment  
@@ -1003,6 +985,7 @@ plot_rna_chromainFeatures_geneExamples = function(tss,
 
 Analysis_TSS_positionalGenes_in_mature_regeneration = function(tss, ids)
 {
+  
   features = c('atac', 'H3K4me3', 'H3K27me3', 'H3K4me1', 'H3K27ac')
   
   kks = match(ids, tss$geneID)
@@ -1066,17 +1049,16 @@ Analysis_TSS_positionalGenes_in_mature_regeneration = function(tss, ids)
   }
   
   colnames(test)[c(1:(length(features)*length(samples)))] = paste0(rep(features, each = length(samples)), '_', samples)
-  saveRDS(test, file = paste0(RdataDir, '/positional_gene_TSS_chromatinFeatures.rds'))
+  # saveRDS(test, file = paste0(RdataDir, '/positional_gene_TSS_chromatinFeatures.rds'))
   
   ### add RNA-seq data
-  test = readRDS(file = paste0(RdataDir, '/positional_gene_TSS_chromatinFeatures.rds'))
+  #test = readRDS(file = paste0(RdataDir, '/positional_gene_TSS_chromatinFeatures.rds'))
   samples = c('mHand', 'mLA', 'mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d')
-  
   ## here import the microarray data of all genes, becasue Prod1, Tig1 are missing in the list of postional genes identified
   ## but still HOXA9, HOXA11 and HOXD9 are missing in the microarray probes
   ## test the microarray data, however the dynamic ranges are very different from the smartseq2 data in regeneration
   ## so use smart-seq2 mature samples as well
-  rna = readRDS( file = paste0("../results/RNAseq_data_used/Rdata/matureSamples_cpm_DEgenes_8selectedSamples.batch4_v47.hox.patch.rds"))
+  rna = readRDS(file = paste0("../results/RNAseq_data_used/Rdata/matureSamples_cpm_DEgenes_8selectedSamples.batch4_v47.hox.patch.rds"))
   ids = rna$geneID
   ggs = rna$gene
   
@@ -1095,6 +1077,7 @@ Analysis_TSS_positionalGenes_in_mature_regeneration = function(tss, ids)
   ## add regeneration data
   res = readRDS(file = paste0('../results/RNAseq_data_used/Rdata/', 
           'smartseq2_R10724_R11635_cpm.batchCorrect_DESeq2.test.withbatch.log2FC.shrinked_RNAseq_data_used_20220408.rds'))
+  
   cpm = res[, grep('log2FoldChange_d', colnames(res))]
   #cpm = cal_sample_means(cpm, conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal",  "BL_UA_13days_distal"))
   colnames(cpm) = samples[4:7]
@@ -1109,7 +1092,7 @@ Analysis_TSS_positionalGenes_in_mature_regeneration = function(tss, ids)
   
   test = data.frame(test, rna, stringsAsFactors = FALSE)
   
-  saveRDS(test, file = paste0(RdataDir, '/positional_gene_TSS_chromatinFeatures_smartseq2_mature.reg.rds'))
+  # saveRDS(test, file = paste0(RdataDir, '/positional_gene_TSS_chromatinFeatures_smartseq2_mature.reg.rds'))
   
   ### SVD analysis
   Test.SVD = FALSE
