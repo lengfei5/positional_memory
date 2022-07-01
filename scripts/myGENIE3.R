@@ -588,7 +588,6 @@ plot_tf_network = function(link.list)
   dist_weighted = dist + alpha*dist2
   #pcs.use = data.frame(pcs[, c(1:10)], pcs2[, c(1:5)])
   
-  
   set.seed(7)
   #weight_coex_umap <- uwot::umap(dist_weighted, n_neighbors=5)
   nb_pcs = 10;
@@ -642,6 +641,7 @@ plot_tf_network = function(link.list)
     #theme(legend.position = "none") 
   ggsave(paste0(figureDir, "TRN_tfExpr.umap_connectivity.clusters_withLegends_v5.png"), width=10, height = 10)
   
+  
   #plot(p1)
   # pdf(paste0(figureDir, "/GRN_UMPA_Test_v3.pdf"),  width = 14, height = 10) # Open a new pdf file
   # for(n in c(1:25, 1011, 2022))
@@ -649,9 +649,6 @@ plot_tf_network = function(link.list)
   #   cat(n, '\n')
   # }
   # dev.off()
-  
-  
-  
   
   # # basic graph
   ggraph(trn, layout = "stress") +
@@ -669,13 +666,13 @@ plot_tf_network = function(link.list)
   # E(g)$col <- F
   # E(g)$col[bb$backbone] <- T
   
-  ggraph(g,layout="manual",x=bb$xy[,1],y=bb$xy[,2])+
-    geom_edge_link0(aes(col=col),width=0.1)+
-    geom_node_point(aes(col=grp))+
-    scale_color_brewer(palette = "Set1")+
-    scale_edge_color_manual(values=c(rgb(0,0,0,0.3),rgb(0,0,0,1)))+
-    theme_graph()+
-    theme(legend.position = "none")
+  # ggraph(g,layout="manual",x=bb$xy[,1],y=bb$xy[,2])+
+  #   geom_edge_link0(aes(col=col),width=0.1)+
+  #   geom_node_point(aes(col=grp))+
+  #   scale_color_brewer(palette = "Set1")+
+  #   scale_edge_color_manual(values=c(rgb(0,0,0,0.3),rgb(0,0,0,1)))+
+  #   theme_graph()+
+  #   theme(legend.position = "none")
   
   # centrality layout
   # https://github.com/schochastics/graphlayouts
@@ -699,78 +696,79 @@ plot_tf_network = function(link.list)
   ## following code from https://github.com/lengfei5/pallium_evo/blob/main/analysis/GRN_analysis/moo_graph_layout.R
   ######################################################################
   #### Net with only TFs ####
-  #### Get avg expression for genes ####
-  region_summary <- Pando::aggregate_matrix(rna_expr[, union(grn_net$tf, grn_net$target)], groups=mome_atac$pred_regions_all)
-  subclass_summary <- Pando::aggregate_matrix(rna_expr[, union(grn_net$tf, grn_net$target)], groups=mome_atac$subclasses)
-  
-  region_summary_df <- region_summary %>% t() %>% 
-    as_tibble(rownames='gene') 
-  
-  subclass_summary_df <- subclass_summary %>% t() %>% 
-    as_tibble(rownames='gene') 
-  
-  gene_scores <- inner_join(region_summary_df, subclass_summary_df)
-  
-  ### Get coex and umap ####
-  gene_cor <- Pando::sparse_cor(rna_expr[, union(grn_net$tf, grn_net$target)])
-  
-  reg_mat <- grn_net %>% 
-    filter(!str_detect(target, '^(AMEX|LOC)')) %>% 
-    filter(target%in%tfs$symbol) %>%
-    distinct(target, tf, estimate) %>%
-    pivot_wider(names_from=tf, values_from=estimate, values_fill=0) %>% 
-    column_to_rownames('target') %>% as.matrix() %>% Matrix::Matrix(sparse=T)
-  reg_factor_mat <- abs(reg_mat) + 1
-  
-  weighted_coex_mat <- gene_cor[rownames(reg_factor_mat), colnames(reg_factor_mat)] * sqrt(reg_factor_mat)
-  weighted_coex_mat <- as.matrix(gene_cor[rownames(reg_factor_mat), colnames(reg_factor_mat)])
-  weight_coex_umap <- uwot::umap(weighted_coex_mat, n_neighbors=5)
-  rownames(weight_coex_umap) <- rownames(weighted_coex_mat)
-  colnames(weight_coex_umap) <- c('UMAP1', 'UMAP2')
-  
-  
-  #### Plot network ####
-  weight_coex_meta <- weight_coex_umap %>% 
-    as_tibble(rownames='gene') %>% 
-    left_join(gene_scores)
-  
-  tf_graph <- as_tbl_graph(grn_net) %>% 
-    activate(edges) %>% 
-    mutate(from_node=.N()$name[from], to_node=.N()$name[to]) %>% 
-    activate(nodes) %>% 
-    mutate(
-      central_pr=centrality_pagerank(weights = estimate),
-      central_betw=centrality_betweenness(),
-      central_eig=centrality_eigen(),
-      central_deg=centrality_degree(),
-      outdegree=centrality_degree(mode='out'),
-      indegree=centrality_degree(mode='in')
-    ) %>% 
-    inner_join(weight_coex_meta, by=c('name'='gene')) %>% 
-    activate(edges) %>%
-    filter(padj<0.05) %N>% 
-    filter(!node_is_isolated())
-  
-  ggraph(tf_graph, x=UMAP1, y=UMAP2) + 
-    geom_edge_diagonal(aes(alpha=-log10(padj), color=factor(sign(estimate))), width=0.5) + 
-    geom_node_point(aes(size=outdegree), shape=21, color='black', fill='grey') +
-    geom_node_text(aes(label=name), size=5/ggplot2::.pt, repel=T) +
-    scale_edge_color_manual(values=c('#f5b7b1', '#7dcea0')) +
-    scale_edge_alpha_continuous(range=c(0.01,0.8), limits=c(2,20)) +
-    theme_void() 
-  ggsave('plots/tf_grn_umap.png', width=6, height=6)
-  ggsave('plots/tf_grn_umap.pdf', width=6, height=6)
-  
-  
-  ggraph(tf_graph, x=UMAP1, y=UMAP2) + 
-    geom_edge_diagonal(aes(alpha=-log10(padj), color=factor(sign(estimate))), width=0.5) + 
-    geom_node_point(aes(size=outdegree), shape=21, color='black', fill='grey') +
-    # geom_node_text(aes(label=name), size=5/ggplot2::.pt, repel=T) +
-    scale_edge_color_manual(values=c('#f5b7b1', '#7dcea0')) +
-    scale_edge_alpha_continuous(range=c(0.01,0.8), limits=c(2,20)) +
-    theme_void() 
-  ggsave('plots/tf_grn_unlabelled_umap.png', width=6, height=6)
-  ggsave('plots/tf_grn_unlabelled_umap.pdf', width=6, height=6)
-  
+  # #### Get avg expression for genes ####
+  # region_summary <- Pando::aggregate_matrix(rna_expr[, union(grn_net$tf, grn_net$target)], groups=mome_atac$pred_regions_all)
+  # subclass_summary <- Pando::aggregate_matrix(rna_expr[, union(grn_net$tf, grn_net$target)], groups=mome_atac$subclasses)
+  # 
+  # region_summary_df <- region_summary %>% t() %>% 
+  #   as_tibble(rownames='gene') 
+  # 
+  # subclass_summary_df <- subclass_summary %>% t() %>% 
+  #   as_tibble(rownames='gene') 
+  # 
+  # gene_scores <- inner_join(region_summary_df, subclass_summary_df)
+  # 
+  # ### Get coex and umap ####
+  # gene_cor <- Pando::sparse_cor(rna_expr[, union(grn_net$tf, grn_net$target)])
+  # 
+  # reg_mat <- grn_net %>% 
+  #   filter(!str_detect(target, '^(AMEX|LOC)')) %>% 
+  #   filter(target%in%tfs$symbol) %>%
+  #   distinct(target, tf, estimate) %>%
+  #   pivot_wider(names_from=tf, values_from=estimate, values_fill=0) %>% 
+  #   column_to_rownames('target') %>% as.matrix() %>% Matrix::Matrix(sparse=T)
+  # reg_factor_mat <- abs(reg_mat) + 1
+  # 
+  # weighted_coex_mat <- gene_cor[rownames(reg_factor_mat), colnames(reg_factor_mat)] * sqrt(reg_factor_mat)
+  # weighted_coex_mat <- as.matrix(gene_cor[rownames(reg_factor_mat), colnames(reg_factor_mat)])
+  # weight_coex_umap <- uwot::umap(weighted_coex_mat, n_neighbors=5)
+  # rownames(weight_coex_umap) <- rownames(weighted_coex_mat)
+  # colnames(weight_coex_umap) <- c('UMAP1', 'UMAP2')
+  # 
+  # 
+  # #### Plot network ####
+  # weight_coex_meta <- weight_coex_umap %>% 
+  #   as_tibble(rownames='gene') %>% 
+  #   left_join(gene_scores)
+  # 
+  # tf_graph <- as_tbl_graph(grn_net) %>% 
+  #   activate(edges) %>% 
+  #   mutate(from_node=.N()$name[from], to_node=.N()$name[to]) %>% 
+  #   activate(nodes) %>% 
+  #   mutate(
+  #     central_pr=centrality_pagerank(weights = estimate),
+  #     central_betw=centrality_betweenness(),
+  #     central_eig=centrality_eigen(),
+  #     central_deg=centrality_degree(),
+  #     outdegree=centrality_degree(mode='out'),
+  #     indegree=centrality_degree(mode='in')
+  #   ) %>% 
+  #   inner_join(weight_coex_meta, by=c('name'='gene')) %>% 
+  #   activate(edges) %>%
+  #   filter(padj<0.05) %N>% 
+  #   filter(!node_is_isolated())
+  # 
+  # ggraph(tf_graph, x=UMAP1, y=UMAP2) + 
+  #   geom_edge_diagonal(aes(alpha=-log10(padj), color=factor(sign(estimate))), width=0.5) + 
+  #   geom_node_point(aes(size=outdegree), shape=21, color='black', fill='grey') +
+  #   geom_node_text(aes(label=name), size=5/ggplot2::.pt, repel=T) +
+  #   scale_edge_color_manual(values=c('#f5b7b1', '#7dcea0')) +
+  #   scale_edge_alpha_continuous(range=c(0.01,0.8), limits=c(2,20)) +
+  #   theme_void() 
+  # ggsave('plots/tf_grn_umap.png', width=6, height=6)
+  # ggsave('plots/tf_grn_umap.pdf', width=6, height=6)
+  # 
+  # 
+  # ggraph(tf_graph, x=UMAP1, y=UMAP2) + 
+  #   geom_edge_diagonal(aes(alpha=-log10(padj), color=factor(sign(estimate))), width=0.5) + 
+  #   geom_node_point(aes(size=outdegree), shape=21, color='black', fill='grey') +
+  #   # geom_node_text(aes(label=name), size=5/ggplot2::.pt, repel=T) +
+  #   scale_edge_color_manual(values=c('#f5b7b1', '#7dcea0')) +
+  #   scale_edge_alpha_continuous(range=c(0.01,0.8), limits=c(2,20)) +
+  #   theme_void() 
+  # ggsave('plots/tf_grn_unlabelled_umap.png', width=6, height=6)
+  # ggsave('plots/tf_grn_unlabelled_umap.pdf', width=6, height=6)
+  # 
     
 }
+
