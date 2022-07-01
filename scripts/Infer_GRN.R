@@ -325,16 +325,16 @@ if(Manual_correction_motif_tf_association){
     
 }
 
-### target-to-CRE matrix
+##########################################
+# construct the gene-regulator matrix by matrix multiplication 
+##########################################
+### single cell expression matrix
 E = readRDS(file = paste0(RdataDir, '/GRNinference_scExprMatrix_v3_347geneID_290TFsymbols.rds'))
 targets.ids = get_geneID(rownames(E))
 
-### CRE-motif-occurence matrix
-mocs = readRDS(file = '../results/motif_analysis/motif_oc_fimo_atacPeaks.2kbTSS_jaspar2022.core.unvalided_pval.0.00001_v1.rds')
-cres = unique(rownames(mocs))
 
-#targets = data.frame(geneID = targets.ids, stringsAsFactors = FALSE)
-#targets$CREs = NA
+
+
 bed = read.table(file = 
     paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/motif_analysis/', 
            'FIMO_atacPeak_tss_mediumQ_core.unvalided_64Gmem/peaks_for_fimo_sorted.bed'), header = FALSE)
@@ -365,6 +365,11 @@ ss = apply(xx, 1, sum)
 xx = xx[which(ss>0), ]
 mm = match(rownames(xx), targets.ids)
 rownames(xx) = rownames(E)[mm]
+
+### CRE-motif-occurence matrix (regulaory regions * motif occurrence)
+mocs = readRDS(file = '../results/motif_analysis/motif_oc_fimo_atacPeaks.2kbTSS_jaspar2022.core.unvalided_pval.0.00001_v1.rds')
+cres = unique(rownames(mocs))
+
 
 ## match the tf-CRE
 jj = match(colnames(xx), rownames(mocs))
