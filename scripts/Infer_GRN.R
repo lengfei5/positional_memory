@@ -363,7 +363,8 @@ length(which(ss==0))
 ### motif-TF-association matrix
 mapping =readRDS(file = '../data/JASPAR2022_CORE_UNVALIDED_vertebrates_nonRedundant_metadata_manual_rmRedundantUNVALIDED.rds')
 mm = match(colnames(target.moc), mapping$name)
-target.moc = target.moc[,which(!is.na(mm))] # filter the unvalided motifs if core motifs are present
+target.moc = target.moc[ ,which(!is.na(mm))] # filter the unvalided motifs if core motifs are present
+#mat_gcre = mat_gcre[, which(!is.na(match(colnames(mat_gcre), mapping$name)))]
 
 #atm = table(mapping$name, mapping$gene)
 atm = matrix(0, nrow = ncol(target.moc), ncol = nrow(target.moc))
@@ -387,6 +388,7 @@ for(n in 1:nrow(atm))
 
 target.tfs = target.moc %*% atm
 
+
 x = target.tfs[grep('HOXA13', rownames(target.tfs)), ];
 x[which(x>0)]
 
@@ -405,6 +407,13 @@ cat(nrow(target.tfs), ' targets by ', ncol(target.tfs), ' TFs \n')
 
 
 saveRDS(target.tfs, file = paste0(RdataDir, '/GRN_priorNetwork_target_TFs.rds'))
+
+# save all matrix for GRN prunning later
+mocs = mocs[, which(!is.na(match(colnames(mocs), rownames(atm))))]
+save(E, mat_gcre, mocs, atm, target.tfs, 
+     file = paste0(RdataDir, '/target_CREs_motifs_tfs_matrix_for_targetRegulator.Rdata'))
+
+# xx = mat_gcre%*% mocs %*% atm
 
 ########################################################
 ########################################################
@@ -477,9 +486,46 @@ head(link.list)
 # 
 ########################################################
 ########################################################
+# saved matrix: E, mat_gcre, mocs, atm, target.tfs,
+load(file = paste0(RdataDir, '/target_CREs_motifs_tfs_matrix_for_targetRegulator.Rdata')) 
+
+##########################################
+# time-specfic peaks or CREs 
+##########################################
+## tss and atac peaks
+tss = readRDS(file =paste0(RdataDir, '/regeneration_matureSamples_tss_perGene_smartseq2_atac_histM_v5.rds'))
+
+cres = colnames(mat_gcre)
+cres = as.character(sapply(cres, function(x) {x = unlist(strsplit(gsub(':', '-', as.character(x)), '-'));
+paste0(x[1], ':', (as.numeric(x[2]) +1), '-', (as.numeric(x[3])-300 + 2000))}))
+mm = match(cres, tss$coords)
+length(which(!is.na(mm)))
+missed = setdiff(c(1:length(cres)), which(!is.na(mm)))
+
+tss = tss[!is.na(match(tss$)), ]
+rownames(tss) = tss$coords
+tss = tss[, grep('atac_', colnames(tss))]
+tss = tss[, c(1:5)]
+
+# all atac-seq peaks
+res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks__mUA_regeneration_dev_2Batches.R10723_R7977_peakAnnot_v8.rds'))
+
+ens = res[, c(9:20)]
+ens = cal_sample_means(ens, 
+                       conds = c('Mature_UA', 'BL_UA_5days', 'BL_UA_9days', 'BL_UA_13days_proximal', 'BL_UA_13days_distal'))
+rownames(ens) = gsub('_', '-', rownames(ens))
+#colnames(ens) = colnames(tss)
+cres = colnames(mat_gcre)
+cres = as.character(sapply(cres, function(x) {x = unlist(strsplit(gsub(':', '-', as.character(x)), '-'));
+paste0(x[1], ':', (as.numeric(x[2]) +1), '-', x[3])}))
+
+mm = match(cres, rownames(ens))
+length(which(!is.na(mm)))
+
+missed = setdiff(missed, which(!is.na(mm)))
 
 
-
+#load(file = paste0(RdataDir, '/dynamic_ATACpeaks_regeneration_data.heatmap_DPGPclusters.Rdata')) # variable: res, all atac peaks
 
 ##########################################
 # TF expression 
