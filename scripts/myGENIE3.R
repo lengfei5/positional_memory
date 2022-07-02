@@ -550,6 +550,8 @@ plot_tf_network = function(link.list)
   V(trn)$umap1 <-weight_coex_umap[,1]
   V(trn)$umap2 <-weight_coex_umap[,2]
   
+  saveRDS(trn, file = paste0(RdataDir, '/TRN_umap_layout.rds'))
+  
   #set.seed(2022)
   ggraph(trn, x=umap1, y=umap2) +
     geom_edge_link(aes(edge_width = weight), edge_colour = "gray80" ) +
@@ -769,7 +771,6 @@ plot_tf_network = function(link.list)
   #   theme_void() 
   # ggsave('plots/tf_grn_unlabelled_umap.png', width=6, height=6)
   # ggsave('plots/tf_grn_unlabelled_umap.pdf', width=6, height=6)
-  # 
-    
+  
 }
 
