@@ -440,6 +440,8 @@ E = E[sels, ]
 target.tfs = target.tfs[!is.na(match(rownames(target.tfs), rownames(E))), 
                         !is.na(match(colnames(target.tfs), rownames(E)))]
 
+saveRDS(target.tfs, file = paste0(RdataDir, '/GRN_priorNetwork_target_TFs_final.rds'))
+
 grep('ZNF281', rownames(E))
 grep('ZNF281', rownames(target.tfs))
 
@@ -462,6 +464,10 @@ gene.unique = names(gene.counts)[which(gene.counts==1)]
 mm = match(genes, gene.unique)
 kk = which(!is.na(mm))
 ggs[kk] = genes[kk]
+
+# geneName_mapping = data.frame(gene = ggs, original= rownames(wtm), stringsAsFactors = FALSE)
+# saveRDS(geneName_mapping, file = paste0(RdataDir, '/geneName_mapping.rds'))
+
 colnames(wtm) = ggs
 rownames(wtm) = ggs
 
@@ -502,10 +508,13 @@ mm = match(cres, tss$coords)
 length(which(!is.na(mm)))
 missed = setdiff(c(1:length(cres)), which(!is.na(mm)))
 
-tss = tss[!is.na(match(tss$)), ]
-rownames(tss) = tss$coords
+cat(length(missed), 'CREs missing \n')
+
+tss = tss[mm[!is.na(mm)], ]
+rownames(tss) = colnames(mat_gcre)[!is.na(mm)]
 tss = tss[, grep('atac_', colnames(tss))]
 tss = tss[, c(1:5)]
+
 
 # all atac-seq peaks
 res = readRDS(file = paste0(RdataDir, '/res_temporal_dynamicPeaks__mUA_regeneration_dev_2Batches.R10723_R7977_peakAnnot_v8.rds'))
@@ -523,9 +532,30 @@ mm = match(cres, rownames(ens))
 length(which(!is.na(mm)))
 
 missed = setdiff(missed, which(!is.na(mm)))
+cat(length(missed), 'CREs missing \n')
 
+ens = ens[mm[!is.na(mm)], ]
+rownames(ens) = colnames(mat_gcre)[!is.na(mm)]
+
+colnames(ens) = colnames(tss)
+
+cres = rbind(tss, ens)
+cres = cres[match(colnames(mat_gcre), rownames(cres)), ]
+
+saveRDS(cres, file = paste0(RdataDir, '/tss_enhancer_peakData_for_wholeGRN_inference.rds'))
 
 #load(file = paste0(RdataDir, '/dynamic_ATACpeaks_regeneration_data.heatmap_DPGPclusters.Rdata')) # variable: res, all atac peaks
+
+##########################################
+# specific different groups and prune group-specific subGRN 
+##########################################
+cres =  readRDS(file = paste0(RdataDir, '/tss_enhancer_peakData_for_wholeGRN_inference.rds'))
+
+ss = cres[, 1] - cres[, 2]
+pp = rownames(cres)[which(ss > 1)]
+
+build_subgraph_GRN(pp, )
+
 
 ##########################################
 # TF expression 

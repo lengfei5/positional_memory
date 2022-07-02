@@ -774,3 +774,129 @@ plot_tf_network = function(link.list)
   
 }
 
+build_subgraph_GRN = function(pp)
+{
+  library(igraph)
+  library(ggraph)
+  library(tidygraph)
+  library(graphlayouts) 
+  library(RColorBrewer) 
+  
+  trn = readRDS(file = paste0(RdataDir, '/TRN_umap_layout.rds'))
+  
+  # saved matrix: E, mat_gcre, mocs, atm, target.tfs,
+  load(file = paste0(RdataDir, '/target_CREs_motifs_tfs_matrix_for_targetRegulator.Rdata')) 
+  target.tfs =readRDS(file = paste0(RdataDir, '/GRN_priorNetwork_target_TFs.rds'))
+  #target.tfs =readRDS(file = paste0(RdataDir, '/GRN_priorNetwork_target_TFs_final.rds'))
+  geneName_mapping = readRDS(file = paste0(RdataDir, '/geneName_mapping.rds'))
+  
+  mat_gcre_sub = mat_gcre
+  mm = match(colnames(mat_gcre), pp)
+  jj = which(is.na(mm))
+  for(j in jj) mat_gcre_sub[ ,j] = 0
+  
+  target.tfs_sub = mat_gcre_sub %*% mocs %*% atm
+  
+  target.tfs_sub = target.tfs_sub[match(rownames(target.tfs), rownames(target.tfs_sub)),
+                                  match(colnames(target.tfs), colnames(target.tfs_sub))]
+  
+  colnames(target.tfs) = geneName_mapping$gene[match(colnames(target.tfs), geneName_mapping$original)]
+  rownames(target.tfs) = geneName_mapping$gene[match(rownames(target.tfs), geneName_mapping$original)]
+  colnames(target.tfs_sub) = colnames(target.tfs)
+  rownames(target.tfs_sub) = rownames(target.tfs)
+  
+  ### prune edges based on the sub target-tf matrix
+  edgeList.full = as_edgelist(trn)
+  sub_trn = trn
+  for(n in 1:nrow(edgeList.full))
+  {
+    # n = 1
+    kk1 = which(colnames(target.tfs_sub) == edgeList.full[n, 1])
+    kk2 = which(rownames(target.tfs_sub) == edgeList.full[n, 2])
+    
+    if(target.tfs[kk2, kk1] > 0){
+      ratio = target.tfs_sub[kk2, kk1] / target.tfs[kk2, kk1]
+      if(ratio < 0.1) {
+        cat(n, ' : delete edge -- ', paste0(edgeList.full[n, 1], '|', edgeList.full[n, 2]), '\n')
+        sub_trn = delete_edges(sub_trn, paste0(edgeList.full[n, 1], '|', edgeList.full[n, 2]))
+      }
+    }
+  }
+  
+  sub_trn = delete.vertices(simplify(sub_trn), degree(sub_trn)==0)
+  nb_clusters = length(unique(V(trn)$cluster))
+  cat(nb_clusters, ' clusters used here \n')
+  
+  if(length(nb_clusters)<=9) {
+    library(khroma)
+    muted <- colour("muted")
+    got_palette = c("#CC6677", "#332288", "#DDCC77", "#117733", "#88CCEE", "#882255", "#44AA99")[1:nb_clusters] 
+  }else{
+    cat('More than 9 colors needed \n')
+    
+    got_palette = c("#CC6677", "#332288", "#DDCC77", "#117733", "#88CCEE", "#882255", "#44AA99", 
+                    "#1A5878", "#C44237", "#AD8941", "#E99093",
+                    "#50594B", "#8968CD", "#9ACD32")[1:nb_clusters]
+  }
+  
+  pal<-brewer.pal(nb_clusters, "Set3") # Vertex color assigned per each class number
+  
+  V(sub_trn)$degree<-degree(sub_trn, mode = 'All')
+  V(sub_trn)$degreeIn = degree(sub_trn, mode = 'in')
+  V(sub_trn)$degreeOut = degree(sub_trn, mode = 'out')
+  V(sub_trn)$name[which.max(V(sub_trn)$degree)]
+  V(sub_trn)$name[which.max(V(sub_trn)$degreeIn)]
+  V(sub_trn)$name[which.max(V(sub_trn)$degreeOut)]
+  
+  ggraph(sub_trn, x=umap1, y=umap2) +
+    geom_edge_link(aes(edge_width = weight), edge_colour = "gray80" ) +
+    #geom_edge_diagonal(color='darkgray', width=0.2) +
+    geom_node_point(aes(fill = module, size = degree), shape = 21) +
+    scale_size_continuous(range = c(1, 7)) +
+    #geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
+    #geom_node_text(aes(filter = size >= 20, label=name), size=6/ggplot2::.pt, repel=T, family = "serif")+
+    scale_edge_width_continuous(range = c(0.05, 0.2)) +
+    scale_edge_color_gradientn(colors=rev(brewer.pal(n=11, name="RdBu")), limits=c(0.01, 0.6)) +
+    #scale_edge_alpha_continuous(range=c(0.05, 0.4), limits=c(2,20)) +
+    scale_edge_alpha_continuous(range=c(0.01,0.8), limits=c(2,20)) + 
+    scale_fill_manual(values = got_palette) +
+    #scale_fill_viridis(option='magma') + 
+    #scale_fill_manual(values = pal) +
+    coord_fixed() +
+    theme_graph() +
+    #theme(legend.position = "bottom") 
+    theme(legend.position = "none") 
+  
+  ggsave(paste0(figureDir, "TRN_tfExpr.umap_connectivit.module_subgraph_mUA.pdf"), width=8, height = 6)
+  
+  library(viridis)
+  ntop = 20
+  xx = data.frame(degree = V(sub_trn)$degree, gene = V(sub_trn)$name)
+  xx = xx[order(-xx$degree), ]
+  xx = xx[c(1:ntop), ]
+  
+  xx$gene = sapply(xx$gene, function(x) unlist(strsplit(as.character(x), '_'))[1])
+  
+  as_tibble(xx) %>% 
+    ggplot(aes(y=degree, x=reorder(gene, -degree), fill = reorder(gene, -degree))) + 
+    geom_bar(position="dodge", stat="identity") +
+    theme_classic() +
+    #theme(axis.text.x = element_text(angle = 90, size = 10)) +
+    scale_fill_viridis_d(option = 'magma', direction = -1) +
+    labs(x = '', y = 'number of connections') +
+    theme(axis.text.x = element_text(angle = 60, size = 12, hjust = 1), 
+          axis.text.y = element_text(angle = 0, size = 12), 
+          axis.title =  element_text(size = 12),
+          legend.text = element_text(size=12),
+          legend.title = element_text(size = 14),
+          legend.position='none',
+          #plot.margin = margin()
+          #legend.key.size = unit(1, 'cm')
+          #legend.key.width= unit(1, 'cm')
+    )
+  
+  ggsave(paste0(figureDir, "GRN_subgraph_centrality_all.pdf"),  width = 6, height = 4)
+  
+}
+
+
