@@ -549,13 +549,36 @@ saveRDS(cres, file = paste0(RdataDir, '/tss_enhancer_peakData_for_wholeGRN_infer
 ##########################################
 # specific different groups and prune group-specific subGRN 
 ##########################################
+source('myGENIE3.R')
+
 cres =  readRDS(file = paste0(RdataDir, '/tss_enhancer_peakData_for_wholeGRN_inference.rds'))
 
-ss = cres[, 1] - cres[, 2]
+cres[, 4] = apply(cres[, c(4:5)], 1, mean)
+cres = cres[, c(1:4)]
+
+fc.cutoff = 0.7
+
+sels = which(cres[, 1] - cres[, 2] > fc.cutoff &   cres[, 1] - cres[,3] > fc.cutoff & cres[, 1] - cres[, 4] > fc.cutoff)
+pp = rownames(cres)[sels]
+
+build_subgraph_GRN(pp, subgroup = 'mUA')
+
+ss = cres[, 2] - cres[, 1] 
 pp = rownames(cres)[which(ss > 1)]
+subgroup = 'BL.day5'
+build_subgraph_GRN(pp, subgroup = 'BL.day5')
 
-build_subgraph_GRN(pp, )
+sels = which(cres[, 3] - cres[, 2] > fc.cutoff &  cres[, 3] - cres[,1] > fc.cutoff)
+pp = rownames(cres)[sels]
 
+subgroup = 'BL.day9'
+build_subgraph_GRN(pp, subgroup = 'BL.day9')
+
+sels = which(cres[, 4] - cres[, 3] > fc.cutoff &  cres[, 4] - cres[,1] > fc.cutoff)
+pp = rownames(cres)[sels]
+
+subgroup = 'BL.day13'
+build_subgraph_GRN(pp, subgroup = subgroup)
 
 ##########################################
 # TF expression 

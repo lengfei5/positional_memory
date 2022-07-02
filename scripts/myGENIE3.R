@@ -774,7 +774,7 @@ plot_tf_network = function(link.list)
   
 }
 
-build_subgraph_GRN = function(pp)
+build_subgraph_GRN = function(pp, subgroup = 'BL.day5')
 {
   library(igraph)
   library(ggraph)
@@ -805,6 +805,20 @@ build_subgraph_GRN = function(pp)
   colnames(target.tfs_sub) = colnames(target.tfs)
   rownames(target.tfs_sub) = rownames(target.tfs)
   
+  # compute the group specificity 
+  ggs = unique(c(colnames(target.tfs), rownames(target.tfs)))
+  specificity = c()
+  for(n in 1:length(ggs))
+  {
+    jj1 = which(colnames(target.tfs) == ggs[n])
+    jj2 = which(rownames(target.tfs) == ggs[n])
+    motif.total = sum(c(target.tfs[, jj1], target.tfs[jj2, ]), na.rm = TRUE)
+    motif.group = sum(c(target.tfs_sub[, jj1], target.tfs_sub[jj2, ]), na.rm = TRUE)
+    specificity = c(specificity, motif.group/motif.total)
+
+  }
+  names(specificity) = ggs
+    
   ### prune edges based on the sub target-tf matrix
   edgeList.full = as_edgelist(trn)
   sub_trn = trn
@@ -817,13 +831,14 @@ build_subgraph_GRN = function(pp)
     if(target.tfs[kk2, kk1] > 0){
       ratio = target.tfs_sub[kk2, kk1] / target.tfs[kk2, kk1]
       if(ratio < 0.1) {
-        cat(n, ' : delete edge -- ', paste0(edgeList.full[n, 1], '|', edgeList.full[n, 2]), '\n')
+        # cat(n, ' : delete edge -- ', paste0(edgeList.full[n, 1], '|', edgeList.full[n, 2]), '\n')
         sub_trn = delete_edges(sub_trn, paste0(edgeList.full[n, 1], '|', edgeList.full[n, 2]))
       }
     }
   }
   
-  sub_trn = delete.vertices(simplify(sub_trn), degree(sub_trn)==0)
+  sub_trn = delete.vertices(simplify(sub_trn), degree(sub_trn)<2)
+  
   nb_clusters = length(unique(V(trn)$cluster))
   cat(nb_clusters, ' clusters used here \n')
   
@@ -867,35 +882,36 @@ build_subgraph_GRN = function(pp)
     #theme(legend.position = "bottom") 
     theme(legend.position = "none") 
   
-  ggsave(paste0(figureDir, "TRN_tfExpr.umap_connectivit.module_subgraph_mUA.pdf"), width=8, height = 6)
+  ggsave(paste0(figureDir, "GRN_tfExpr.umap_connectivit.module_subgraph_", subgroup, ".pdf"), width=8, height = 6)
   
   library(viridis)
   ntop = 20
   xx = data.frame(degree = V(sub_trn)$degree, gene = V(sub_trn)$name)
+  xx$specificity = as.numeric(specificity[match(xx$gene, names(specificity))])
   xx = xx[order(-xx$degree), ]
   xx = xx[c(1:ntop), ]
   
   xx$gene = sapply(xx$gene, function(x) unlist(strsplit(as.character(x), '_'))[1])
   
   as_tibble(xx) %>% 
-    ggplot(aes(y=degree, x=reorder(gene, -degree), fill = reorder(gene, -degree))) + 
+    ggplot(aes(y=degree, x=reorder(gene, -degree), fill = specificity)) + 
     geom_bar(position="dodge", stat="identity") +
     theme_classic() +
     #theme(axis.text.x = element_text(angle = 90, size = 10)) +
-    scale_fill_viridis_d(option = 'magma', direction = -1) +
+    scale_fill_viridis_c(option = 'magma', direction = -1) +
     labs(x = '', y = 'number of connections') +
     theme(axis.text.x = element_text(angle = 60, size = 12, hjust = 1), 
           axis.text.y = element_text(angle = 0, size = 12), 
-          axis.title =  element_text(size = 12),
+          axis.title =  element_text(size = 14),
           legend.text = element_text(size=12),
           legend.title = element_text(size = 14),
-          legend.position='none',
+          legend.position = 'top',
           #plot.margin = margin()
           #legend.key.size = unit(1, 'cm')
           #legend.key.width= unit(1, 'cm')
     )
   
-  ggsave(paste0(figureDir, "GRN_subgraph_centrality_all.pdf"),  width = 6, height = 4)
+  ggsave(paste0(figureDir, "GRN_subgraph_centrality_all_", subgroup, ".pdf"),  width = 6, height = 4)
   
 }
 
