@@ -239,6 +239,10 @@ save(design, counts, file = paste0(RdataDir, '/samplesDesign_readCounts.within_p
 ##########################################
 load(file = paste0(RdataDir, '/samplesDesign_readCounts.within_peakConsensus.Rdata'))
 
+# specify batches
+design$batch = '2'
+design$batch[grep('-1|-2', design$sample)] = '1'
+
 ss = apply(as.matrix(counts[, -1]), 1, mean)
 
 par(mfrow=c(1,2))
@@ -257,7 +261,7 @@ require(ggplot2)
 require(DESeq2)
 
 rownames(counts) = counts$gene
-dds <- DESeqDataSetFromMatrix(as.matrix(counts[kk, -1]), DataFrame(design), design = ~ condition)
+dds <- DESeqDataSetFromMatrix(as.matrix(counts[kk, -1]), DataFrame(design), design = ~ condition + batch)
 
 ss = rowSums(counts(dds))
 length(which(ss > quantile(ss, probs = 0.6)))
@@ -278,8 +282,8 @@ vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
 pca=plotPCA(vsd, intgroup = colnames(design)[3], ntop = 3000, returnData = FALSE)
 print(pca)
 
-pca2save = plotPCA(vsd, intgroup = colnames(design)[3], ntop = 3000, returnData = TRUE)
-ggp = ggplot(data=pca2save, aes(PC1, PC2, label = name, color=condition)) +
+pca2save = plotPCA(vsd, intgroup = colnames(design)[c(3:4)], ntop = 3000, returnData = TRUE)
+ggp = ggplot(data=pca2save, aes(PC1, PC2, label = name, color=condition, shape = batch)) +
   geom_point(size=3) +
   geom_text(hjust = 0.2, nudge_y = 0.1, size=3)
 
@@ -288,10 +292,14 @@ plot(ggp)
 ggsave(paste0(resDir, "/PCA_allatacseq_new.old.merged_ntop3000_allSamples.pdf"), width = 10, height = 6)
 
 ### select the samples from the same batch
-sels = grep('-1|-2', design$sample)
-design = design[sels, ]
-dds = dds[, sels]
-fpm = fpm[, sels]
+Select.subset.samples.batches = FALSE
+if(Select.subset.samples.batches){
+  sels = grep('-1|-2', design$sample)
+  design = design[sels, ]
+  dds = dds[, sels]
+  fpm = fpm[, sels]
+  
+}
 
 dds$condition = droplevels(dds$condition)
 
@@ -356,17 +364,17 @@ make.motif.oc.matrix.from.fimo.output(fimo.out = fimo.out,
 ##########################################
 res = readRDS(file = paste0(RdataDir, '/fpm_DE_binding_lfcShrink_res.rds'))
 
-# fdr.cutoff = 0.15; logfc.cutoff = 0.5
-# jj = which((res$padj_zebrah_3dpa.vs.0dpa < fdr.cutoff & abs(res$log2FoldChange_zebrah_3dpa.vs.0dpa) > logfc.cutoff) |
-#              (res$padj_zebrah_7dpa.vs.0dpa < fdr.cutoff & abs(res$log2FoldChange_zebrah_7dpa.vs.0dpa) > logfc.cutoff)
-# )
-# cat(length(jj), '\n')
-
-pval.cutoff = 0.05; logfc.cutoff = 0.0
-jj = which((res$pvalue_zebrah_3dpa.vs.0dpa < pval.cutoff & abs(res$log2FoldChange_zebrah_3dpa.vs.0dpa) > logfc.cutoff) |
-             (res$pvalue_zebrah_7dpa.vs.0dpa < pval.cutoff & abs(res$log2FoldChange_zebrah_7dpa.vs.0dpa) > logfc.cutoff)
+fdr.cutoff = 0.05; logfc.cutoff = 0.5
+jj = which((res$padj_zebrah_3dpa.vs.0dpa < fdr.cutoff & abs(res$log2FoldChange_zebrah_3dpa.vs.0dpa) > logfc.cutoff) |
+             (res$padj_zebrah_7dpa.vs.0dpa < fdr.cutoff & abs(res$log2FoldChange_zebrah_7dpa.vs.0dpa) > logfc.cutoff)
 )
 cat(length(jj), '\n')
+
+# pval.cutoff = 0.05; logfc.cutoff = 0.0
+# jj = which((res$pvalue_zebrah_3dpa.vs.0dpa < pval.cutoff & abs(res$log2FoldChange_zebrah_3dpa.vs.0dpa) > logfc.cutoff) |
+#              (res$pvalue_zebrah_7dpa.vs.0dpa < pval.cutoff & abs(res$log2FoldChange_zebrah_7dpa.vs.0dpa) > logfc.cutoff)
+# )
+# cat(length(jj), '\n')
 
 #res = res[order(res$pvalue_zebrah_3dpa.vs.0dpa), ]
 
@@ -390,7 +398,7 @@ cat(nrow(res), 'DE peaks found !\n')
 res = res[order(-res$log2FoldChange_zebrah_3dpa.vs.0dpa), ]
 
 ## prepare the response matrix
-keep = as.matrix(res[, c(1:6)])
+keep = as.matrix(res[, c(1:12)])
 conds = c('0dpa', '3dpa', '7dpa')
 
 # make sure the response is logscale !!!
@@ -520,7 +528,7 @@ plt = pheatmap(test, show_rownames=TRUE, show_colnames = FALSE,
                annotation_legend = TRUE,
                clustering_callback = callback,
                filename = paste0(figureDir, 'MARA_bayesianRidge_Jaspar2022_', species,'.pdf'), 
-               width = 6, height = 6)
+               width = 6, height = 10)
 
 ### plot associated TF expression
 test = xx[plt$tree_row$order, c(13:16)]
