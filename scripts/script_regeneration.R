@@ -2436,3 +2436,184 @@ as_tibble(xx) %>%
 ggsave(paste0(figureDir, "Footprint_Motif_", motif, ".pdf"),  width = 6, height = 4)
 
 
+########################################################
+########################################################
+# Section : cross-species analysis
+# 1) shared motif analysis
+# 2) shared RUNX1 and AP1 targets
+# 3) Runx1 CNEs analysis 
+########################################################
+########################################################
+
+##########################################
+# regulators cross-species:
+# some code origined from https://davemcg.github.io/post/lets-plot-scrna-dotplots/
+# or from https://github.com/lengfei5/pallium_evo/blob/main/analysis/ComparativeSpeciesAnalysis.Rmd
+##########################################
+library(tidyverse)
+library(ggdendro)
+library(cowplot)
+library(ggtree)
+library(patchwork)
+
+## collect MARA results
+ntop = 135 
+bb = readRDS(file =  paste0(RdataDir, '/MARA_output_Motifs_maxZscore_filteredTFsExpr_top', ntop, '.rds'))
+sels = which(bb[, 2]> bb[, 1]|bb[, 3] > bb[, 1]|bb[, 4]> bb[,1] |bb[, 5] > bb[, 1])
+bb = bb[sels, ]
+keep = as.matrix(bb[, c(2:5)])
+rownames(keep) = bb$gene
+keep = data.frame(keep, stringsAsFactors = FALSE)
+
+keep$zscore = apply(keep, 1, max)
+keep$rank = c(1:nrow(keep)) 
+keep = keep[, -c(1:4)]
+keep$species = 'axolotl'
+keep$gene = rownames(keep)
+rownames(keep) = NULL
+
+### zebrafish fin
+xx = readRDS(file =  paste0('../results/cross_species_20220621/zebrafish_fin/Rdata', 
+                            '/MARA_output_Motifs_filteredTFsExpr.rds'))
+test = data.frame(xx[, c(2, 4)])
+rownames(test) = xx$gene
+test$zscore = apply(test, 1, max)
+test$rank = c(1:nrow(test)) 
+test = test[, -c(1, 2)]
+test$species = 'zebrafishFin'
+test$gene = rownames(test)
+rownames(keep) = NULL
+
+keep = data.frame(rbind(keep, test), stringsAsFactors = FALSE)
+
+#ggs = unique(c(rownames(keep), rownames(test)))
+#keep = data.frame(keep[match(ggs, rownames(keep)), ], test[match(ggs, rownames(test)), ])
+
+### zebrafish heart
+xx = readRDS(file =  paste0('../results/cross_species_20220621/zebrafish_heart/Rdata/', 
+                            '/MARA_output_Motifs_filteredTFsExpr.rds'))
+xx = xx[which(xx$motifs != 'FOS_MA1951.1'), ]
+test = data.frame(xx[, c(2,3)])
+rownames(test) = xx$gene
+
+#test$zscore_zebrafishHeart = apply(test, 1, max)
+#test$rank_zebrafishHeart = c(1:nrow(test)) 
+test$zscore = apply(test, 1, max)
+test$rank = c(1:nrow(test)) 
+test = test[, -c(1, 2)]
+test$species = 'zebrafishHeart'
+test$gene = rownames(test)
+keep = data.frame(rbind(keep, test), stringsAsFactors = FALSE)
+# ggs = unique(c(rownames(keep), rownames(test)))
+# keep = data.frame(keep[match(ggs, rownames(keep)), ], test[match(ggs, rownames(test)), ])
+
+### acoel
+xx = readRDS(file =  paste0('../results/cross_species_20220621/acoel/Rdata/', 
+                            '/MARA_output_sorted.rds'))
+kk1 = apply(as.matrix(xx[, c(1:6)]), 1, function(x) which.max(x) > 1 & max(x) > 2)
+kk2 = apply(as.matrix(xx[, c(7:10)]), 1,  function(x) which.max(x) > 1 & max(x) > 2)
+kk = kk1 + kk2 > 0
+xx = xx[kk, ]
+
+xx = xx[which(xx$motifs != 'MEIS1_MA1639.1'), ]
+test = data.frame(xx[, c(2:6)])
+rownames(test) = xx$gene
+
+test$zscore = apply(test, 1, max)
+test$rank = c(1:nrow(test)) 
+test = test[, c((ncol(test)-1):ncol(test))]
+test$species = 'acoel'
+test$gene = rownames(test)
+keep = data.frame(rbind(keep, test), stringsAsFactors = FALSE)
+#test$zscore_acoel = apply(test, 1, max)
+#test$rank_acoel = c(1:nrow(test)) 
+
+#ggs = unique(c(rownames(keep), rownames(test)))
+#keep = data.frame(keep[match(ggs, rownames(keep)), ], test[match(ggs, rownames(test)), ])
+saveRDS(keep, file = paste0(RdataDir, '/motif_collections_crossSpecies.rds'))
+
+# gene_cluster <- read_tsv('https://github.com/davemcg/davemcg.github.io/raw/master/content/post/scRNA_dotplot_data.tsv.gz')
+# gene_cluster %>% sample_n(5)
+# markers <- gene_cluster$Gene %>% unique()
+keep = readRDS(file = paste0(RdataDir, '/motif_collections_crossSpecies.rds'))
+keep$rank = as.integer(keep$rank)
+
+## discard motifs only once present in acoel, zebrafish fin or heart
+counts = table(keep$species, keep$gene)
+ss = apply(counts, 2, sum)
+genes.NC = colnames(counts)[which(ss > 1)]
+
+mat = counts[, !is.na(match(colnames(counts), genes.NC))]
+clust = hclust(dist(t(mat))) # hclust with distance matrix
+ddgram <- as.dendrogram(clust) # create dendrogram
+ggtree_plot <- ggtree::ggtree(ddgram)
+ggtree_plot
+
+as_tibble(keep) %>% 
+  filter(gene %in% genes.NC) %>% 
+  mutate(gene = factor(gene, levels = clust$labels[clust$order])) %>% 
+  ggplot(aes(y=gene, x = factor(species, levels = c('axolotl', 'zebrafishFin', 'zebrafishHeart', 'acoel')), 
+             color = zscore, size = reorder(rank, -rank))) + 
+  geom_point() + 
+  cowplot::theme_cowplot() + 
+  theme(axis.line  = element_blank()) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  ylab('') + xlab('') +
+  theme(axis.ticks = element_blank()) +
+  scale_color_gradientn(colours = viridis::viridis(20), limits = c(0,8), oob = scales::squish, name = 'motif activity') +
+  theme(axis.text.x = element_text(angle = 60,  size = 18, hjust = 0.4), 
+        axis.text.y = element_text(angle = 0, size = 12), 
+        axis.title =  element_text(size = 12),
+        legend.text = element_text(size=12),
+        legend.title = element_text(size = 14),
+        legend.position='none',
+        #plot.margin = margin()
+        #legend.key.size = unit(1, 'cm')
+        #legend.key.width= unit(1, 'cm')
+  )
+
+ggsave(paste0(figureDir, "CrossSpecies_shared_Regulators.pdf"),  width = 6, height = 10)
+# plot_grid(ggtree_plot, dotplot, nrow = 1, rel_widths = c(0.1,4), align = 'h')
+
+# gene_cluster %>% filter(Gene %in% markers) %>% 
+#   mutate(`% Expressing` = (cell_exp_ct/cell_ct) * 100) %>% 
+#   filter(count > 0, `% Expressing` > 1) %>% 
+#   ggplot(aes(x=cluster, y = Gene, color = count, size = `% Expressing`)) + 
+#   geom_point() + 
+#   cowplot::theme_cowplot() + 
+#   theme(axis.line  = element_blank()) +
+#   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+#   ylab('') +
+#   theme(axis.ticks = element_blank()) + 
+#   #scale_fill_viridis_d(option = 'magma', direction = -1)
+#   scale_color_gradientn(colours = viridis::viridis(20), limits = c(0,4), oob = scales::squish, name = 'log2 (count + 1)')
+
+# cols = colorRampPalette(c(rev(RColorBrewer::brewer.pal(9, "Blues")),
+#                           RColorBrewer::brewer.pal(9, "Reds")))(101)
+# 
+# br = seq(-max(abs(cort$r)), max(abs(cort$r)), length.out = 101)
+# cols = cols[!(br>max(cort$r) | br<min(cort$r))]
+# write.csv(plot_df, 
+#           file = "results/ComparativeSpeciesAnalysis/GABA_all_axolotl_turtle_tab.csv", 
+#           col.names = T, row.names = F, quote = F)
+# corplot = ggplot()+
+#   #facet_grid(~reg, scales = "free", space = "free_x")+
+#   geom_point(data = plot_df, mapping = aes(x = Var2, y = Var1, fill = value, size = padj), 
+#              shape = 21)+
+#   geom_point(data = plot_df[plot_df$rowmax,], mapping = aes(x = Var2, y = Var1, size = padj), 
+#              shape = "—", show.legend = F, colour = "grey10")+
+#   geom_point(data = plot_df[plot_df$colmax,], mapping = aes(x = Var2, y = Var1, size = padj), 
+#              shape = "|", show.legend = F, colour = "grey10")+
+#   scale_x_discrete(expand = c(0,0.7))+
+#   scale_y_discrete(expand = c(0,0.7))+
+#   scale_fill_gradientn(breaks = signif(c(min(cort$r)+0.005, 0, max(cort$r)-0.005),2), 
+#                        values = scales::rescale(c(min(br), 0, max(br))),
+#                        colours = cols)+
+#   labs(x = sp2, y = sp1, fill = "Spearman's\nrho", size = "-log10\nadj. p-value")+
+#   theme_classic()+
+#   theme(axis.title = element_text(colour = "black", face = "bold"),
+#         axis.text = element_text(colour = "black", size = 7),
+#         axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+#         legend.title = element_text(size = 7.5),
+#         legend.text = element_text(size = 6.5),
+#         strip.text = element_text(size = 7.5))
