@@ -21,6 +21,7 @@ subclustering.postional.histM.postioinalAtacPeaks = function(test)
   peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rdata/', 
                                 'position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters_6.rds')) # positional atac
   table(peaks$clusters)
+  
   cluster_order = c(6, 1, 5, 3, 4, 2)
   
   ## specify row gaps as atac-seq peaks
