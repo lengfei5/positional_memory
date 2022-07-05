@@ -1208,7 +1208,7 @@ pdfname = paste0(figureDir, 'chromatinFeatures_relatedTo_dynamicGenes_upregulate
 pdf(pdfname, width = 8, height = 5)
 par(cex = 1.0, las = 1, mgp = c(2,2,0), mar = c(3,2,2,0.2), tcl = -0.3)
 
-upset(DEs, sets = c("H3K4me3", "H3K27ac","atac","H3K4me1", "H3K27me3"), 
+upset(DEs[, c(1:4)], sets = c("H3K4me3", "atac","H3K4me1", "H3K27me3"), 
       mb.ratio = c(0.65, 0.35), order.by = "freq", keep.order =TRUE, decreasing = TRUE, show.numbers = FALSE,
       point.size = 3., line.size = 1.5, mainbar.y.label = "gene counts", sets.x.label = "gene counts", 
       text.scale = 1.6, 
@@ -1365,7 +1365,7 @@ pdfname = paste0(figureDir, 'chromatinFeatures_relatedTo_dynamicGenes_downregula
 pdf(pdfname, width = 8, height = 5)
 par(cex = 1.0, las = 1, mgp = c(2,2,0), mar = c(3,2,2,0.2), tcl = -0.3)
 
-upset(DEs, sets = c("H3K4me3", "H3K27ac","atac","H3K4me1", "H3K27me3"), 
+upset(DEs[, c(1:4)], sets = c("H3K4me3", "atac","H3K4me1", "H3K27me3"), 
           mb.ratio = c(0.65, 0.35), order.by = "freq", keep.order =TRUE, decreasing = TRUE, show.numbers = FALSE,
       point.size = 3., line.size = 1.5, mainbar.y.label = "gene counts", sets.x.label = "gene counts", 
       text.scale = 1.6,
