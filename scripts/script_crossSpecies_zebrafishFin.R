@@ -141,6 +141,8 @@ cat(length(jj), '\n')
 
 res = res[jj, ]
 
+saveRDS(res, file = paste0(RdataDir, '/RNAseq_fpm_DEgenes_lfcShrink_res_RRgenes.rds'))
+
 ggs = get_geneName(rownames(res))
 print(intersect(ggs, tfs))
 
@@ -555,15 +557,20 @@ pheatmap(test, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = FALSE,
 ########################################################
 cat(' star the footprinting analysis \n')
 
-amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
-tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM_geneCorrection_v3.rds'))
+# gene annotation
+gtf = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
 
-DEgenes = tss[which(tss$groups == 'DE_up'|tss$groups == 'DE_down'), ]
+# DE genes from RNA-seq data
+DEgenes = readRDS(file = paste0(RdataDir, '/RNAseq_fpm_DEgenes_lfcShrink_res_RRgenes.rds'))
+DEgenes = data.frame(DEgenes)
+DEgenes$gene = get_geneName(rownames(DEgenes))
+DEgenes$geneID = get_geneID(rownames(DEgenes))
 
-dir.list = list.dirs(path = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/',
-                                   'Data/atacseq_using/footprinting'), recursive = FALSE,  full.names = TRUE)
-dir.list = dir.list[grep('ATAC_footprint_BL_UA_5days|ATAC_footprint_BL_UA_9days', dir.list)]
-dir.list = dir.list[grep('_13616', dir.list)]
+dir.list = list.dirs(path = paste0("/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/",
+                                   "other_species_atac_rnaseq/zebrafish_fin_Lee2020/footprinting"), 
+                     recursive = FALSE,  full.names = TRUE)
+
+dir.list = dir.list[grep('sp7ne4dpa_SRR8587716.SRR8587717.merged|sp7po4dpa_SRR8587720.SRR8587721', dir.list)]
 
 ##### RUNX targets
 motif = 'RUNX' 
@@ -596,26 +603,61 @@ for(m in 1:length(dir.list))
 }
 cat('total footprint found -- ', length(footprint), '\n')
 
-pp.annots = annotatePeak(footprint, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
-
-source('Functions_Integration.matureReg.R')
-p = run_enrichGo_axolotl(pp.annots, distanceToTSS = 2000, regulation = 'both', title = 'RUNX targets')
-
-pdfname = paste0(figureDir, 'GoEnrichment_footprinting_targetGenes_', motif, '_axolotl.pdf')
-pdf(pdfname, width = 8, height = 5)
-par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
-grid.arrange(p, ncol = 1, nrow = 1)
-dev.off()
+pp.annots = annotatePeak(footprint, TxDb=gtf, tssRegion = c(-2000, 2000), level = 'transcript')
 
 ## save the target genes
 pp.annots = as.data.frame(pp.annots)
 pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 2000), ]
+
 pp = pp.annots[!is.na(match(pp.annots$geneId, DEgenes$geneID)), ]
 ggs = DEgenes$gene[match(pp$geneId, DEgenes$geneID)]
 ggs = unique(as.character(ggs))
 cat(length(ggs), ' targets \n')
 
-saveRDS(ggs, file = paste0(RdataDir, '/targetGenes_footprint_', motif, '_axolotl.rds'))
+saveRDS(ggs, file = paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata',
+                           '/targetGenes_footprint_', motif, '_', species,  '.rds'))
 
+motif = 'REL' 
+for(m in 1:length(dir.list))
+{
+  # m = 1
+  subdir = list.dirs(dir.list[m], recursive = FALSE, full.names = TRUE)
+  subdir = subdir[grep(motif, subdir)]
+  subdir = subdir[grep('RUNX3', subdir, invert = TRUE)]
+  subdir = subdir[grep('MA0002.1', subdir, invert = TRUE)]
+  subdir = subdir[grep('RELB', subdir, invert = TRUE)]
   
+  for(n in 1:length(subdir))
+  {
+    bed.list = list.files(path = subdir[n], pattern = '*.txt', full.names = TRUE)
+    bed.file = bed.list[grep('_overview', bed.list)]
+    
+    bounds = read.table(bed.file, header = TRUE)
+    kk = grep('_bound', colnames(bounds))
+    bounds = bounds[which(bounds[,kk] == 1), ]
+    bounds = makeGRangesFromDataFrame(bounds, seqnames.field=c("TFBS_chr"),
+                                      start.field="TFBS_start", end.field="TFBS_end", strand.field="TFBS_strand ")
+    
+    cat(basename(dir.list[m]), ' -- ', basename(bed.file), ' -- bound site ', length(bounds), '\n')
+    if(m == 1 & n == 1){
+      footprint = bounds
+    }else{
+      footprint = union(footprint, bounds)
+    }
+  }
+}
+cat('total footprint found -- ', length(footprint), '\n')
 
+pp.annots = annotatePeak(footprint, TxDb=gtf, tssRegion = c(-2000, 2000), level = 'transcript')
+
+## save the target genes
+pp.annots = as.data.frame(pp.annots)
+pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 2000), ]
+
+pp = pp.annots[!is.na(match(pp.annots$geneId, DEgenes$geneID)), ]
+ggs = DEgenes$gene[match(pp$geneId, DEgenes$geneID)]
+ggs = unique(as.character(ggs))
+cat(length(ggs), ' targets \n')
+
+saveRDS(ggs, file = paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata',
+                           '/targetGenes_footprint_', motif, '_', species,  '.rds'))
