@@ -1140,10 +1140,15 @@ Analysis_TSS_positionalGenes_in_mature_regeneration = function(tss, ids)
 ##########################################
 firstup <- function(x) {
   substr(x, 1, 1) <- toupper(substr(x, 1, 1))
-  x
+  return(x)
 }
-run_enrichGo_axolotl = function(pp.annots, regulation = 'DE_down')
+
+run_enrichGo_axolotl = function(pp.annots, distanceToTSS = 2000,  regulation = 'DE_down', 
+                                title.plot = 'GoEnrichment')
 {
+  pp.annots = as.data.frame(pp.annots)
+  pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < distanceToTSS), ]
+  
   tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM_geneCorrection_v3.rds'))
   bgs = tss$gene
   
@@ -1175,7 +1180,7 @@ run_enrichGo_axolotl = function(pp.annots, regulation = 'DE_down')
                  OrgDb = org.Mm.eg.db)
   
   ego <-  enrichGO(gene         = gene.df$ENSEMBL,
-                   #universe     = bgs.df$ENSEMBL,
+                   universe     = bgs.df$ENSEMBL,
                    #OrgDb         = org.Hs.eg.db,
                    OrgDb         = org.Mm.eg.db,
                    keyType       = 'ENSEMBL',
@@ -1184,12 +1189,10 @@ run_enrichGo_axolotl = function(pp.annots, regulation = 'DE_down')
                    pvalueCutoff  = 0.05,
                    qvalueCutoff  = 0.1)
   
-  barplot(ego) 
-  
   # kk = grep('deoxyribonucleic', ego@result$Description)
   # ego@result$Description[kk] = 'endonuclease activity'
   
-  eval(parse(text = paste0('p = barplot(ego, showCategory=20) + ggtitle("', motif, ' target genes")')))
+  eval(parse(text = paste0('p = barplot(ego, showCategory=20) + ggtitle("', title.plot, '")')))
   plot(p)
   
   return(p)

@@ -2810,14 +2810,16 @@ require(ggpubr)
 #require(ChIPseeker)
 
 amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
+tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM_geneCorrection_v3.rds'))
 
+DEgenes = tss[which(tss$groups == 'DE_up'|tss$groups == 'DE_down'), ]
 
 dir.list = list.dirs(path = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/',
                                      'Data/atacseq_using/footprinting'), recursive = FALSE,  full.names = TRUE)
 dir.list = dir.list[grep('ATAC_footprint_BL_UA_5days|ATAC_footprint_BL_UA_9days', dir.list)]
 dir.list = dir.list[grep('_13616', dir.list)]
 
-## RUNX targets
+##### RUNX targets
 motif = 'RUNX' 
 for(m in 1:length(dir.list))
 {
@@ -2850,61 +2852,24 @@ cat('total footprint found -- ', length(footprint), '\n')
 
 pp.annots = annotatePeak(footprint, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
 
-#plotAnnoBar(pp.annots)
-pp.annots = as.data.frame(pp.annots)
-pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 2000), ]
-
-#source('Functions_Integration.matureReg.R')
-#p = run_enrichGo_axolotl(pp.annots, regulation = 'both')
-
-tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM_geneCorrection_v3.rds'))
-bgs = tss$gene
-
-# tss = tss[which(tss$groups == 'DE_down'), ]
-tss = tss[which(tss$groups == 'DE_up'|tss$groups == 'DE_down'), ]
-
-pp = pp.annots[!is.na(match(pp.annots$geneId, tss$geneID)), ]
-ggs = tss$gene[match(pp$geneId, tss$geneID)]
-ggs = unique(as.character(ggs))
-
-gg.expressed = ggs # gene set 
-xx0 = bgs # background
-
-gg.expressed = gg.expressed[which(gg.expressed != '' & gg.expressed != 'N/A' & !is.na(gg.expressed))]
-bgs = unique(xx0[which(xx0 != '' & xx0 != 'N/A' & !is.na(xx0))])
-
-gg.expressed = firstup(tolower(gg.expressed))
-bgs = firstup(tolower(bgs))
-
-gene.df <- bitr(gg.expressed, fromType = "SYMBOL", toType = c("ENSEMBL", "ENTREZID"),
-                OrgDb = org.Mm.eg.db)
-bgs.df <- bitr(bgs, fromType = "SYMBOL", toType = c("ENSEMBL", "ENTREZID"),
-               OrgDb = org.Mm.eg.db)
-
-ego <-  enrichGO(gene         = gene.df$ENSEMBL,
-                 universe     = bgs.df$ENSEMBL,
-                 #OrgDb         = org.Hs.eg.db,
-                 OrgDb         = org.Mm.eg.db,
-                 keyType       = 'ENSEMBL',
-                 ont           = "BP",
-                 pAdjustMethod = "BH",
-                 pvalueCutoff  = 0.05,
-                 qvalueCutoff  = 0.1)
-
-barplot(ego, showCategory = 20)
-
-# kk = grep('deoxyribonucleic', ego@result$Description)
-# ego@result$Description[kk] = 'endonuclease activity'
-
-eval(parse(text = paste0('p = barplot(ego, showCategory=20) + ggtitle("', motif, ' target genes")')))
+source('Functions_Integration.matureReg.R')
+p = run_enrichGo_axolotl(pp.annots, distanceToTSS = 2000, regulation = 'both', title = 'RUNX targets')
 
 pdfname = paste0(figureDir, 'GoEnrichment_footprinting_targetGenes_', motif, '_axolotl.pdf')
 pdf(pdfname, width = 8, height = 5)
 par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
-
 grid.arrange(p, ncol = 1, nrow = 1)
-
 dev.off()
+
+## save the target genes
+pp.annots = as.data.frame(pp.annots)
+pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 2000), ]
+pp = pp.annots[!is.na(match(pp.annots$geneId, DEgenes$geneID)), ]
+ggs = DEgenes$gene[match(pp$geneId, DEgenes$geneID)]
+ggs = unique(as.character(ggs))
+cat(length(ggs), ' targets \n')
+
+saveRDS(ggs, file = paste0(RdataDir, '/targetGenes_footprint_', motif, '_axolotl.rds'))
 
 ### FOS-JUND motif
 motif = 'FOS_JUND'
@@ -2945,56 +2910,26 @@ pp.annots = annotatePeak(footprint, TxDb=amex, tssRegion = c(-2000, 2000), level
 pp.annots = as.data.frame(pp.annots)
 pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 2000), ]
 
-tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM_geneCorrection_v3.rds'))
-bgs = tss$gene
-
-tss = tss[which(tss$groups == 'DE_down'), ]
-# tss = tss[which(tss$groups == 'DE_up'|tss$groups == 'DE_down'), ]
-
-pp = pp.annots[!is.na(match(pp.annots$geneId, tss$geneID)), ]
-ggs = tss$gene[match(pp$geneId, tss$geneID)]
-ggs = unique(as.character(ggs))
-cat(length(ggs), ' targets \n')
-
-gg.expressed = ggs # gene set 
-xx0 = bgs # background
-
-gg.expressed = gg.expressed[which(gg.expressed != '' & gg.expressed != 'N/A' & !is.na(gg.expressed))]
-bgs = unique(xx0[which(xx0 != '' & xx0 != 'N/A' & !is.na(xx0))])
-
-gg.expressed = firstup(tolower(gg.expressed))
-bgs = firstup(tolower(bgs))
-
-gene.df <- bitr(gg.expressed, fromType = "SYMBOL", toType = c("ENSEMBL", "ENTREZID"),
-                OrgDb = org.Mm.eg.db)
-bgs.df <- bitr(bgs, fromType = "SYMBOL", toType = c("ENSEMBL", "ENTREZID"),
-               OrgDb = org.Mm.eg.db)
-
-ego <-  enrichGO(gene         = gene.df$ENSEMBL,
-                 universe     = bgs.df$ENSEMBL,
-                 #OrgDb         = org.Hs.eg.db,
-                 OrgDb         = org.Mm.eg.db,
-                 keyType       = 'ENSEMBL',
-                 ont           = "BP",
-                 pAdjustMethod = "BH",
-                 pvalueCutoff  = 0.05,
-                 qvalueCutoff  = 0.1)
-
-barplot(ego, showCategory = 20)
-
-# kk = grep('deoxyribonucleic', ego@result$Description)
-# ego@result$Description[kk] = 'endonuclease activity'
-
-eval(parse(text = paste0('p = barplot(ego, showCategory=20) + ggtitle("', motif, ' target genes")')))
+source('Functions_Integration.matureReg.R')
+p = run_enrichGo_axolotl(pp.annots, distanceToTSS = 2000, regulation = 'DE_down', title.plot = 'AP-1 targets')
 
 pdfname = paste0(figureDir, 'GoEnrichment_footprinting_targetGenes_', motif, '_axolotl.pdf')
 pdf(pdfname, width = 8, height = 5)
 par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
-
 grid.arrange(p, ncol = 1, nrow = 1)
-
 dev.off()
 
+## save the target genes
+pp.annots = as.data.frame(pp.annots)
+pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 2000), ]
+pp = pp.annots[!is.na(match(pp.annots$geneId, DEgenes$geneID)), ]
+ggs = DEgenes$gene[match(pp$geneId, DEgenes$geneID)]
+ggs = unique(as.character(ggs))
+cat(length(ggs), ' targets \n')
+saveRDS(ggs, file = paste0(RdataDir, '/targetGenes_footprint_', motif, '_axolotl.rds'))
+
+
+## motif RELA 
 motif = 'REL'
 for(m in 1:length(dir.list))
 {
@@ -3030,19 +2965,23 @@ cat('total footprint found -- ', length(footprint), '\n')
 pp.annots = annotatePeak(footprint, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
 
 #plotAnnoBar(pp.annots)
-pp.annots = as.data.frame(pp.annots)
-pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 2000), ]
-
 source('Functions_Integration.matureReg.R')
-p = run_enrichGo_axolotl(pp.annots, regulation = 'DE_down')
+p = run_enrichGo_axolotl(pp.annots, distanceToTSS = 2000, regulation = 'DE_down', title.plot = 'RELA targets')
 
 pdfname = paste0(figureDir, 'GoEnrichment_footprinting_targetGenes_', motif, '_axolotl.pdf')
 pdf(pdfname, width = 8, height = 5)
 par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
-
 grid.arrange(p, ncol = 1, nrow = 1)
-
 dev.off()
+
+## save the target genes
+pp.annots = as.data.frame(pp.annots)
+pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 2000), ]
+pp = pp.annots[!is.na(match(pp.annots$geneId, DEgenes$geneID)), ]
+ggs = DEgenes$gene[match(pp$geneId, DEgenes$geneID)]
+ggs = unique(as.character(ggs))
+cat(length(ggs), ' targets \n')
+saveRDS(ggs, file = paste0(RdataDir, '/targetGenes_footprint_', motif, '_axolotl.rds'))
 
 
 motif = 'BACH1'
@@ -3080,22 +3019,23 @@ cat('total footprint found -- ', length(footprint), '\n')
 
 pp.annots = annotatePeak(footprint, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
 
-#plotAnnoBar(pp.annots)
-pp.annots = as.data.frame(pp.annots)
-pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 2000), ]
-
 source('Functions_Integration.matureReg.R')
-p = run_enrichGo_axolotl(pp.annots, regulation = 'DE_down')
+p = run_enrichGo_axolotl(pp.annots, distanceToTSS = 2000, regulation = 'DE_down', title.plot = 'BACH1 targets')
 
 pdfname = paste0(figureDir, 'GoEnrichment_footprinting_targetGenes_', motif, '_axolotl.pdf')
 pdf(pdfname, width = 8, height = 5)
 par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
-
 grid.arrange(p, ncol = 1, nrow = 1)
-
 dev.off()
 
-
+## save the target genes
+pp.annots = as.data.frame(pp.annots)
+pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 2000), ]
+pp = pp.annots[!is.na(match(pp.annots$geneId, DEgenes$geneID)), ]
+ggs = DEgenes$gene[match(pp$geneId, DEgenes$geneID)]
+ggs = unique(as.character(ggs))
+cat(length(ggs), ' targets \n')
+saveRDS(ggs, file = paste0(RdataDir, '/targetGenes_footprint_', motif, '_axolotl.rds'))
 
 motif = 'MAF_NFE2'
 for(m in 1:length(dir.list))
@@ -3133,18 +3073,21 @@ cat('total footprint found -- ', length(footprint), '\n')
 
 pp.annots = annotatePeak(footprint, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
 
-#plotAnnoBar(pp.annots)
-pp.annots = as.data.frame(pp.annots)
-pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 2000), ]
-
 source('Functions_Integration.matureReg.R')
-p = run_enrichGo_axolotl(pp.annots, regulation = 'DE_up')
+p = run_enrichGo_axolotl(pp.annots, distanceToTSS = 2000, regulation = 'DE_up', title.plot = 'MAFK targets')
 
 pdfname = paste0(figureDir, 'GoEnrichment_footprinting_targetGenes_', motif, '_axolotl.pdf')
 pdf(pdfname, width = 8, height = 5)
 par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
-
 grid.arrange(p, ncol = 1, nrow = 1)
-
 dev.off()
+
+## save the target genes
+pp.annots = as.data.frame(pp.annots)
+pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 2000), ]
+pp = pp.annots[!is.na(match(pp.annots$geneId, DEgenes$geneID)), ]
+ggs = DEgenes$gene[match(pp$geneId, DEgenes$geneID)]
+ggs = unique(as.character(ggs))
+cat(length(ggs), ' targets \n')
+saveRDS(ggs, file = paste0(RdataDir, '/targetGenes_footprint_', motif, '_axolotl.rds'))
 
