@@ -243,6 +243,19 @@ load(file = paste0(RdataDir, '/samplesDesign_readCounts.within_peakConsensus.Rda
 design$batch = '2'
 design$batch[grep('-1|-2', design$sample)] = '1'
 
+# save sample info for footprinting 
+saveSampleInfo4Footprint = FALSE
+if(saveSampleInfo4Footprint){
+  design$condition = paste0(design$condition, '_batch', design$batch)
+  xx = design[, c(1, 3)]
+  colnames(xx) = c('sampleID', 'condition')
+  
+  if(!dir.exists(paste0(dataDir, '/footprinting'))) dir.create(paste0(dataDir, '/footprinting'))
+  write.table(xx, file = paste0(dataDir, '/footprinting/sample_infos.txt'), sep = '\t', quote = FALSE, col.names = TRUE,
+              row.names = FALSE)
+  
+}
+
 ss = apply(as.matrix(counts[, -1]), 1, mean)
 
 par(mfrow=c(1,2))

@@ -228,6 +228,18 @@ counts = process.countTable(all=all, design = design[, c(1, 3)])
 
 save(design, counts, file = paste0(RdataDir, '/samplesDesign_readCounts.within_peakConsensus.Rdata'))
 
+# save sample info for footprinting 
+saveSampleInfo4Footprint = FALSE
+if(saveSampleInfo4Footprint){
+  xx = design[, c(1, 3)]
+  colnames(xx) = c('sampleID', 'condition')
+  
+  write.table(xx, file = paste0(dataDir, '/footprinting/sample_infos.txt'), sep = '\t', quote = FALSE, col.names = TRUE,
+              row.names = FALSE)
+  
+}
+
+
 
 ss = apply(as.matrix(counts[, -1]), 1, mean)
 

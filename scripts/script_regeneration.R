@@ -47,7 +47,7 @@ require(ggpubr)
 
 # limb fibroblast expressing genes
 gtf.file =  '../data/AmexT_v47_Hox.patch_limb.fibroblast.expressing.23585.genes.dev.mature.regeneration.gtf'
-amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
+#amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
 
 ########################################################
 ########################################################
@@ -2435,6 +2435,145 @@ as_tibble(xx) %>%
 
 ggsave(paste0(figureDir, "Footprint_Motif_", motif, ".pdf"),  width = 6, height = 4)
 
+motif = 'BACH1'
+f = file.list[grep(motif, file.list)]
+f = f[grep('BACH1_MA1633.2_BACH1_MA1633.2', f)]
+
+ff = read.table(f, as.is = c(1:3))
+xx = matrix(NA, nrow = nrow(ff), ncol = 500)
+for(n in 1:nrow(xx))
+{
+  xx[n, ] = sapply(ff[n, 3],  function(x) as.numeric(unlist(strsplit(as.character(x), ','))))
+}
+
+## scale the data according to 50bp in right/left sides
+ss = apply(xx[, c(1:50, 450:500)], 1, median)
+for(n in 1:nrow(xx)) xx[n,] = xx[n,] - ss[n]
+apply(xx[, c(1:50, 450:500)], 1, median)
+
+xx = data.frame(sample = c('mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d'), xx,  stringsAsFactors = FALSE)
+colnames(xx)[2:501] = as.factor(seq(1, 500, by = 1))
+
+as_tibble(xx) %>%
+  gather(bins, signals, 2:501) %>%
+  mutate(bins = factor(bins, levels=c(1:500))) %>% 
+  mutate(sample = factor(sample, levels = c('mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d'))) %>%
+  ggplot(aes(y=signals, x=bins, color = sample, group = sample)) + 
+  #geom_line(aes(linetype=sample, color = sample), size = 0) +
+  geom_smooth(span = 0.03, method = 'loess', se = FALSE, size =1.5) + 
+  theme_classic() +
+  theme(axis.text.y = element_text(angle = 0, size = 16), 
+        axis.text.x = element_text(angle = 0, size = 16),
+        axis.title = element_text(angle = 0, size = 16),
+        legend.position = c(0.8, 0.9),
+        legend.text = element_text(size=14),
+        legend.title = element_text(size = 14)
+        #axis.text.x = element_blank(), 
+        #axis.ticks = element_blank()
+  ) +
+  #scale_color_manual(values=c('gray60', 'darkgreen', 'blue', 'gray70','gray80')) +
+  #scale_linetype_manual(values=c("dotted", "solid", "solid", "dotted", "dotted")) + 
+  labs( x = 'bp from center', y = 'Enrichment score') +
+  scale_x_discrete(
+    breaks=c(50, 150,  250, 350, 450),
+    labels=c("-200", '-100', "0", '100', "200")
+  )
+
+ggsave(paste0(figureDir, "Footprint_Motif_", motif, ".pdf"),  width = 6, height = 4)
+
+
+motif = 'MAFK'
+f = file.list[grep(motif, file.list)]
+f = f[grep('MAFK_MA0496.3_MAFK_MA0496.3', f)]
+
+ff = read.table(f, as.is = c(1:3))
+xx = matrix(NA, nrow = nrow(ff), ncol = 500)
+for(n in 1:nrow(xx))
+{
+  xx[n, ] = sapply(ff[n, 3],  function(x) as.numeric(unlist(strsplit(as.character(x), ','))))
+}
+
+## scale the data according to 50bp in right/left sides
+ss = apply(xx[, c(1:50, 450:500)], 1, median)
+for(n in 1:nrow(xx)) xx[n,] = xx[n,] - ss[n]
+apply(xx[, c(1:50, 450:500)], 1, median)
+
+xx = data.frame(sample = c('mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d'), xx,  stringsAsFactors = FALSE)
+colnames(xx)[2:501] = as.factor(seq(1, 500, by = 1))
+
+as_tibble(xx) %>%
+  gather(bins, signals, 2:501) %>%
+  mutate(bins = factor(bins, levels=c(1:500))) %>% 
+  mutate(sample = factor(sample, levels = c('mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d'))) %>%
+  ggplot(aes(y=signals, x=bins, color = sample, group = sample)) + 
+  #geom_line(aes(linetype=sample, color = sample), size = 0) +
+  geom_smooth(span = 0.03, method = 'loess', se = FALSE, size =1.5) + 
+  theme_classic() +
+  theme(axis.text.y = element_text(angle = 0, size = 16), 
+        axis.text.x = element_text(angle = 0, size = 16),
+        axis.title = element_text(angle = 0, size = 16),
+        legend.text = element_text(size=14),
+        legend.title = element_text(size = 14),
+        legend.position = 'none'
+        #axis.text.x = element_blank(), 
+        #axis.ticks = element_blank()
+  ) +
+  #scale_color_manual(values=c('gray60', 'darkgreen', 'blue', 'gray70','gray80')) +
+  #scale_linetype_manual(values=c("dotted", "solid", "solid", "dotted", "dotted")) + 
+  labs( x = 'bp from center', y = 'Enrichment score') +
+  scale_x_discrete(
+    breaks=c(50, 150,  250, 350, 450),
+    labels=c("-200", '-100', "0", '100', "200")
+  )
+
+ggsave(paste0(figureDir, "Footprint_Motif_", motif, ".pdf"),  width = 6, height = 4)
+
+
+motif = 'RELA'
+f = file.list[grep(motif, file.list)]
+
+ff = read.table(f, as.is = c(1:3))
+xx = matrix(NA, nrow = nrow(ff), ncol = 500)
+for(n in 1:nrow(xx))
+{
+  xx[n, ] = sapply(ff[n, 3],  function(x) as.numeric(unlist(strsplit(as.character(x), ','))))
+}
+
+## scale the data according to 50bp in right/left sides
+ss = apply(xx[, c(1:50, 450:500)], 1, median)
+for(n in 1:nrow(xx)) xx[n,] = xx[n,] - ss[n]
+apply(xx[, c(1:50, 450:500)], 1, median)
+
+xx = data.frame(sample = c('mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d'), xx,  stringsAsFactors = FALSE)
+colnames(xx)[2:501] = as.factor(seq(1, 500, by = 1))
+
+as_tibble(xx) %>%
+  gather(bins, signals, 2:501) %>%
+  mutate(bins = factor(bins, levels=c(1:500))) %>% 
+  mutate(sample = factor(sample, levels = c('mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d'))) %>%
+  ggplot(aes(y=signals, x=bins, color = sample, group = sample)) + 
+  #geom_line(aes(linetype=sample, color = sample), size = 0) +
+  geom_smooth(span = 0.05, method = 'loess', se = FALSE, size =1.5) + 
+  theme_classic() +
+  theme(axis.text.y = element_text(angle = 0, size = 16), 
+        axis.text.x = element_text(angle = 0, size = 16),
+        axis.title = element_text(angle = 0, size = 16),
+        legend.text = element_text(size=14),
+        legend.title = element_text(size = 14),
+        legend.position = 'none'
+        #axis.text.x = element_blank(), 
+        #axis.ticks = element_blank()
+  ) +
+  #scale_color_manual(values=c('gray60', 'darkgreen', 'blue', 'gray70','gray80')) +
+  #scale_linetype_manual(values=c("dotted", "solid", "solid", "dotted", "dotted")) + 
+  labs( x = 'bp from center', y = 'Enrichment score') +
+  scale_x_discrete(
+    breaks=c(50, 150,  250, 350, 450),
+    labels=c("-200", '-100', "0", '100', "200")
+  )
+
+ggsave(paste0(figureDir, "Footprint_Motif_", motif, ".pdf"),  width = 6, height = 4)
+
 
 ########################################################
 ########################################################
@@ -2643,3 +2782,369 @@ as_tibble(keep) %>%
         #legend.key.width= unit(1, 'cm')
   )
 ggsave(paste0(figureDir, "CrossSpecies_shared_Regulators_Legend.pdf"),  width = 8, height = 10)
+
+##########################################
+##########################################
+# gene targets of RUNX1/2, RELA, AP-1, Bach1, MAFK in axolotl
+##########################################
+##########################################
+library(tidyr)
+library(dplyr)
+require(ggplot2)
+library("gridExtra")
+library("cowplot")
+require(ggpubr)
+library(enrichplot)
+library(clusterProfiler)
+library(openxlsx)
+library(ggplot2)
+library(stringr)
+#library(org.Hs.eg.db)
+library(org.Mm.eg.db)
+library(tidyr)
+library(dplyr)
+require(ggplot2)
+library("gridExtra")
+library("cowplot")
+require(ggpubr)
+#require(ChIPseeker)
+
+amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
+
+
+dir.list = list.dirs(path = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/',
+                                     'Data/atacseq_using/footprinting'), recursive = FALSE,  full.names = TRUE)
+dir.list = dir.list[grep('ATAC_footprint_BL_UA_5days|ATAC_footprint_BL_UA_9days', dir.list)]
+dir.list = dir.list[grep('_13616', dir.list)]
+
+## RUNX targets
+motif = 'RUNX' 
+for(m in 1:length(dir.list))
+{
+  # m = 1
+  subdir = list.dirs(dir.list[m], recursive = FALSE, full.names = TRUE)
+  subdir = subdir[grep(motif, subdir)]
+  subdir = subdir[grep('RUNX3', subdir, invert = TRUE)]
+  subdir = subdir[grep('MA0002.1', subdir, invert = TRUE)]
+  
+  for(n in 1:length(subdir))
+  {
+    bed.list = list.files(path = subdir[n], pattern = '*.txt', full.names = TRUE)
+    bed.file = bed.list[grep('_overview', bed.list)]
+    
+    bounds = read.table(bed.file, header = TRUE)
+    kk = grep('_bound', colnames(bounds))
+    bounds = bounds[which(bounds[,kk] == 1), ]
+    bounds = makeGRangesFromDataFrame(bounds, seqnames.field=c("TFBS_chr"),
+                                           start.field="TFBS_start", end.field="TFBS_end", strand.field="TFBS_strand ")
+    
+    cat(basename(dir.list[m]), ' -- ', basename(bed.file), ' -- bound site ', length(bounds), '\n')
+    if(m == 1 & n == 1){
+      footprint = bounds
+    }else{
+      footprint = union(footprint, bounds)
+    }
+  }
+}
+cat('total footprint found -- ', length(footprint), '\n')
+
+pp.annots = annotatePeak(footprint, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+
+#plotAnnoBar(pp.annots)
+pp.annots = as.data.frame(pp.annots)
+pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 2000), ]
+
+#source('Functions_Integration.matureReg.R')
+#p = run_enrichGo_axolotl(pp.annots, regulation = 'both')
+
+tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM_geneCorrection_v3.rds'))
+bgs = tss$gene
+
+# tss = tss[which(tss$groups == 'DE_down'), ]
+tss = tss[which(tss$groups == 'DE_up'|tss$groups == 'DE_down'), ]
+
+pp = pp.annots[!is.na(match(pp.annots$geneId, tss$geneID)), ]
+ggs = tss$gene[match(pp$geneId, tss$geneID)]
+ggs = unique(as.character(ggs))
+
+gg.expressed = ggs # gene set 
+xx0 = bgs # background
+
+gg.expressed = gg.expressed[which(gg.expressed != '' & gg.expressed != 'N/A' & !is.na(gg.expressed))]
+bgs = unique(xx0[which(xx0 != '' & xx0 != 'N/A' & !is.na(xx0))])
+
+gg.expressed = firstup(tolower(gg.expressed))
+bgs = firstup(tolower(bgs))
+
+gene.df <- bitr(gg.expressed, fromType = "SYMBOL", toType = c("ENSEMBL", "ENTREZID"),
+                OrgDb = org.Mm.eg.db)
+bgs.df <- bitr(bgs, fromType = "SYMBOL", toType = c("ENSEMBL", "ENTREZID"),
+               OrgDb = org.Mm.eg.db)
+
+ego <-  enrichGO(gene         = gene.df$ENSEMBL,
+                 universe     = bgs.df$ENSEMBL,
+                 #OrgDb         = org.Hs.eg.db,
+                 OrgDb         = org.Mm.eg.db,
+                 keyType       = 'ENSEMBL',
+                 ont           = "BP",
+                 pAdjustMethod = "BH",
+                 pvalueCutoff  = 0.05,
+                 qvalueCutoff  = 0.1)
+
+barplot(ego, showCategory = 20)
+
+# kk = grep('deoxyribonucleic', ego@result$Description)
+# ego@result$Description[kk] = 'endonuclease activity'
+
+eval(parse(text = paste0('p = barplot(ego, showCategory=20) + ggtitle("', motif, ' target genes")')))
+
+pdfname = paste0(figureDir, 'GoEnrichment_footprinting_targetGenes_', motif, '_axolotl.pdf')
+pdf(pdfname, width = 8, height = 5)
+par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+
+grid.arrange(p, ncol = 1, nrow = 1)
+
+dev.off()
+
+### FOS-JUND motif
+motif = 'FOS_JUND'
+for(m in 1:length(dir.list))
+{
+  # m = 1
+  subdir = list.dirs(dir.list[m], recursive = FALSE, full.names = TRUE)
+  subdir = subdir[grep(motif, subdir)]
+  subdir = subdir[grep('RUNX3', subdir, invert = TRUE)]
+  subdir = subdir[grep('MA0002.1', subdir, invert = TRUE)]
+  
+  for(n in 1:length(subdir))
+  {
+    # n = 1
+    
+    bed.list = list.files(path = subdir[n], pattern = '*.txt', full.names = TRUE)
+    bed.file = bed.list[grep('_overview', bed.list)]
+    
+    bounds = read.table(bed.file, header = TRUE)
+    kk = grep('_bound', colnames(bounds))
+    bounds = bounds[which(bounds[,kk] == 1), ]
+    bounds = makeGRangesFromDataFrame(bounds, seqnames.field=c("TFBS_chr"),
+                                      start.field="TFBS_start", end.field="TFBS_end", strand.field="TFBS_strand ")
+    
+    cat(basename(dir.list[m]), ' -- ', basename(bed.file), ' -- bound site ', length(bounds), '\n')
+    if(m == 1 & n == 1){
+      footprint = bounds
+    }else{
+      footprint = union(footprint, bounds)
+    }
+  }
+}
+cat('total footprint found -- ', length(footprint), '\n')
+
+pp.annots = annotatePeak(footprint, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+
+#plotAnnoBar(pp.annots)
+pp.annots = as.data.frame(pp.annots)
+pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 2000), ]
+
+tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM_geneCorrection_v3.rds'))
+bgs = tss$gene
+
+tss = tss[which(tss$groups == 'DE_down'), ]
+# tss = tss[which(tss$groups == 'DE_up'|tss$groups == 'DE_down'), ]
+
+pp = pp.annots[!is.na(match(pp.annots$geneId, tss$geneID)), ]
+ggs = tss$gene[match(pp$geneId, tss$geneID)]
+ggs = unique(as.character(ggs))
+cat(length(ggs), ' targets \n')
+
+gg.expressed = ggs # gene set 
+xx0 = bgs # background
+
+gg.expressed = gg.expressed[which(gg.expressed != '' & gg.expressed != 'N/A' & !is.na(gg.expressed))]
+bgs = unique(xx0[which(xx0 != '' & xx0 != 'N/A' & !is.na(xx0))])
+
+gg.expressed = firstup(tolower(gg.expressed))
+bgs = firstup(tolower(bgs))
+
+gene.df <- bitr(gg.expressed, fromType = "SYMBOL", toType = c("ENSEMBL", "ENTREZID"),
+                OrgDb = org.Mm.eg.db)
+bgs.df <- bitr(bgs, fromType = "SYMBOL", toType = c("ENSEMBL", "ENTREZID"),
+               OrgDb = org.Mm.eg.db)
+
+ego <-  enrichGO(gene         = gene.df$ENSEMBL,
+                 universe     = bgs.df$ENSEMBL,
+                 #OrgDb         = org.Hs.eg.db,
+                 OrgDb         = org.Mm.eg.db,
+                 keyType       = 'ENSEMBL',
+                 ont           = "BP",
+                 pAdjustMethod = "BH",
+                 pvalueCutoff  = 0.05,
+                 qvalueCutoff  = 0.1)
+
+barplot(ego, showCategory = 20)
+
+# kk = grep('deoxyribonucleic', ego@result$Description)
+# ego@result$Description[kk] = 'endonuclease activity'
+
+eval(parse(text = paste0('p = barplot(ego, showCategory=20) + ggtitle("', motif, ' target genes")')))
+
+pdfname = paste0(figureDir, 'GoEnrichment_footprinting_targetGenes_', motif, '_axolotl.pdf')
+pdf(pdfname, width = 8, height = 5)
+par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+
+grid.arrange(p, ncol = 1, nrow = 1)
+
+dev.off()
+
+motif = 'REL'
+for(m in 1:length(dir.list))
+{
+  # m = 1
+  subdir = list.dirs(dir.list[m], recursive = FALSE, full.names = TRUE)
+  subdir = subdir[grep(motif, subdir)]
+  subdir = subdir[grep('RUNX3', subdir, invert = TRUE)]
+  subdir = subdir[grep('MA0002.1', subdir, invert = TRUE)]
+  
+  for(n in 1:length(subdir))
+  {
+    # n = 1
+    
+    bed.list = list.files(path = subdir[n], pattern = '*.txt', full.names = TRUE)
+    bed.file = bed.list[grep('_overview', bed.list)]
+    
+    bounds = read.table(bed.file, header = TRUE)
+    kk = grep('_bound', colnames(bounds))
+    bounds = bounds[which(bounds[,kk] == 1), ]
+    bounds = makeGRangesFromDataFrame(bounds, seqnames.field=c("TFBS_chr"),
+                                      start.field="TFBS_start", end.field="TFBS_end", strand.field="TFBS_strand ")
+    
+    cat(basename(dir.list[m]), ' -- ', basename(bed.file), ' -- bound site ', length(bounds), '\n')
+    if(m == 1 & n == 1){
+      footprint = bounds
+    }else{
+      footprint = union(footprint, bounds)
+    }
+  }
+}
+cat('total footprint found -- ', length(footprint), '\n')
+
+pp.annots = annotatePeak(footprint, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+
+#plotAnnoBar(pp.annots)
+pp.annots = as.data.frame(pp.annots)
+pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 2000), ]
+
+source('Functions_Integration.matureReg.R')
+p = run_enrichGo_axolotl(pp.annots, regulation = 'DE_down')
+
+pdfname = paste0(figureDir, 'GoEnrichment_footprinting_targetGenes_', motif, '_axolotl.pdf')
+pdf(pdfname, width = 8, height = 5)
+par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+
+grid.arrange(p, ncol = 1, nrow = 1)
+
+dev.off()
+
+
+motif = 'BACH1'
+for(m in 1:length(dir.list))
+{
+  # m = 1
+  subdir = list.dirs(dir.list[m], recursive = FALSE, full.names = TRUE)
+  subdir = subdir[grep(motif, subdir)]
+  subdir = subdir[grep('RUNX3', subdir, invert = TRUE)]
+  subdir = subdir[grep('MA0002.1', subdir, invert = TRUE)]
+  subdir = subdir[grep('MA1633.1|MAFK', subdir, invert = TRUE)]
+  
+  for(n in 1:length(subdir))
+  {
+    # n = 1
+    
+    bed.list = list.files(path = subdir[n], pattern = '*.txt', full.names = TRUE)
+    bed.file = bed.list[grep('_overview', bed.list)]
+    
+    bounds = read.table(bed.file, header = TRUE)
+    kk = grep('_bound', colnames(bounds))
+    bounds = bounds[which(bounds[,kk] == 1), ]
+    bounds = makeGRangesFromDataFrame(bounds, seqnames.field=c("TFBS_chr"),
+                                      start.field="TFBS_start", end.field="TFBS_end", strand.field="TFBS_strand ")
+    
+    cat(basename(dir.list[m]), ' -- ', basename(bed.file), ' -- bound site ', length(bounds), '\n')
+    if(m == 1 & n == 1){
+      footprint = bounds
+    }else{
+      footprint = union(footprint, bounds)
+    }
+  }
+}
+cat('total footprint found -- ', length(footprint), '\n')
+
+pp.annots = annotatePeak(footprint, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+
+#plotAnnoBar(pp.annots)
+pp.annots = as.data.frame(pp.annots)
+pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 2000), ]
+
+source('Functions_Integration.matureReg.R')
+p = run_enrichGo_axolotl(pp.annots, regulation = 'DE_down')
+
+pdfname = paste0(figureDir, 'GoEnrichment_footprinting_targetGenes_', motif, '_axolotl.pdf')
+pdf(pdfname, width = 8, height = 5)
+par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+
+grid.arrange(p, ncol = 1, nrow = 1)
+
+dev.off()
+
+
+
+motif = 'MAF_NFE2'
+for(m in 1:length(dir.list))
+{
+  # m = 1
+  subdir = list.dirs(dir.list[m], recursive = FALSE, full.names = TRUE)
+  subdir = subdir[grep(motif, subdir)]
+  subdir = subdir[grep('RUNX3', subdir, invert = TRUE)]
+  subdir = subdir[grep('MA0002.1', subdir, invert = TRUE)]
+  subdir = subdir[grep('MA1633.1', subdir, invert = TRUE)]
+  subdir = subdir[grep('BACH1', subdir, invert = TRUE)]
+  
+  for(n in 1:length(subdir))
+  {
+    # n = 1
+    
+    bed.list = list.files(path = subdir[n], pattern = '*.txt', full.names = TRUE)
+    bed.file = bed.list[grep('_overview', bed.list)]
+    
+    bounds = read.table(bed.file, header = TRUE)
+    kk = grep('_bound', colnames(bounds))
+    bounds = bounds[which(bounds[,kk] == 1), ]
+    bounds = makeGRangesFromDataFrame(bounds, seqnames.field=c("TFBS_chr"),
+                                      start.field="TFBS_start", end.field="TFBS_end", strand.field="TFBS_strand ")
+    
+    cat(basename(dir.list[m]), ' -- ', basename(bed.file), ' -- bound site ', length(bounds), '\n')
+    if(m == 1 & n == 1){
+      footprint = bounds
+    }else{
+      footprint = union(footprint, bounds)
+    }
+  }
+}
+cat('total footprint found -- ', length(footprint), '\n')
+
+pp.annots = annotatePeak(footprint, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+
+#plotAnnoBar(pp.annots)
+pp.annots = as.data.frame(pp.annots)
+pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 2000), ]
+
+source('Functions_Integration.matureReg.R')
+p = run_enrichGo_axolotl(pp.annots, regulation = 'DE_up')
+
+pdfname = paste0(figureDir, 'GoEnrichment_footprinting_targetGenes_', motif, '_axolotl.pdf')
+pdf(pdfname, width = 8, height = 5)
+par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+
+grid.arrange(p, ncol = 1, nrow = 1)
+
+dev.off()
+
