@@ -2677,30 +2677,46 @@ keep = data.frame(rbind(keep, test), stringsAsFactors = FALSE)
 
 saveRDS(keep, file = paste0(RdataDir, '/motif_collections_crossSpecies_v2.rds'))
 
-
+###########
 ### manually merge similar motifs or from the same family and make the plot 
-keep = readRDS(file = paste0(RdataDir, '/motif_collections_crossSpecies.rds'))
+###########
+keep = readRDS(file = paste0(RdataDir, '/motif_collections_crossSpecies_v2.rds'))
 keep$rank = as.integer(keep$rank)
 
 ## manually merge the similar motifs and discard motifs only once present in acoel, zebrafish fin or heart
 counts = table(keep$species, keep$gene)
 
+# merge HOXA HOXC
+kk = grep('HOXA13|HOXC13', colnames(counts))
+counts[, kk[1]] = apply(counts[, kk], 1, sum)
+colnames(counts)[kk[1]] = 'HOXA13/HOXC13'
+keep$gene[grep('HOXA13|HOXC13', keep$gene)] = 'HOXA13/HOXC13'
+
+# merge CEBPA CEBPG
+kk = grep('CEBPA|CEBPG', colnames(counts))
+counts[, kk[1]] = apply(counts[, kk], 1, sum)
+colnames(counts)[kk[1]] = 'CEBPA/G'
+keep$gene[grep('CEBPA|CEBPG', keep$gene)] = 'CEBPA/G'
+
+# merge IRFs
+kk = grep('IRF1|IRF2|IRF7', colnames(counts))
+counts[, kk[1]] = apply(counts[, kk], 1, sum)
+colnames(counts)[kk[1]] = 'IRF1/2/7'
+keep$gene[grep('IRF1|IRF2|IRF7', keep$gene)] = 'IRF1/2/7'
+
+
 # merge RELA RELB
-kk = which(colnames(counts) == 'REL'| colnames(counts) == 'RELA')
-counts[, kk[2]] = apply(counts[, kk], 1, sum)
-#colnames(counts)[kk[1]] = 'RELA'
-keep$gene[which(keep$gene == colnames(counts)[kk[1]]|
-                  keep$gene == colnames(counts)[kk[2]])] = 'RELA'
-counts = counts[, -kk[1]]
-#keep$gene[which(keep$gene == 'RELA'|keep$gene == 'RELA')] = 'RELA.B'
+kk = grep('REL|RELA|RELB', colnames(counts))
+counts[, kk[1]] = apply(counts[, kk], 1, sum)
+colnames(counts)[kk[1]] = 'REL/RELA/RELB'
+keep$gene[grep('REL|RELA|RELB', keep$gene)] = 'REL/RELA/RELB'
+
 
 # merge RUNX1 and RUNX2
-kk = which(colnames(counts) == 'RUNX1' | colnames(counts) == 'RUNX2')
+kk = grep('RUNX1|RUNX2', colnames(counts))
 counts[, kk[1]] = apply(counts[, kk], 1, sum)
-counts[, kk[2]] = 0
-colnames(counts)[kk[1]] = 'RUNX1.2'
-keep$gene[which(keep$gene == colnames(counts)[kk[1]]|
-                  keep$gene == colnames(counts)[kk[2]])] = 'RUNX1.2'
+colnames(counts)[kk[1]] = 'RUNX1/2'
+keep$gene[grep('RUNX1|RUNX2', keep$gene)] ='RUNX1/2'
 
 # merge SMAD4/2/5
 kk = grep('SMAD', colnames(counts))
@@ -2708,8 +2724,9 @@ counts[, kk[2]] = apply(counts[, kk], 1, sum)
 colnames(counts)[kk[2]] = 'SMAD'
 keep$gene[grep('SMAD', keep$gene)] = 'SMAD'
 
-ss = apply(counts, 2, sum)
-genes.NC = colnames(counts)[which(ss > 1)]
+
+ss = apply(counts>0, 2, sum)
+genes.NC = colnames(counts)[which(ss > 2)]
 
 mat = counts[, !is.na(match(colnames(counts), genes.NC))] >0
 clust = hclust(dist(t(mat))) # hclust with distance matrix
@@ -2723,15 +2740,16 @@ ss = ss[match(orders, names(ss))]
 orders = orders[order(-ss)]
 ss = ss[match(orders, names(ss))]
 
-newlevels = c("RUNX1.2","RELA", 
-             "SMAD",  "MAFK", "NFE2L2",  "HIC1", "FOSL1_JUN", "BACH1", "FOS_JUND",   "PRDM1",  "TCF7L2", 
-             "ZNF341",     "ZBTB32",     "ZBTB26",     "ZBTB18", 
-"TFAP4",      "PRDM5",      "KLF17",    "FOSL2_JUNB", "JDP2",  "TEAD3",      "MAF_NFE2",   "CREB1",     
-"FOS" ,       "THAP11",     "TBP",        "OSR2",       "NR2F1",      "LEF1",       "BCL11B",     "HOXC13",    
-"EGR3",       "NFATC1",     "STAT6",      "STAT2",      "PRDM15",     "POU6F1",     "EGR2",       "NFYA",      
-"ZNF384",     "TCF7",       "ZFX")     
+# newlevels = c("RUNX1.2","RELA", 
+#              "SMAD",  "MAFK", "NFE2L2",  "HIC1", "FOSL1_JUN", "BACH1", "FOS_JUND",   "PRDM1",  "TCF7L2", 
+#              "ZNF341",     "ZBTB32",     "ZBTB26",     "ZBTB18", 
+# "TFAP4",      "PRDM5",      "KLF17",    "FOSL2_JUNB", "JDP2",  "TEAD3",      "MAF_NFE2",   "CREB1",     
+# "FOS" ,       "THAP11",     "TBP",        "OSR2",       "NR2F1",      "LEF1",       "BCL11B",     "HOXC13",    
+# "EGR3",       "NFATC1",     "STAT6",      "STAT2",      "PRDM15",     "POU6F1",     "EGR2",       "NFYA",      
+# "ZNF384",     "TCF7",       "ZFX")     
+# newlevels = newlevels[c(length(newlevels):1)]
 
-newlevels = newlevels[c(length(newlevels):1)]
+newlevels = clust$labels[clust$order]
 
 keep$rank = as.numeric(keep$rank)
 as_tibble(keep) %>% 
@@ -2752,39 +2770,13 @@ as_tibble(keep) %>%
         axis.title =  element_text(size = 12),
         legend.text = element_text(size=12),
         legend.title = element_text(size = 14),
-        legend.position='none',
-        #plot.margin = margin()
-        #legend.key.size = unit(1, 'cm')
-        #legend.key.width= unit(1, 'cm')
-  )
-
-ggsave(paste0(figureDir, "CrossSpecies_shared_Regulators.pdf"),  width = 8, height = 10)
-# plot_grid(ggtree_plot, dotplot, nrow = 1, rel_widths = c(0.1,4), align = 'h')
-## with legends
-as_tibble(keep) %>% 
-  filter(gene %in% genes.NC) %>% 
-  # mutate(gene = factor(gene, levels = clust$labels[clust$order])) %>% 
-  mutate(gene = factor(gene, levels = newlevels)) %>% 
-  ggplot(aes(y=gene, x = factor(species, levels = c('axolotl', 'zebrafishFin', 'zebrafishHeart', 'acoel')), 
-             color = zscore, size = rank)) + 
-  geom_point() + 
-  cowplot::theme_cowplot() + 
-  theme(axis.line  = element_blank()) +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-  ylab('') + xlab('') +
-  theme(axis.ticks = element_blank()) +
-  scale_color_gradientn(colours = viridis::viridis(20), limits = c(0,8), oob = scales::squish, name = 'motif activity') +
-  theme(axis.text.x = element_text(angle = 60,  size = 18, hjust = 0.4), 
-        axis.text.y = element_text(angle = 0, size = 12), 
-        axis.title =  element_text(size = 12),
-        legend.text = element_text(size=12),
-        legend.title = element_text(size = 14),
         legend.position='right',
         #plot.margin = margin()
         #legend.key.size = unit(1, 'cm')
         #legend.key.width= unit(1, 'cm')
   )
-ggsave(paste0(figureDir, "CrossSpecies_shared_Regulators_Legend.pdf"),  width = 8, height = 10)
+ggsave(paste0(figureDir, "CrossSpecies_shared_Regulators.pdf"),  width = 8, height = 10)
+
 
 ##########################################
 ##########################################
@@ -2855,7 +2847,7 @@ cat('total footprint found -- ', length(footprint), '\n')
 
 pp.annots = annotatePeak(footprint, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
 
-source('Functions_Integration.matureReg.R')
+source('Functions_crossSpecies.R')
 p = run_enrichGo_axolotl(pp.annots, distanceToTSS = 2000, regulation = 'both', title = 'RUNX targets')
 
 pdfname = paste0(figureDir, 'GoEnrichment_footprinting_targetGenes_', motif, '_axolotl.pdf')
@@ -2913,7 +2905,7 @@ pp.annots = annotatePeak(footprint, TxDb=amex, tssRegion = c(-2000, 2000), level
 pp.annots = as.data.frame(pp.annots)
 pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 2000), ]
 
-source('Functions_Integration.matureReg.R')
+source('Functions_crossSpecies.R')
 p = run_enrichGo_axolotl(pp.annots, distanceToTSS = 2000, regulation = 'DE_down', title.plot = 'AP-1 targets')
 
 pdfname = paste0(figureDir, 'GoEnrichment_footprinting_targetGenes_', motif, '_axolotl.pdf')
@@ -2968,7 +2960,7 @@ cat('total footprint found -- ', length(footprint), '\n')
 pp.annots = annotatePeak(footprint, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
 
 #plotAnnoBar(pp.annots)
-source('Functions_Integration.matureReg.R')
+source('Functions_crossSpecies.R')
 p = run_enrichGo_axolotl(pp.annots, distanceToTSS = 2000, regulation = 'DE_down', title.plot = 'RELA targets')
 
 pdfname = paste0(figureDir, 'GoEnrichment_footprinting_targetGenes_', motif, '_axolotl.pdf')
@@ -3022,7 +3014,7 @@ cat('total footprint found -- ', length(footprint), '\n')
 
 pp.annots = annotatePeak(footprint, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
 
-source('Functions_Integration.matureReg.R')
+source('Functions_crossSpecies.R')
 p = run_enrichGo_axolotl(pp.annots, distanceToTSS = 2000, regulation = 'DE_down', title.plot = 'BACH1 targets')
 
 pdfname = paste0(figureDir, 'GoEnrichment_footprinting_targetGenes_', motif, '_axolotl.pdf')
@@ -3076,7 +3068,7 @@ cat('total footprint found -- ', length(footprint), '\n')
 
 pp.annots = annotatePeak(footprint, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
 
-source('Functions_Integration.matureReg.R')
+source('Functions_crossSpecies.R')
 p = run_enrichGo_axolotl(pp.annots, distanceToTSS = 2000, regulation = 'DE_up', title.plot = 'MAFK targets')
 
 pdfname = paste0(figureDir, 'GoEnrichment_footprinting_targetGenes_', motif, '_axolotl.pdf')
@@ -3094,22 +3086,70 @@ ggs = unique(as.character(ggs))
 cat(length(ggs), ' targets \n')
 saveRDS(ggs, file = paste0(RdataDir, '/targetGenes_footprint_', motif, '_axolotl.rds'))
 
-
 ##########################################
-# collect targets cross-species and find the shared  
+# Collect RUNX targets cross-species and find the shared  
+# the network plot was original from 
+# https://github.com/lengfei5/pallium_evo/blob/main/analysis/GRN_analysis/moo_branch_grns.R
 ##########################################
-targets = readRDS(paste0(RdataDir, '/targetGenes_footprint_RUNX_zebrafish_heart.rds'))
+source('Functions_crossSpecies.R')
+source('Functions_histM.R')
 
-ggs = readRDS(paste0(RdataDir, '/targetGenes_footprint_RUNX_zebrafish_fin.rds'))
-targets = intersect(targets, ggs)
+gg1 = readRDS(paste0(RdataDir, '/targetGenes_footprint_RUNX_zebrafish_fin.rds'))
+gg2 = readRDS(paste0(RdataDir, '/targetGenes_footprint_RUNX_zebrafishHeart.rds'))
+targets = intersect(gg1, gg2)
+targets = targets[order(targets)]
 
 ggs = readRDS(paste0(RdataDir, '/targetGenes_footprint_RUNX_axolotl.rds'))
-targets = intersect(targets, ggs)
+ggs = ggs[grep('AMEX|LOC', ggs, invert = TRUE)]
+ggs = ggs[order(ggs)]
+intersect(targets, ggs)
+#d = rbind(d, data.frame(gene = intersect(targets, ggs), species = rep('')) )
 
-ggs = readRDS(paste0(RdataDir, '/targetGenes_footprint_RUNX_acoel.rds'))
-targets = intersect(targets, ggs)
+gg3 = readRDS(paste0(RdataDir, '/targetGenes_footprint_RUNX_acoel.rds'))
+gg3 = gg3[grep('^g', gg3, invert = TRUE)]
+gg3 = gg3[order(gg3)]
+intersect(targets, gg3)
 
+library(igraph)
+library(ggraph)
+library(tidygraph)
+library(graphlayouts) 
+library(RColorBrewer) # This is the color library
 
-targets = intersect(targets, ggs)
+jj1 = which(!is.na(match(d$gene, ggs)))
+jj2 = which(!is.na(match(d$gene, gg3)))
+jj = intersect(jj1, jj2)
+
+d = data.frame(regulator = rep('RUNX', length(targets)),
+               gene =  targets, species = rep('fish', length(targets)), stringsAsFactors = FALSE)
+d$species[jj1] = 'fish.axolotl'
+d$species[jj2] = 'fish.acoel'
+d$species[jj] = 'all'
+
+d  =d[which(d$species != 'fish'), ]
+
+g <- graph_from_data_frame(d, directed = TRUE)
+V(g)$species = d$species[match(V(g)$name, d$gene)]
+V(g)$species[1] = 'all'
+
+require(khroma)
+highcontrast <- colour("high contrast")
+got_palette = highcontrast(3)
+
+ggraph(g, layout='tree', circular=T) +
+  #geom_edge_link(edge_colour = "gray80" ) +
+  geom_edge_diagonal(width=0.3) +
+  geom_node_label(aes(label=name), size=12/ggplot2::.pt, 
+                  label.padding=unit(0.1, 'cm'), label.size=0.3, fill = 'black',  color='white') +
+  geom_node_label(aes(label=name, fill = species), size=12/ggplot2::.pt, label.padding=unit(0.1, 'cm'), label.size=0.3) +
+  #geom_node_label(aes(label=name, fill = species), size=10/ggplot2::.pt, label.padding=unit(0.05, 'cm'), label.size=0.2) +
+  #geom_node_point(aes(fill = species,size=10/ggplot2::.pt), shape = 21) + 
+  #geom_node_text(aes(label=name), size=6/ggplot2::.pt, repel=T, family = "serif")+
+  #scale_fill_manual(values = got_palette) + 
+  scale_x_continuous(expand=c(0.1, 0)) +
+  scale_y_continuous(expand=c(0.1, 0)) +
+  theme_void()
+
+ggsave(paste0(figureDir, "crossSpecies_RUNX_targets.pdf"), width=7, height = 5)
 
 
