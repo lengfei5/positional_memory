@@ -610,10 +610,10 @@ DEgenes$gene = get_geneName(rownames(DEgenes))
 DEgenes$geneID = get_geneID(rownames(DEgenes))
 
 dir.list = list.dirs(path = paste0("/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/",
-                                   "other_species_atac_rnaseq/zebrafish_fin_Lee2020/footprinting"), 
+                                   "other_species_atac_rnaseq/zebrafish_heart_Cao2022/footprinting"), 
                      recursive = FALSE,  full.names = TRUE)
 
-dir.list = dir.list[grep('sp7ne4dpa_SRR8587716.SRR8587717.merged|sp7po4dpa_SRR8587720.SRR8587721', dir.list)]
+dir.list = dir.list[grep('zebrah_3dpa_|zebrah_7dpa', dir.list)]
 
 ##### RUNX targets
 motif = 'RUNX' 
@@ -657,6 +657,7 @@ ggs = DEgenes$gene[match(pp$geneId, DEgenes$geneID)]
 ggs = unique(as.character(ggs))
 cat(length(ggs), ' targets \n')
 
+
 saveRDS(ggs, file = paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata',
                            '/targetGenes_footprint_', motif, '_', species,  '.rds'))
 
@@ -697,11 +698,11 @@ pp.annots = annotatePeak(footprint, TxDb=gtf, tssRegion = c(-2000, 2000), level 
 pp.annots = as.data.frame(pp.annots)
 pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 2000), ]
 
-pp = pp.annots[!is.na(match(pp.annots$geneId, DEgenes$geneID)), ]
-ggs = DEgenes$gene[match(pp$geneId, DEgenes$geneID)]
+# the RNA-seq data is too late and all target from footprint will be kept
+pp = pp.annots$geneId 
+ggs = annot$Human.gene.name[match(pp, annot$Gene.stable.ID)]
 ggs = unique(as.character(ggs))
 cat(length(ggs), ' targets \n')
 
 saveRDS(ggs, file = paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata',
                            '/targetGenes_footprint_', motif, '_', species,  '.rds'))
-

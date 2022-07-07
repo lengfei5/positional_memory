@@ -3091,3 +3091,22 @@ ggs = unique(as.character(ggs))
 cat(length(ggs), ' targets \n')
 saveRDS(ggs, file = paste0(RdataDir, '/targetGenes_footprint_', motif, '_axolotl.rds'))
 
+
+##########################################
+# collect targets cross-species and find the shared  
+##########################################
+targets = readRDS(paste0(RdataDir, '/targetGenes_footprint_RUNX_zebrafish_heart.rds'))
+
+ggs = readRDS(paste0(RdataDir, '/targetGenes_footprint_RUNX_zebrafish_fin.rds'))
+targets = intersect(targets, ggs)
+
+ggs = readRDS(paste0(RdataDir, '/targetGenes_footprint_RUNX_axolotl.rds'))
+targets = intersect(targets, ggs)
+
+ggs = readRDS(paste0(RdataDir, '/targetGenes_footprint_RUNX_acoel.rds'))
+targets = intersect(targets, ggs)
+
+
+targets = intersect(targets, ggs)
+
+

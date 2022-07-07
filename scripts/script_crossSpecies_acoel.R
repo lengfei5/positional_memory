@@ -56,7 +56,7 @@ rnaDir = paste0(dataDir, '/rna_seq')
 atacMetadata = paste0(atacDir, '/metadata_PRJNA512373.txt')
 
 ## annotatations
-gtf.file = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/acoel/Hmi_1.0/annotation/hmi_annotated_contig.gff'
+gtf.file = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/acoel/Hmi_1.0/annotation/hmi_annotated_contig.CABFPE.gtf'
 annot.file = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/acoel/Hmi_1.0/annotation/hmi_annotated_contig.gff'
 annot = read.delim(annot.file)
 
@@ -69,19 +69,22 @@ tfs = unique(tfs$`HGNC symbol`)
 # 
 ########################################################
 ########################################################
-count.file = paste0(rnaDir, '/GSE126701_RNA_finRegen_featureCounts.txt')
+count.file = paste0(rnaDir, '/featurecounts.count.gene.tsv')
 counts = read.table(count.file, sep = '\t', header = TRUE)
 
-mm = match(counts$Geneid, annot$Gene.stable.ID)
-jj = which(annot$Human.gene.name[mm] != '' & !is.na(mm))
-mm = mm[jj]
-ggs = paste0(annot$Human.gene.name[mm], '_',  annot$Gene.stable.ID[mm])
-rownames(counts) = counts$Geneid
-rownames(counts)[jj] = ggs
+ggs = counts$gene_id
+ggs = gsub('_HUMAN', '', ggs)
+ggs = gsub('[|]', '_', ggs)
+#ggs = paste0(annot$Human.gene.name[mm], '_',  annot$Gene.stable.ID[mm])
+#rownames(counts) = counts$Geneid
+rownames(counts) = ggs
 counts = counts[, -1]
 
+counts = counts[, grep('tail', colnames(counts))]
+
 conds = colnames(counts)
-conds = gsub('_rep1|_rep2', '', conds)
+conds = sapply(conds, function(x) {unlist(strsplit(as.character(x), '_'))[2]})
+
 conds = data.frame(condition = conds)
 dds <- DESeqDataSetFromMatrix(counts, DataFrame(conds), design = ~ condition)
 
@@ -103,7 +106,7 @@ print(pca)
 # DE test
 ##########################################
 dds$condition = droplevels(dds$condition)
-dds$condition <- relevel(dds$condition, ref = "sp7po0dpa")
+dds$condition <- relevel(dds$condition, ref = "0h")
 
 dds <- DESeq(dds, test="Wald", fitType = c("parametric"))
 
@@ -112,15 +115,26 @@ resultsNames(dds)
 
 fpm = log2(fpm(dds) + 2^-6)
 
-res = results(dds, name="condition_sp7po4dpa_vs_sp7po0dpa", test = 'Wald')
-res <- lfcShrink(dds, coef="condition_sp7po4dpa_vs_sp7po0dpa")
-colnames(res) = paste0(colnames(res), "_sp7po_4dpa.vs.0dpa")
+res = results(dds, name="condition_1h_vs_0h", test = 'Wald')
+res <- lfcShrink(dds, coef="condition_1h_vs_0h")
+colnames(res) = paste0(colnames(res), "_1h.vs.0h")
 res = data.frame(res[, c(2, 5, 6)])
 
-res.ii = results(dds, contrast = c('condition', 'sp7ne4dpa', 'sp7ne0dpa'), test = 'Wald')
-res.ii <- lfcShrink(dds, contrast = c('condition', 'sp7ne4dpa', 'sp7ne0dpa'))
-colnames(res.ii) = paste0(colnames(res.ii), "_sp7ne_4dpa.vs.0dpa")
-res = data.frame(res, res.ii[, c(2, 5, 6)])
+res.ii = results(dds, name="condition_3h_vs_0h", test = 'Wald')
+res.ii <- lfcShrink(dds, coef="condition_3h_vs_0h")
+colnames(res.ii) = paste0(colnames(res.ii), "_3h.vs.0h")
+res.ii = data.frame(res.ii[, c(2, 5, 6)])
+res = data.frame(res, res.ii)
+
+res.ii = results(dds, name="condition_6h_vs_0h", test = 'Wald')
+res.ii <- lfcShrink(dds, coef="condition_6h_vs_0h")
+colnames(res.ii) = paste0(colnames(res.ii), "_6h.vs.0h")
+res = data.frame(res, data.frame(res.ii[, c(2, 5, 6)]))
+
+res.ii = results(dds, name="condition_12h_vs_0h", test = 'Wald')
+res.ii <- lfcShrink(dds, coef="condition_12h_vs_0h")
+colnames(res.ii) = paste0(colnames(res.ii), "_12h.vs.0h")
+res = data.frame(res, data.frame(res.ii[, c(2, 5, 6)]))
 
 res = data.frame(fpm, res, stringsAsFactors = FALSE)
 
@@ -132,12 +146,17 @@ saveRDS(res, file = paste0(RdataDir, '/RNAseq_fpm_DEgenes_lfcShrink_res.rds'))
 res = readRDS(file = paste0(RdataDir, '/RNAseq_fpm_DEgenes_lfcShrink_res.rds'))
 
 fdr.cutoff = 0.05; logfc.cutoff = 1 # select only activated genes in regeneration
-jj = which((res$padj_sp7ne_4dpa.vs.0dpa < fdr.cutoff & res$log2FoldChange_sp7ne_4dpa.vs.0dpa > logfc.cutoff) |
-             (res$padj_sp7po_4dpa.vs.0dpa < fdr.cutoff & (res$log2FoldChange_sp7po_4dpa.vs.0dpa) > logfc.cutoff)
+
+jj = which((res$padj_1h.vs.0h < fdr.cutoff & res$log2FoldChange_1h.vs.0h > logfc.cutoff) |
+             (res$padj_3h.vs.0h < fdr.cutoff & (res$log2FoldChange_3h.vs.0h) > logfc.cutoff)|
+             (res$padj_6h.vs.0h < fdr.cutoff & (res$log2FoldChange_6h.vs.0h) > logfc.cutoff) |
+             (res$padj_12h.vs.0h < fdr.cutoff & (res$log2FoldChange_12h.vs.0h) > logfc.cutoff)
 )
 cat(length(jj), '\n')
 
 res = res[jj, ]
+
+saveRDS(res, file = paste0(RdataDir, '/RNAseq_fpm_DEgenes_lfcShrink_res_RRgenes.rds'))
 
 ggs = get_geneName(rownames(res))
 print(intersect(ggs, tfs))
@@ -586,9 +605,121 @@ pheatmap(test, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = FALSE,
 # 
 ########################################################
 ########################################################
-Run_footprint_analysis = FALSE
-if(Run_footprint_analysis){
-  cat(' star the footprinting analysis \n')
+cat(' star the footprinting analysis \n')
+
+# gene annotation
+gtf = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
+
+# DE genes from RNA-seq data
+DEgenes = readRDS(file = paste0(RdataDir, '/RNAseq_fpm_DEgenes_lfcShrink_res_RRgenes.rds'))
+DEgenes = data.frame(DEgenes)
+DEgenes$gene = get_geneName(rownames(DEgenes))
+DEgenes$geneID = get_geneID(rownames(DEgenes))
+
+dir.list = list.dirs(path = paste0("/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/",
+                                   "other_species_atac_rnaseq/acoel_Gehrke2019/footprinting"), 
+                     recursive = FALSE,  full.names = TRUE)
+
+dir.list = dir.list[grep('hmia_12h_tail|hmia_24h_tail|hmia_48h_tail', dir.list)]
+
+##### RUNX targets
+motif = 'RUNX' 
+for(m in 1:length(dir.list))
+{
+  # m = 1
+  subdir = list.dirs(dir.list[m], recursive = FALSE, full.names = TRUE)
+  subdir = subdir[grep(motif, subdir)]
+  subdir = subdir[grep('RUNX3', subdir, invert = TRUE)]
+  subdir = subdir[grep('MA0002.1', subdir, invert = TRUE)]
   
+  for(n in 1:length(subdir))
+  {
+    bed.list = list.files(path = subdir[n], pattern = '*.txt', full.names = TRUE)
+    bed.file = bed.list[grep('_overview', bed.list)]
+    
+    bounds = read.table(bed.file, header = TRUE)
+    kk = grep('_bound', colnames(bounds))
+    bounds = bounds[which(bounds[,kk] == 1), ]
+    bounds = makeGRangesFromDataFrame(bounds, seqnames.field=c("TFBS_chr"),
+                                      start.field="TFBS_start", end.field="TFBS_end", strand.field="TFBS_strand ")
+    
+    cat(basename(dir.list[m]), ' -- ', basename(bed.file), ' -- bound site ', length(bounds), '\n')
+    if(m == 1 & n == 1){
+      footprint = bounds
+    }else{
+      footprint = union(footprint, bounds)
+    }
+  }
 }
+cat('total footprint found -- ', length(footprint), '\n')
+
+pp.annots = annotatePeak(footprint, TxDb=gtf, tssRegion = c(-2000, 2000), level = 'transcript')
+
+## save the target genes
+pp.annots = as.data.frame(pp.annots)
+pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 2000), ]
+
+ggs = pp.annots$geneId 
+ggs = gsub('_HUMAN', '', ggs)
+ggs = gsub('[|]', '_', ggs)
+ggs = get_geneName(ggs)
+ggs = unique(as.character(ggs))
+cat(length(ggs), ' targets \n')
+
+#pp = pp.annots[!is.na(match(pp.annots$geneId, DEgenes$geneID)), ]
+#ggs = DEgenes$gene[match(pp$geneId, DEgenes$geneID)]
+#ggs = unique(as.character(ggs))
+#cat(length(ggs), ' targets \n')
+
+saveRDS(ggs, file = paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata',
+                           '/targetGenes_footprint_', motif, '_', species,  '.rds'))
+
+motif = 'REL' 
+
+for(m in 1:length(dir.list))
+{
+  # m = 1
+  subdir = list.dirs(dir.list[m], recursive = FALSE, full.names = TRUE)
+  subdir = subdir[grep(motif, subdir)]
+  subdir = subdir[grep('RUNX3', subdir, invert = TRUE)]
+  subdir = subdir[grep('MA0002.1', subdir, invert = TRUE)]
+  subdir = subdir[grep('RELB', subdir, invert = TRUE)]
+  
+  for(n in 1:length(subdir))
+  {
+    bed.list = list.files(path = subdir[n], pattern = '*.txt', full.names = TRUE)
+    bed.file = bed.list[grep('_overview', bed.list)]
+    
+    bounds = read.table(bed.file, header = TRUE)
+    kk = grep('_bound', colnames(bounds))
+    bounds = bounds[which(bounds[,kk] == 1), ]
+    bounds = makeGRangesFromDataFrame(bounds, seqnames.field=c("TFBS_chr"),
+                                      start.field="TFBS_start", end.field="TFBS_end", strand.field="TFBS_strand ")
+    
+    cat(basename(dir.list[m]), ' -- ', basename(bed.file), ' -- bound site ', length(bounds), '\n')
+    if(m == 1 & n == 1){
+      footprint = bounds
+    }else{
+      footprint = union(footprint, bounds)
+    }
+  }
+}
+cat('total footprint found -- ', length(footprint), '\n')
+
+pp.annots = annotatePeak(footprint, TxDb=gtf, tssRegion = c(-2000, 2000), level = 'transcript')
+
+## save the target genes
+pp.annots = as.data.frame(pp.annots)
+pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 2000), ]
+
+# the RNA-seq data is too late and all target from footprint will be kept
+ggs = pp.annots$geneId 
+ggs = gsub('_HUMAN', '', ggs)
+ggs = gsub('[|]', '_', ggs)
+ggs = get_geneName(ggs)
+ggs = unique(as.character(ggs))
+cat(length(ggs), ' targets \n')
+
+saveRDS(ggs, file = paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata',
+                           '/targetGenes_footprint_', motif, '_', species,  '.rds'))
 
