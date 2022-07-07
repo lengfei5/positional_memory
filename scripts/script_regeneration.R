@@ -2640,45 +2640,43 @@ xx = xx[which(xx$motifs != 'FOS_MA1951.1'), ]
 test = data.frame(xx[, c(2,3)])
 rownames(test) = xx$gene
 
-#test$zscore_zebrafishHeart = apply(test, 1, max)
-#test$rank_zebrafishHeart = c(1:nrow(test)) 
-test$zscore = apply(test, 1, max)
+test$zscore = apply(test, 1,function(x) max(abs(x)))
+test = test[order(-test$zscore), ]
+#test$zscore = apply(test, 1, max)
+
 test$rank = c(1:nrow(test)) 
 test = test[, -c(1, 2)]
 test$species = 'zebrafishHeart'
 test$gene = rownames(test)
 keep = data.frame(rbind(keep, test), stringsAsFactors = FALSE)
-# ggs = unique(c(rownames(keep), rownames(test)))
-# keep = data.frame(keep[match(ggs, rownames(keep)), ], test[match(ggs, rownames(test)), ])
 
 ### acoel
 xx = readRDS(file =  paste0('../results/cross_species_20220621/acoel/Rdata/', 
                             '/MARA_output_sorted.rds'))
-kk1 = apply(as.matrix(xx[, c(1:6)]), 1, function(x) which.max(x) > 1 & max(x) > 2)
-kk2 = apply(as.matrix(xx[, c(7:10)]), 1,  function(x) which.max(x) > 1 & max(x) > 2)
-kk = kk1 + kk2 > 0
-xx = xx[kk, ]
+
+#kk1 = apply(as.matrix(xx[, c(1:6)]), 1, function(x) which.max(x) > 1 & max(x) > 2)
+#kk2 = apply(as.matrix(xx[, c(7:10)]), 1,  function(x) which.max(x) > 1 & max(x) > 2)
+#kk = kk1 + kk2 > 0
+#xx = xx[kk, ]
+sels = apply(xx[, c(2:6, 8:10)], 1, function(x) any(max(x)>1.8))
+xx = xx[sels, ]
 
 xx = xx[which(xx$motifs != 'MEIS1_MA1639.1'), ]
 test = data.frame(xx[, c(2:6)])
 rownames(test) = xx$gene
 
-test$zscore = apply(test, 1, max)
+test$zscore = apply(test, 1,function(x) max(abs(x)))
+test = test[order(-test$zscore), ]
+
 test$rank = c(1:nrow(test)) 
 test = test[, c((ncol(test)-1):ncol(test))]
 test$species = 'acoel'
 test$gene = rownames(test)
+
 keep = data.frame(rbind(keep, test), stringsAsFactors = FALSE)
-#test$zscore_acoel = apply(test, 1, max)
-#test$rank_acoel = c(1:nrow(test)) 
 
-#ggs = unique(c(rownames(keep), rownames(test)))
-#keep = data.frame(keep[match(ggs, rownames(keep)), ], test[match(ggs, rownames(test)), ])
-saveRDS(keep, file = paste0(RdataDir, '/motif_collections_crossSpecies.rds'))
+saveRDS(keep, file = paste0(RdataDir, '/motif_collections_crossSpecies_v2.rds'))
 
-# gene_cluster <- read_tsv('https://github.com/davemcg/davemcg.github.io/raw/master/content/post/scRNA_dotplot_data.tsv.gz')
-# gene_cluster %>% sample_n(5)
-# markers <- gene_cluster$Gene %>% unique()
 
 ### manually merge similar motifs or from the same family and make the plot 
 keep = readRDS(file = paste0(RdataDir, '/motif_collections_crossSpecies.rds'))
