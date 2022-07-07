@@ -2598,14 +2598,19 @@ library(patchwork)
 ## collect MARA results
 ntop = 135 
 bb = readRDS(file =  paste0(RdataDir, '/MARA_output_Motifs_maxZscore_filteredTFsExpr_top', ntop, '.rds'))
-sels = which(bb[, 2]> bb[, 1]|bb[, 3] > bb[, 1]|bb[, 4]> bb[,1] |bb[, 5] > bb[, 1])
+
+#sels1 = which(bb[, 2]> bb[, 1]|bb[, 3] > bb[, 1]|bb[, 4]> bb[,1] |bb[, 5] > bb[, 1])
+sels = which(apply(bb[, c(2:5)], 1, function(x) any(abs(x)>1.8)) == TRUE)
+
 bb = bb[sels, ]
 keep = as.matrix(bb[, c(2:5)])
 rownames(keep) = bb$gene
 keep = data.frame(keep, stringsAsFactors = FALSE)
 
-keep$zscore = apply(keep, 1, max)
+keep$zscore = apply(keep, 1, function(x) max(abs(x)))
+keep = keep[order(-keep$zscore), ]
 keep$rank = c(1:nrow(keep)) 
+
 keep = keep[, -c(1:4)]
 keep$species = 'axolotl'
 keep$gene = rownames(keep)
@@ -2616,17 +2621,17 @@ xx = readRDS(file =  paste0('../results/cross_species_20220621/zebrafish_fin/Rda
                             '/MARA_output_Motifs_filteredTFsExpr.rds'))
 test = data.frame(xx[, c(2, 4)])
 rownames(test) = xx$gene
-test$zscore = apply(test, 1, max)
+
+test$zscore = apply(test, 1,function(x) max(abs(x)))
+test = test[order(-test$zscore), ]
+
 test$rank = c(1:nrow(test)) 
 test = test[, -c(1, 2)]
 test$species = 'zebrafishFin'
 test$gene = rownames(test)
-rownames(keep) = NULL
+rownames(test) = NULL
 
 keep = data.frame(rbind(keep, test), stringsAsFactors = FALSE)
-
-#ggs = unique(c(rownames(keep), rownames(test)))
-#keep = data.frame(keep[match(ggs, rownames(keep)), ], test[match(ggs, rownames(test)), ])
 
 ### zebrafish heart
 xx = readRDS(file =  paste0('../results/cross_species_20220621/zebrafish_heart/Rdata/', 
