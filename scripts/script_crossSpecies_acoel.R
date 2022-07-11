@@ -73,20 +73,21 @@ count.file = paste0(rnaDir, '/featurecounts.count.gene.tsv')
 counts = read.table(count.file, sep = '\t', header = TRUE)
 
 ggs = counts$gene_id
-ggs = gsub('_HUMAN', '', ggs)
-ggs = gsub('[|]', '_', ggs)
+#ggs = gsub('_HUMAN', '', ggs)
+#ggs = gsub('[|]', '_', ggs)
 #ggs = paste0(annot$Human.gene.name[mm], '_',  annot$Gene.stable.ID[mm])
 #rownames(counts) = counts$Geneid
 rownames(counts) = ggs
 counts = counts[, -1]
 
-counts = counts[, grep('tail', colnames(counts))]
+# counts = counts[, grep('tail', colnames(counts))]
 
-conds = colnames(counts)
-conds = sapply(conds, function(x) {unlist(strsplit(as.character(x), '_'))[2]})
+design = data.frame(file = colnames(counts))
+design$condition = sapply(design$file, function(x) {unlist(strsplit(as.character(x), '_'))[2]})
+design$tissue = sapply(design$file, function(x) {unlist(strsplit(as.character(x), '_'))[3]})
+design$condition = paste0(design$tissue, '_', design$condition)
 
-conds = data.frame(condition = conds)
-dds <- DESeqDataSetFromMatrix(counts, DataFrame(conds), design = ~ condition)
+dds <- DESeqDataSetFromMatrix(counts, DataFrame(design), design = ~ condition)
 
 ss = rowSums(counts(dds))
 
@@ -106,7 +107,7 @@ print(pca)
 # DE test
 ##########################################
 dds$condition = droplevels(dds$condition)
-dds$condition <- relevel(dds$condition, ref = "0h")
+dds$condition <- relevel(dds$condition, ref = "tail_0h")
 
 dds <- DESeq(dds, test="Wald", fitType = c("parametric"))
 
@@ -115,25 +116,45 @@ resultsNames(dds)
 
 fpm = log2(fpm(dds) + 2^-6)
 
-res = results(dds, name="condition_1h_vs_0h", test = 'Wald')
-res <- lfcShrink(dds, coef="condition_1h_vs_0h")
-colnames(res) = paste0(colnames(res), "_1h.vs.0h")
+res = results(dds, name="condition_tail_1h_vs_tail_0h", test = 'Wald')
+res <- lfcShrink(dds, coef="condition_tail_1h_vs_tail_0h")
+colnames(res) = paste0(colnames(res), "_tail.1h.vs.0h")
 res = data.frame(res[, c(2, 5, 6)])
 
-res.ii = results(dds, name="condition_3h_vs_0h", test = 'Wald')
-res.ii <- lfcShrink(dds, coef="condition_3h_vs_0h")
-colnames(res.ii) = paste0(colnames(res.ii), "_3h.vs.0h")
+res.ii = results(dds, name="condition_tail_3h_vs_tail_0h", test = 'Wald')
+res.ii <- lfcShrink(dds, coef="condition_tail_3h_vs_tail_0h")
+colnames(res.ii) = paste0(colnames(res.ii), "_tail.3h.vs.0h")
 res.ii = data.frame(res.ii[, c(2, 5, 6)])
 res = data.frame(res, res.ii)
 
-res.ii = results(dds, name="condition_6h_vs_0h", test = 'Wald')
-res.ii <- lfcShrink(dds, coef="condition_6h_vs_0h")
-colnames(res.ii) = paste0(colnames(res.ii), "_6h.vs.0h")
+res.ii = results(dds, name="condition_tail_6h_vs_tail_0h", test = 'Wald')
+res.ii <- lfcShrink(dds, coef="condition_tail_6h_vs_tail_0h")
+colnames(res.ii) = paste0(colnames(res.ii), "_tail.6h.vs.0h")
 res = data.frame(res, data.frame(res.ii[, c(2, 5, 6)]))
 
-res.ii = results(dds, name="condition_12h_vs_0h", test = 'Wald')
-res.ii <- lfcShrink(dds, coef="condition_12h_vs_0h")
-colnames(res.ii) = paste0(colnames(res.ii), "_12h.vs.0h")
+res.ii = results(dds, name="condition_tail_12h_vs_tail_0h", test = 'Wald')
+res.ii <- lfcShrink(dds, coef="condition_tail_12h_vs_tail_0h")
+colnames(res.ii) = paste0(colnames(res.ii), "_tail.12h.vs.0h")
+res = data.frame(res, data.frame(res.ii[, c(2, 5, 6)]))
+
+res.ii = results(dds, contrast = c("condition", "head_1h", "head_0h"), test = 'Wald')
+res.ii <- lfcShrink(dds,contrast = c("condition", "head_1h", "head_0h"))
+colnames(res.ii) = paste0(colnames(res.ii), "_head.1h.vs.0h")
+res = data.frame(res, data.frame(res.ii[, c(2, 5, 6)]))
+
+res.ii = results(dds, contrast = c("condition", "head_3h", "head_0h"), test = 'Wald')
+res.ii <- lfcShrink(dds,contrast = c("condition", "head_3h", "head_0h"))
+colnames(res.ii) = paste0(colnames(res.ii), "_head.3h.vs.0h")
+res = data.frame(res, data.frame(res.ii[, c(2, 5, 6)]))
+
+res.ii = results(dds, contrast = c("condition", "head_6h", "head_0h"), test = 'Wald')
+res.ii <- lfcShrink(dds,contrast = c("condition", "head_6h", "head_0h"))
+colnames(res.ii) = paste0(colnames(res.ii), "_head.6h.vs.0h")
+res = data.frame(res, data.frame(res.ii[, c(2, 5, 6)]))
+
+res.ii = results(dds, contrast = c("condition", "head_12h", "head_0h"), test = 'Wald')
+res.ii <- lfcShrink(dds,contrast = c("condition", "head_12h", "head_0h"))
+colnames(res.ii) = paste0(colnames(res.ii), "_head.12h.vs.0h")
 res = data.frame(res, data.frame(res.ii[, c(2, 5, 6)]))
 
 res = data.frame(fpm, res, stringsAsFactors = FALSE)
@@ -145,12 +166,17 @@ saveRDS(res, file = paste0(RdataDir, '/RNAseq_fpm_DEgenes_lfcShrink_res.rds'))
 ##########################################
 res = readRDS(file = paste0(RdataDir, '/RNAseq_fpm_DEgenes_lfcShrink_res.rds'))
 
-fdr.cutoff = 0.05; logfc.cutoff = 1 # select only activated genes in regeneration
+fdr.cutoff = 0.1; logfc.cutoff = 0 # select only activated genes in regeneration
 
-jj = which((res$padj_1h.vs.0h < fdr.cutoff & res$log2FoldChange_1h.vs.0h > logfc.cutoff) |
-             (res$padj_3h.vs.0h < fdr.cutoff & (res$log2FoldChange_3h.vs.0h) > logfc.cutoff)|
-             (res$padj_6h.vs.0h < fdr.cutoff & (res$log2FoldChange_6h.vs.0h) > logfc.cutoff) |
-             (res$padj_12h.vs.0h < fdr.cutoff & (res$log2FoldChange_12h.vs.0h) > logfc.cutoff)
+jj = which((res$padj_tail.1h.vs.0h < fdr.cutoff & res$log2FoldChange_tail.1h.vs.0h > logfc.cutoff) |
+             (res$padj_tail.1h.vs.0h < fdr.cutoff & (res$log2FoldChange_tail.3h.vs.0h) > logfc.cutoff)|
+             (res$padj_tail.6h.vs.0h < fdr.cutoff & (res$log2FoldChange_tail.6h.vs.0h) > logfc.cutoff) |
+             (res$padj_tail.12h.vs.0h < fdr.cutoff & (res$log2FoldChange_tail.12h.vs.0h) > logfc.cutoff)|
+             (res$padj_head.1h.vs.0h < fdr.cutoff & res$log2FoldChange_head.1h.vs.0h > logfc.cutoff) |
+             (res$padj_head.3h.vs.0h < fdr.cutoff & (res$log2FoldChange_head.3h.vs.0h) > logfc.cutoff)|
+             (res$padj_head.6h.vs.0h < fdr.cutoff & (res$log2FoldChange_head.6h.vs.0h) > logfc.cutoff) |
+             (res$padj_head.12h.vs.0h < fdr.cutoff & (res$log2FoldChange_head.12h.vs.0h) > logfc.cutoff)
+             
 )
 cat(length(jj), '\n')
 

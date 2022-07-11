@@ -3102,12 +3102,13 @@ targets = targets[order(targets)]
 ggs = readRDS(paste0(RdataDir, '/targetGenes_footprint_RUNX_axolotl.rds'))
 ggs = ggs[grep('AMEX|LOC', ggs, invert = TRUE)]
 ggs = ggs[order(ggs)]
+
 intersect(targets, ggs)
 #d = rbind(d, data.frame(gene = intersect(targets, ggs), species = rep('')) )
 
 gg3 = readRDS(paste0(RdataDir, '/targetGenes_footprint_RUNX_acoel.rds'))
-gg3 = gg3[grep('^g', gg3, invert = TRUE)]
-gg3 = gg3[order(gg3)]
+#gg3 = gg3[grep('^g', gg3, invert = TRUE)]
+#gg3 = gg3[order(gg3)]
 intersect(targets, gg3)
 
 library(igraph)
@@ -3116,12 +3117,13 @@ library(tidygraph)
 library(graphlayouts) 
 library(RColorBrewer) # This is the color library
 
+d = data.frame(regulator = rep('RUNX', length(targets)),
+               gene =  targets, species = rep('fish', length(targets)), stringsAsFactors = FALSE)
+
 jj1 = which(!is.na(match(d$gene, ggs)))
 jj2 = which(!is.na(match(d$gene, gg3)))
 jj = intersect(jj1, jj2)
 
-d = data.frame(regulator = rep('RUNX', length(targets)),
-               gene =  targets, species = rep('fish', length(targets)), stringsAsFactors = FALSE)
 d$species[jj1] = 'fish.axolotl'
 d$species[jj2] = 'fish.acoel'
 d$species[jj] = 'all'
@@ -3136,20 +3138,24 @@ require(khroma)
 highcontrast <- colour("high contrast")
 got_palette = highcontrast(3)
 
-ggraph(g, layout='tree', circular=T) +
+ggraph(g, layout='tree', circular=TRUE) +
+  #geom_edge_link(aes(edge_width = 0.3), edge_colour = s) + 
   #geom_edge_link(edge_colour = "gray80" ) +
   geom_edge_diagonal(width=0.3) +
-  geom_node_label(aes(label=name), size=12/ggplot2::.pt, 
-                  label.padding=unit(0.1, 'cm'), label.size=0.3, fill = 'black',  color='white') +
-  geom_node_label(aes(label=name, fill = species), size=12/ggplot2::.pt, label.padding=unit(0.1, 'cm'), label.size=0.3) +
+  # geom_node_label(aes(label=name), size=12/ggplot2::.pt, 
+  #                 label.padding=unit(0.1, 'cm'), label.size=0.3, fill = 'black',  color='white') +
+  geom_node_label(aes(label=name, fill = species), size=12/ggplot2::.pt, 
+                  fontface = "bold",label.padding=unit(0.1, 'cm'), label.size=0.3) +
   #geom_node_label(aes(label=name, fill = species), size=10/ggplot2::.pt, label.padding=unit(0.05, 'cm'), label.size=0.2) +
   #geom_node_point(aes(fill = species,size=10/ggplot2::.pt), shape = 21) + 
   #geom_node_text(aes(label=name), size=6/ggplot2::.pt, repel=T, family = "serif")+
-  #scale_fill_manual(values = got_palette) + 
+  #scale_color_manual(values = got_palette)  +
+  guides(fill = NULL) + 
+  scale_color_brewer(palette="Set2") +
   scale_x_continuous(expand=c(0.1, 0)) +
   scale_y_continuous(expand=c(0.1, 0)) +
   theme_void()
 
-ggsave(paste0(figureDir, "crossSpecies_RUNX_targets.pdf"), width=7, height = 5)
+ggsave(paste0(figureDir, "crossSpecies_RUNX_targets.pdf"), width=7, height = 4)
 
 
