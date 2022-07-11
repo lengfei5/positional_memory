@@ -3111,6 +3111,23 @@ gg3 = readRDS(paste0(RdataDir, '/targetGenes_footprint_RUNX_acoel.rds'))
 #gg3 = gg3[order(gg3)]
 intersect(targets, gg3)
 
+intersect(ggs, gg3)
+## manually checking the protein in the same family
+ggs[grep('HMG', ggs)]; gg3[grep('HMG', gg3)]
+ggs[grep('KDM', ggs)]; gg3[grep('KDM', gg3)]
+ggs[grep('MRP', ggs)]; gg3[grep('MRP', gg3)]
+ggs[grep('PHF', ggs)]; gg3[grep('PHF', gg3)]
+ggs[grep('PSM', ggs)]; gg3[grep('PSM', gg3)];
+ggs[grep('RNF', ggs)]; gg3[grep('RNF', gg3)];
+ggs[grep('SALL', ggs)]; gg3[grep('SALL', gg3)];
+ggs[grep('SLC44', ggs)]; gg3[grep('SLC44', gg3)];
+ggs[grep('TMEM', ggs)]; gg3[grep('TMEM', gg3)]; 
+
+
+
+##########
+## Visualize the shared targets
+#########
 library(igraph)
 library(ggraph)
 library(tidygraph)
