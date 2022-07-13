@@ -2752,12 +2752,15 @@ ss = ss[match(orders, names(ss))]
 newlevels = clust$labels[clust$order]
 
 keep$rank = as.numeric(keep$rank)
-as_tibble(keep) %>% 
+
+p1 = as_tibble(keep) %>% 
   filter(gene %in% genes.NC) %>% 
   # mutate(gene = factor(gene, levels = clust$labels[clust$order])) %>% 
   mutate(gene = factor(gene, levels = newlevels)) %>% 
   ggplot(aes(y=gene, x = factor(species, levels = c('axolotl', 'zebrafishFin', 'zebrafishHeart', 'acoel')), 
              color = zscore, size = reorder(rank, -rank))) + 
+  # ggplot(aes(y=gene, x = factor(species, levels = c('axolotl', 'zebrafishFin', 'zebrafishHeart', 'acoel')), 
+  #            color = zscore)) + 
   geom_point() + 
   cowplot::theme_cowplot() + 
   theme(axis.line  = element_blank()) +
@@ -2775,7 +2778,8 @@ as_tibble(keep) %>%
         #legend.key.size = unit(1, 'cm')
         #legend.key.width= unit(1, 'cm')
   )
-ggsave(paste0(figureDir, "CrossSpecies_shared_Regulators.pdf"),  width = 8, height = 10)
+p1
+ggsave(paste0(figureDir, "CrossSpecies_shared_Regulators_test.pdf"),  width = 8, height = 10)
 
 
 ##########################################
