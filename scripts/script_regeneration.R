@@ -2574,7 +2574,6 @@ as_tibble(xx) %>%
 
 ggsave(paste0(figureDir, "Footprint_Motif_", motif, ".pdf"),  width = 6, height = 4)
 
-
 ########################################################
 ########################################################
 # Section : cross-species analysis
@@ -2779,7 +2778,7 @@ p1 = as_tibble(keep) %>%
         #legend.key.width= unit(1, 'cm')
   )
 p1
-ggsave(paste0(figureDir, "CrossSpecies_shared_Regulators_test.pdf"),  width = 8, height = 10)
+ggsave(paste0(figureDir, "CrossSpecies_shared_Regulators.pdf"),  width = 8, height = 10)
 
 
 ##########################################
@@ -2872,6 +2871,11 @@ saveRDS(ggs, file = paste0(RdataDir, '/targetGenes_footprint_', motif, '_axolotl
 
 ### FOS-JUND motif
 motif = 'FOS_JUND'
+dir.list = list.dirs(path = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/',
+                                   'Data/atacseq_using/footprinting'), recursive = FALSE,  full.names = TRUE)
+dir.list = dir.list[grep('ATAC_footprint_BL_UA_5days|ATAC_footprint_BL_UA_9days', dir.list)]
+dir.list = dir.list[grep('_13616', dir.list)]
+
 for(m in 1:length(dir.list))
 {
   # m = 1
@@ -2901,6 +2905,7 @@ for(m in 1:length(dir.list))
     }
   }
 }
+
 cat('total footprint found -- ', length(footprint), '\n')
 
 pp.annots = annotatePeak(footprint, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
@@ -2930,6 +2935,11 @@ saveRDS(ggs, file = paste0(RdataDir, '/targetGenes_footprint_', motif, '_axolotl
 
 ## motif RELA 
 motif = 'REL'
+dir.list = list.dirs(path = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/',
+                                   'Data/atacseq_using/footprinting'), recursive = FALSE,  full.names = TRUE)
+dir.list = dir.list[grep('ATAC_footprint_BL_UA_5days|ATAC_footprint_BL_UA_9days', dir.list)]
+dir.list = dir.list[grep('_13616', dir.list)]
+
 for(m in 1:length(dir.list))
 {
   # m = 1

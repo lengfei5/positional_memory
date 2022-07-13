@@ -552,14 +552,16 @@ plot_tf_network = function(link.list)
   
   saveRDS(trn, file = paste0(RdataDir, '/TRN_umap_layout.rds'))
   
+  trn = readRDS(file = paste0(RdataDir, '/TRN_umap_layout.rds'))
+  
   #set.seed(2022)
   ggraph(trn, x=umap1, y=umap2) +
-    geom_edge_link(aes(edge_width = weight), edge_colour = "gray80" ) +
+    geom_edge_link(aes(edge_width = weight), edge_colour = "gray85" ) +
     #geom_edge_diagonal(color='darkgray', width=0.2) +
     geom_node_point(aes(fill = module, size = degreeOut), shape = 21) +
-    scale_size_continuous(range = c(1, 7)) +
+    scale_size_continuous(range = c(1, 10)) +
     #geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
-    geom_node_text(aes(filter = size >= 20, label=name), size=6/ggplot2::.pt, repel=T, family = "serif")+
+    geom_node_text(aes(filter = size >= 20, label=name), size=5/ggplot2::.pt, repel=T, family = "serif")+
     scale_edge_width_continuous(range = c(0.05, 0.2)) +
     scale_edge_color_gradientn(colors=rev(brewer.pal(n=11, name="RdBu")), limits=c(0.01, 0.6)) +
     #scale_edge_alpha_continuous(range=c(0.05, 0.4), limits=c(2,20)) +
@@ -571,14 +573,13 @@ plot_tf_network = function(link.list)
     theme_graph() +
     #theme(legend.position = "bottom") 
     theme(legend.position = "none") 
+  ggsave(paste0(figureDir, "TRN_tfExpr.umap_connectivity.clusters_v6.pdf"), width=10, height = 10)
   
-  ggsave(paste0(figureDir, "TRN_tfExpr.umap_connectivity.clusters_v5.pdf"), width=10, height = 8)
-  
-  ggraph(trn, x=umap1, y=umap2) +
+  p1 = ggraph(trn, x=umap1, y=umap2) +
     geom_edge_link(aes(edge_width = weight), edge_colour = "gray80" ) +
     #geom_edge_diagonal(color='darkgray', width=0.2) +
     geom_node_point(aes(fill = module, size = degreeOut), shape = 21) +
-    scale_size_continuous(range = c(1, 7)) +
+    scale_size_continuous(range = c(1, 8)) +
     #geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
     geom_node_text(aes(filter = size >= 20, label=name), size=6/ggplot2::.pt, repel=T, family = "serif")+
     scale_edge_width_continuous(range = c(0.05, 0.2)) +
@@ -588,11 +589,21 @@ plot_tf_network = function(link.list)
     scale_fill_manual(values = got_palette) +
     #scale_fill_viridis(option='magma') + 
     #scale_fill_manual(values = pal) +
-    coord_fixed() +
-    theme_graph() +
+    coord_fixed() + 
+    theme_void() +
     theme(legend.position = "right") 
     #theme(legend.position = "none") 
-  ggsave(paste0(figureDir, "TRN_tfExpr.umap_connectivity.clusters_withLegends_v5.png"), width=10, height = 10)
+  
+  #ggsave(paste0(figureDir, "TRN_tfExpr.umap_connectivity.clusters_withLegends_v6.pdf"), width=10, height = 10)
+  pdfname = paste0(figureDir,  "TRN_tfExpr.umap_connectivity.clusters_withLegends_v6.pdf")
+  pdf(pdfname, width = 10, height = 10)
+  par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+  
+  p1
+  #grid.arrange(p1, ncol = 1, nrow = 1)
+  
+  dev.off()
+  
   
   ##########################################
   # summary of centrality
