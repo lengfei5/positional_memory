@@ -2873,6 +2873,7 @@ saveRDS(ggs, file = paste0(RdataDir, '/targetGenes_footprint_', motif, '_axolotl
 motif = 'FOS_JUND'
 dir.list = list.dirs(path = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/',
                                    'Data/atacseq_using/footprinting'), recursive = FALSE,  full.names = TRUE)
+#dir.list = dir.list[grep('ATAC_footprint_BL_UA_5days|ATAC_footprint_BL_UA_9days|Mature_UA', dir.list)]
 dir.list = dir.list[grep('ATAC_footprint_BL_UA_5days|ATAC_footprint_BL_UA_9days', dir.list)]
 dir.list = dir.list[grep('_13616', dir.list)]
 
@@ -2901,7 +2902,12 @@ for(m in 1:length(dir.list))
     if(m == 1 & n == 1){
       footprint = bounds
     }else{
-      footprint = union(footprint, bounds)
+      if(length(grep('Mature_UA', dir.list[m]))==0) {
+        footprint = union(footprint, bounds) 
+      }else{
+        footprint = GenomicRanges::setdiff(footprint, bounds)
+      }
+     
     }
   }
 }
@@ -2911,11 +2917,11 @@ cat('total footprint found -- ', length(footprint), '\n')
 pp.annots = annotatePeak(footprint, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
 
 #plotAnnoBar(pp.annots)
-pp.annots = as.data.frame(pp.annots)
-pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 2000), ]
-
+# pp.annots = as.data.frame(pp.annots)
+# pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 2000), ]
 source('Functions_crossSpecies.R')
-p = run_enrichGo_axolotl(pp.annots, distanceToTSS = 2000, regulation = 'DE_down', title.plot = 'AP-1 targets')
+p = run_enrichGo_axolotl(pp.annots, distanceToTSS = 5000, regulation = 'DE_down', title.plot = 'AP-1 targets')
+
 
 pdfname = paste0(figureDir, 'GoEnrichment_footprinting_targetGenes_', motif, '_axolotl.pdf')
 pdf(pdfname, width = 8, height = 5)
@@ -3124,19 +3130,25 @@ gg3 = readRDS(paste0(RdataDir, '/targetGenes_footprint_RUNX_acoel.rds'))
 #gg3 = gg3[grep('^g', gg3, invert = TRUE)]
 #gg3 = gg3[order(gg3)]
 intersect(targets, gg3)
-
 intersect(ggs, gg3)
+
 ## manually checking the protein in the same family
-ggs[grep('HMG', ggs)]; gg3[grep('HMG', gg3)]
-ggs[grep('KDM', ggs)]; gg3[grep('KDM', gg3)]
+targets[grep('HMG', targets)]; ggs[grep('HMG', ggs)]; gg3[grep('HMG', gg3)]
+targets[which(targets == 'HMGB1')] = 'HMGB1/3'
+ggs[which(ggs == 'HMGB3')] = 'HMGB1/3'
+
+targets[grep('KDM', targets)]; ggs[grep('KDM', ggs)]; gg3[grep('KDM', gg3)]
+
 ggs[grep('MRP', ggs)]; gg3[grep('MRP', gg3)]
+
 ggs[grep('PHF', ggs)]; gg3[grep('PHF', gg3)]
 ggs[grep('PSM', ggs)]; gg3[grep('PSM', gg3)];
-ggs[grep('RNF', ggs)]; gg3[grep('RNF', gg3)];
-ggs[grep('SALL', ggs)]; gg3[grep('SALL', gg3)];
+
+targets[grep('RNF', targets)]; ggs[grep('RNF', ggs)]; gg3[grep('RNF', gg3)];
+targets[grep('SALL', targets)];ggs[grep('SALL', ggs)]; gg3[grep('SALL', gg3)];
+
 ggs[grep('SLC44', ggs)]; gg3[grep('SLC44', gg3)];
 ggs[grep('TMEM', ggs)]; gg3[grep('TMEM', gg3)]; 
-
 
 
 ##########

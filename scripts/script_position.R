@@ -896,6 +896,8 @@ peaks.sels[grep('HOXA13|MEIS|SHOX|HOX', peaks.sels$transcriptId), ]
 
 ####### top 30 promoter peaks
 ntop = 30
+ntop = nrow(peaks.sels)
+
 o1 = order(-peaks.sels$fdr.mean)
 peaks.sels = peaks.sels[o1[1:ntop], ]
 yy.sels = yy.sels[o1[1:ntop], ]
@@ -908,10 +910,15 @@ mm = match(ggs, geneSymbols$geneID)
 ggs[!is.na(mm)] = geneSymbols$gene.symbol.toUse[mm[!is.na(mm)]]
 
 grep('HOX', ggs)
-
-
 rownames(yy.sels) = ggs
 yy.sels = as.matrix(yy.sels)
+
+if(saveTables){
+  write.table(data.frame(gene = ggs, geneID = peaks.sels$geneId,  yy.sels, stringsAsFactors = FALSE), 
+              file = paste0(tableDir, 'Figure1_promoter_segment_specific_atacPeak.txt'), 
+              sep = '\t', row.names = FALSE, col.names = TRUE, quote = FALSE)
+}
+
 
 test = yy.sels
 for(n in 1:length(conds))
@@ -948,11 +955,7 @@ pheatmap(test,
          filename = paste0(figureDir, '/heatmap_positionalPeaks_top30.promoters.pdf'), 
          width = 6, height = 5)
 
-if(saveTables){
-  write.table(data.frame(peak = rownames(yy.sels), gene = ggs, yy.sels, stringsAsFactors = FALSE), 
-              file = paste0(tableDir, 'Figure1_top30_promoter_segment_specific_atacPeak.txt'), 
-              sep = '\t', row.names = FALSE, col.names = TRUE, quote = FALSE)
-}
+
 
 ##########################################
 # #### highlight the enhancers
