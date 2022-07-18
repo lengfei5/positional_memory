@@ -34,7 +34,8 @@ tfDir = '~/workspace/imp/positional_memory/results/motif_analysis'
 RdataDir = paste0(resDir, "/Rdata/")
 #shareDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/AkaneToJingkuiShareFiles/results_rnaseq/positional_genes'
 figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
-tableDir = paste0(figureDir, 'tables4plots/')
+#tableDir = paste0(figureDir, 'tables4plots/')
+tableDir = paste0('/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/SupTables/')
 
 annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
                        'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
@@ -164,7 +165,9 @@ print(intersect(ggs, sps))
 print(intersect(ggs, eps))
 print(intersect(ggs, rbp))
 
-yy = res[select, c(1:9)]
+yy = res[select, ]
+saveRDS(yy, file = paste0(RdataDir, 'microarray_positionalGenes_data.rds'))
+
 df <- data.frame(condition = rep(c('mUA', 'mLA', 'mHand'), each = 3))
 rownames(df) = colnames(yy)
 colnames(df) = 'segments'
@@ -196,7 +199,31 @@ pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
          filename = paste0(figureDir, '/Fig2A_heatmap_DEgenes_matureSample_fdr.0.05_log2fc.1_microarray_nonScaled.pdf')) 
 
 
-saveRDS(yy, file = paste0(RdataDir, 'microarray_positionalGenes_data.rds'))
+if(saveTables){
+  source('Functions_histM.R')
+  
+  yy = readRDS(file = paste0(RdataDir, 'microarray_positionalGenes_data.rds'))
+  yy = data.frame(gene = get_geneName(rownames(yy)), geneID = rownames(yy), 
+                  specificSegment = 'mHand', yy, stringsAsFactors = FALSE)
+  yy$specificSegment[which(yy$logFC_mHand.vs.mUA<0)] = 'mUA'
+  
+  write.csv(yy[, c(1:3)],
+            file = paste0(tableDir, '/position_geneList_microarray.csv'), 
+            quote = FALSE, row.names = FALSE)
+  
+  
+  jj = grep('^CYP26|^RARA|^RARB|^RARG', rownames(res))
+  yy = res[jj, c(1:18)]
+  yy = yy[, c(1:9, grep('_mHand.vs.mUA', colnames(yy)))]
+  write.csv(yy,
+           file = paste0(tableDir, '/CYP26_RARs_geneList_microarray.csv'), 
+           quote = FALSE, row.names = TRUE)
+  
+  write.csv(res[select, ],
+            file = paste0(tableDir, '/position_dependent_genes_from_matureSamples_microarray_qv.0.05_log2FC.1.csv'), 
+            quote = FALSE, row.names = TRUE)
+  
+}
 
 ##########################################
 # GO term analysis of DE genes 
@@ -214,68 +241,75 @@ firstup <- function(x) {
   x
 }
 
+clean_geneNames = function(gg.expressed)
+{
+  gg.expressed = unique(unlist(lapply(gg.expressed, 
+                                      function(x) { x = unlist(strsplit(as.character(x), '_'));  return(x[length(x)])})))
+  gg.expressed = unique(annot$gene.symbol.toUse[match(gg.expressed, annot$geneID)])
+  gg.expressed = gg.expressed[which(gg.expressed != '' & gg.expressed != 'N/A' & !is.na(gg.expressed))]
+  
+  return(gg.expressed)
+}
+
+
+res = readRDS(file = paste0("../results/microarray/Rdata/", 
+            'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_limma.DE.stats.rds'))
+yy = readRDS(file = paste0(RdataDir, 'microarray_positionalGenes_data.rds'))
 
 # background
-gg.expressed = unique(unlist(lapply(rownames(res), function(x) { x = unlist(strsplit(as.character(x), '_'));  return(x[length(x)])})))
-gg.expressed = unique(annot$gene.symbol.toUse[match(gg.expressed, annot$geneID)])
-gg.expressed = gg.expressed[which(gg.expressed != '' & gg.expressed != 'N/A' & !is.na(gg.expressed))]
-
-bgs0 = gg.expressed
-bgs0 = unique(bgs0)
+bgs0 = unique(clean_geneNames(rownames(res)))
 
 xx0 = unique(annot$gene.symbol.toUse)
 xx0 = xx0[which(xx0 != '' & xx0 != 'N/A' & !is.na(xx0))]
 bgs = unique(xx0)
 
-gg.expressed = unique(unlist(lapply(rownames(yy), function(x) { x = unlist(strsplit(as.character(x), '_'));  return(x[length(x)])})))
-gg.expressed = unique(annot$gene.symbol.toUse[match(gg.expressed, annot$geneID)])
-gg.expressed = gg.expressed[which(gg.expressed != '' & gg.expressed != 'N/A' & !is.na(gg.expressed))]
+gg.expressed = unique(clean_geneNames(rownames(yy)[which(yy$logFC_mHand.vs.mUA < 0)]))
+cat('# of genes --', length(gg.expressed), '\n')
 
-gg.expressed = firstup(tolower(gg.expressed))
-bgs = firstup(tolower(bgs))
-bgs0 = firstup(tolower(bgs0))
+#gg.expressed = firstup(tolower(gg.expressed))
+#bgs = firstup(tolower(bgs))
+#bgs0 = firstup(tolower(bgs0))
 
 gene.df <- bitr(gg.expressed, fromType = "SYMBOL",
                 toType = c("ENSEMBL", "ENTREZID"),
-                OrgDb = org.Mm.eg.db)
+                OrgDb = org.Hs.eg.db)
 head(gene.df)
 
 bgs.df <- bitr(bgs, fromType = "SYMBOL",
                toType = c("ENSEMBL", "ENTREZID"),
-               OrgDb = org.Mm.eg.db)
-
+               OrgDb = org.Hs.eg.db)
 head(bgs.df)
 
 bgs0.df <- bitr(bgs0, fromType = "SYMBOL",
                 toType = c("ENSEMBL", "ENTREZID"),
-                OrgDb = org.Mm.eg.db)
+                OrgDb = org.Hs.eg.db)
 
 #pval.cutoff = 0.05
-
-#pdfname = paste0(resDir, "/GO.Terms_enrichment_mir1.mutant_upregulated_downregulated_genes.pdf")
-#pdf(pdfname, width = 12, height = 10)
-#par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
-
-#kk.up = which(res$pvalue_mir1.mutant.vs.wt < pval.cutoff & res$log2FoldChange_mir1.mutant.vs.wt > 0)
-#kk.down = which(res$pvalue_mir1.mutant.vs.wt < pval.cutoff & res$log2FoldChange_mir1.mutant.vs.wt < 0)
-#cat('nb of upregulated genes : ', length(kk.up), '\n')
-#cat('nb of downregulated genes : ', length(kk.down), '\n')
 ego <-  enrichGO(gene         = gene.df$ENSEMBL,
                  universe     = bgs0.df$ENSEMBL,
-                 #OrgDb         = org.Hs.eg.db,
-                 OrgDb         = org.Mm.eg.db,
+                 #universe     = bgs.df$ENSEMBL,
+                 OrgDb         = org.Hs.eg.db,
+                 #OrgDb         = org.Mm.eg.db,
                  keyType       = 'ENSEMBL',
                  ont           = "BP",
                  pAdjustMethod = "BH",
-                 pvalueCutoff  = 0.01,
-                 qvalueCutoff  = 0.05)
+                 pvalueCutoff  = 0.1,
+                 qvalueCutoff  = 0.3, 
+                 minGSSize = 3)
 
-head(ego)
+#head(ego)
 
-#barplot(ego, showCategory=30) + ggtitle("Go term enrichment for promoter peaks in Akane's ATAC-seq data")
+barplot(ego) + ggtitle("Go term enrichment for positional genes")
+
+kegg = enrichKEGG(gene = gene.df$ENTREZID,
+                  organism = 'hsa', 
+                  keyType = 'kegg', 
+                  universe = bgs0.df$ENTREZID, 
+                  minGSSize = 5)
+barplot(kegg)
 
 #edox <- setReadable(ego, 'org.Mm.eg.db', 'ENSEMBL')
-pdfname = paste0(figureDir, 'Fig2B_GOterm_postionalGenes.pdf')
+pdfname = paste0(figureDir, 'GOterm_postionalGenes_mUASpecific.pdf')
 pdf(pdfname, width = 12, height = 8)
 par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
 
@@ -345,13 +379,6 @@ for(comp in c('mHand.vs.mUA', 'mHand.vs.mLA', 'mLA.vs.mUA'))
   
 }
 
-
-if(saveTables){
-  write.csv(res[select, ],
-            file = paste0(tableDir, '/position_dependent_genes_from_matureSamples_microarray_qv.0.05_log2FC.1.csv'), 
-            quote = FALSE, row.names = TRUE)
-  
-}
 
 ##########################################
 # highlight TFs and EPs in positional genes 

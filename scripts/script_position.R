@@ -910,16 +910,23 @@ mm = match(ggs, geneSymbols$geneID)
 ggs[!is.na(mm)] = geneSymbols$gene.symbol.toUse[mm[!is.na(mm)]]
 
 grep('HOX', ggs)
-rownames(yy.sels) = ggs
+
 yy.sels = as.matrix(yy.sels)
 
 if(saveTables){
-  write.table(data.frame(gene = ggs, geneID = peaks.sels$geneId,  yy.sels, stringsAsFactors = FALSE), 
-              file = paste0(tableDir, 'Figure1_promoter_segment_specific_atacPeak.txt'), 
-              sep = '\t', row.names = FALSE, col.names = TRUE, quote = FALSE)
+  test = data.frame(peak = rownames(peaks.sels), gene = ggs, geneID = peaks.sels$geneId,  
+                    yy.sels, stringsAsFactors = FALSE)
+  test = test[, c(1:6)]
+  test$specificSegment = 'mHand'
+  test$specificSegment[which(test$atac_mUA > test$atac_mHand)] = 'mUA'
+  test = test[, -c(4:6)]
+  
+  write.csv(test, file = paste0(tableDir, 'Figure1_allPromoter_segment_specific_atacPeak.csv'), 
+              row.names = FALSE)
+  
 }
 
-
+rownames(yy.sels) = ggs
 test = yy.sels
 for(n in 1:length(conds))
 {
