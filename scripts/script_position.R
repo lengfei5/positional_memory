@@ -962,7 +962,6 @@ pheatmap(test,
          filename = paste0(figureDir, '/heatmap_positionalPeaks_top30.promoters.pdf'), 
          width = 6, height = 5)
 
-
 ##########################################
 # #### highlight the enhancers
 ##########################################
