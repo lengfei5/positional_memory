@@ -2749,6 +2749,7 @@ ss = ss[match(orders, names(ss))]
 # newlevels = newlevels[c(length(newlevels):1)]
 
 newlevels = clust$labels[clust$order]
+newlevels = newlevels[c(1:21, 24, 23, 22)] # manually specify orders
 
 keep$rank = as.numeric(keep$rank)
 
@@ -2778,8 +2779,8 @@ p1 = as_tibble(keep) %>%
         #legend.key.width= unit(1, 'cm')
   )
 p1
-ggsave(paste0(figureDir, "CrossSpecies_shared_Regulators.pdf"),  width = 8, height = 10)
 
+ggsave(paste0(figureDir, "CrossSpecies_shared_Regulators_v3.pdf"),  width = 8, height = 10)
 
 ##########################################
 ##########################################

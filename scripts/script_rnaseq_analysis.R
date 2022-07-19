@@ -20,7 +20,6 @@ require(DESeq2)
 require(dplyr)
 require(gridExtra)
 
-
 version.Data = 'RNAseq_data_used';
 version.analysis = paste0("_", version.Data, "_20220408") # in the version 20220408, counts were done with update annot with Hox patch
 
@@ -665,7 +664,6 @@ load(file = paste0(RdataDir, 'design_dds_all_regeneration_12selectedSamples_v47.
 
 #design$protocol = gsub(' ', '', design$protocol)
 #design$batch = paste0(design$request, '_', design$protocol)
-
 table(design$condition, design$batch)
 
 #sels = which(design$batch == 'R10724_smartseq2' & design$SampleID != '13615x')
@@ -837,6 +835,12 @@ for(n in 1:length(conds))
 colnames(sample.means) = conds
 cpm = cpm[, sample.sels]
 
+if(saveTable){
+  jj = grep('^KDM6|^LRAT_', rownames(sample.means))
+  
+  write.csv(sample.means[jj, ], file = paste0(tableDir, 'KDM6_LRAT_smartseq2_regeneration.csv'), row.names = TRUE)
+  
+}
 res$log2fc = apply(sample.means, 1, function(x) max(x) - min(x))
 res$maxs = apply(sample.means, 1, max)
 res$mins = apply(sample.means, 1, min)
