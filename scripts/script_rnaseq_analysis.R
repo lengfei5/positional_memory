@@ -210,17 +210,30 @@ if(saveTables){
             file = paste0(tableDir, '/position_geneList_microarray.csv'), 
             quote = FALSE, row.names = FALSE)
   
-  
-  jj = grep('^CYP26|^RARA|^RARB|^RARG', rownames(res))
+  #jj = grep('^CYP26|^RARA|^RARB|^RARG|SCUBE2|FGF9|FGF2_|FGFR2|FGFR4', rownames(res))
+  jj = unique(grep('MEIS1_AMEX60DD024424|MEIS|LRAT|FGF9|FGF2_|FGFR2|FGFR4', rownames(res)))
   yy = res[jj, c(1:18)]
+  
   yy = yy[, c(1:9, grep('_mHand.vs.mUA', colnames(yy)))]
+  
   write.csv(yy,
-           file = paste0(tableDir, '/CYP26_RARs_geneList_microarray.csv'), 
+           file = paste0(tableDir, '/MEIS_LRAT_FGF_geneList_microarray.csv'), 
            quote = FALSE, row.names = TRUE)
   
   write.csv(res[select, ],
             file = paste0(tableDir, '/position_dependent_genes_from_matureSamples_microarray_qv.0.05_log2FC.1.csv'), 
             quote = FALSE, row.names = TRUE)
+  
+  yy = cal_sample_means(res[, c(1:9)], conds = c('mUA', 'mLA', 'mHand'))
+  
+  yy = cbind(yy, res[,  grep('_mHand.vs.mUA', colnames(res))])
+  
+  write.csv(yy,
+            file = paste0(tableDir, '/allGenes_microarray.csv'), 
+            quote = FALSE, row.names = TRUE)
+  
+  
+  
   
 }
 
@@ -249,7 +262,6 @@ clean_geneNames = function(gg.expressed)
   
   return(gg.expressed)
 }
-
 
 res = readRDS(file = paste0("../results/microarray/Rdata/", 
             'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_limma.DE.stats.rds'))
@@ -318,6 +330,14 @@ dev.off()
 
 write.csv(ego, file = paste0(tableDir, "GO_term_enrichmenet_for_positional_genes_Microarray.csv"), 
           row.names = TRUE)
+
+SaveGoTermName = FALSE
+if(SaveGoTermName){
+  
+  ego = read.csv(file = paste0(tableDir, "FigS1EGO_term_enrichmenet_for_positional_genes_Microarray.csv"))
+  
+  
+}
 
 ##########################################
 # volcano plot with highlighting genes

@@ -150,8 +150,6 @@ if(Batch.Correct.regeneration.embryoStage){
   saveRDS(design.sels, file = paste0(RdataDir, '/design_sels_bc_TMM_combat_mUA_regeneration_dev_2Batches.R10723_R7977',
                                      version.analysis, '.rds'))
   
-  
-  
 }
 
 ########################################################
@@ -999,6 +997,7 @@ if(Peak.annotation_feature.distribution){
 ########################################################
 # prepare all tss to quantify the read counts within those tss 
 gtf.all = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/AmexT_v47_Hox.patch.gtf'
+
 amex.all = GenomicFeatures::makeTxDbFromGFF(file = gtf.all)
 tss = GenomicFeatures::promoters(amex.all, upstream = 2000, downstream = 2000, use.names = TRUE)
 
