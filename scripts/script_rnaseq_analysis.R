@@ -277,23 +277,23 @@ bgs = unique(xx0)
 gg.expressed = unique(clean_geneNames(rownames(yy)[which(yy$logFC_mHand.vs.mUA < 0)]))
 cat('# of genes --', length(gg.expressed), '\n')
 
-#gg.expressed = firstup(tolower(gg.expressed))
-#bgs = firstup(tolower(bgs))
-#bgs0 = firstup(tolower(bgs0))
+gg.expressed = firstup(tolower(gg.expressed))
+bgs = firstup(tolower(bgs))
+bgs0 = firstup(tolower(bgs0))
 
 gene.df <- bitr(gg.expressed, fromType = "SYMBOL",
                 toType = c("ENSEMBL", "ENTREZID"),
-                OrgDb = org.Hs.eg.db)
+                OrgDb = org.Mm.eg.db)
 head(gene.df)
 
 bgs.df <- bitr(bgs, fromType = "SYMBOL",
                toType = c("ENSEMBL", "ENTREZID"),
-               OrgDb = org.Hs.eg.db)
+               OrgDb = org.Mm.eg.db)
 head(bgs.df)
 
 bgs0.df <- bitr(bgs0, fromType = "SYMBOL",
                 toType = c("ENSEMBL", "ENTREZID"),
-                OrgDb = org.Hs.eg.db)
+                OrgDb = org.Mm.eg.db)
 
 #pval.cutoff = 0.05
 ego <-  enrichGO(gene         = gene.df$ENSEMBL,
@@ -335,6 +335,18 @@ SaveGoTermName = FALSE
 if(SaveGoTermName){
   
   ego = read.csv(file = paste0(tableDir, "FigS1EGO_term_enrichmenet_for_positional_genes_Microarray.csv"))
+  ego$geneSymbols = NA
+  
+  for(n in 1:nrow(ego))
+  {
+    # n = 1
+    test = as.character(ego$geneID[n])
+    test = unlist(strsplit(test, '/'))
+    ego$geneSymbols[n] = paste0(bgs.df$SYMBOL[match(test, bgs.df$ENSEMBL)], collapse = ';')
+  }
+  
+  write.csv(ego[, -1], file = paste0(tableDir, "FigS1E_GO_term_enrichmenet_for_positional_genes_Microarray_geneSymbols.csv"),
+            row.names = FALSE)
   
   
 }
