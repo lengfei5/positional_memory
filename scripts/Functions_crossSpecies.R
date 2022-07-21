@@ -481,6 +481,7 @@ collect_target_footprint = function(species = 'axolotl', motif = 'RUNX', distanc
     pp.annots = as.data.frame(pp.annots)
     pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 5000), ]
     cat(length(unique(pp.annots$geneId)), 'targets by promoter footprinting \n')
+    pp.annots$geneId = as.character(sapply(pp.annots$geneId, function(x) unlist(strsplit(x, '[|]'))[1]))
     
     # DE genes from RNA-seq data
     #res = readRDS(file = paste0(RdataDir, '/RNAseq_fpm_DEgenes_lfcShrink_res.rds'))
@@ -507,7 +508,7 @@ collect_target_footprint = function(species = 'axolotl', motif = 'RUNX', distanc
     DEgenes$geneID = DEgenes$gene  
     
     ggs = pp.annots$geneId
-    ggs = as.character(sapply(ggs, function(x) unlist(strsplit(x, '[|]'))[1]))
+    #ggs = as.character(sapply(ggs, function(x) unlist(strsplit(x, '[|]'))[1]))
     #ggs = gsub('_HUMAN', '', ggs)
     #ggs = gsub('[|]', '_', ggs)
     #ggs = get_geneName(ggs)
@@ -533,10 +534,10 @@ collect_target_footprint = function(species = 'axolotl', motif = 'RUNX', distanc
     saveRDS(ggs$geneSymbols, file = paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata',
                                '/targetGenes_footprint_', motif, '_', species,  '.rds'))
     
-    pp = pp.annots[!is.na(match(pp.annots$geneId, rownames(DEgenes))), ]
+    pp = pp.annots[!is.na(match(pp.annots$geneId, DEgenes$geneID)), ]
     
     pp$gene = DEgenes$geneID[match(pp$geneId, rownames(DEgenes))]
-    pp$geneSymbols = ggs$geneSymbols[match(pp$gene, ggs$From)]
+    pp$geneSymbols = ggs$geneSymbols[match(pp$geneId, ggs$From)]
     
     
     saveRDS(pp, file = paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata',
@@ -638,7 +639,7 @@ find_RUNX_orthologues_orthofinder = function()
   
   ss = apply(as.matrix(targets[, c(4:5)]), 1, function(x) sum(x, na.rm = TRUE))
   
-  targets[ss>=2, c(1, 4:6)]
+  targets[ss>=1, c(1, 4:6)]
   
   
 }

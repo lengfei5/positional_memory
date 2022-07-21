@@ -2689,39 +2689,57 @@ kk = grep('HOXA13|HOXC13', colnames(counts))
 counts[, kk[1]] = apply(counts[, kk], 1, sum)
 colnames(counts)[kk[1]] = 'HOXA13/HOXC13'
 keep$gene[grep('HOXA13|HOXC13', keep$gene)] = 'HOXA13/HOXC13'
+keep[grep('HOXA13|HOXC13', keep$gene), ]
+
 
 # merge CEBPA CEBPG
 kk = grep('CEBPA|CEBPG', colnames(counts))
 counts[, kk[1]] = apply(counts[, kk], 1, sum)
 colnames(counts)[kk[1]] = 'CEBPA/G'
 keep$gene[grep('CEBPA|CEBPG', keep$gene)] = 'CEBPA/G'
+keep[grep('CEBPA/G', keep$gene), ]
 
 # merge IRFs
 kk = grep('IRF1|IRF2|IRF7', colnames(counts))
 counts[, kk[1]] = apply(counts[, kk], 1, sum)
 colnames(counts)[kk[1]] = 'IRF1/2/7'
 keep$gene[grep('IRF1|IRF2|IRF7', keep$gene)] = 'IRF1/2/7'
-
+keep[grep('IRF1/2/7', keep$gene), ]
 
 # merge RELA RELB
 kk = grep('REL|RELA|RELB', colnames(counts))
 counts[, kk[1]] = apply(counts[, kk], 1, sum)
 colnames(counts)[kk[1]] = 'REL/RELA/RELB'
 keep$gene[grep('REL|RELA|RELB', keep$gene)] = 'REL/RELA/RELB'
-
+keep[grep('REL/RELA/RELB', keep$gene), ]
 
 # merge RUNX1 and RUNX2
 kk = grep('RUNX1|RUNX2', colnames(counts))
 counts[, kk[1]] = apply(counts[, kk], 1, sum)
 colnames(counts)[kk[1]] = 'RUNX1/2'
 keep$gene[grep('RUNX1|RUNX2', keep$gene)] ='RUNX1/2'
+keep[grep('RUNX1/2', keep$gene), ]
 
 # merge SMAD4/2/5
 kk = grep('SMAD', colnames(counts))
 counts[, kk[2]] = apply(counts[, kk], 1, sum)
 colnames(counts)[kk[2]] = 'SMAD'
 keep$gene[grep('SMAD', keep$gene)] = 'SMAD'
+keep[grep('SMAD', keep$gene), ]
 
+## remove the reduncy of keep after manual changes
+gene_species = paste0(keep$gene, '_', keep$species)
+idx = c()
+for(g in unique(gene_species))
+{
+  jj = which(gene_species == g)
+  if(length(jj) == 1){
+    idx = c(idx, jj)
+  }else{
+    idx = c(idx, jj[which.min(keep$rank)])  
+  }
+}
+keep = keep[idx, ]
 
 ss = apply(counts>0, 2, sum)
 genes.NC = colnames(counts)[which(ss > 2)]
@@ -2752,7 +2770,7 @@ newlevels = newlevels[c(1:21, 24, 23, 22)] # manually specify orders
 
 keep$rank = as.numeric(keep$rank)
 
-p1 = as_tibble(keep) %>% 
+as_tibble(keep) %>% 
   filter(gene %in% genes.NC) %>% 
   # mutate(gene = factor(gene, levels = clust$labels[clust$order])) %>% 
   mutate(gene = factor(gene, levels = newlevels)) %>% 
@@ -2777,9 +2795,8 @@ p1 = as_tibble(keep) %>%
         #legend.key.size = unit(1, 'cm')
         #legend.key.width= unit(1, 'cm')
   )
-p1
 
-ggsave(paste0(figureDir, "CrossSpecies_shared_Regulators_v3.pdf"),  width = 8, height = 10)
+ggsave(paste0(figureDir, "CrossSpecies_shared_Regulators_v4.pdf"),  width = 8, height = 10)
 
 ##########################################
 ##########################################
@@ -3114,42 +3131,65 @@ saveRDS(ggs, file = paste0(RdataDir, '/targetGenes_footprint_', motif, '_axolotl
 source('Functions_crossSpecies.R')
 source('Functions_histM.R')
 
-gg1 = readRDS(paste0(RdataDir, '/targetGenes_footprint_RUNX_zebrafish_fin.rds'))
-gg2 = readRDS(paste0(RdataDir, '/targetGenes_footprint_RUNX_zebrafishHeart.rds'))
+ax = readRDS(paste0(RdataDir, '/targetGenes_footprint_RUNX_axolotl_geneID_coordinate_4bed.rds'))
+
+targets = data.frame(ax$gene, ax$geneId, ax$transcriptId, stringsAsFactors = FALSE)
+targets$ortho_zebrafishFin = NA
+targets$ortho_zebrafishHeart = NA
+targets$ortho_acoel = NA
+
+## start the orthologues in fish fin
+annotFish = 
+  read.delim('/Volumes/groups/tanaka/People/current/jiwang/Genomes/zebrafish/GRCz11/annotation_ens_biomart_proteinID.txt')
+
+pp1 = readRDS(paste0(RdataDir, '/targetGenes_footprint_RUNX_zebrafishFin_geneID_coordinate_4bed.rds'))
+pp2 = readRDS(paste0(RdataDir, '/targetGenes_footprint_RUNX_zebrafishHeart_geneID_coordinate_4bed.rds'))
+#ort1 = read.delim(paste0(outDir_orthofinder, '/8296_Ambystoma_mexicanum__v__7955_Danio_rerio.tsv'), 
+#                  header = TRUE)
+pp3 = readRDS(paste0(RdataDir, '/targetGenes_footprint_RUNX_acoel_geneID_coordinate_4bed.rds'))
+
+
+# gg1 = readRDS(paste0(RdataDir, '/targetGenes_footprint_RUNX_zebrafish_fin.rds'))
+# gg2 = readRDS(paste0(RdataDir, '/targetGenes_footprint_RUNX_zebrafishHeart.rds'))
+# ggs = readRDS(paste0(RdataDir, '/targetGenes_footprint_RUNX_axolotl.rds'))
+# gg3 = readRDS(paste0(RdataDir, '/targetGenes_footprint_RUNX_acoel.rds'))
+gg1 = get_geneName(pp1$gene)
+gg2 = get_geneName(pp2$gene)
 targets = intersect(gg1, gg2)
 targets = targets[order(targets)]
 
-ggs = readRDS(paste0(RdataDir, '/targetGenes_footprint_RUNX_axolotl.rds'))
+ggs = get_geneName(ax$gene)
 ggs = ggs[grep('AMEX|LOC', ggs, invert = TRUE)]
-ggs = ggs[order(ggs)]
+ggs = as.character(ggs[order(ggs)])
 
 intersect(targets, ggs)
 #d = rbind(d, data.frame(gene = intersect(targets, ggs), species = rep('')) )
 
-gg3 = readRDS(paste0(RdataDir, '/targetGenes_footprint_RUNX_acoel.rds'))
+gg3 = unique(pp3$geneSymbols)
+
 #gg3 = gg3[grep('^g', gg3, invert = TRUE)]
 #gg3 = gg3[order(gg3)]
 intersect(targets, gg3)
 intersect(ggs, gg3)
 
+
 ## manually checking the protein in the same family
-targets[grep('HMG', targets)]; ggs[grep('HMG', ggs)]; gg3[grep('HMG', gg3)]
-targets[which(targets == 'HMGB1')] = 'HMGB1/3'
-ggs[which(ggs == 'HMGB3')] = 'HMGB1/3'
-
-targets[grep('KDM', targets)]; ggs[grep('KDM', ggs)]; gg3[grep('KDM', gg3)]
-
-ggs[grep('MRP', ggs)]; gg3[grep('MRP', gg3)]
-
-ggs[grep('PHF', ggs)]; gg3[grep('PHF', gg3)]
-ggs[grep('PSM', ggs)]; gg3[grep('PSM', gg3)];
-
-targets[grep('RNF', targets)]; ggs[grep('RNF', ggs)]; gg3[grep('RNF', gg3)];
-targets[grep('SALL', targets)];ggs[grep('SALL', ggs)]; gg3[grep('SALL', gg3)];
-
-ggs[grep('SLC44', ggs)]; gg3[grep('SLC44', gg3)];
-ggs[grep('TMEM', ggs)]; gg3[grep('TMEM', gg3)]; 
-
+# targets[grep('HMG', targets)]; ggs[grep('HMG', ggs)]; gg3[grep('HMG', gg3)]
+# targets[which(targets == 'HMGB1')] = 'HMGB1/3'
+# ggs[which(ggs == 'HMGB3')] = 'HMGB1/3'
+# 
+# targets[grep('KDM', targets)]; ggs[grep('KDM', ggs)]; gg3[grep('KDM', gg3)]
+# 
+# ggs[grep('MRP', ggs)]; gg3[grep('MRP', gg3)]
+# 
+# ggs[grep('PHF', ggs)]; gg3[grep('PHF', gg3)]
+# ggs[grep('PSM', ggs)]; gg3[grep('PSM', gg3)];
+# 
+# targets[grep('RNF', targets)]; ggs[grep('RNF', ggs)]; gg3[grep('RNF', gg3)];
+# targets[grep('SALL', targets)];ggs[grep('SALL', ggs)]; gg3[grep('SALL', gg3)];
+# 
+# ggs[grep('SLC44', ggs)]; gg3[grep('SLC44', gg3)];
+# ggs[grep('TMEM', ggs)]; gg3[grep('TMEM', gg3)]; 
 
 ##########
 ## Visualize the shared targets
@@ -3160,6 +3200,8 @@ library(tidygraph)
 library(graphlayouts) 
 library(RColorBrewer) # This is the color library
 
+
+#xx = unique(targets, intersect(targets),)
 d = data.frame(regulator = rep('RUNX', length(targets)),
                gene =  targets, species = rep('fish', length(targets)), stringsAsFactors = FALSE)
 
@@ -3175,7 +3217,7 @@ d  =d[which(d$species != 'fish'), ]
 
 g <- graph_from_data_frame(d, directed = TRUE)
 V(g)$species = d$species[match(V(g)$name, d$gene)]
-V(g)$species[1] = 'all'
+V(g)$species[1] = 'none'
 
 require(khroma)
 highcontrast <- colour("high contrast")
@@ -3200,5 +3242,3 @@ ggraph(g, layout='tree', circular=TRUE) +
   theme_void()
 
 ggsave(paste0(figureDir, "crossSpecies_RUNX_targets.pdf"), width=7, height = 4)
-
-
