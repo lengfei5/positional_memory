@@ -3155,6 +3155,7 @@ pp3 = readRDS(paste0(RdataDir, '/targetGenes_footprint_RUNX_acoel_geneID_coordin
 # gg3 = readRDS(paste0(RdataDir, '/targetGenes_footprint_RUNX_acoel.rds'))
 gg1 = get_geneName(pp1$gene)
 gg2 = get_geneName(pp2$gene)
+
 targets = intersect(gg1, gg2)
 targets = targets[order(targets)]
 
@@ -3171,6 +3172,7 @@ gg3 = unique(pp3$geneSymbols)
 #gg3 = gg3[order(gg3)]
 intersect(targets, gg3)
 intersect(ggs, gg3)
+
 
 
 ## manually checking the protein in the same family

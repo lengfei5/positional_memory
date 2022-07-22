@@ -92,6 +92,46 @@ run_enrichGo_axolotl = function(pp.annots, distanceToTSS = 2000,  regulation = '
   
 }
 
+
+run_enrichGo_withGeneList = function(ggs,  title.plot = 'GoEnrichment')
+{
+  
+  cat(length(ggs), ' targets \n')
+  
+  gg.expressed = ggs # gene set 
+  # xx0 = bgs # background
+  
+  gg.expressed = gg.expressed[which(gg.expressed != '' & gg.expressed != 'N/A' & !is.na(gg.expressed))]
+  #bgs = unique(xx0[which(xx0 != '' & xx0 != 'N/A' & !is.na(xx0))])
+  
+  gg.expressed = firstup(tolower(gg.expressed))
+  #bgs = firstup(tolower(bgs))
+  
+  gene.df <- bitr(gg.expressed, fromType = "SYMBOL", toType = c("ENSEMBL", "ENTREZID"),
+                  OrgDb = org.Mm.eg.db)
+  #bgs.df <- bitr(bgs, fromType = "SYMBOL", toType = c("ENSEMBL", "ENTREZID"),
+  #               OrgDb = org.Mm.eg.db)
+  
+  ego <-  enrichGO(gene         = gene.df$ENSEMBL,
+                   # universe     = bgs.df$ENSEMBL,
+                   #OrgDb         = org.Hs.eg.db,
+                   OrgDb         = org.Mm.eg.db,
+                   keyType       = 'ENSEMBL',
+                   ont           = "BP",
+                   pAdjustMethod = "BH",
+                   pvalueCutoff  = 0.05,
+                   qvalueCutoff  = 0.1)
+  
+  # kk = grep('deoxyribonucleic', ego@result$Description)
+  # ego@result$Description[kk] = 'endonuclease activity'
+  
+  eval(parse(text = paste0('p = barplot(ego, showCategory=20) + ggtitle("', title.plot, '")')))
+  plot(p)
+  
+  return(p)
+  
+}
+
 ########################################################
 ########################################################
 # Section : find conserved targets for conserved regulators
@@ -145,6 +185,7 @@ collect_target_footprint = function(species = 'axolotl', motif = 'RUNX', distanc
       }
     }
     cat('total footprint found -- ', length(footprint), '\n')
+    
     saveFootprint = FALSE
     if(saveFootprint){
       
@@ -168,11 +209,11 @@ collect_target_footprint = function(species = 'axolotl', motif = 'RUNX', distanc
     res = readRDS(file = paste0('../results/cross_species_20220621/zebrafish_fin/Rdata', 
                                 '/RNAseq_fpm_DEgenes_lfcShrink_res.rds'))
     
-    fdr.cutoff = 0.1; logfc.cutoff = 0 # select only activated genes in regeneration
-    jj = which((res$padj_sp7ne_4dpa.vs.0dpa < fdr.cutoff & res$log2FoldChange_sp7ne_4dpa.vs.0dpa > logfc.cutoff) |
-                 (res$padj_sp7po_4dpa.vs.0dpa < fdr.cutoff & (res$log2FoldChange_sp7po_4dpa.vs.0dpa) > logfc.cutoff)
-    )
+    fdr.cutoff = 0.01; logfc.cutoff = 0 # select DE genes in regeneration
+    jj = which(res$padj_sp7ne_4dpa.vs.0dpa < fdr.cutoff |
+                 res$padj_sp7po_4dpa.vs.0dpa < fdr.cutoff)
     cat(length(jj), '\n')
+    
     DEgenes = res[jj, ]
     
     DEgenes = data.frame(DEgenes)
@@ -184,6 +225,14 @@ collect_target_footprint = function(species = 'axolotl', motif = 'RUNX', distanc
     ggs = DEgenes$gene[match(pp$geneId, DEgenes$geneID)]
     ggs = unique(as.character(ggs))
     cat(length(ggs), ' targets \n')
+    
+    p = run_enrichGo_withGeneList(ggs,  title.plot = 'RUNX target in zebrafish fin')
+    
+    pdfname = paste0(figureDir, 'GoEnrichment_footprinting_targetGenes_RUNX_', species, '.pdf')
+    pdf(pdfname, width = 8, height = 5)
+    par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+    grid.arrange(p, ncol = 1, nrow = 1)
+    dev.off()
     
     saveRDS(ggs, file = paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata',
                                '/targetGenes_footprint_', motif, '_', species,  '.rds'))
@@ -270,9 +319,9 @@ collect_target_footprint = function(species = 'axolotl', motif = 'RUNX', distanc
     res = readRDS(file = paste0('../results/cross_species_20220621/zebrafish_heart', 
                                 '/Rdata/RNAseq_fpm_DEgenes_lfcShrink_res.rds'))
     
-    fdr.cutoff = 0.1; logfc.cutoff =  # select only activated genes in regeneration
-    jj = which((res$padj_3dpa.vs.0dpa < fdr.cutoff & res$log2FoldChange_3dpa.vs.0dpa > logfc.cutoff) |
-                 (res$padj_7dpa.vs.0dpa < fdr.cutoff & (res$log2FoldChange_7dpa.vs.0dpa) > logfc.cutoff)
+    fdr.cutoff = 0.05; logfc.cutoff = 0 # select only activated genes in regeneration
+    jj = which((res$padj_3dpa.vs.0dpa < fdr.cutoff & abs(res$log2FoldChange_3dpa.vs.0dpa) > logfc.cutoff) |
+                 (res$padj_7dpa.vs.0dpa < fdr.cutoff & abs(res$log2FoldChange_7dpa.vs.0dpa) > logfc.cutoff)
     )
     cat(length(jj), '\n')
     
@@ -288,6 +337,14 @@ collect_target_footprint = function(species = 'axolotl', motif = 'RUNX', distanc
     ggs = DEgenes$gene[match(pp$geneId, DEgenes$geneID)]
     ggs = unique(as.character(ggs))
     cat(length(ggs), ' targets \n')
+    
+    p = run_enrichGo_withGeneList(ggs,  title.plot = 'RUNX target in zebrafish heart')
+    
+    pdfname = paste0(figureDir, 'GoEnrichment_footprinting_targetGenes_RUNX_', species, '.pdf')
+    pdf(pdfname, width = 8, height = 5)
+    par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+    grid.arrange(p, ncol = 1, nrow = 1)
+    dev.off()
     
     saveRDS(ggs, file = paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata',
                                '/targetGenes_footprint_', motif, '_', species,  '.rds'))
@@ -490,14 +547,14 @@ collect_target_footprint = function(species = 'axolotl', motif = 'RUNX', distanc
     fdr.cutoff = 0.1; logfc.cutoff = 0 # select only activated genes in regeneration
     
     # fdr.cutoff = 0.1; logfc.cutoff = 0 # select only activated genes in regeneration
-    jj = which((res$padj_tail.1h.vs.0h < fdr.cutoff & res$log2FoldChange_tail.1h.vs.0h > logfc.cutoff) |
-                 (res$padj_tail.1h.vs.0h < fdr.cutoff & (res$log2FoldChange_tail.3h.vs.0h) > logfc.cutoff)|
-                 (res$padj_tail.6h.vs.0h < fdr.cutoff & (res$log2FoldChange_tail.6h.vs.0h) > logfc.cutoff) |
-                 (res$padj_tail.12h.vs.0h < fdr.cutoff & (res$log2FoldChange_tail.12h.vs.0h) > logfc.cutoff)|
-                 (res$padj_head.1h.vs.0h < fdr.cutoff & res$log2FoldChange_head.1h.vs.0h > logfc.cutoff) |
-                 (res$padj_head.3h.vs.0h < fdr.cutoff & (res$log2FoldChange_head.3h.vs.0h) > logfc.cutoff)|
-                 (res$padj_head.6h.vs.0h < fdr.cutoff & (res$log2FoldChange_head.6h.vs.0h) > logfc.cutoff) |
-                 (res$padj_head.12h.vs.0h < fdr.cutoff & (res$log2FoldChange_head.12h.vs.0h) > logfc.cutoff)
+    jj = which((res$padj_tail.1h.vs.0h < fdr.cutoff & abs(res$log2FoldChange_tail.1h.vs.0h) > logfc.cutoff) |
+                 (res$padj_tail.1h.vs.0h < fdr.cutoff & abs(res$log2FoldChange_tail.3h.vs.0h) > logfc.cutoff)|
+                 (res$padj_tail.6h.vs.0h < fdr.cutoff & abs(res$log2FoldChange_tail.6h.vs.0h) > logfc.cutoff) |
+                 (res$padj_tail.12h.vs.0h < fdr.cutoff & abs(res$log2FoldChange_tail.12h.vs.0h) > logfc.cutoff)|
+                 (res$padj_head.1h.vs.0h < fdr.cutoff & abs(res$log2FoldChange_head.1h.vs.0h) > logfc.cutoff) |
+                 (res$padj_head.3h.vs.0h < fdr.cutoff & abs(res$log2FoldChange_head.3h.vs.0h) > logfc.cutoff)|
+                 (res$padj_head.6h.vs.0h < fdr.cutoff & abs(res$log2FoldChange_head.6h.vs.0h) > logfc.cutoff) |
+                 (res$padj_head.12h.vs.0h < fdr.cutoff & abs(res$log2FoldChange_head.12h.vs.0h) > logfc.cutoff)
                
     )
     cat(length(jj), '\n')
@@ -521,10 +578,11 @@ collect_target_footprint = function(species = 'axolotl', motif = 'RUNX', distanc
     
     ggs = as.character(sapply(ggs, function(x) unlist(strsplit(x, '[|]'))[1]))
     
+    
     write.table(ggs, file = paste0("../results/Uniprot_EntryName.txt"), sep = '\t',
                 col.names = FALSE, row.names = FALSE, quote =FALSE)
     
-    ggs =read.delim('../data/uniprot-download_true_fields_accession_2Creviewed_2Cid_2Cprotein_nam-2022.07.07-16.03.50.51.tsv', 
+    ggs =read.delim('../data/uniprot-compressed_true_download_true_fields_accession_2Creviewed_2C-2022.07.21-14.36.28.02.tsv', 
                     sep = '\t')
     ggs$geneSymbols = sapply(ggs$Gene.Names, function(x) unlist(strsplit(as.character(x), ' '))[1])
     #pp = pp.annots[!is.na(match(pp.annots$geneId, DEgenes$geneID)), ]
@@ -533,6 +591,15 @@ collect_target_footprint = function(species = 'axolotl', motif = 'RUNX', distanc
     #cat(length(ggs), ' targets \n')
     saveRDS(ggs$geneSymbols, file = paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata',
                                '/targetGenes_footprint_', motif, '_', species,  '.rds'))
+    
+    p = run_enrichGo_withGeneList(ggs$geneSymbols,  title.plot = 'RUNX target in acoel')
+    
+    pdfname = paste0(figureDir, 'GoEnrichment_footprinting_targetGenes_RUNX_', species, '.pdf')
+    pdf(pdfname, width = 8, height = 5)
+    par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+    grid.arrange(p, ncol = 1, nrow = 1)
+    dev.off()
+    
     
     pp = pp.annots[!is.na(match(pp.annots$geneId, DEgenes$geneID)), ]
     

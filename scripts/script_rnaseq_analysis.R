@@ -141,6 +141,10 @@ saveRDS(res, file = paste0("../results/microarray/Rdata/",
 res = readRDS(file = paste0("../results/microarray/Rdata/", 
 'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_limma.DE.stats.rds'))
 
+## manual change the gene annotation MEIS3
+rownames(res)[grep('AMEX60DD024424', rownames(res))]
+rownames(res)[grep('AMEX60DD024424', rownames(res))] = 'MEIS3_AMEX60DD024424' 
+
 ggs = sapply(rownames(res), function(x){unlist(strsplit(as.character(x), '_'))[1]})
 
 qv.cutoff = 0.05
@@ -164,7 +168,7 @@ print(intersect(ggs, sps))
 print(intersect(ggs, eps))
 print(intersect(ggs, rbp))
 
-yy = res[select, ]
+yy = res[select, c(1:9)]
 saveRDS(yy, file = paste0(RdataDir, 'microarray_positionalGenes_data.rds'))
 
 df <- data.frame(condition = rep(c('mUA', 'mLA', 'mHand'), each = 3))
@@ -427,7 +431,8 @@ pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
          cluster_cols=FALSE, annotation_col=df, fontsize_row = 8, 
          width = 8, height = 10,
          annotation_colors = annot_colors,
-         filename = paste0(figureDir, 'FigS2A_heatmap_DE.tfs_eps_mature_qv.0.05_log2fc.1_microarray_lgo2.geneExp_nonScaled.pdf')) 
+         filename = paste0(figureDir, 
+                           'FigS2A_heatmap_DE.tfs_eps_mature_qv.0.05_log2fc.1_microarray_lgo2.geneExp_nonScaled.pdf')) 
 
 pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
          color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(16), 
@@ -435,7 +440,8 @@ pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = FALSE,
          cluster_cols=FALSE, annotation_col=df, fontsize_row = 8, 
          width = 8, height = 10,
          annotation_colors = annot_colors,
-         filename = paste0(figureDir, 'FigS2A_heatmap_DE.tfs_eps_mature_qv.0.05_log2fc.1_microarray_scaled.log2.geneExp_zscore.pdf')) 
+         filename = paste0(figureDir, 
+                           'FigS2A_heatmap_DE.tfs_eps_mature_qv.0.05_log2fc.1_microarray_scaled.log2.geneExp_zscore.pdf')) 
 
 mm = match(ggs, unique(c(toupper(sps))))
 yy1 = yy[unique(c(which(!is.na(mm)), grep('CYP2', rownames(yy)))), ]
