@@ -183,10 +183,10 @@ if(Make.Granges.and.peakAnnotation){
   # annotation from ucsc browser ambMex60DD_genes_putative
   amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
   pp.annots = annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
-  #plotAnnoBar(pp.annots)
-  
+    
   pp.annots = as.data.frame(pp.annots)
-  rownames(pp.annots) = rownames(fpm)
+  rownames(pp.annots) = rownames(yy)
+  
   
   promoters = select.promoters.regions(upstream = 2000, downstream = 2000, ORF.type.gtf = 'Putative', promoter.select = 'all')
   
@@ -580,7 +580,7 @@ if(Plot_histMarkers_for_positionalATAC){
   
   # conds_histM = c('H3K4me3', 'H3K27me3', 'H3K4me1', 'H3K27ac')
   conds_histM = c('H3K4me3', 'H3K27me3', 'H3K4me1')
-  range <- 3.0
+  range <- 2.0
   
   yy = matrix(NA, nrow = nrow(yy0), ncol = length(conds_histM)*3)
   rownames(yy) = rownames(yy0)
@@ -619,7 +619,7 @@ if(Plot_histMarkers_for_positionalATAC){
   pheatmap(yy, cluster_rows=TRUE,
            #cutree_rows = 4,
            show_rownames=FALSE, fontsize_row = 5,
-           color = colorRampPalette(rev(brewer.pal(n = 8, name ="RdBu")))(7), 
+           color = colorRampPalette(rev(brewer.pal(n = 8, name ="RdBu")))(8), 
            show_colnames = FALSE,
            scale = 'none',
            cluster_cols=FALSE, annotation_col=df,
@@ -633,7 +633,120 @@ if(Plot_histMarkers_for_positionalATAC){
            filename = paste0(outDir, '/Fig_S1F_heatmap_histoneMarker_DE_notoverlapped.with.atac.postionalPeaks.pdf'))
   
   
-    
+  ##########################################
+  # highlight some positional genes and promoters
+  ##########################################
+  pp = data.frame(t(sapply(rownames(yy), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  pp$strand = '*'
+  pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
+  
+  amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
+  pp.annots = annotatePeak(pp, TxDb=amex, tssRegion = c(-5000, 5000), level = 'transcript')  
+  
+  ### highlight promoter peaks
+  pp.annots = as.data.frame(pp.annots)
+  promoter.sels = grep('Promoter', pp.annots$annotation)
+  
+  yy.sels = yy[promoter.sels, ]
+  peaks.sels = pp.annots[promoter.sels, ]
+  rownames(peaks.sels) = rownames(yy.sels)
+  mm = match(rownames(peaks.sels), rownames(keep))
+  peaks.sels$log2fc = apply(keep[mm, setdiff(grep('logFC.mHand.vs.mUA_', colnames(keep)), grep('H3K27ac', colnames(keep)))], 
+                            1, function(x){x[which.max(abs(x))]})
+  
+  o1 = order(-abs(peaks.sels$log2fc))
+  peaks.sels = peaks.sels[o1, ]
+  yy.sels = yy.sels[o1, ]
+  
+  #tss$gene[which(rownames(tss) == 'AMEX60DD028208')] = 'PROD1'
+  #tss$gene[which(rownames(tss) == 'AMEX60DD024424')] = 'MEIS3'
+  
+  peaks.sels[grep('HOXA13|MEIS|SHOX', peaks.sels$transcriptId), ]
+  
+  ## further selection of positional genes with microarray data
+  genelists = readRDS(file = paste0('../results/RNAseq_data_used/Rdata/', 
+                                    'microarray_positionalGenes_data.rds'))
+  ids = get_geneID(rownames(genelists)) 
+  #ids = c(tss$geneID[match(positional.genes, tss$gene)], ids)
+  ids = unique(ids)
+  
+  # convert transcriptID to gene ID
+  annot = read.delim(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                         'annot_AmexT_v47_transcriptID_transcriptCotig_geneID_geneSymbol.hs_nr_CDS.txt'))
+  
+  peaks.sels$geneId = sapply(peaks.sels$geneId, function(x) {x = unlist(strsplit(as.character(x), '[|]')); 
+  x[grep('AMEX60', x)]} )
+  peaks.sels$geneId = as.character(annot$geneID[match(peaks.sels$geneId, annot$transcriptID)])
+  
+  kk = match(peaks.sels$geneId, ids)
+  kk = which(!is.na(kk))
+  kk = unique(c(grep('MEIS', peaks.sels$transcriptId), kk))
+  
+  #test = peaks.sels[kk, ]
+  #test[grep('HOXA13|MEIS|SHOX', test$transcriptId), ]
+  peaks.sels = peaks.sels[kk, ]
+  yy.sels = yy.sels[kk, ]
+  
+  segments = c('mUA', 'mLA', 'mHand')
+  conds = c('atac', 'H3K4me3','H3K27me3', 'H3K4me1')
+  cc = paste(rep(conds, each = length(segments)), segments, sep = "_")
+  
+  ####### top 30 promoter peaks
+  # ntop = 30
+  # ntop = nrow(peaks.sels)
+  # 
+  # o1 = order(-peaks.sels$fdr.mean)
+  # peaks.sels = peaks.sels[o1[1:ntop], ]
+  # yy.sels = yy.sels[o1[1:ntop], ]
+  
+  geneSymbols = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                               'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
+  
+  # jj = which(geneSymbols$geneID == 'AMEX60DD024424')
+  # geneSymbols$gene.symbol.toUse[jj] = 'MEIS3'
+  # geneSymbols$manual[jj] = 'MEIS3'
+  # 
+  # saveRDS(geneSymbols, file = paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+  #                       'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
+  
+  ggs = peaks.sels$geneId
+  mm = match(ggs, geneSymbols$geneID)
+  ggs[!is.na(mm)] = geneSymbols$gene.symbol.toUse[mm[!is.na(mm)]]
+  
+  grep('HOX13|MEIS|SHOX', ggs)
+  
+  yy.sels = as.matrix(yy.sels)
+  
+  rownames(yy.sels) = ggs
+  test = yy.sels
+  
+  df = data.frame(segments = sapply(colnames(test), function(x) unlist(strsplit(as.character(x), '_'))[2]))
+  colnames(df) = c('seg')
+  rownames(df) = colnames(test)
+  
+  sample_colors = c('springgreen4', 'steelblue2', 'gold2')
+  names(sample_colors) = c('mUA', 'mLA', 'mHand')
+  annot_colors = list(segments = sample_colors)
+  
+  gaps.col = c(3, 6)
+  pheatmap(test, 
+           annotation_col = df, show_rownames = TRUE, scale = 'none', 
+           color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
+           show_colnames = FALSE,
+           cluster_rows = TRUE, cluster_cols = FALSE, 
+           annotation_colors = annot_colors, 
+           gaps_col = gaps.col, fontsize_row = 8,
+           #breaks = seq(-2, 2, length.out = 8),
+           clustering_method = 'complete', cutree_rows = 4,
+           breaks = seq(-range, range, length.out = 8),
+           #gaps_row =  gaps.row, 
+           treeheight_row = 20,
+           legend_labels = FALSE,
+           annotation_legend = FALSE,
+           filename = paste0(outDir, 'Fig_S1G_heatmap_positional_histMarks_promoters.pdf'), 
+           width = 5, height = 15)
+  
 }
 
 ##########################################
@@ -1113,7 +1226,7 @@ require(patchwork)
 tss = readRDS(file = paste0(RdataDir, '/regeneration_matureSamples_tss_perGene_smartseq2_atac_histM_v4.rds'))
 
 tss$gene[which(rownames(tss) == 'AMEX60DD028208')] = 'PROD1'
-tss$gene[which(rownames(tss) == 'AMEX60DD024424')] = NA
+tss$gene[which(rownames(tss) == 'AMEX60DD024424')] = 'MEIS3'
 
 # saveRDS(tss, file =paste0(RdataDir, '/regeneration_matureSamples_tss_perGene_smartseq2_atac_histM_v5.rds'))
 
