@@ -1342,7 +1342,6 @@ plt = pheatmap(xx,
                filename = paste0(figureDir, '/heatmap_positionalGens_notExprmUA_TSS_mature_regeneration_log2FC.2.pdf'), 
                width = 6, height = 5)
 
-
 pheatmap(xx, 
          annotation_col = df, 
          show_rownames = FALSE, scale = 'none', 

@@ -362,6 +362,9 @@ library(tibble)
 res = readRDS(file = paste0("../results/microarray/Rdata/", 
       'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_limma.DE.stats.rds'))
 
+rownames(res)[grep('AMEX60DD024424', rownames(res))]
+rownames(res)[grep('AMEX60DD024424', rownames(res))] = 'MEIS3_AMEX60DD024424' 
+
 res$gene = sapply(rownames(res), function(x) unlist(strsplit(as.character(x), '_'))[1])
 
 for(comp in c('mHand.vs.mUA', 'mHand.vs.mLA', 'mLA.vs.mUA'))
@@ -374,7 +377,7 @@ for(comp in c('mHand.vs.mUA', 'mHand.vs.mLA', 'mLA.vs.mUA'))
   
   #examples.sel = which(res$pval > 4 & abs(res$logfc) > 2)
   examples.sel = c()
-  examples.sel = unique(c(examples.sel, grep('HOXA13|HOXD13', res$gene)))
+  examples.sel = unique(c(examples.sel, grep('HOXA13|HOXD13|MEIS1|MEIS2|MEIS3', res$gene)))
   
   ggplot(data=res, aes(x=logfc, y=pval, label = gene)) +
     geom_point(size = 0.3) + 
@@ -407,8 +410,7 @@ for(comp in c('mHand.vs.mUA', 'mHand.vs.mLA', 'mLA.vs.mUA'))
     geom_hline(yintercept=-log10(0.001), col="gray") +
     labs(x = "log2FC (mHand/mUA)", y = "-log10(p-val)")
   
-  ggsave(paste0(figureDir, "Fig2C_VolcanoPlot_log2FC_pval_microarray_noLabels_", comp, ".pdf"), width=6, height = 4)
-  
+  ggsave(paste0(figureDir, "Fig_S1D_VolcanoPlot_log2FC_pval_microarray_noLabels_", comp, ".pdf"), width=6, height = 4)
   
 }
 
