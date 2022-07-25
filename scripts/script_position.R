@@ -572,14 +572,14 @@ if(Plot_histMarkers_for_positionalATAC){
   source('Functions_plots.R')
   subclustering.postional.histM.postioinalAtacPeaks()
   
-  
   ##########################################
   # dynamic histM peaks overlapped with stable atac peaks;
   ##########################################
   yy0 = readRDS(file = paste0(RdataDir, '/peak_signals_atac_4histM_notOverlapped.positionalPeaks.rds'))
   yy0 = yy0[, grep('mRep', colnames(yy0))]
   
-  conds_histM = c('H3K4me3', 'H3K27me3', 'H3K4me1', 'H3K27ac')
+  # conds_histM = c('H3K4me3', 'H3K27me3', 'H3K4me1', 'H3K27ac')
+  conds_histM = c('H3K4me3', 'H3K27me3', 'H3K4me1')
   range <- 3.0
   
   yy = matrix(NA, nrow = nrow(yy0), ncol = length(conds_histM)*3)
@@ -608,7 +608,7 @@ if(Plot_histMarkers_for_positionalATAC){
   sample_colors = c('springgreen4', 'steelblue2', 'gold2')
   annot_colors = list(segments = sample_colors)
   
-  gaps_col = c(3, 6, 9)
+  gaps_col = c(3, 6)
   
   callback = function(hc, mat){
     sv = svd(t(mat))$v[,8]
@@ -626,11 +626,13 @@ if(Plot_histMarkers_for_positionalATAC){
            gaps_col = gaps_col,
            legend = TRUE,
            treeheight_row = 20,
-           annotation_legend = FALSE, 
+           annotation_legend = TRUE, 
            #annotation_colors = annot_colors,
            clustering_callback = callback,
            width = 4, height = 12, 
-           filename = paste0(figureDir, '/heatmap_histoneMarker_DE_notoverlapped.with.atac.postionalPeaks.pdf'))
+           filename = paste0(outDir, '/Fig_S1F_heatmap_histoneMarker_DE_notoverlapped.with.atac.postionalPeaks.pdf'))
+  
+  
     
 }
 
@@ -658,34 +660,42 @@ xx1 = cal_sample_means(ps, conds =  c("Mature_UA", "Mature_LA", "Mature_Hand"))
 colnames(xx1) = paste0('atac_', segments)
 xx1 = data.frame(clusters = peaks$clusters, xx1, stringsAsFactors = FALSE)
 
-conds_histM = c('H3K4me3','H3K27me3', 'H3K4me1', 'H3K27ac')
+# conds_histM = c('H3K4me3','H3K27me3', 'H3K4me1', 'H3K27ac')
+# levels = c('atac', 'H3K4me3', 'H3K4me1', 'H3K27me3', 'H3K27ac')
+conds_histM = c('H3K4me3','H3K27me3', 'H3K4me1')
+levels = c('atac', 'H3K4me3', 'H3K4me1', 'H3K27me3')
+
 cc = paste(rep(conds_histM, each = length(segments)), segments, sep = "_")
 xx2 = cal_sample_means(signals, conds = cc)
 rownames(xx2) = rownames(xx1)
 
 xx1 = data.frame(xx1, xx2, stringsAsFactors = FALSE)
 
+cols = c('Blue', 'darkgreen',  'purple1', 'orange2')
+
 # cluster order : 6, 1, 5, 3, 4, 2
 yy = xx1[which(xx1$clusters == 6),]
 p1 = as_tibble(yy) %>% 
-  gather(marker, signal, 2:16) %>%
+  gather(marker, signal, 2:ncol(yy)) %>%
   separate(marker, c('markers', 'segment')) %>%
-  ggplot(aes(x = segment, y = signal, fill = factor(markers, levels = c('atac', 'H3K4me3', 'H3K4me1', 'H3K27me3', 'H3K27ac')))) +
+  ggplot(aes(x = segment, y = signal, fill = factor(markers, levels = levels))) +
   #geom_bar(stat = "identity") +
   geom_boxplot() + 
-  scale_fill_brewer(palette="Dark2") +
+  #scale_fill_brewer(palette="Dark2") +
+  scale_fill_manual(values = cols) +
   guides(fill=guide_legend(title="")) +
   theme_classic() +
   ggtitle('cluster 1')
 
 yy = xx1[which(xx1$clusters == 1),]
 p2 = as_tibble(yy) %>% 
-  gather(marker, signal, 2:16) %>%
+  gather(marker, signal, 2:ncol(yy)) %>%
   separate(marker, c('markers', 'segment')) %>%
-  ggplot(aes(x = segment, y = signal, fill = factor(markers, levels = c('atac', 'H3K4me3', 'H3K4me1', 'H3K27me3', 'H3K27ac')))) +
+  ggplot(aes(x = segment, y = signal, fill = factor(markers, levels = levels))) +
   #geom_bar(stat = "identity") +
   geom_boxplot() + 
-  scale_fill_brewer(palette="Dark2") +
+  #scale_fill_brewer(palette="Dark2") +
+  scale_fill_manual(values = cols) +
   guides(fill=guide_legend(title="")) +
   theme_classic() +
   ggtitle('cluster 2')
@@ -693,24 +703,26 @@ p2 = as_tibble(yy) %>%
 
 yy = xx1[which(xx1$clusters == 5| xx1$clusters == 3),]
 p3 = as_tibble(yy) %>% 
-  gather(marker, signal, 2:16) %>%
+  gather(marker, signal, 2:ncol(yy)) %>%
   separate(marker, c('markers', 'segment')) %>%
-  ggplot(aes(x = segment, y = signal, fill = factor(markers, levels = c('atac', 'H3K4me3', 'H3K4me1', 'H3K27me3', 'H3K27ac')))) +
+  ggplot(aes(x = segment, y = signal, fill = factor(markers, levels = levels))) +
   #geom_bar(stat = "identity") +
   geom_boxplot() + 
-  scale_fill_brewer(palette="Dark2") +
+  #scale_fill_brewer(palette="Dark2") +
+  scale_fill_manual(values = cols) +
   guides(fill=guide_legend(title="")) +
   theme_classic() +
   ggtitle('cluster 3,4')
 
 yy = xx1[which(xx1$clusters == 2| xx1$clusters == 4),]
 p4 = as_tibble(yy) %>% 
-  gather(marker, signal, 2:16) %>%
+  gather(marker, signal, 2:ncol(yy)) %>%
   separate(marker, c('markers', 'segment')) %>%
-  ggplot(aes(x = segment, y = signal, fill = factor(markers, levels = c('atac', 'H3K4me3', 'H3K4me1', 'H3K27me3', 'H3K27ac')))) +
+  ggplot(aes(x = segment, y = signal, fill = factor(markers, levels = levels))) +
   #geom_bar(stat = "identity") +
   geom_boxplot() + 
-  scale_fill_brewer(palette="Dark2") +
+  #scale_fill_brewer(palette="Dark2") +
+  scale_fill_manual(values = cols) +
   guides(fill=guide_legend(title="")) +
   theme_classic() +
   ggtitle('cluster 5,6') 
@@ -727,13 +739,9 @@ plot_list[['p2']]=p2[[4]]
 plot_list[['p3']]=p3[[4]]
 plot_list[['p4']]=p4[[4]]
 
-pdf(paste0(figureDir, "/atac_histMarkers_boxplot_byClusters.pdf"),
+pdf(paste0(figureDir, "/Fig_S1H_atac_histMarkers_boxplot_byClusters.pdf"),
     width = 10, height = 6) # Open a new pdf file
 
-#layout = matrix(c(1, 2, 3,4 ), nrow = 2)
-#grid.arrange(grobs=plot_list, nrow= 2,
-#             layout_matrix = layout)
-#p1 + p2 /(p3 + p4)
 plot_grid(p1, p2, p3, p4,
           ncol = 2, nrow = 2)
 
@@ -757,7 +765,8 @@ mm[missed] = mm[174]
 
 keep = keep[mm, ]
 
-res = matrix(0, nrow = nrow(keep), ncol = 5)
+conds_histM = c('H3K4me3','H3K27me3', 'H3K4me1')
+res = matrix(0, nrow = nrow(keep), ncol = (1+length(conds_histM)))
 colnames(res) = c('atac', conds_histM)
 rownames(res) = rownames(peaks)
 res = data.frame(res, stringsAsFactors = FALSE)
@@ -788,11 +797,12 @@ for(n in 1:ncol(yy)){
 
 yy = t(yy)
 
-yy = yy[c(5:1), ]
+# yy = yy[c(nrow(yy):1), ]
 
+outDir = "/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/Figure_S1/"
 pheatmap(yy, cluster_rows = FALSE, cluster_cols = TRUE, show_rownames = TRUE, show_colnames = FALSE,
          color = c('darkred', 'white', 'darkgreen'), treeheight_row = 0, treeheight_col = 0, 
-         filename = paste0(figureDir, '/check_histMarkers_follow_atacPeak.pdf'), 
+         filename = paste0(outDir, '/Fig_S1H_check_histMarkers_follow_atacPeak.pdf'), 
          width = 6, height = 2)
 
 
@@ -1224,13 +1234,16 @@ pheatmap(yy[plt$tree_row$order, ],
 
 
 ## predicted postional genes from above clusters 
-outDir = "/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/Gene_Examples"   
+outDir = paste0("/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/", 
+                "figure/plots_4figures/Gene_Examples")
+
 source('Functions_Integration.matureReg.R')
 if(!dir.exists(outDir)) dir.create(outDir)
 
 tss$gene[which(tss$geneID == 'AMEX60DD023963')] = 'AMEX60DD023963'
 tss$gene[which(tss$geneID == 'AMEX60DD004776')] = 'AMEX60DD004776'
-plot_rna_chromainFeatures_geneExamples(tss, geneList = c('LHX2', 'COL9A2', 'GDF5', 'SALL1', 'SCUBE2', 'ECM2', 'CYP2F1', 'CYP2A13'), 
+plot_rna_chromainFeatures_geneExamples(tss, geneList = c('LHX2', 'COL9A2', 'GDF5', 'SALL1', 'SCUBE2', 
+                                                         'ECM2', 'CYP2F1', 'CYP2A13'), 
                                        outDir = outDir, incl_Mature = TRUE, log2fc = TRUE)
 
 ##########################################
