@@ -1959,7 +1959,8 @@ yy$rna_mUA[is.na(yy$rna_mUA)] = -6
 yy %>% 
   pivot_longer(cols = fts, names_to = 'features') %>%
   mutate(features = factor(features, levels = fts)) %>%
-  mutate(groups = factor(groups, levels = c('DE_up', 'DE_down', 'house_keep', 'highlyExpr_stable', 'lowlyExpr_stable',  'non_expr'))) %>% 
+  mutate(groups = factor(groups, levels = c('DE_up', 'DE_down', 'house_keep', 'highlyExpr_stable', 
+                                            'lowlyExpr_stable',  'non_expr'))) %>% 
   ggplot(aes(x = features, y=value, fill= groups)) + 
   geom_boxplot(outlier.alpha = 0.1) + 
   #geom_jitter(width = 0.1)+
@@ -1979,7 +1980,7 @@ ggsave(paste0(figureDir, "GeneGroups_features_promoterChromatinFeatures.pdf"),  
 
 ## plot non-high-rank features
 
-fts = c('H3K4me1_mUA', 'H3K27ac_mUA')
+fts = c('H3K4me1_mUA')
 yy %>% 
   pivot_longer(cols = fts, names_to = 'features') %>%
   mutate(features = factor(features, levels = fts)) %>%
@@ -2000,14 +2001,16 @@ yy %>%
   labs(x = "", y= ' log2 cpm at promoter') + 
   scale_fill_brewer(palette = "Dark2")
 
-ggsave(paste0(figureDir, "GeneGroups_features_promoterChromatinFeatures.pdf_lessImportant.pdf"),  width = 8, height = 4)
+outDir =  "/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/Figure_S3/"
+ggsave(paste0(outDir, "Fig_S3E_GeneGroups_features_promoterChromatinFeatures.pdf_lessImportant.pdf"),  width = 6, height = 4)
 
 
 fts = c("ZFP42_MA1651.1")
 yy %>% 
   pivot_longer(cols = fts, names_to = 'features') %>%
   mutate(features = factor(features, levels = fts)) %>%
-  mutate(groups = factor(groups, levels = c('DE_up', 'DE_down', 'house_keep', 'highlyExpr_stable', 'lowlyExpr_stable',  'non_expr'))) %>%
+  mutate(groups = factor(groups, levels = c('DE_up', 'DE_down', 'house_keep', 'highlyExpr_stable', 
+                                            'lowlyExpr_stable',  'non_expr'))) %>%
   ggplot(aes(x = features, y=value, fill= groups)) + 
   #geom_boxplot(outlier.alpha = 0.1) + 
   #geom_jitter(width = 0.1)+
