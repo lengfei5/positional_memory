@@ -237,8 +237,6 @@ if(saveTables){
             quote = FALSE, row.names = TRUE)
   
   
-  
-  
 }
 
 ##########################################
