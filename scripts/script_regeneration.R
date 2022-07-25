@@ -1420,9 +1420,13 @@ require(patchwork)
 
 ## bivalent analysis here
 tss = readRDS(file = paste0(RdataDir, '/regeneration_tss_perGene_smartseq2_atac_histM_geneCorrection_v3.rds'))
+tss$gene[which(rownames(tss) == 'AMEX60DD024424')] = 'MEIS3'
+tss$gene[which(rownames(tss) == 'AMEX60DD028208')] = 'PROD1'
 kk = which(!is.na(tss$gene))
+
 rownames(tss)[kk] = paste0(tss$gene[kk], '_', rownames(tss)[kk])
 tss$gene[-kk] = rownames(tss)[-kk]
+
 
 res = tss[which(!is.na(tss$groups)), ]
 res$x = apply(res[, grep('H3K4me3_mUA', colnames(res))], 1, mean)
@@ -1433,7 +1437,7 @@ res = res[which(res$x<7 & res$y <7),]
 dev.example = c('HOXA13', 'HOXA11', 'HOXA9', 'HOXD13','HOXD11', 'HOXD9',
                 'SHH', 'FGF8', 'FGF10', 'HAND2', 'BMP4', 'ALX1',
                 'ALX4', 'PRRX1', 'GREM1', 'LHX2', 'LHX9', 
-                'TBX2_', 'TBX4', 'MEIS1', 'MEIS2', 'SALL4')
+                'TBX2_', 'TBX4', 'MEIS1', 'MEIS2', 'SALL4', 'MEIS3')
 
 mature.example = c('COL1A1', 'COL4A1', 'COL4A2', 'COL6A1', 'LAMA4', 'TNXB', 
                    'MATN2', 'FBN1', 'FBLN2', 'FBLN5', 'PRELP', 'ELN', 'RSPO1', 
@@ -1444,7 +1448,6 @@ examples.sel = examples.sel[which(rownames(res)[examples.sel] != 'HAND2_AMEX60DD
 examples.sel = examples.sel[which(rownames(res)[examples.sel] != 'MEIS1_AMEX60DD024424')]
 
 matures.sel = unique(grep(paste0(mature.example, collapse = '|'), rownames(res)))
-
 
 ##########################################
 # plot the bivalent TSS in mUA
@@ -1504,7 +1507,7 @@ ggplot(data=res, aes(x=x, y=y, label = gene)) +
   theme(axis.text.x = element_text(size = 12), 
         axis.text.y = element_text(size = 12)) +
   geom_point(data=res[res$groups == 'house_keep', ], aes(x=x, y=y),  size=0.3, color = 'red') +
-  geom_point(data=res[res$groups == 'non_expr', ], aes(x=x, y=y),  size=0.3, color = 'darkorange') +
+  #geom_point(data=res[res$groups == 'non_expr', ], aes(x=x, y=y),  size=0.3, color = 'darkorange') +
   geom_point(data=res[examples.sel, ], aes(x=x, y=y),  size=2.0, color = 'black') +
   #geom_text_repel(data= res[examples.sel, ], size = 4.0, color = 'blue') +
   #geom_point(data=res[matures.sel, ], aes(x=x, y=y),  size=1.5, color = 'black') +
@@ -1515,9 +1518,9 @@ ggplot(data=res, aes(x=x, y=y, label = gene)) +
                   #family = 'Times',
                   fontface = 'bold',
                   # Add extra padding around each text label.
-                  box.padding = unit(0.3, 'lines'),
+                  box.padding = unit(0.2, 'lines'),
                   # Add extra padding around each data point.
-                  point.padding = unit(1.6, 'lines')) +
+                  point.padding = unit(1., 'lines')) +
   theme_classic() +
   theme(axis.text.x = element_text(angle = 0, size = 15), 
         axis.text.y = element_text(angle = 0, size = 15), 
@@ -1529,6 +1532,7 @@ ggplot(data=res, aes(x=x, y=y, label = gene)) +
   #geom_hline(yintercept=c(0), col="black") +
   labs(x = "gene expression in mUA (log2 cpm)", y= 'gene expression in 9dpa (log2 cpm)') +
   guides(colour = guide_legend(override.aes = list(size=2)))
+
 
 ggsave(paste0(figureDir, "geneExpression_comparison_mUA_BLday9.pdf"),  width = 8, height = 6)
 
@@ -2077,10 +2081,10 @@ ggsave(paste0(figureDir, "CpGscores_geneGroups.pdf"),  width = 6, height = 4)
 load(file = paste0(RdataDir, '/peak_to_gene_assignment_atacseqPeaks_all.Rdata'))
 
 as_tibble(corrMax) %>% 
-  gather(features, corr, 1:5) %>%
+  gather(features, corr, 1:4) %>%
   ggplot(aes(x = corr, color = features)) +
   geom_density(size = 1.) +
-  scale_color_manual(values = c("#117733",  "blue", 'red', 'cyan', 'black')) +
+  scale_color_manual(values = c("#117733", 'red', 'cyan', 'black')) +
   #scale_color_brewer(palette="Dark2") +
   #scale_fill_manual(values=c("#117733",  "blue", 'cyan',  'magenta')) +
   theme_classic() +
@@ -2100,8 +2104,8 @@ if(check.plot.distance.to.TSS){
   xx = readRDS(file = paste0(RdataDir, '/enhancers_candidates_55k_atacPeaks_histM_H3K4me1_chipseekerAnnot_manual_targets.rds'))
   #xx = data.frame(xx[, c(54:64)], stringsAsFactors = FALSE)
   #xx = xx[, c(1:2, 9:11)]
-  xx = data.frame(chipseeker = xx$distanceToTSS_chipseeker,  manual = xx$distanceToTSS)
-  xx = xx[which(!is.na(xx$manual)), ]
+  xx = data.frame(chipseeker = xx$distanceToTSS_chipseeker,  corr.withinTAD = xx$distanceToTSS)
+  xx = xx[which(!is.na(xx$corr.withinTAD)), ]
   
   for(n in 1:ncol(xx))
   {
@@ -2119,7 +2123,7 @@ if(check.plot.distance.to.TSS){
     #geom_vline(xintercept=c(-6, -3,  3, 6), col='gray', size = 1.) +
     theme(legend.text = element_text(size=14),
           legend.title = element_blank(),
-          legend.position=c(0.3, 0.8),
+          legend.position=c(0.2, 0.8),
           plot.margin = margin(),
           axis.text.x = element_text(angle = 0, size = 14), 
           axis.text.y = element_text(angle = 0, size = 14),
