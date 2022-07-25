@@ -202,16 +202,16 @@ collect_target_footprint = function(species = 'axolotl', motif = 'RUNX', distanc
     
     ## select targets with maximum distance of 5kb
     pp.annots = as.data.frame(pp.annots)
-    pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 5000), ]
+    pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 2000), ]
     cat(length(unique(pp.annots$geneId)), 'targets by promoter footprinting \n')
     
     ### DE genes from RNA-seq data
     res = readRDS(file = paste0('../results/cross_species_20220621/zebrafish_fin/Rdata', 
                                 '/RNAseq_fpm_DEgenes_lfcShrink_res.rds'))
     
-    fdr.cutoff = 0.01; logfc.cutoff = 0 # select DE genes in regeneration
-    jj = which(res$padj_sp7ne_4dpa.vs.0dpa < fdr.cutoff |
-                 res$padj_sp7po_4dpa.vs.0dpa < fdr.cutoff)
+    fdr.cutoff = 0.05; logfc.cutoff = 1 # select DE genes in regeneration
+    jj = which((res$padj_sp7ne_4dpa.vs.0dpa < fdr.cutoff & abs(res$log2FoldChange_sp7ne_4dpa.vs.0dpa) > logfc.cutoff) |
+               (res$padj_sp7po_4dpa.vs.0dpa < fdr.cutoff & abs(res$log2FoldChange_sp7po_4dpa.vs.0dpa) > logfc.cutoff))
     cat(length(jj), '\n')
     
     DEgenes = res[jj, ]
@@ -234,8 +234,8 @@ collect_target_footprint = function(species = 'axolotl', motif = 'RUNX', distanc
     grid.arrange(p, ncol = 1, nrow = 1)
     dev.off()
     
-    saveRDS(ggs, file = paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata',
-                               '/targetGenes_footprint_', motif, '_', species,  '.rds'))
+    # saveRDS(ggs, file = paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata',
+    #                           '/targetGenes_footprint_', motif, '_', species,  '.rds'))
     
     ## save both gene ID and gene symbol 
     annot.file = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/zebrafish/GRCz11/annotation_ens_biomart.txt'
@@ -312,14 +312,14 @@ collect_target_footprint = function(species = 'axolotl', motif = 'RUNX', distanc
     
     ## save the target genes
     pp.annots = as.data.frame(pp.annots)
-    pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 5000), ]
+    pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 2000), ]
     cat(length(unique(pp.annots$geneId)), 'targets by promoter footprinting \n')
     
     # DE genes from RNA-seq data
     res = readRDS(file = paste0('../results/cross_species_20220621/zebrafish_heart', 
                                 '/Rdata/RNAseq_fpm_DEgenes_lfcShrink_res.rds'))
     
-    fdr.cutoff = 0.05; logfc.cutoff = 0 # select only activated genes in regeneration
+    fdr.cutoff = 0.05; logfc.cutoff = 1 # select only activated genes in regeneration
     jj = which((res$padj_3dpa.vs.0dpa < fdr.cutoff & abs(res$log2FoldChange_3dpa.vs.0dpa) > logfc.cutoff) |
                  (res$padj_7dpa.vs.0dpa < fdr.cutoff & abs(res$log2FoldChange_7dpa.vs.0dpa) > logfc.cutoff)
     )
@@ -346,8 +346,8 @@ collect_target_footprint = function(species = 'axolotl', motif = 'RUNX', distanc
     grid.arrange(p, ncol = 1, nrow = 1)
     dev.off()
     
-    saveRDS(ggs, file = paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata',
-                               '/targetGenes_footprint_', motif, '_', species,  '.rds'))
+    # saveRDS(ggs, file = paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata',
+    #                           '/targetGenes_footprint_', motif, '_', species,  '.rds'))
     
     ## save gene ID and gene symbols
     annot.file = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/zebrafish/GRCz11/annotation_ens_biomart.txt'
@@ -362,16 +362,6 @@ collect_target_footprint = function(species = 'axolotl', motif = 'RUNX', distanc
     
     saveRDS(pp, file = paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata',
                               '/targetGenes_footprint_', motif, '_', species,  '_geneID_coordinate_4bed.rds'))
-    
-    gg2 = readRDS(paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata',
-                         '/targetGenes_footprint_RUNX_zebrafish_fin.rds'))
-      
-    pp0 = readRDS(paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata/',
-                  'targetGenes_footprint_RUNX_zebrafishFin_geneID_coordinate_4bed.rds'))
-    
-    mm = match(pp0$geneId, pp$geneId)
-    pp0 = pp0[which(!is.na(mm)), ]
-    
   }
   
   if(species == 'axolotl'){
@@ -425,9 +415,10 @@ collect_target_footprint = function(species = 'axolotl', motif = 'RUNX', distanc
     }
     
     pp.annots = annotatePeak(footprint, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+    
     ## save the target genes
     pp.annots = as.data.frame(pp.annots)
-    pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 5000), ]
+    pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 2000), ]
     cat(length(unique(pp.annots$geneId)), 'targets by promoter footprinting \n')
     
     ## DEgenes by RNA-seq data
@@ -436,15 +427,15 @@ collect_target_footprint = function(species = 'axolotl', motif = 'RUNX', distanc
             'smartseq2_R10724_R11635_cpm.batchCorrect_DESeq2.test.withbatch.log2FC.shrinked_RNAseq_data_used_20220408.rds'))
     
     fdr.cutoff = 0.05
-    logfc.cutoff = 0
+    logfc.cutoff = 1
     
     select = which(
       (res$padj_dpa5.vs.mUA < fdr.cutoff & abs(res$log2FoldChange_dpa5.vs.mUA) > logfc.cutoff) | 
         (res$padj_dpa9.vs.mUA < fdr.cutoff & abs(res$log2FoldChange_dpa9.vs.mUA) > logfc.cutoff) |
         (res$padj_dpa13prox.vs.mUA < fdr.cutoff & abs(res$log2FoldChange_dpa13prox.vs.mUA) > logfc.cutoff) |
         (res$padj_dpa13dist.vs.mUA < fdr.cutoff & abs(res$log2FoldChange_dpa13dist.vs.mUA) > logfc.cutoff))
-    
     cat(length(select), ' DE genes \n')
+    
     DEgenes = res[select, ]
     DEgenes$gene = get_geneName(rownames(DEgenes))
     DEgenes$geneID = get_geneID(rownames(DEgenes))
@@ -454,17 +445,9 @@ collect_target_footprint = function(species = 'axolotl', motif = 'RUNX', distanc
     ggs = unique(as.character(ggs))
     cat(length(ggs), ' targets found for ', motif, ' \n')
     
-    saveRDS(ggs, file = paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata', 
-                               '/targetGenes_footprint_', motif, '_axolotl.rds'))
-
-    gg1 = readRDS(paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata',
-                     '/targetGenes_footprint_RUNX_zebrafish_fin.rds'))
-    gg2 = readRDS(paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata',
-                         '/targetGenes_footprint_RUNX_zebrafishHeart.rds'))
-    
-    xx = intersect(gg1, gg2)
-    intersect(xx, ggs)
-    
+    #saveRDS(ggs, file = paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata', 
+    #                           '/targetGenes_footprint_', motif, '_axolotl.rds'))
+        
     pp$gene = rownames(DEgenes)[match(pp$geneId, DEgenes$geneID)]
     
     saveRDS(pp, file = paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata',
@@ -486,7 +469,7 @@ collect_target_footprint = function(species = 'axolotl', motif = 'RUNX', distanc
                                        "other_species_atac_rnaseq/acoel_Gehrke2019/footprinting"), 
                          recursive = FALSE,  full.names = TRUE)
     
-    dir.list = dir.list[grep('hmia_12h_tail|hmia_24h_tail|_48h_', dir.list)]
+    dir.list = dir.list[grep('hmia_12h_tail|hmia_24h_tail', dir.list)]
     
     ##### RUNX targets
     motif = 'RUNX' 
@@ -517,7 +500,6 @@ collect_target_footprint = function(species = 'axolotl', motif = 'RUNX', distanc
         }
       }
     }
-    
     cat('total footprint found -- ', length(footprint), '\n')
     
     saveFootprint = FALSE
@@ -533,10 +515,10 @@ collect_target_footprint = function(species = 'axolotl', motif = 'RUNX', distanc
       
     }
     
-    
     pp.annots = annotatePeak(footprint, TxDb=gtf, tssRegion = c(-2000, 2000), level = 'transcript')
     pp.annots = as.data.frame(pp.annots)
-    pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 5000), ]
+    
+    pp.annots = pp.annots[which(abs(pp.annots$distanceToTSS) < 3000), ]
     cat(length(unique(pp.annots$geneId)), 'targets by promoter footprinting \n')
     pp.annots$geneId = as.character(sapply(pp.annots$geneId, function(x) unlist(strsplit(x, '[|]'))[1]))
     
@@ -544,7 +526,7 @@ collect_target_footprint = function(species = 'axolotl', motif = 'RUNX', distanc
     #res = readRDS(file = paste0(RdataDir, '/RNAseq_fpm_DEgenes_lfcShrink_res.rds'))
     res = readRDS(file = paste0('../results/cross_species_20220621/acoel', 
                                 '/Rdata/RNAseq_fpm_DEgenes_lfcShrink_res.rds'))
-    fdr.cutoff = 0.1; logfc.cutoff = 0 # select only activated genes in regeneration
+    fdr.cutoff = 0.1; logfc.cutoff = 0.5 # select only activated genes in regeneration
     
     # fdr.cutoff = 0.1; logfc.cutoff = 0 # select only activated genes in regeneration
     jj = which((res$padj_tail.1h.vs.0h < fdr.cutoff & abs(res$log2FoldChange_tail.1h.vs.0h) > logfc.cutoff) |
@@ -578,19 +560,13 @@ collect_target_footprint = function(species = 'axolotl', motif = 'RUNX', distanc
     
     ggs = as.character(sapply(ggs, function(x) unlist(strsplit(x, '[|]'))[1]))
     
-    
     write.table(ggs, file = paste0("../results/Uniprot_EntryName.txt"), sep = '\t',
                 col.names = FALSE, row.names = FALSE, quote =FALSE)
     
-    ggs =read.delim('../data/uniprot-compressed_true_download_true_fields_accession_2Creviewed_2C-2022.07.21-14.36.28.02.tsv', 
+    ggs =read.delim('../data/uniprot-compressed_true_download_true_fields_accession_2Creviewed_2C-2022.07.22-13.48.25.19.tsv.gz', 
                     sep = '\t')
     ggs$geneSymbols = sapply(ggs$Gene.Names, function(x) unlist(strsplit(as.character(x), ' '))[1])
-    #pp = pp.annots[!is.na(match(pp.annots$geneId, DEgenes$geneID)), ]
-    #ggs = DEgenes$gene[match(pp$geneId, DEgenes$geneID)]
-    #ggs = unique(as.character(ggs))
-    #cat(length(ggs), ' targets \n')
-    saveRDS(ggs$geneSymbols, file = paste0('../results/Rxxxx_R10723_R11637_R12810_atac/Rdata',
-                               '/targetGenes_footprint_', motif, '_', species,  '.rds'))
+    
     
     p = run_enrichGo_withGeneList(ggs$geneSymbols,  title.plot = 'RUNX target in acoel')
     

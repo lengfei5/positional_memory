@@ -15,6 +15,7 @@ source(RNA.functions)
 source(RNA.QC.functions)
 source('functions_chipSeq.R')
 source('Functions_atac.R')
+source('Functions_histM.R')
 
 version.analysis = 'Rxxxx_R10723_R11637_R12810_atac'
 #peakDir = "Peaks/macs2_broad"
@@ -3172,7 +3173,6 @@ gg3 = unique(pp3$geneSymbols)
 #gg3 = gg3[order(gg3)]
 intersect(targets, gg3)
 intersect(ggs, gg3)
-
 
 
 ## manually checking the protein in the same family
