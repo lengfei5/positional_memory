@@ -1418,7 +1418,8 @@ test = Analysis_TSS_positionalGenes_in_mature_regeneration(tss = tss, ids = gene
 #test = Analysis_TSS_positionalGenes_in_mature_regeneration(tss, ids)
 #test = readRDS(file = paste0(RdataDir, '/positional_gene_TSS_chromatinFeatures.rds'))
 #test = readRDS(file = paste0(RdataDir, '/positional_gene_TSS_chromatinFeatures_smartseq2_mature.reg.rds'))
-xx = as.matrix(test[,c(1:35)])
+xx = as.matrix(test[,c(1:28)])
+
 yy = as.matrix(test[, c(38:ncol(test))])
 rownames(xx) = test$gene
 rownames(yy) = rownames(xx)
@@ -1458,7 +1459,7 @@ plt = pheatmap(xx,
                cluster_rows = TRUE, 
                cluster_cols = FALSE, 
                annotation_colors = annot_colors, 
-               gaps_col = seq(7, 35, by = 7), 
+               gaps_col = seq(7, ncol(xx), by = 7), 
                fontsize_row = 7,
                treeheight_row = 20,
                cutree_rows = 4,
@@ -1476,7 +1477,7 @@ pheatmap(xx,
          cluster_rows = TRUE, 
          cluster_cols = FALSE, 
          annotation_colors = annot_colors, 
-         gaps_col = seq(7, 35, by = 7), 
+         gaps_col = seq(7, ncol(xx), by = 7), 
          fontsize_row = 7,
          treeheight_row = 20,
          cutree_rows = 4,
@@ -1509,7 +1510,6 @@ pheatmap(yy[plt$tree_row$order, ],
          gaps_row =  gaps.row, 
          filename = paste0(figureDir, '/heatmap_positionalGens_notExprmUA_smartseq2_mature_regeneration_log2FC.2.pdf'), 
          width = 3.5, height = 5)
-
 
 ##########################################
 # positional enhancers in mature and regeneration 
