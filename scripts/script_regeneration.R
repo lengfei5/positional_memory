@@ -1498,23 +1498,34 @@ ggplot(data=res, aes(x=x, y=y, label = gene)) +
 
 ggsave(paste0(figureDir, "Bivalent_TSS_mUA_scatterplot.pdf"),  width = 8, height = 6)
 
+## gene expression mUA vs 9dpa
+rna = readRDS(file = paste0("../results/RNAseq_data_used/Rdata/",
+              "smartseq2_R10724_R11635_cpm.batchCorrect_DESeq2.test.withbatch.log2FC.shrinked_RNAseq_data_used_20220408.rds"))
+
 res$x = res$smartseq2_mUA
 res$y = res$smartseq2_X9dpa
+ids = get_geneID(rownames(rna))
+res$log2fc.9dpa.vs.mUA = rna$log2FoldChange_dpa9.vs.mUA[match(res$geneID, ids)]
+res$fdr.9dpa.vs.mUA = rna$padj_dpa9.vs.mUA[match(res$geneID, ids)]
+examples.up = which(res$log2fc.9dpa.vs.mUA > 1 & res$fdr.9dpa.vs.mUA <0.05)
+examples.down =  which(res$log2fc.9dpa.vs.mUA < (-1) & res$fdr.9dpa.vs.mUA <0.05)
 
 ggplot(data=res, aes(x=x, y=y, label = gene)) +
   geom_point(size = 0.1, color = 'darkgray') + 
   #geom_point(size = 0.1 ) +
   theme(axis.text.x = element_text(size = 12), 
         axis.text.y = element_text(size = 12)) +
-  geom_point(data=res[res$groups == 'house_keep', ], aes(x=x, y=y),  size=0.3, color = 'red') +
+  #geom_point(data=res[res$groups == 'house_keep', ], aes(x=x, y=y),  size=0.3, color = 'red') +
   #geom_point(data=res[res$groups == 'non_expr', ], aes(x=x, y=y),  size=0.3, color = 'darkorange') +
-  geom_point(data=res[examples.sel, ], aes(x=x, y=y),  size=2.0, color = 'black') +
+  geom_point(data=res[examples.up, ], aes(x=x, y=y),  size=0.1, color = 'red') +
+  geom_point(data=res[examples.down, ], aes(x=x, y=y),  size=0.1, color = 'blue') +
   #geom_text_repel(data= res[examples.sel, ], size = 4.0, color = 'blue') +
   #geom_point(data=res[matures.sel, ], aes(x=x, y=y),  size=1.5, color = 'black') +
+  geom_point(data=res[examples.sel, ], aes(x=x, y=y),  size=0.5, color = 'black') +
   geom_text_repel(data= res[c(examples.sel), ], 
                   aes(x, y),
                   size = 5,
-                  color = "blue",
+                  color = "black",
                   #family = 'Times',
                   fontface = 'bold',
                   # Add extra padding around each text label.
@@ -1533,6 +1544,52 @@ ggplot(data=res, aes(x=x, y=y, label = gene)) +
   labs(x = "gene expression in mUA (log2 cpm)", y= 'gene expression in 9dpa (log2 cpm)') +
   guides(colour = guide_legend(override.aes = list(size=2)))
 
+ggsave(paste0(figureDir, "geneExpression_comparison_mUA_BLday9.pdf"),  width = 8, height = 6)
+
+
+ego = read.csv(file = paste0(tableDir, "FigS1E_GO_term_enrichmenet_for_positional_genes_Microarray_geneSymbols.csv"),
+               header = TRUE)
+gg1 = unique(c(unlist(strsplit(as.character(ego$geneSymbols[2]), ';')),
+               unlist(strsplit(as.character(ego$geneSymbols[5]), ';'))))
+gg2 = unique(c(unlist(strsplit(as.character(ego$geneSymbols[14]), ';')),
+               unlist(strsplit(as.character(ego$geneSymbols[15]), ';'))))
+
+examples.m = which(!is.na(match(res$gene, toupper(gg1))))
+examples.r =  which(!is.na(match(res$gene, toupper(gg2))))
+
+ggplot(data=res, aes(x=x, y=y, label = gene)) +
+  geom_point(size = 0.1, color = 'darkgray') + 
+  #geom_point(size = 0.1 ) +
+  theme(axis.text.x = element_text(size = 12), 
+        axis.text.y = element_text(size = 12)) +
+  #geom_point(data=res[res$groups == 'house_keep', ], aes(x=x, y=y),  size=0.3, color = 'red') +
+  #geom_point(data=res[res$groups == 'non_expr', ], aes(x=x, y=y),  size=0.3, color = 'darkorange') +
+  geom_point(data=res[examples.m, ], aes(x=x, y=y),  size=0.1, color = 'red') +
+  geom_point(data=res[examples.r, ], aes(x=x, y=y),  size=0.1, color = 'darkblue') +
+  #geom_text_repel(data= res[examples.sel, ], size = 4.0, color = 'blue') +
+  #geom_point(data=res[matures.sel, ], aes(x=x, y=y),  size=1.5, color = 'black') +
+  #geom_point(data=res[examples.sel, ], aes(x=x, y=y),  size=0.5, color = 'purple1') +
+  #geom_text_repel(data= res[c(examples.sel), ], 
+                  # aes(x, y),
+                  # size = 5,
+                  # color = "purple1",
+                  # #family = 'Times',
+                  # fontface = 'bold',
+                  # # Add extra padding around each text label.
+                  # box.padding = unit(0.2, 'lines'),
+                  # # Add extra padding around each data point.
+                  # point.padding = unit(1., 'lines')) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 0, size = 15), 
+        axis.text.y = element_text(angle = 0, size = 15), 
+        axis.title =  element_text(size = 18),
+        legend.text = element_text(size=12),
+        legend.title = element_text(size = 14)) + 
+  geom_abline(slope = 1, intercept = 0, col = 'black') +
+  #geom_vline(xintercept=c(1), col='black') +
+  #geom_hline(yintercept=c(0), col="black") +
+  labs(x = "gene expression in mUA (log2 cpm)", y= 'gene expression in 9dpa (log2 cpm)') +
+  guides(colour = guide_legend(override.aes = list(size=2)))
 
 ggsave(paste0(figureDir, "geneExpression_comparison_mUA_BLday9.pdf"),  width = 8, height = 6)
 

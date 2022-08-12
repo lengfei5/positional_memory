@@ -873,6 +873,8 @@ for(n in 1:length(conds))
 colnames(sample.means) = conds
 cpm = cpm[, sample.sels]
 
+
+
 if(saveTable){
   jj = grep('^KDM6|^LRAT_', rownames(sample.means))
   
@@ -1086,7 +1088,6 @@ for(subg in c('tfs', 'eps', 'sps', 'rbp'))
   #write.table(yy, file = paste0(resDir, '/DEtfs_mUA_regeneration_dev.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
   
 }
-
 
 ##########################################
 # check the dev-specific genes and mature-specific genes during the regeneration 
