@@ -694,7 +694,6 @@ dds <- DESeqDataSetFromMatrix(raw, DataFrame(design), design = ~ condition)
 
 save(design, dds, file = paste0(RdataDir, 'design_dds_all_regeneration_12selectedSamples_v47.hox.patch.Rdata'))
 
-
 ##########################################
 # filering and normalization 
 ##########################################
@@ -872,7 +871,6 @@ for(n in 1:length(conds))
 
 colnames(sample.means) = conds
 cpm = cpm[, sample.sels]
-
 
 
 if(saveTable){
