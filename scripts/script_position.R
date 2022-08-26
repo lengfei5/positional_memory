@@ -945,7 +945,6 @@ ps = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rxxxx_R107
 mm = match(rownames(peaks), rownames(ps))
 peaks = data.frame(ps[mm, ], peaks, stringsAsFactors = FALSE)
 
-
 pp = data.frame(t(sapply(rownames(peaks), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
 pp$strand = '*'
 pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),

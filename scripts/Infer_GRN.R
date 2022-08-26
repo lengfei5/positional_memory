@@ -139,6 +139,7 @@ cat('total TFs of interest : ', length(geneSet), '\n')
 which(geneSet == 'ZNF281')
 geneSet = c(geneSet, 'ZNF281')
 
+E_all = E;
 mm = match(genes, geneSet)
 E = E[!is.na(mm), ]  # many gene IDs share the same gene symbols in the annotation
 genes = get_geneName(rownames(E)) 
@@ -158,6 +159,7 @@ length(gg.counts)
 
 ## 346 TFs from scRNA-seq data with 289 unique gene symbols
 saveRDS(E, file = paste0(RdataDir, '/GRNinference_scExprMatrix_v3_347geneID_290TFsymbols.rds')) 
+saveRDS(E_all, file = paste0(RdataDir, '/GRNinference_scExprMatrix_allGenes_290TFsymbols.rds'))
 
 ########################################################
 ########################################################
