@@ -40,34 +40,26 @@ target.moc = mat_gcre_sel %*% mocs_sel
 ss = apply(target.moc, 2, sum)
 length(which(ss==0))
 
+saveRDS(target.moc, file = paste0(RdataDir, '/target_motifOccurrence_all.rds'))
 
 ### motif-TF-association matrix
 mapping =readRDS(file = '../data/JASPAR2022_CORE_UNVALIDED_vertebrates_nonRedundant_metadata_manual_rmRedundantUNVALIDED.rds')
 mm = match(colnames(target.moc), mapping$name)
-target.moc = target.moc[ ,which(!is.na(mm))] # filter the unvalided motifs if core motifs are present
+
+#target.moc_sel = target.moc[ ,which(!is.na(mm))] # filter the unvalided motifs if core motifs are present
 #mat_gcre = mat_gcre[, which(!is.na(match(colnames(mat_gcre), mapping$name)))]
 
-#atm = table(mapping$name, mapping$gene)
-atm = matrix(0, nrow = ncol(target.moc), ncol = nrow(target.moc))
-colnames(atm) = rownames(target.moc)
-rownames(atm) = colnames(target.moc)
-genes = get_geneName(colnames(atm))
+mapping$gene = as.character(mapping$gene)
+atm = table(mapping$name, mapping$gene)
 
-for(n in 1:nrow(atm))
-{
-  # n = 164
-  tfs = unlist(strsplit(as.character(mapping$tfs[which(mapping$name == rownames(atm)[n])]), '_'))
-  for(tf in tfs)
-  {
-    jj = which(genes == tf)
-    if(length(jj)>0){
-      cat(n, '--', rownames(atm)[n], ' -- tfs --', tf, '\n')
-      atm[n, jj] = 1
-    }
-  }
-}
+jj = match(colnames(target.moc), rownames(atm))
+ii = which(!is.na(jj))
 
-target.tfs = target.moc %*% atm
+target.moc_sel = target.moc[, ii];
+atm_sel = atm[jj[ii], ]
+
+rm(target.moc);
+target.tfs = target.moc_sel %*% atm_sel
 
 
 x = target.tfs[grep('HOXA13', rownames(target.tfs)), ];
@@ -86,8 +78,29 @@ target.tfs = target.tfs[, which(ss2>0)]
 
 cat(nrow(target.tfs), ' targets by ', ncol(target.tfs), ' TFs \n')
 
+##########################################
+# filter TFs with gene expression 
+##########################################
+E = readRDS(file = paste0(RdataDir, '/GRNinference_scExprMatrix_346geneID_289TFsymbols.rds'))
+ggs = as.character(get_geneName(rownames(E)))
+mm = match(colnames(target.tfs), ggs)
 
-saveRDS(target.tfs, file = paste0(RdataDir, '/GRN_priorNetwork_target_TFs.rds'))
+target.tfs_sel = target.tfs[, which(!is.na(mm))]
+
+# check if some targets have no regulators
+ss1 = apply(target.tfs_sel, 1, sum)
+cat(length(which(ss1==0)), 'targets with no regulators \n')
+target.tfs_sel = target.tfs_sel[which(ss1>0), ]
+
+# check if some regulators don't have any targets due to missing motifs 
+ss2 = apply(target.tfs_sel, 2, sum)
+cat(length(which(ss2==0)), 'regulators with no targets found \n')
+
+target.tfs_sel = target.tfs_sel[, which(ss2>0)]
+
+cat(nrow(target.tfs_sel), ' targets by ', ncol(target.tfs_sel), ' TFs \n')
+
+saveRDS(target.tfs_sel, file = paste0(RdataDir, '/GRN_priorNetwork_allTarget_expressedTFs.rds'))
 
 
 
