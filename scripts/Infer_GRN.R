@@ -50,6 +50,7 @@ library(dplyr)
 library(Seurat)
 library(patchwork)
 
+
 ########################################################
 ########################################################
 # Section : define gene set of interest
@@ -345,33 +346,12 @@ mat_gcre = build_target_CRE_matrix(targets.ids)
 mm = match(rownames(mat_gcre), targets.ids)
 rownames(mat_gcre) = rownames(E)[mm]
 
-target.ids_all = get_geneID(rownames(E_all))
-mat_gcre_all = build_target_CRE_matrix(target.ids_all)
-mm = match(rownames(mat_gcre_all), target.ids_all)
-rownames(mat_gcre_all) = rownames(E_all)[mm]
-
 ### CRE-motif-occurence matrix (regulaory regions * motif occurrence)
 mocs = readRDS(file = '../results/motif_analysis/motif_oc_fimo_atacPeaks.2kbTSS_jaspar2022.core.unvalided_pval.0.00001_v1.rds')
 cres = unique(rownames(mocs))
 
 ## match the tf-CRE
 jj = match(colnames(mat_gcre), rownames(mocs))
-missed = which(is.na(jj))
-cat(length(missed), ' CRE missed \n')
-
-ii = which(!is.na(jj))
-jj = jj[ii]
-
-mat_gcre = mat_gcre[,ii]
-mocs = mocs[jj, ]
-
-target.moc = mat_gcre %*% mocs 
-
-ss = apply(target.moc, 2, sum)
-length(which(ss==0))
-
-## match the tf-CRE for all targets
-jj = match(colnames(mat_gcre_all), rownames(mocs))
 missed = which(is.na(jj))
 cat(length(missed), ' CRE missed \n')
 
