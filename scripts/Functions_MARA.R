@@ -1808,9 +1808,354 @@ run.MARA.atac.temporal = function(motif.oc, Y, method = c('Bayesian.ridge'))
   }
 }
 
-motif_enrichment_for_regenerationSpecificPeaks = function()
+motif_enrichment_for_regenerationSpecificPeaks = function(keep)
 {
+  require(ggplot2)
+  require(tidyverse)
+  library(ggrepel)
+  library(pheatmap)
+  library(RColorBrewer)
+  source('Functions_atac.R')
+  
+  ## prepare reponse matrix with selected dynamic peaks
+  Y = as.matrix(keep)
+  
+  # prepare X matrix from motif occurrency matrix
+  motif.oc = readRDS(file = '../results/motif_analysis/motif_oc_fimo_jaspar2022_pval.0.0001_v1.rds')
+  mm = match(rownames(motif.oc), rownames(Y))
+  cat(length(which(!is.na(mm))), ' peaks found with peak name matching \n')
+  
+  motif.oc = motif.oc[!is.na(mm), ]
+  
+  ss.m = apply(motif.oc, 2, sum)
+  motif.oc = motif.oc[ , which(ss.m>0)]
+  
+  ss.p = apply(motif.oc, 1, sum)
+  motif.oc = motif.oc[which(ss.p>0), ]
+  
+  kk = match(rownames(motif.oc), rownames(Y))
+  Y = Y[kk, ]
+  
+  X = as.matrix(motif.oc)
+  Y = as.matrix(Y)
+  cat(nrow(Y), ' genomeic regions will be used after filtering \n')
+  
+  ##########################################
+  # enrichment analysis of regeneration-specific motifs 
+  ##########################################
+  
+  
+  
+  if(method == 'Bayesian.ridge'){ 
     
+    cat('--start Bayesian ridge -- \n')
+    
+    library(scchicFuncs)
+    
+    # the original code from Jake 
+    # https://github.com/jakeyeung/scchic-functions/blob/master/scripts/motevo_scripts/lib/run_ridge_regression2.R
+    E = as.matrix(Y) # exp: matrix of expression, row centered.
+    N = as.matrix(X)
+    
+    E = t(apply(E, 1, scale, center = TRUE, scale = FALSE))
+    colnames(E) = colnames(Y)
+    
+    ## use mUA as background 
+    #for(ii in 1:ncol(E)) E[, ii] = E[,ii] - E[, 1]
+    #E = E[, -1]
+    
+    # run lambda optimization and regression
+    opt =  scchicFuncs::optimize.lambda(N, E)
+    r = ridge.regression(N, E, opt$lambda.opt)
+    
+    zz = r$Zscore
+    zz = apply(as.matrix(zz[, c(1:3)]), 1, function(x){x.abs = abs(x); return(x[which(x.abs == max(x.abs))][1]); })
+    r$max.Zscore = abs(zz)
+    
+    #zz = r$Zscore
+    #zz = apply(as.matrix(zz), 1, max)
+    #r$max.Zscore = zz
+    
+    # = sort(r$combined.Zscore, decreasing=TRUE)[1:50]
+    sort(r$combined.Zscore, decreasing=TRUE)[1:50]
+    #sort(r$max.Zscore, decreasing=TRUE)[1:20]
+    #sort(r$max.Zscore, decreasing=TRUE)[1:30]
+    #sort(r$max.Zscore, decreasing=TRUE)[1:40]
+    sort(r$max.Zscore, decreasing=TRUE)[1:50]
+    saveRDS(r, file = paste0(RdataDir, '/Bayesian_Ridge_output_fdr0.05_log2FC.1.rds'))
+    
+    ## load the Bayesian ridge result
+    r = readRDS(file = paste0(RdataDir, '/Bayesian_Ridge_output_fdr0.05_log2FC.1.rds'))
+    
+    topMotifs = sort(r$max.Zscore, decreasing = TRUE)
+    
+    topMotifs = topMotifs[which(topMotifs>=2.0)]
+    
+    motif.names = rownames(r$Zscore)
+    bb = r$Zscore[match(names(topMotifs), motif.names), ]
+    
+    bb =data.frame(bb, stringsAsFactors = FALSE)
+    bb$motifs = rownames(bb)
+    bb$combine.Zscore = r$combined.Zscore[match(rownames(bb), names(r$combined.Zscore))]
+    bb$rank = order(bb$combine.Zscore)
+    bb$maxZscore = r$max.Zscore[match(rownames(bb), names(r$max.Zscore))]
+    bb$gene = sapply(rownames(bb), 
+                     function(x) {x = unlist(strsplit(as.character(x), '_')); x = x[-length(x)]; paste0(x, collapse = '_')})
+    
+    colnames(bb)[1:5] = c('mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d')
+    
+    bb[!is.na(match(bb$gene, names(table(bb$gene))[which(table(bb$gene)>1)])), ]
+    
+    bb = bb[which(rownames(bb) != 'NFIX_MA0671.1'), ]
+    
+    saveRDS(bb, file = paste0(RdataDir, '/MARA_output_top135_maxZscore.rds'))
+    
+    ##########################################
+    ## grouping similiar motifs 
+    ## some codes from https://bioconductor.org/packages/release/bioc/html/universalmotif.html
+    ## section : Motif comparisons and P-values
+    ##########################################
+    source('Functions_histM.R')
+    library(universalmotif)
+    library(ggtree) 
+    library(ggplot2)
+    
+    ntop = 135 
+    #ntop = 50
+    bb = readRDS(file = paste0(RdataDir, '/MARA_output_top', ntop, '_maxZscore.rds'))
+    
+    dir_jaspar2022 = '/Volumes/groups/tanaka/People/current/jiwang/Databases/motifs_TFs/JASPAR2022/'
+    file.pwm = paste0(dir_jaspar2022, 'JASPAR2022_CORE_vertebrates_nonRedundant.meme')
+    yy = read_meme(file = file.pwm, skip = 0)
+    # convert to PPM to have the propre format
+    yy = convert_type(yy, "PPM")
+    
+    ii = c()
+    for(n in 1:length(yy))
+    {
+      if(length(which(!is.na(match(rownames(bb), yy[[n]]@name)))) >0) ii = c(ii, n)
+    }
+    
+    yy = yy[ii]
+    
+    motifs = convert_motifs(yy, class = "universalmotif-universalmotif")
+    cat(length(motifs), ' motifs \n')
+    
+    pwm.corr <- compare_motifs(motifs, method = "PCC", min.mean.ic = 0,
+                               score.strat = "a.mean")
+    comparisons <- 1 - pwm.corr
+    dd = as.dist(comparisons)
+    
+    #comparisons <- as.dist(comparisons)
+    # We also want to extract names from the dist object to match annotations
+    #labels <- attr(comparisons, "Labels")
+    
+    comparisons <- ape::as.phylo(hclust(comparisons))
+    # Hierarchical clustering using Complete Linkage
+    hc <- hclust(dd, method = "ward.D2" )
+    
+    # Plot the obtained dendrogram
+    #plot(hc, cex = 0.6, hang = -1)
+    #sub_grp <- cutree(hc, h = 0.1)
+    pdfname = paste0(resDir, "/Jaspar2022_PWM_similarity_clustering.pdf")
+    pdf(pdfname, width=10, height = 20)
+    par(cex =0.5, mar = c(3,0.8,2,5)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+    
+    #plot(hc, cex = 0.5, hang = -1)
+    plot(as.dendrogram(hc), cex=0.5, horiz=TRUE)
+    abline(v = c( 0.1, 0.15, 0.2, 0.25), col = c('orange', 'blue', 'red', 'green'))
+    #rect.hclust(hc, h = hc.cutoff, border="darkred")
+    #groups <- 
+    #length(unique(cutree(hc, h = 0.01)))
+    #length(unique(cutree(hc, h = 0.05)))
+    length(unique(cutree(hc, h = 0.1)))
+    length(unique(cutree(hc, h = 0.15)))
+    length(unique(cutree(hc, h = 0.2)))
+    length(unique(cutree(hc, h = 0.25)))
+    #length(unique(cutree(hc, h = 0.3)))
+    
+    dev.off()
+    
+    ##########################################
+    ## add RNA-seq data and filter motifs with no-expressed TFs
+    ##########################################
+    source('Functions_histM.R')
+    ntop = 135 
+    #ntop = 50
+    bb = readRDS(file = paste0(RdataDir, '/MARA_output_top', ntop, '_maxZscore.rds'))
+    
+    res = readRDS(file = paste0('../results/RNAseq_data_used/Rdata/', 
+                                'smartseq2_R10724_R11635_cpm.batchCorrect_DESeq2.test.withbatch.log2FC.shrinked_RNAseq_data_used_20220408.rds'))
+    cpm = res[, c(1:12)]
+    #cpm = res[, grep('log2FoldChange_d', colnames(res))]
+    cpm = cal_sample_means(cpm, conds = c("Mature_UA", "BL_UA_5days", "BL_UA_9days", "BL_UA_13days_proximal",  "BL_UA_13days_distal"))
+    ggs = get_geneName(rownames(cpm))
+    
+    ## find expression of associated TFs
+    bb$index = NA
+    bb$corr.tfs = NA
+    for(n in 1:nrow(bb)){
+      
+      tfs = unique(unlist(strsplit(as.character(bb$gene[n]), '_')))
+      if(length(tfs) == 1){
+        if(tfs == 'SNAI3') tfs = 'SNAI2'
+        if(tfs == 'ZNF701') tfs = 'ZNF419' 
+      }
+      
+      jj = c()
+      for(tf in tfs) jj = c(jj, which(ggs == tf))
+      
+      if(length(jj) == 1) {
+        bb$index[n] = jj
+        bb$corr.tfs[n] = cor(as.numeric(bb[n, c(1:5)]), cpm[jj, ])
+      }
+      if(length(jj) >=2){
+        correlation = cor(as.numeric(bb[n, c(1:5)]), t(cpm[jj,]), method = 'pearson')
+        bb$index[n] = jj[which.max(abs(correlation))]
+        bb$corr.tfs[n] = correlation[which.max(abs(correlation))]
+      }
+      if(length(jj) == 0){
+        cat(n, '--', tfs, ': ')
+        cat(length(jj), 'tfs found \n')
+      }
+    }
+    
+    bb$tfs = ggs[bb$index]
+    bb$tf_ids = rownames(cpm)[bb$index]
+    
+    xx = bb[which(!is.na(bb$tfs)), ]
+    xx = data.frame(xx, cpm[xx$index,])
+    
+    saveRDS(xx, file =  paste0(RdataDir, '/MARA_output_Motifs_maxZscore_filteredTFsExpr_top', ntop, '.rds'))
+    
+    ##########################################
+    # plot the results 
+    ##########################################
+    bb = readRDS(file =  paste0(RdataDir, '/MARA_output_Motifs_maxZscore_filteredTFsExpr_top', ntop, '.rds'))
+    bb = bb[c(1:57), ]
+    
+    test = as.matrix(bb[, c(1:5)])
+    rownames(test) = bb$gene
+    
+    range <- 8
+    test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
+    
+    df <- data.frame(colnames(test))
+    rownames(df) = colnames(test)
+    colnames(df) = 'samples'
+    
+    library(khroma)
+    BuRd <- colour("BuRd")
+    sunset <- colour("sunset")
+    cols = BuRd(10)
+    cols = sunset(10)
+    cols = rev(colour('PRGn')(12))
+    
+    cool = rainbow(50, start=rgb2hsv(col2rgb('cyan'))[1], end=rgb2hsv(col2rgb('blue'))[1])
+    warm = rainbow(50, start=rgb2hsv(col2rgb('red'))[1], end=rgb2hsv(col2rgb('yellow'))[1])
+    cols = c(rev(cool), rev(warm))
+    cols <- colorRampPalette(cols)(8)
+    callback = function(hc, mat){
+      sv = svd(t(mat))$v[,1]
+      dend = reorder(as.dendrogram(hc), wts = sv)
+      as.hclust(dend)
+    }
+    
+    o1 = c("NRF1", "NFIC", "NFIX", "NFIB", "NFIA", "KLF3", "TFAP4", "MSANTD3", "ZNF701",  "PRDM1", "TEF", "ZBTB18", "ARID5A", 
+           "CTCF", "TFDP1", "IRF2", "MEF2C", "NFAT5","PLAGL2", "SNAI3",
+           "RUNX1", "RUNX2",  "BCL11B", "BACH1", "FOS", "FOSL1_JUN",  "FOS_JUND", "BATF3", 
+           "MAFK",  "BNC2",   "BACH1_MAFK", "MAF_NFE2", 
+           "TCF7L2",   "TCF7" ,"LEF1", "GCM1","RARA",
+           "REST", "ZNF549", "ZSCAN31",    
+           "OSR2","HIC2","THAP1", 
+           "ZFX", "BARX1","ZNF417","ZEB1", "ZNF384", "TCF4",     
+           "PLAG1", "HIC1",   "RELA", "TEAD3","TFAP2B","SMAD2", "HOXA13", "HOXC13")
+    mm = match(o1, rownames(test))
+    
+    plt = pheatmap(test[mm, ], cluster_rows=FALSE, show_rownames=TRUE, show_colnames = FALSE, 
+                   color = cols,
+                   scale = 'none', cluster_cols=FALSE, main = '', 
+                   na_col = "white", #fontsize_row = 10, 
+                   breaks = seq(-8, 8, length.out = 8), 
+                   annotation_col = df, 
+                   #treeheight_row = 20,
+                   #clustering_method = 'complete', cutree_rows = 6, 
+                   annotation_legend = FALSE,
+                   #clustering_callback = callback,
+                   filename = paste0(figureDir, 'MARA_bayesianRidge_Jaspar2022_regeneration.pdf'), 
+                   width = 3.5, height = 10)
+    
+    ## plot the motif importance ranks
+    ggplot(bb, aes(x=combine.Zscore, y=rank, label = gene)) +
+      geom_point(size = 2.0) +
+      #scale_color_manual(values=c('blue', 'red')) +
+      geom_text_repel(data= bb[which(bb$combine.Zscore>2.0), ] , size = 3.0) +
+      theme_classic() +
+      geom_hline(yintercept=0.0, colour = "darkgray", size = 1.5) +
+      xlab("motif activity importance rank") + ylab("combined Z scores") +
+      theme(axis.text.x = element_text(size = 14),
+            axis.text.y = element_text(size = 14),
+            axis.title.x = element_text(size=14, face="bold"),
+            axis.title.y = element_text(size=14, face="bold"))
+    
+    ggsave(paste0(figureDir, 'MARA_bayesianRidge_temporalpeaks_motifActivity.rank_vs_TFexpression.pdf'), width=8, height = 6)
+    
+    # plot associated TF expression using dotplot
+    # original code from https://davemcg.github.io/post/lets-plot-scrna-dotplots/
+    library(tidyverse)
+    library(ggdendro)
+    library(cowplot)
+    library(ggtree)
+    library(patchwork) 
+    
+    test = bb[match(o1, rownames(test)), c(13, 15:19)]
+    
+    test$tfs[31] = 'MAFK.1'
+    
+    rownames(test) = test$tfs
+    test = test[, -1]
+    colnames(test) = c('mUA', '5dpa', '9dpa', '13dpa.p', '13dpa.d')
+    
+    test = t(apply(test, 1, cal_centering))
+    range <- 3
+    test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
+    cols = rev(colour('PRGn')(5))
+    df <- data.frame(colnames(test))
+    rownames(df) = colnames(test)
+    colnames(df) = 'samples'
+    
+    pheatmap(test, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = FALSE, 
+             color = cols,
+             scale = 'none', cluster_cols=FALSE, main = '', 
+             na_col = "white", #fontsize_row = 10, 
+             #breaks = seq(-8, 8, length.out = 8), 
+             annotation_col = df, 
+             #treeheight_row = 20,
+             #clustering_method = 'complete', cutree_rows = 6, 
+             annotation_legend = FALSE,
+             #clustering_callback = callback,
+             filename = paste0(figureDir, 'TFs_associatedMotifs_regeneration.pdf'), 
+             width = 3, height = 10)
+    
+    bb$activity = 'activator'
+    bb$activity[which(bb$corr.tfs<0)] = 'repressor'
+    as_tibble(bb) %>% 
+      ggplot(aes(x=combine.Zscore, y=corr.tfs, label = gene)) +
+      geom_point(aes(x=combine.Zscore, y=corr.tfs, color = activity), size = 2.0) +
+      scale_color_manual(values=c('blue', 'red')) +
+      geom_text_repel(data= bb[which(bb$combine.Zscore>2), ] , size = 2.5) +
+      theme_classic() +
+      geom_hline(yintercept=0.0, colour = "darkgray", size = 1.5) +
+      xlab("Motif activity importance (z-score)") + ylab("Correlation to TF expression") +
+      theme(axis.text.x = element_text(size = 14),
+            axis.text.y = element_text(size = 14),
+            axis.title.x = element_text(size=14, face="bold"),
+            axis.title.y = element_text(size=14, face="bold"))
+    
+    ggsave(paste0(figureDir, 'MARA_bayesianRidge_temporalpeaks_motifActivity_vs_TFexpression.pdf'), width=6, height = 4)
+    
+    
+  }
 }
 
 ##########################################
