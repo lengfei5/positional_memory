@@ -1808,6 +1808,11 @@ run.MARA.atac.temporal = function(motif.oc, Y, method = c('Bayesian.ridge'))
   }
 }
 
+motif_enrichment_for_regenerationSpecificPeaks = function()
+{
+    
+}
+
 ##########################################
 # General function of MARA
 ##########################################

@@ -2347,9 +2347,11 @@ if(Select.dynamic.peaks.for.MARA){
   keep = cal_sample_means(keep, conds = conds)
   rownames(keep) = gsub('_', '-', rownames(keep))
   
+  
 }
 
 xx = run.MARA.atac.temporal(keep)
+
 
 ##########################################
 # plot footprint analysis results from TOBIAS 

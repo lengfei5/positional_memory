@@ -394,6 +394,7 @@ read.expr.matrix <- function(filename, form="", sep="", default.gene.label="gene
 ##########################################
 build_target_CRE_matrix = function(targets.ids)
 {
+  # targets.ids = target.ids_all
   bed = read.table(file = 
                      paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/motif_analysis/', 
                             'FIMO_atacPeak_tss_mediumQ_core.unvalided_64Gmem/peaks_for_fimo_sorted.bed'), header = FALSE)
@@ -419,12 +420,13 @@ build_target_CRE_matrix = function(targets.ids)
   targets$geneID = as.character(droplevels(targets$geneID))
   #targets$CREs =droplevels(targets$CREs)
   
-  xx = table(targets$geneID, targets$CREs) ## target-CRE matrix: each row is tf and each column is associated tss and enhancer peaks
+  ## target-CRE matrix: each row is tf and each column is associated tss and enhancer peaks
+  xx = table(targets$geneID, targets$CREs)
   ss = apply(xx, 1, sum)
   xx = xx[which(ss>0), ]
   
   mm = match(rownames(xx), targets.ids)
-  rownames(xx) = targets.ids
+  # rownames(xx) = targets.ids
   
   return(xx)
   
