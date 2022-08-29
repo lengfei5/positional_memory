@@ -1843,8 +1843,31 @@ motif_enrichment_for_regenerationSpecificPeaks = function(keep)
   ##########################################
   # enrichment analysis of regeneration-specific motifs 
   ##########################################
+  xx = readRDS(file = paste0(RdataDir, '/dynamic_ATACpeaks_regeneration_data.heatmap_DPGPclusters_saved.rds'))
+  test = X[!is.na(match(rownames(X), gsub('_', '-', rownames(xx)[which(xx$clusters == 'mc4')]))), ]
   
+  enrich = rep(NA, length = ncol(X))
+  names(enrich) = colnames(X)
+  for(n in 1:length(enrich))
+  {
+    # n = 1
+    cat(n, '\n')
+    dat <- data.frame(
+      "withHits" = c(length(which(test[,n]>0)), length(which(X[,n]>0))),
+      "noHits" =  c(length(which(test[,n]==0)), length(which(X[,n]==0))),
+      row.names = c("forground", "background"),
+      stringsAsFactors = FALSE
+    )
+    
+    enrich[n] = fisher.test(x = dat, 
+                alternative = "greater")$p.value
+    
+  }
   
+  enrich = enrich[order(enrich)]
+  
+  enrich = data.frame(motif = names(enrich), pval = enrich, stringsAsFactors = FALSE)
+  write.csv(enrich, file = paste0(tableDir, 'regeneration_specific_peaks_C4_motifEnrichment.csv'), row.names = FALSE)
   
   if(method == 'Bayesian.ridge'){ 
     
