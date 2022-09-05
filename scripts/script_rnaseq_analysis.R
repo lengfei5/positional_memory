@@ -69,7 +69,8 @@ if(Run.limma.test){
   require(limma)
   
   Rdata.microarray = "../results/microarray/Rdata/"
-  load(file = paste0(Rdata.microarray, 'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary.Rdata'))
+  load(file = paste0(Rdata.microarray, 
+                     'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary.Rdata'))
   
   mm = match(rownames(res), annot$geneID)
   ggs = paste0(annot$gene.symbol.toUse[mm], '_',  annot$geneID[mm])
@@ -98,15 +99,21 @@ if(Run.limma.test){
   res = data.frame(res, xx)
   res = res[order(-res$pval.max), ]
   
-  save(res, raw, fit2, file = paste0(RdataDir, 
-                                     'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_DEpval.Rdata'))
+  save(res, raw, fit2, 
+       file = paste0(RdataDir, 
+          'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_DEpval.Rdata'))
+  
   
 }
 
 require(limma)
 # load microarray analysis results: log2 signal (res), comparison (fit2), and raw data (raw)
 load(file = paste0("../results/microarray/Rdata/", 
-                   'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_DEpval.Rdata'))
+                   'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_DEpval_RARB.Rdata'))
+
+#load(file = paste0("../results/microarray/Rdata/", 
+#                   'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_DEpval.Rdata'))
+
 
 res = res[, c(1:9)] # drop the pval kept previously
 
@@ -132,7 +139,7 @@ o1 = order(-res$fdr.max)
 res = res[o1, ]
 
 saveRDS(res, file = paste0("../results/microarray/Rdata/", 
-                     'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_limma.DE.stats.rds'))
+  'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_limma.DE.stats_RARB.rds'))
 
 
 ##########################################
@@ -238,6 +245,7 @@ if(saveTables){
   
   yy = res
   yy = yy[, c(1:18)]
+  
   write.csv(yy,
             file = paste0(tableDir, '/allGenes_microarray.csv'), 
             quote = FALSE, row.names = TRUE)
@@ -252,6 +260,13 @@ if(saveTables){
   write.csv(yy,
             file = paste0(tableDir, '/Genes_microarray_geneExample_SPRY4.csv'), 
             quote = FALSE, row.names = TRUE)
+  
+  yy = yy[ grep('^RARB', rownames(yy)), ]
+  
+  write.csv(yy,
+            file = paste0(tableDir, '/Genes_microarray_geneExample_RARB.csv'), 
+            quote = FALSE, row.names = TRUE)
+
 }
 
 ##########################################

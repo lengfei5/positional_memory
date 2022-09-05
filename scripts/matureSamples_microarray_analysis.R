@@ -119,9 +119,19 @@ save(design, raw, file = paste0(RdataDir, 'design_probeIntensityMatrix.Rdata'))
 ##########################################
 # process the probe-to-gene mapping  
 ##########################################
+load(file = paste0(RdataDir, 'design_probeIntensityMatrix.Rdata'))
+
 mapping = fread('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/microarray_probes/AmexMA_v2-AmexT_v47.bed', 
                 header=FALSE, stringsAsFactors=FALSE)
 colnames(mapping) = c('transcript', 'start', 'end', 'probeName', 'match', 'strand')
+
+## RARB probeIDs are :
+# CUST_109069_Unique_A400K
+# CUST_40470_Unique_A400K
+# CUST_40471_Unique_A400K
+# CUST_40469_Unique_A400K
+# CUST_40468_Unique_A400K
+
 
 # filter the probes with >=5 mismatches
 mapping = mapping[which(mapping$match > 55), ]
@@ -154,16 +164,26 @@ cat(nrow(mapping), ' annotated mapping : keep only the positive strand probes \n
 mapping = mapping[which(mapping$strand == '+'), ]
 cat(nrow(mapping), ' probes left \n')
 
-# filter unannotated probes
+# filter unannotated probes but keep the RARB probes
 cat(nrow(raw), ' probes in intensity matrix; now keep only those with annotated transcrips \n')
 mm = match(raw$probeName, mapping$probeName)
-raw = raw[!is.na(mm), ]
+kk.rarb= which(raw$probeName == 'CUST_40469_Unique'|
+                 raw$probeName == 'CUST_109069_Unique'|
+                 raw$probeName == 'CUST_40470_Unique'| 
+                 raw$probeName == 'CUST_40471_Unique')
+
+raw = raw[unique(c(kk.rarb, which(!is.na(mm)))), ]
 cat(nrow(raw), ' probes left in intensity matrix \n')
 
 # combine the intensity matrix with transcript and genes
 mm = match(raw$probeName, mapping$probeName)
 
 raw = data.frame(mapping[mm, c(1,4, 5:6, 8:9)], raw, stringsAsFactors = FALSE)
+raw$transcript[1:4] = 'RARB'
+raw$probeName[1:4] = raw$probeName.1[1:4]
+raw$geneID[1:4] = 'RARB'
+raw$geneSymbol[1:4] = 'RARB'
+
 raw = raw[, -8] 
 
 mat = as.matrix(raw[, c(8:ncol(raw))])
@@ -196,7 +216,7 @@ bg.cutoff = quantile(bg, prob = 0.95)
 nb.pass.cutoff = apply(mat.bc, 1, function(x) length(which(x > bg.cutoff)))
 
 sels = which(nb.pass.cutoff >= 3)
-
+sels = c(3, sels); # add second RARB
 mat.bc = mat.bc[sels, ]
 raw = raw[sels, ]
 
@@ -207,12 +227,13 @@ colnames(mat.bc) = paste0(rep(c('mUA', 'mLA', 'mHand'), each = 3), '_', c(1:3))
 raw = data.frame(raw[, c(1:7)], mat.bc) 
 #colnames(raw)[c(8:16)] = colnames(mat)
 
-save(design, raw, mapping, file = paste0(RdataDir, 'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_BgCorrected.Rdata'))
+save(design, raw, mapping, 
+     file = paste0(RdataDir, 'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_BgCorrected_keepingRARB.Rdata'))
 
 ##########################################
 # Qunatile normalization
 ##########################################
-load(file = paste0(RdataDir, 'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_BgCorrected.Rdata'))
+load(file = paste0(RdataDir, 'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_BgCorrected_keepingRARB.Rdata'))
 
 library(preprocessCore)
 mat = as.matrix(raw[, c(8:16)])
@@ -221,6 +242,7 @@ mat.norm = normalize.quantiles(mat)
 #mat.norm = limma::normalizeBetweenArrays(mat, )
 colnames(mat.norm) = colnames(mat)
 
+mat.norm[grep('RARB', raw$geneSymbol),]
 mat.norm[grep('HOXA13', raw$geneSymbol),]
 mat.norm[grep('RARRES1', raw$geneSymbol),]
 
@@ -240,7 +262,8 @@ for(n in 1:nrow(res))
   }
 }
 
-save(res, raw, file = paste0(RdataDir, 'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary.Rdata'))
+save(res, raw, 
+     file = paste0(RdataDir, 'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_RARB.Rdata'))
 
 
 ##########################################
@@ -248,7 +271,8 @@ save(res, raw, file = paste0(RdataDir, 'design_probeIntensityMatrix_probeToTrans
 # original code were from limma manual section 9.3
 ##########################################
 require(limma)
-load(file = paste0(RdataDir, 'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary.Rdata'))
+load(file = paste0(RdataDir, 'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_RARB.Rdata'))
+
 annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
                        'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
 
@@ -279,6 +303,7 @@ xx$pval.max = apply(as.matrix(-log10(xx)), 1, max)
 res = data.frame(res, xx)
 res = res[order(-res$pval.max), ]
 
-save(res, raw, fit2, file = paste0(RdataDir, 
-                             'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_DEpval.Rdata'))
+save(res, raw, fit2, 
+     file = paste0(RdataDir, 
+    'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_DEpval_RARB.Rdata'))
 
