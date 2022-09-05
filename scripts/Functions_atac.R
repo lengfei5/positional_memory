@@ -3209,7 +3209,6 @@ Identify.LA.Hand.specific.genes.from.atacseq = function(xx)
   
 }
 
-
 process.dynamic.peaks.clustering.GPDP = function(yy, res)
 {
   require(data.table)
@@ -3242,6 +3241,7 @@ process.dynamic.peaks.clustering.GPDP = function(yy, res)
   }
   
   library(corrplot)
+  
   M = cor(t(cs))
   corrplot.mixed(M, order = 'hclust', addrect = 10)
   

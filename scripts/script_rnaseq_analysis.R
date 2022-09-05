@@ -236,7 +236,22 @@ if(saveTables){
             file = paste0(tableDir, '/allGenes_microarray.csv'), 
             quote = FALSE, row.names = TRUE)
   
+  yy = res
+  yy = yy[, c(1:18)]
+  write.csv(yy,
+            file = paste0(tableDir, '/allGenes_microarray.csv'), 
+            quote = FALSE, row.names = TRUE)
   
+  yy = yy[grep('WNT5', rownames(yy)), ]
+  write.csv(yy,
+            file = paste0(tableDir, '/Genes_microarray_geneExample_Wnt5A.B.csv'), 
+            quote = FALSE, row.names = TRUE)
+  
+  yy = yy[ grep('^RARB|^SPRY4', rownames(yy)), ]
+  
+  write.csv(yy,
+            file = paste0(tableDir, '/Genes_microarray_geneExample_SPRY4.csv'), 
+            quote = FALSE, row.names = TRUE)
 }
 
 ##########################################

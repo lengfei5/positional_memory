@@ -102,5 +102,5 @@ cat(nrow(target.tfs_sel), ' targets by ', ncol(target.tfs_sel), ' TFs \n')
 
 saveRDS(target.tfs_sel, file = paste0(RdataDir, '/GRN_priorNetwork_allTarget_expressedTFs.rds'))
 
-
+ttf = readRDS(file = paste0(RdataDir, '/GRN_priorNetwork_allTarget_expressedTFs.rds'))
 

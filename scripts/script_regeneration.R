@@ -185,6 +185,14 @@ if(grouping.temporal.peaks){
   ##########################################
   Make.Granges.and.peakAnnotation = TRUE
   if(Make.Granges.and.peakAnnotation){
+    # one enhancer defined by Akane: chr2p               880963799                  880966329
+    gr <- GRanges(
+      seqnames = Rle(c("chr2p"), c(1)),
+      ranges = IRanges(880963799, end = 880966329, names = 'axe.R'),
+      strand = Rle(strand(c("*")), c(1)),
+      score = 1
+    )
+    gr 
     
     pp = data.frame(t(sapply(rownames(fpm), function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
     pp$strand = '*'
@@ -198,6 +206,11 @@ if(grouping.temporal.peaks){
     
     pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
                                   start.field="X2", end.field="X3", strand.field="strand")
+    
+    overlapsAny(gr, pp)
+    pp[overlapsAny(pp, gr)]
+    
+    ## peak name overlapping with Akane's axe.R is chr2p:880964725_880965275
     
     ## annotation from ucsc browser ambMex60DD_genes_putative
     ## to update in the future 
@@ -530,6 +543,7 @@ if(Save.Matrix.for.DPGP){
   write.table(yy, 
               file = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/DPGP_clustering/', 
                             'atac_peakSignals_all.txt'), sep = '\t', col.names = TRUE, row.names = TRUE, quote = FALSE)
+  
   
 }
 
