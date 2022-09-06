@@ -443,7 +443,7 @@ plt = pheatmap(yy, annotation_row = my_gene_col,
                gaps_col = gaps.col, 
                treeheight_row = 20,
                annotation_legend = FALSE,
-               filename = paste0(figureDir, '/positional_atacPeaks_fdr0.05_log2FC.1_rmHeadPeaks.pdf'), 
+               filename = paste0(figureDir, '/positional_atacPeaks_fdr0.05_log2FC.1_rmHeadPeaks_v2.pdf'), 
                width = 4, height = 12)
 
 saveRDS(plt, file = paste0(RdataDir, '/postional_atacPeaks_heatmap_orderSaved.rds'))

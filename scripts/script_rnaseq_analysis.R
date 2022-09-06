@@ -779,6 +779,17 @@ x <- DESeqDataSetFromMatrix(counts(dds), DataFrame(design), design = ~ batch + c
 
 dds = estimateSizeFactors(x)
 
+if(save.scalingFactors.for.deeptools){
+  
+  sfs = data.frame(sampleID = design$SampleID,  
+                   scalingFactor = design.sel$usable/(sizeFactors(ddx)*median(as.numeric(design.sel$usable))),
+                   stringsAsFactors = FALSE)
+  
+  write.table(sfs, file = paste0(resDir, '/histMarkers_DESeq2_scalingFactor_forDeeptools.txt'), sep = '\t',
+              col.names = FALSE, row.names = FALSE, quote = FALSE)
+  
+}
+
 #sels = unique(c(which((design.matrix$batch == 3 | design.matrix$condition == 'BL_UA_9days'))))
 #sels = unique(c(which((design.matrix$batch == 3 | design.matrix$condition == 'BL_UA_9days') & 
 #                        design.matrix$SampleID != '136150' & design.matrix$SampleID != '106351')))

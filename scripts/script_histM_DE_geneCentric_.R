@@ -378,13 +378,15 @@ for(n_histM in 1:length(conds_histM))
   res$log2fc = apply(sample.means, 1, function(x) max(x) - min(x))
   res$maxs = apply(sample.means, 1, max)
   res$mins = apply(sample.means, 1, min)
+  
+  source('Functions_histM.R')
+  res$length = width(gene)[match(get_geneID(rownames(res)), gene$gene_id)]
+  res$length = res$length + 5000
+  res$max_rpkm = res$maxs + log2(10^3/res$length)
+  
   #
   xx = data.frame(cpm[match(rownames(res), rownames(cpm)), ],  res, stringsAsFactors = FALSE) 
   res = xx
-  
-  saveRDS(res, file = paste0(RdataDir, '/TSSgenebody_fpm_bc_TMM_combat_DBedgeRtest_', 
-                             conds_histM[n_histM], '_', version.analysis, '.rds'))
-  
   
   ## select the significant peaks
   fdr.cutoff = 0.05; logfc.cutoff = 1
@@ -397,13 +399,250 @@ for(n_histM in 1:length(conds_histM))
   
   res = res[order(res$adj.P.Val.mHand.vs.mUA), ]
   
-  source('Functions_histM.R')
-  res$length = width(gene)[match(get_geneID(rownames(res)), gene$gene_id)]
-  res$length = res$length + 5000
-  res$max_rpkm = res$maxs + log2(10^3/res$length)
   # plot_individual_histMarker_withinATACpeak(res)
-  length(which(res$max_rpkm[select]> 0))
   
-  
+  saveRDS(res, file = paste0(RdataDir, '/TSSgenebody_fpm_bc_TMM_combat_DBedgeRtest_', 
+                             conds_histM[n_histM], '_', version.analysis, '.rds'))
     
 }
+
+##########################################
+# plot segment-specific histone marks overlapped with segement-specific atac
+# and segment-specific histone marks overlapped with stable atac
+# subclustering was performed 
+##########################################
+Plot_histMarkers_for_positionalATAC = FALSE
+if(Plot_histMarkers_for_positionalATAC){
+  
+  library(gridExtra)
+  library(grid)
+  library(ggplot2)
+  library(lattice)
+  require(pheatmap)
+  require(RColorBrewer)
+  library(khroma)
+  source('Functions_histM.R')
+  
+  ## call function for heamtap 
+  source('Functions_plots.R')
+  # subclustering.postional.histM.postioinalAtacPeaks()
+  
+  ##########################################
+  # merge first the histM tables
+  ##########################################
+  conds_histM = c('H3K27me3', 'H3K4me1', 'H3K4me3')
+  for(n in 1:length(conds_histM)){
+    # n = 2
+    if(n == 1){
+      res = readRDS(file = paste0(RdataDir, '/TSSgenebody_fpm_bc_TMM_combat_DBedgeRtest_', 
+                                  conds_histM[n], '_', version.analysis, '.rds'))
+      colnames(res) = paste0(colnames(res), '.', conds_histM[n])
+      
+    }else{
+      xx = readRDS(file = paste0(RdataDir, '/TSSgenebody_fpm_bc_TMM_combat_DBedgeRtest_', 
+                                 conds_histM[n], '_', version.analysis, '.rds'))
+      colnames(xx) = paste0(colnames(xx), '.', conds_histM[n])
+      xx = xx[match(rownames(res), rownames(xx)),]
+      res = data.frame(res, xx, stringsAsFactors = FALSE)
+    }
+  }
+ 
+  saveRDS(res, file = paste0(RdataDir, '/TSSgenebody_fpm_bc_TMM_combat_DBedgeRtest_all3histM_', version.analysis, '.rds'))
+  
+  ##########################################
+  # select the genes based on the H3K27me3 
+  ##########################################
+  res = readRDS(file = paste0(RdataDir, '/TSSgenebody_fpm_bc_TMM_combat_DBedgeRtest_all3histM_', version.analysis, '.rds'))
+  source('Functions_histM.R')
+  
+  ## select the significant peaks
+  fdr.cutoff = 0.1; logfc.cutoff = 1
+  select = which((res$adj.P.Val.mLA.vs.mUA.H3K27me3 < fdr.cutoff & abs(res$logFC.mLA.vs.mUA.H3K27me3) > logfc.cutoff) |
+                   (res$adj.P.Val.mHand.vs.mUA.H3K27me3 < fdr.cutoff & abs(res$logFC.mHand.vs.mUA.H3K27me3) > logfc.cutoff)|
+                   (res$adj.P.Val.mHand.vs.mLA.H3K27me3 < fdr.cutoff & abs(res$logFC.mHand.vs.mLA.H3K27me3) > logfc.cutoff)
+  )
+  select = select[which(res$max_rpkm.H3K27me3[select]>0.6)]
+  cat(length(select), ' DE H3K27me3 ',  ' \n')
+  
+  
+  yy0 = res[select, ]
+  range <- 2.0
+  
+  yy = matrix(NA, nrow = nrow(yy0), ncol = length(conds_histM)*3)
+  rownames(yy) = rownames(yy0)
+  nms = c()
+  
+  for(n in 1:length(conds_histM)) # transform the data
+  {
+    # n = 1
+    jj0 = grep(paste0(conds_histM[n], '_m'), colnames(yy0))
+    
+    test = yy0[, jj0]
+    test = test[, grep('_rRep', colnames(test), invert = TRUE)]
+    
+    test = cal_sample_means(test, conds = paste0(conds_histM[n], c('_mUA', '_mLA', '_mHand')))
+    test = t(apply(test, 1, cal_centering))
+    test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
+    yy[, c((3*n-2):(3*n))] = test
+    nms = c(nms, paste0(conds_histM[n], c('_mUA', '_mLA', '_mHand')))
+    
+    #yy0[ ,jj0] = t(apply(yy0[,jj0], 1, cal_transform_histM, cutoff.min = 0, cutoff.max = 5, centering = FALSE, toScale = TRUE))
+    
+  }
+  
+  colnames(yy) = nms
+  
+  df = as.data.frame(sapply(colnames(yy), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[2])}))
+  colnames(df) = 'segments'
+  rownames(df) = colnames(yy)
+  
+  sample_colors = c('springgreen4', 'steelblue2', 'gold2')
+  annot_colors = list(segments = sample_colors)
+  
+  gaps_col = c(3, 6)
+  
+  callback = function(hc, mat){
+    sv = svd(t(mat))$v[,8]
+    dend = reorder(as.dendrogram(hc), wts = sv)
+    as.hclust(dend)
+  }
+  
+  pheatmap(yy, cluster_rows=TRUE,
+           #cutree_rows = 4,
+           show_rownames=TRUE, fontsize_row = 5,
+           color = colorRampPalette(rev(brewer.pal(n = 8, name ="RdBu")))(8), 
+           show_colnames = FALSE,
+           scale = 'none',
+           cluster_cols=FALSE, annotation_col=df,
+           gaps_col = gaps_col,
+           legend = TRUE,
+           treeheight_row = 15,
+           annotation_legend = FALSE, 
+           #annotation_colors = annot_colors,
+           clustering_callback = callback,
+           #breaks = seq(-2, 2, length.out = 8),
+           clustering_method = 'complete', cutree_rows = 3,
+           breaks = seq(-range, range, length.out = 8),
+           #gaps_row =  gaps.row, 
+           legend_labels = FALSE,
+           width = 5, height = 10, 
+           filename = paste0(figureDir, 'heatmap_histoneMarker_geneCentric_DE.pdf'))
+  
+  
+  ##########################################
+  # highlight some positional genes and promoters
+  ##########################################
+  pp = data.frame(t(sapply(rownames(yy), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  pp$strand = '*'
+  pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                start.field="X2", end.field="X3", strand.field="strand")
+  
+  amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
+  pp.annots = annotatePeak(pp, TxDb=amex, tssRegion = c(-5000, 5000), level = 'transcript')  
+  
+  ### highlight promoter peaks
+  pp.annots = as.data.frame(pp.annots)
+  promoter.sels = grep('Promoter', pp.annots$annotation)
+  
+  yy.sels = yy[promoter.sels, ]
+  peaks.sels = pp.annots[promoter.sels, ]
+  rownames(peaks.sels) = rownames(yy.sels)
+  mm = match(rownames(peaks.sels), rownames(keep))
+  peaks.sels$log2fc = apply(keep[mm, setdiff(grep('logFC.mHand.vs.mUA_', colnames(keep)), grep('H3K27ac', colnames(keep)))], 
+                            1, function(x){x[which.max(abs(x))]})
+  
+  o1 = order(-abs(peaks.sels$log2fc))
+  peaks.sels = peaks.sels[o1, ]
+  yy.sels = yy.sels[o1, ]
+  
+  #tss$gene[which(rownames(tss) == 'AMEX60DD028208')] = 'PROD1'
+  #tss$gene[which(rownames(tss) == 'AMEX60DD024424')] = 'MEIS3'
+  
+  peaks.sels[grep('HOXA13|MEIS|SHOX', peaks.sels$transcriptId), ]
+  
+  ## further selection of positional genes with microarray data
+  genelists = readRDS(file = paste0('../results/RNAseq_data_used/Rdata/', 
+                                    'microarray_positionalGenes_data.rds'))
+  ids = get_geneID(rownames(genelists)) 
+  #ids = c(tss$geneID[match(positional.genes, tss$gene)], ids)
+  ids = unique(ids)
+  
+  # convert transcriptID to gene ID
+  annot = read.delim(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                            'annot_AmexT_v47_transcriptID_transcriptCotig_geneID_geneSymbol.hs_nr_CDS.txt'))
+  
+  peaks.sels$geneId = sapply(peaks.sels$geneId, function(x) {x = unlist(strsplit(as.character(x), '[|]')); 
+  x[grep('AMEX60', x)]} )
+  peaks.sels$geneId = as.character(annot$geneID[match(peaks.sels$geneId, annot$transcriptID)])
+  
+  kk = match(peaks.sels$geneId, ids)
+  kk = which(!is.na(kk))
+  kk = unique(c(grep('MEIS', peaks.sels$transcriptId), kk))
+  
+  #test = peaks.sels[kk, ]
+  #test[grep('HOXA13|MEIS|SHOX', test$transcriptId), ]
+  peaks.sels = peaks.sels[kk, ]
+  yy.sels = yy.sels[kk, ]
+  
+  segments = c('mUA', 'mLA', 'mHand')
+  conds = c('atac', 'H3K4me3','H3K27me3', 'H3K4me1')
+  cc = paste(rep(conds, each = length(segments)), segments, sep = "_")
+  
+  ####### top 30 promoter peaks
+  # ntop = 30
+  # ntop = nrow(peaks.sels)
+  # 
+  # o1 = order(-peaks.sels$fdr.mean)
+  # peaks.sels = peaks.sels[o1[1:ntop], ]
+  # yy.sels = yy.sels[o1[1:ntop], ]
+  
+  geneSymbols = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                               'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
+  
+  # jj = which(geneSymbols$geneID == 'AMEX60DD024424')
+  # geneSymbols$gene.symbol.toUse[jj] = 'MEIS3'
+  # geneSymbols$manual[jj] = 'MEIS3'
+  # 
+  # saveRDS(geneSymbols, file = paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+  #                       'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
+  
+  ggs = peaks.sels$geneId
+  mm = match(ggs, geneSymbols$geneID)
+  ggs[!is.na(mm)] = geneSymbols$gene.symbol.toUse[mm[!is.na(mm)]]
+  
+  grep('HOX13|MEIS|SHOX', ggs)
+  
+  yy.sels = as.matrix(yy.sels)
+  
+  rownames(yy.sels) = ggs
+  test = yy.sels
+  
+  df = data.frame(segments = sapply(colnames(test), function(x) unlist(strsplit(as.character(x), '_'))[2]))
+  colnames(df) = c('seg')
+  rownames(df) = colnames(test)
+  
+  sample_colors = c('springgreen4', 'steelblue2', 'gold2')
+  names(sample_colors) = c('mUA', 'mLA', 'mHand')
+  annot_colors = list(segments = sample_colors)
+  
+  gaps.col = c(3, 6)
+  pheatmap(test, 
+           annotation_col = df, show_rownames = TRUE, scale = 'none', 
+           color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
+           show_colnames = FALSE,
+           cluster_rows = TRUE, cluster_cols = FALSE, 
+           annotation_colors = annot_colors, 
+           gaps_col = gaps.col, fontsize_row = 8,
+           #breaks = seq(-2, 2, length.out = 8),
+           clustering_method = 'complete', cutree_rows = 4,
+           breaks = seq(-range, range, length.out = 8),
+           #gaps_row =  gaps.row, 
+           treeheight_row = 20,
+           legend_labels = FALSE,
+           annotation_legend = FALSE,
+           filename = paste0(outDir, 'Fig_S1G_heatmap_positional_histMarks_promoters.pdf'), 
+           width = 5, height = 15)
+  
+}
+
+
