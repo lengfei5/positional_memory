@@ -3300,6 +3300,39 @@ process.dynamic.peaks.clustering.GPDP = function(yy, res)
   
   saveRDS(res, file = paste0(RdataDir, '/renegeration_dynamicPeaks_GPDPclustering.merged.extended.rds'))
   
+  ##########################################
+  # ## post correction
+  ##########################################
+  res = readRDS(file = paste0(RdataDir, '/renegeration_dynamicPeaks_GPDPclustering.merged.extended.rds'))
+  sample.means = readRDS(file = paste0(RdataDir, '/sampleMean_regeneration_peaks_beforeScaling_GPDPclustering.rds'))
+  
+  table(res$clusters)
+  res[match(names(loci), rownames(res)), ]
+  sample.means[match(names(loci), rownames(sample.means)), ]
+  
+  
+  xx = sample.means[match(rownames(res)[which(res$clusters == 'mc5')], rownames(sample.means)),]
+  dev.max = apply(xx[, c(1:4)], 1, max)
+  
+  dev.max = dev.max[which(dev.max<1.6)] # manual correction of regeneration-specific
+  
+  res$clusters[match(names(dev.max), rownames(res))] = 'mc4'
+  
+  xx = sample.means[match(rownames(res)[which(res$clusters == 'mc2')], rownames(sample.means)),]
+  dev.max = apply(xx[, c(1:4)], 1, max)
+  
+  dev.max = dev.max[which(dev.max<1.6)] # manual correction of regeneration-specific
+  res$clusters[match(names(dev.max), rownames(res))] = 'mc4'
+  
+  xx = sample.means[match(rownames(res)[which(res$clusters == 'mc4')], rownames(sample.means)),]
+  dev.max = apply(xx[, c(1:4)], 1, max)
+  
+  dev.max = dev.max[which(dev.max>3.5)] # manual correction of regeneration-specific
+  
+  res$clusters[match(names(dev.max), rownames(res))] = 'mc1'
+  
+  saveRDS(res, file = paste0(RdataDir, '/renegeration_dynamicPeaks_GPDPclustering.merged.extended_manualBCcorrected.rds'))
+  
 }
 
 ########################################################

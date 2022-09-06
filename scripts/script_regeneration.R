@@ -187,10 +187,10 @@ if(grouping.temporal.peaks){
   if(Make.Granges.and.peakAnnotation){
     # one enhancer defined by Akane: chr2p               880963799                  880966329
     gr <- GRanges(
-      seqnames = Rle(c("chr2p"), c(1)),
-      ranges = IRanges(880963799, end = 880966329, names = 'axe.R'),
-      strand = Rle(strand(c("*")), c(1)),
-      score = 1
+      seqnames = Rle(c("chr2p", "chr7p"), c(1, 1)),
+      ranges = IRanges(start = c(880963799, 216589802), end = c(880966329, 216590446), names = c('axe.R', 'Runx1.promoter')),
+      strand = Rle(strand(c("*")), c(2)),
+      score = rep(1, 2)
     )
     gr 
     
@@ -210,6 +210,7 @@ if(grouping.temporal.peaks){
     overlapsAny(gr, pp)
     pp[overlapsAny(pp, gr)]
     
+    loci =   pp[overlapsAny(pp, gr)]
     ## peak name overlapping with Akane's axe.R is chr2p:880964725_880965275
     
     ## annotation from ucsc browser ambMex60DD_genes_putative
@@ -359,6 +360,8 @@ for(n in 1:length(conds)) {
 keep = keep[, sample.sels]
 sample.means = sample.means[match(rownames(keep), rownames(sample.means)), ]
 
+saveRDS(sample.means, paste0(RdataDir, '/sampleMean_regeneration_peaks_beforeScaling_GPDPclustering.rds'))
+
 cal_z_score <- function(x){
   (x - mean(x)) / sd(x)
 }
@@ -433,10 +436,12 @@ if(!Regeneration.peaks.clustering.DPGP)
   
   #res2 = process.dynamic.peaks.clustering.GPDP(yy, res)
   # reload the processed GPDP clusters
-  res = readRDS(file = paste0(RdataDir, '/renegeration_dynamicPeaks_GPDPclustering.merged.extended.rds'))
+  #res = readRDS(file = paste0(RdataDir, '/renegeration_dynamicPeaks_GPDPclustering.merged.extended.rds'))
+  res = readRDS(file = paste0(RdataDir, '/renegeration_dynamicPeaks_GPDPclustering.merged.extended_manualBCcorrected.rds'))
   res = res[which(!is.na(res$clusters)), ]
   yy = yy[match(rownames(res), rownames(yy)), ]
   
+  res[match(names(loci), rownames(res)),]
   ######
   ### given the order of groups and order the peaks withinin groups using hclust
   ## find the row gap and order subclusters   
@@ -495,7 +500,7 @@ if(!Regeneration.peaks.clustering.DPGP)
            #clustering_callback = callback,
            gaps_col = ii.gaps, 
            gaps_row =  gaps.row, 
-           filename = paste0(figureDir, 'heatmap_regenerationPeaks_scaled.pdf'), 
+           filename = paste0(figureDir, 'heatmap_regenerationPeaks_scaled_bgcorrected.pdf'), 
            width = 6, height = 12)
   
   yy = test
@@ -514,7 +519,8 @@ if(!Regeneration.peaks.clustering.DPGP)
                  #width = 6, height = 12
                  )
    
-  save(yy, plt, res, file = paste0(RdataDir, '/dynamic_ATACpeaks_regeneration_data.heatmap_DPGPclusters.Rdata'))
+  save(yy, plt, res, file = paste0(RdataDir, '/dynamic_ATACpeaks_regeneration_data.heatmap_DPGPclusters_bgcorrected.Rdata'))
+  
   
 }
 
@@ -562,7 +568,8 @@ if(PLOT.global.dynamic.parameters.for.histM){
   # import atac-seq peak
   # z-score of data and heatmap (variable: plt, yy and res)
   # # saved variables: yy (data of atac-seq peaks), res (DE test result) and plt (saved the heatmap of dynamic atac-seq peaks)
-  load(file = paste0(RdataDir, '/dynamic_ATACpeaks_regeneration_data.heatmap_DPGPclusters.Rdata')) 
+  #load(file = paste0(RdataDir, '/dynamic_ATACpeaks_regeneration_data.heatmap_DPGPclusters.Rdata')) 
+  load(file = paste0(RdataDir, '/dynamic_ATACpeaks_regeneration_data.heatmap_DPGPclusters_bgcorrected.Rdata'))
   #design_atac = design
   res_atac = res
   yy_atac = yy
@@ -617,7 +624,7 @@ if(PLOT.global.dynamic.parameters.for.histM){
     xx$clusters = res_atac$clusters
     xx$clusters = gsub('mc', 'c', xx$clusters)
     xx = xx[, c(30, 29, 1:28)]
-    write.csv(xx, file = paste0(tableDir, 'Dyanmic_atacseqPeaks_clustering_and_histM.csv'), row.names = TRUE)
+    write.csv(xx, file = paste0(tableDir, 'Dyanmic_atacseqPeaks_clustering_and_histM_new.csv'), row.names = TRUE)
      
   }
   
@@ -633,7 +640,8 @@ if(PLOT.global.dynamic.parameters.for.histM){
     }
   }
   
-  conds_histM = c('H3K4me3','H3K27me3', 'H3K4me1', 'H3K27ac')
+  #conds_histM = c('H3K4me3','H3K27me3', 'H3K4me1', 'H3K27ac')
+  conds_histM = c('H3K4me3','H3K27me3', 'H3K4me1')
   conds = c("mUA", "BL5days", "BL9days", 'BL13days.prox', 'BL13days.dist')
   
   ## heatmap of test significance for 3 histone marks without H3K27ac
@@ -642,11 +650,11 @@ if(PLOT.global.dynamic.parameters.for.histM){
            gaps_row = gaps.row,
            legend = FALSE,
            gaps_col = c(1,2),
-           filename = paste0(figureDir, '/regeneration_histM_dynamics_for_dynamicATACpeaks.pdf'), 
-           width = 4, height = 12)
+           filename = paste0(figureDir, '/regeneration_histM_dynamics_for_dynamicATACpeaks_bgcor.pdf'), 
+           width = 3, height = 12)
   
   ## heatmaps of log2FC, time point vs mUA for each histone marks 
-  for(n in 1:conds_histM)
+  for(n in 1:length(conds_histM))
   {
     # n = 1
     ii.test = intersect(grep('logFC_', colnames(keep1)), grep(conds_histM[n], colnames(keep1)))
@@ -677,7 +685,8 @@ if(PLOT.global.dynamic.parameters.for.histM){
              color = cols, 
              breaks = seq(-range, range, length.out = nb_breaks), 
              gaps_row = gaps.row,
-             filename = paste0(figureDir, '/regeneration_histM_dynamics_log2fc.vs.mUA_dynamicATACpeaks_', conds_histM[n], '.pdf'), 
+             filename = paste0(figureDir, '/regeneration_histM_dynamics_log2fc.vs.mUA_dynamicATACpeaks_', 
+                               conds_histM[n], '_bgcor.pdf'), 
              width = 3, height = 12)
   }
   
