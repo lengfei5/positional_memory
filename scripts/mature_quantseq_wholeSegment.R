@@ -197,3 +197,21 @@ write.csv(data.frame(fpm.bc, res, stringsAsFactors = FALSE),
           file = paste0(tableDir, 'wholeSegments_matureSamples_Quantseq_cpm_DEgenes.csv'), 
           row.names = TRUE)
 
+res = data.frame(fpm.bc, res, stringsAsFactors = FALSE)
+
+yy = res
+yy = yy[, c(1,4,7,10, 
+            2,5,8,11,
+            3,6,9,12, grep('_mHand.vs.mUA', colnames(yy)))]
+
+jj = c(grep('^HOX|^MEIS|^CYP26|^RARA|^RARB|^RARG|SCUBE2|FGF9|FGF2_|FGFR2|FGFR4', rownames(yy)))
+jj = unique(c(jj, grep('MEIS1_AMEX60DD024424|MEIS|LRAT|FGF9|FGF2_|FGFR2|FGFR4', rownames(yy))))
+jj = unique(c(jj, grep('WNT5', rownames(yy)), grep('^RARB|^SPRY4|AXIN2|DUSP6', rownames(yy))))
+
+yy = yy[jj, ]
+write.csv(yy,
+          file = paste0(tableDir, '/wholeSegments_matureSamples_Quantseq_cpm_DEgenes_geneList.csv'), 
+          quote = FALSE, row.names = TRUE)
+
+
+
