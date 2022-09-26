@@ -722,8 +722,8 @@ make.motif.oc.matrix.from.fimo.output = function(fimo.out,
 {
   library(data.table)
   
-  saveDir = dirname(prefix)
-  if(!dir.exists(saveDir)) dir.create(saveDir)
+  #saveDir = dirname(prefix)
+  #if(!dir.exists(saveDir)) dir.create(saveDir)
   
   #motif.tf = readRDS( '../data/motifs_tfs/motif_tf_mapping.rds')
   #fimo.out = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/',
@@ -743,7 +743,7 @@ make.motif.oc.matrix.from.fimo.output = function(fimo.out,
     motif.oc = t(motif.oc)
     
     options(scipen=999)
-    saveRDS(motif.oc, file = paste0(prefix, '_pval_', p, '.rds'))
+    #saveRDS(motif.oc, file = paste0(prefix, '_pval_', p, '.rds'))
     options(scipen=0)
     
   }
@@ -867,6 +867,8 @@ make.motif.oc.matrix.from.fimo.output = function(fimo.out,
     motif.oc = xx;
     remove(xx)
   }
+  
+  return(motif.oc)
   
 }
 

@@ -25,7 +25,7 @@ RdataDir = paste0(resDir, '/Rdata')
 if(!dir.exists(resDir)) dir.create(resDir)
 if(!dir.exists(RdataDir)) dir.create(RdataDir)
 
-figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
+figureDir = '~/Dropbox (VBC)/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
 tableDir = paste0(figureDir, 'tables4plots/')
 
 annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
@@ -809,5 +809,75 @@ saveRDS(ggs, file = paste0(RdataDir, '/genes_DE.H3K27me3_HOXA13.targets_Meis.chi
 ggs$geneSymbol[!is.na(ggs$HoxA13.target)]
 ggs$geneSymbol[!is.na(ggs$Meis.chip.target)]
 ggs$geneSymbol[!is.na(ggs$Meis.ko.RNA.target)]
+
+
+#####################################################
+### Section: motif enrichment of DE gene promoters
+#####################################################
+require(ggplot2)
+require(tidyverse)
+library(ggrepel)
+library(pheatmap)
+library(RColorBrewer)
+source('Functions_atac.R')
+
+source('Functions_MARA.R')
+Process.fimo.output = FALSE
+if(Process.fimo.output){
+  fimo.out = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/motif_analysis/',
+                    'FIMO_H3K27me3_genePromoters/fimo_out/fimo.tsv')
+  
+  motif.oc = make.motif.oc.matrix.from.fimo.output(fimo.out = fimo.out, 
+                                                   pval = 0.0001)
+  saveRDS(motif.oc, file = paste0(RdataDir, '/H3K27me3_genePromoters_motif_oc_fimo_jaspar2022_pval.0.0001_v1.rds'))
+  
+}
+
+motif.oc = readRDS(file = paste0(RdataDir, '/H3K27me3_genePromoters_motif_oc_fimo_jaspar2022_pval.0.0001_v1.rds'))
+ggs = readRDS(file = paste0(RdataDir, '/genes_DE.H3K27me3.rds'))
+bed = read.table(file = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/', 
+                               'motif_analysis/peaks/',  'gene.23538_promoters_2kb.bed'))
+bed$crd = paste0(bed$V1, ':', bed$V2, '-', bed$V3)
+mm = match(rownames(motif.oc), bed$crd)
+rownames(motif.oc) = bed$V4[mm]
+
+ss.m = apply(motif.oc, 2, sum)
+motif.oc = motif.oc[ , which(ss.m>0)]
+
+ss.p = apply(motif.oc, 1, sum)
+motif.oc = motif.oc[which(ss.p>0), ]
+
+
+X = as.matrix(motif.oc)
+
+##########################################
+# enrichment analysis of regeneration-specific motifs 
+##########################################
+ids = get_geneID(ggs$gene)
+test = X[!is.na(match(rownames(X), ids)), ]
+
+enrich = rep(NA, length = ncol(X))
+names(enrich) = colnames(X)
+for(n in 1:length(enrich))
+{
+  # n = 1
+  cat(n, '\n')
+  dat <- data.frame(
+    "withHits" = c(length(which(test[,n]>0)), length(which(X[,n]>0))),
+    "noHits" =  c(length(which(test[,n]==0)), length(which(X[,n]==0))),
+    row.names = c("forground", "background"),
+    stringsAsFactors = FALSE
+  )
+  
+  enrich[n] = fisher.test(x = dat, 
+                          alternative = "greater")$p.value
+    
+}
+enrich = enrich[order(enrich)]
+enrich = data.frame(motif = names(enrich), pval = enrich, stringsAsFactors = FALSE)
+
+write.csv(enrich, file = paste0(tableDir, 'figure_1g_motifEnrichment.csv'), row.names = FALSE)
+
+
 
 
