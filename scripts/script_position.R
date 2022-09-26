@@ -1018,7 +1018,7 @@ peaks.sels[grep('HOXA13|MEIS|SHOX|HOX', peaks.sels$transcriptId), ]
 
 ####### top 30 promoter peaks
 ntop = 30
-ntop = nrow(peaks.sels)
+#ntop = nrow(peaks.sels)
 
 o1 = order(-peaks.sels$fdr.mean)
 peaks.sels = peaks.sels[o1[1:ntop], ]
@@ -1084,6 +1084,8 @@ pheatmap(test,
          filename = paste0(figureDir, '/heatmap_positionalPeaks_top30.promoters.pdf'), 
          width = 6, height = 5)
 
+saveRDS(ggs, file = paste0(RdataDir, '/positional_atac_promoters_top30.rds'))
+
 ##########################################
 # #### highlight the enhancers
 ##########################################
@@ -1130,6 +1132,8 @@ rownames(df) = colnames(yy.sels)
 sample_colors = c('springgreen4', 'steelblue2', 'gold2')
 names(sample_colors) = c('mUA', 'mLA', 'mHand')
 annot_colors = list(segments = sample_colors)
+
+saveRDS(rownames(test), file = paste0(RdataDir, '/positional_atac_enhancers_top50.rds'))
 
 gaps.col = c(3, 6, 9)
 pheatmap(test, 
