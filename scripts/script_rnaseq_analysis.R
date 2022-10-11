@@ -160,11 +160,11 @@ select = which(res$fdr.max> -log10(qv.cutoff) & abs(res$logFC.max)> 0)
 
 select = which(res$adj.P.Val_mHand.vs.mLA < qv.cutoff & abs(res$logFC_mHand.vs.mLA) > logfc.cutoff|
                  res$adj.P.Val_mHand.vs.mUA < qv.cutoff & abs(res$logFC_mHand.vs.mUA) > logfc.cutoff |
-                 res$adj.P.Val_mHand.vs.mLA < qv.cutoff & abs(res$logFC_mHand.vs.mLA) > logfc.cutoff )
+                 res$adj.P.Val_mLA.vs.mUA < qv.cutoff & abs(res$logFC_mLA.vs.mUA) > logfc.cutoff )
 # cat(length(select), ' positional genes found \n')
 cat(length(select), ' DE genes selected \n')
-
 ggs = ggs[select]
+
 
 cat(ggs[grep('MEIS', ggs)], '\n')
 print(intersect(ggs, tfs))
@@ -692,15 +692,14 @@ if(GO.term.enrich.Smartseq2){
   
   qv.cutoff = 0.05
   logfc.cutoff = 1
-  select = which(res$fdr.max> -log10(qv.cutoff) & abs(res$logFC.max)> 0)
   
-  select = which(res$adj.P.Val_mHand.vs.mLA < qv.cutoff & abs(res$logFC_mHand.vs.mLA) > logfc.cutoff|
-                   res$adj.P.Val_mHand.vs.mUA < qv.cutoff & abs(res$logFC_mHand.vs.mUA) > logfc.cutoff |
-                   res$adj.P.Val_mHand.vs.mLA < qv.cutoff & abs(res$logFC_mHand.vs.mLA) > logfc.cutoff )
+  select = which(res$padj_mHand.vs.mLA < qv.cutoff & abs(res$log2FoldChange_mHand.vs.mLA) > logfc.cutoff|
+                   res$padj_mHand.vs.mUA < qv.cutoff & abs(res$log2FoldChange_mHand.vs.mUA) > logfc.cutoff |
+                   res$padj_mLA.vs.mUA < qv.cutoff & abs(res$log2FoldChange_mLA.vs.mUA) > logfc.cutoff )
   # cat(length(select), ' positional genes found \n')
   cat(length(select), ' DE genes selected \n')
   
-    library(enrichplot)
+  library(enrichplot)
   library(clusterProfiler)
   library(openxlsx)
   library(ggplot2)
