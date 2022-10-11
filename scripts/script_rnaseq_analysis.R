@@ -690,7 +690,7 @@ if(GO.term.enrich.Smartseq2){
   write.csv2(res, file = paste0(tableDir, 'Smartseq2_matureSample_pairwiseComparison_all.csv'), 
               row.names = TRUE, quote = FALSE)
   
-  qv.cutoff = 0.05
+  qv.cutoff = 0.1
   logfc.cutoff = 1
   
   select = which(res$padj_mHand.vs.mLA < qv.cutoff & abs(res$log2FoldChange_mHand.vs.mLA) > logfc.cutoff|
@@ -699,12 +699,16 @@ if(GO.term.enrich.Smartseq2){
   # cat(length(select), ' positional genes found \n')
   cat(length(select), ' DE genes selected \n')
   
+  yy = res[select, ]
+  write.csv2(yy, file = paste0(tableDir, 'Smartseq2_matureSample_positionalGenes_log2FC.1_fdr0.1.csv'), 
+             row.names = TRUE, quote = FALSE)
+  
   library(enrichplot)
   library(clusterProfiler)
   library(openxlsx)
   library(ggplot2)
   library(stringr)
-  library(org.Hs.eg.db)
+  #library(org.Hs.eg.db)
   library(org.Mm.eg.db)
   
   firstup <- function(x) {
@@ -722,10 +726,6 @@ if(GO.term.enrich.Smartseq2){
     return(gg.expressed)
   }
   
-  res = readRDS(file = paste0("../results/microarray/Rdata/", 
-                              'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_limma.DE.stats.rds'))
-  yy = readRDS(file = paste0(RdataDir, 'microarray_positionalGenes_data.rds'))
-  
   # background
   bgs0 = unique(clean_geneNames(rownames(res)))
   
@@ -733,7 +733,8 @@ if(GO.term.enrich.Smartseq2){
   xx0 = xx0[which(xx0 != '' & xx0 != 'N/A' & !is.na(xx0))]
   bgs = unique(xx0)
   
-  gg.expressed = unique(clean_geneNames(rownames(yy)[which(yy$logFC_mHand.vs.mUA < 0)]))
+  # gg.expressed = unique(clean_geneNames(rownames(yy)[which(yy$logFC_mHand.vs.mUA < 0)]))
+  gg.expressed = unique(clean_geneNames(rownames(yy)))
   cat('# of genes --', length(gg.expressed), '\n')
   
   gg.expressed = firstup(tolower(gg.expressed))
@@ -758,37 +759,31 @@ if(GO.term.enrich.Smartseq2){
   ego <-  enrichGO(gene         = gene.df$ENSEMBL,
                    universe     = bgs0.df$ENSEMBL,
                    #universe     = bgs.df$ENSEMBL,
-                   OrgDb         = org.Hs.eg.db,
-                   #OrgDb         = org.Mm.eg.db,
+                   #OrgDb         = org.Hs.eg.db,
+                   OrgDb         = org.Mm.eg.db,
                    keyType       = 'ENSEMBL',
                    ont           = "BP",
                    pAdjustMethod = "BH",
-                   pvalueCutoff  = 0.1,
-                   qvalueCutoff  = 0.3, 
+                   pvalueCutoff  = 0.05,
+                   qvalueCutoff  = 0.2, 
                    minGSSize = 3)
   
   #head(ego)
   
   barplot(ego) + ggtitle("Go term enrichment for positional genes")
   
-  kegg = enrichKEGG(gene = gene.df$ENTREZID,
-                    organism = 'hsa', 
-                    keyType = 'kegg', 
-                    universe = bgs0.df$ENTREZID, 
-                    minGSSize = 5)
-  barplot(kegg)
-  
   #edox <- setReadable(ego, 'org.Mm.eg.db', 'ENSEMBL')
-  pdfname = paste0(figureDir, 'GOterm_postionalGenes_mUASpecific.pdf')
+  pdfname = paste0(figureDir, 'GOterm_postionalGenes_smartseq2.pdf')
   pdf(pdfname, width = 12, height = 8)
   par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
   
-  dotplot(ego, showCategory=30) + ggtitle("positional genes")
+  #dotplot(ego, showCategory=10) + ggtitle("smartseq2 positional genes")
+  barplot(ego, showCategory=10) + ggtitle("Go term enrichment for positional genes")
   
   dev.off()
   
-  write.csv(ego, file = paste0(tableDir, "GO_term_enrichmenet_for_positional_genes_Microarray.csv"), 
-            row.names = TRUE)  
+  #write.csv(ego, file = paste0(tableDir, "GO_term_enrichmenet_for_positional_genes_Microarray.csv"), 
+  #          row.names = TRUE)  
     
 }
 
