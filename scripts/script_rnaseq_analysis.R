@@ -32,9 +32,9 @@ resDir = paste0("../results/", version.Data)
 tfDir = '~/workspace/imp/positional_memory/results/motif_analysis'
 RdataDir = paste0(resDir, "/Rdata/")
 #shareDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/AkaneToJingkuiShareFiles/results_rnaseq/positional_genes'
-figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
+figureDir = '~/Dropbox (VBC)/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
 #tableDir = paste0(figureDir, 'tables4plots/')
-tableDir = paste0('/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/SupTables/')
+tableDir = paste0('~/Dropbox (VBC)/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/SupTables/')
 
 annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
                        'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
@@ -607,6 +607,7 @@ if(Test.mature.smartseq2){
   saveRDS(data.frame(cpm, res, stringsAsFactors = FALSE), 
        file = paste0("../results/RNAseq_data_used/Rdata/matureSamples_cpm_DEgenes_8selectedSamples.batch4_v47.hox.patch.rds"))
   
+  
   # load results from microarray with limma to compare with
   res = readRDS(file = paste0("../results/RNAseq_data_used/Rdata", 
                               "/matureSamples_cpm_DEgenes_8selectedSamples.batch4_v47.hox.patch.rds"))
@@ -673,6 +674,123 @@ if(Test.mature.smartseq2){
     cat(cor(yy[, 1], yy[, 2], use = "na.or.complete"), '\n')
     
   }
+  
+}
+
+##########################################
+# save smart-seq2 result and perform go term enrichment analysis 
+##########################################
+GO.term.enrich.Smartseq2 = FALSE
+if(GO.term.enrich.Smartseq2){
+  res = readRDS(file = paste0("../results/RNAseq_data_used/Rdata", 
+                              "/matureSamples_cpm_DEgenes_8selectedSamples.batch4_v47.hox.patch.rds"))
+    
+  res = res[order(res$padj_mHand.vs.mUA), ]
+  
+  write.csv2(res, file = paste0(tableDir, 'Smartseq2_matureSample_pairwiseComparison_all.csv'), 
+              row.names = TRUE, quote = FALSE)
+  
+  qv.cutoff = 0.05
+  logfc.cutoff = 1
+  select = which(res$fdr.max> -log10(qv.cutoff) & abs(res$logFC.max)> 0)
+  
+  select = which(res$adj.P.Val_mHand.vs.mLA < qv.cutoff & abs(res$logFC_mHand.vs.mLA) > logfc.cutoff|
+                   res$adj.P.Val_mHand.vs.mUA < qv.cutoff & abs(res$logFC_mHand.vs.mUA) > logfc.cutoff |
+                   res$adj.P.Val_mHand.vs.mLA < qv.cutoff & abs(res$logFC_mHand.vs.mLA) > logfc.cutoff )
+  # cat(length(select), ' positional genes found \n')
+  cat(length(select), ' DE genes selected \n')
+  
+    library(enrichplot)
+  library(clusterProfiler)
+  library(openxlsx)
+  library(ggplot2)
+  library(stringr)
+  library(org.Hs.eg.db)
+  library(org.Mm.eg.db)
+  
+  firstup <- function(x) {
+    substr(x, 1, 1) <- toupper(substr(x, 1, 1))
+    x
+  }
+  
+  clean_geneNames = function(gg.expressed)
+  {
+    gg.expressed = unique(unlist(lapply(gg.expressed, 
+                                        function(x) { x = unlist(strsplit(as.character(x), '_'));  return(x[length(x)])})))
+    gg.expressed = unique(annot$gene.symbol.toUse[match(gg.expressed, annot$geneID)])
+    gg.expressed = gg.expressed[which(gg.expressed != '' & gg.expressed != 'N/A' & !is.na(gg.expressed))]
+    
+    return(gg.expressed)
+  }
+  
+  res = readRDS(file = paste0("../results/microarray/Rdata/", 
+                              'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_limma.DE.stats.rds'))
+  yy = readRDS(file = paste0(RdataDir, 'microarray_positionalGenes_data.rds'))
+  
+  # background
+  bgs0 = unique(clean_geneNames(rownames(res)))
+  
+  xx0 = unique(annot$gene.symbol.toUse)
+  xx0 = xx0[which(xx0 != '' & xx0 != 'N/A' & !is.na(xx0))]
+  bgs = unique(xx0)
+  
+  gg.expressed = unique(clean_geneNames(rownames(yy)[which(yy$logFC_mHand.vs.mUA < 0)]))
+  cat('# of genes --', length(gg.expressed), '\n')
+  
+  gg.expressed = firstup(tolower(gg.expressed))
+  bgs = firstup(tolower(bgs))
+  bgs0 = firstup(tolower(bgs0))
+  
+  gene.df <- bitr(gg.expressed, fromType = "SYMBOL",
+                  toType = c("ENSEMBL", "ENTREZID"),
+                  OrgDb = org.Mm.eg.db)
+  head(gene.df)
+  
+  bgs.df <- bitr(bgs, fromType = "SYMBOL",
+                 toType = c("ENSEMBL", "ENTREZID"),
+                 OrgDb = org.Mm.eg.db)
+  head(bgs.df)
+  
+  bgs0.df <- bitr(bgs0, fromType = "SYMBOL",
+                  toType = c("ENSEMBL", "ENTREZID"),
+                  OrgDb = org.Mm.eg.db)
+  
+  #pval.cutoff = 0.05
+  ego <-  enrichGO(gene         = gene.df$ENSEMBL,
+                   universe     = bgs0.df$ENSEMBL,
+                   #universe     = bgs.df$ENSEMBL,
+                   OrgDb         = org.Hs.eg.db,
+                   #OrgDb         = org.Mm.eg.db,
+                   keyType       = 'ENSEMBL',
+                   ont           = "BP",
+                   pAdjustMethod = "BH",
+                   pvalueCutoff  = 0.1,
+                   qvalueCutoff  = 0.3, 
+                   minGSSize = 3)
+  
+  #head(ego)
+  
+  barplot(ego) + ggtitle("Go term enrichment for positional genes")
+  
+  kegg = enrichKEGG(gene = gene.df$ENTREZID,
+                    organism = 'hsa', 
+                    keyType = 'kegg', 
+                    universe = bgs0.df$ENTREZID, 
+                    minGSSize = 5)
+  barplot(kegg)
+  
+  #edox <- setReadable(ego, 'org.Mm.eg.db', 'ENSEMBL')
+  pdfname = paste0(figureDir, 'GOterm_postionalGenes_mUASpecific.pdf')
+  pdf(pdfname, width = 12, height = 8)
+  par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+  
+  dotplot(ego, showCategory=30) + ggtitle("positional genes")
+  
+  dev.off()
+  
+  write.csv(ego, file = paste0(tableDir, "GO_term_enrichmenet_for_positional_genes_Microarray.csv"), 
+            row.names = TRUE)  
+    
 }
 
 ########################################################

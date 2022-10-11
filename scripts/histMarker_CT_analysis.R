@@ -438,6 +438,13 @@ design$unique.rmdup = as.numeric(design$unique.rmdup)
 jj = which(as.numeric(design$unique.rmdup) > 1000)
 design$unique.rmdup[jj] = design$unique.rmdup[jj]/10^6
 
+xx = design[order(design$condition), ]
+xx = xx[, c(3, 2, 8,13, 16)]
+colnames(xx)[c(3, 4)] = c('total.reads.in.million', 'usable.reads.in.million')
+
+write.csv2(xx, file = paste0(resDir, '/Akane_CutAndTag_QCs.csv'), col.names = TRUE,
+            row.names = FALSE, sep = '\t', quote = FALSE)
+
 ##########################################
 # filter peaks below certain thrshold of read counts
 ##########################################

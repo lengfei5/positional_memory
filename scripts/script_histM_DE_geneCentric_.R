@@ -873,6 +873,7 @@ for(n in 1:length(enrich))
                           alternative = "greater")$p.value
     
 }
+
 enrich = enrich[order(enrich)]
 enrich = data.frame(motif = names(enrich), pval = enrich, stringsAsFactors = FALSE)
 
