@@ -541,7 +541,7 @@ if(Test.mature.smartseq2){
   design$batch = droplevels(design$batch)
   table(design$condition, design$batch)
   
-  kk = which(design$condition != 'Mature_HEAD')
+  kk = which(design$condition != 'Mature_HEAD' & design$condition != 'Mature_LA') # excluding the LA and Head
   design = design[kk, ]
   dds = dds[, kk]
   dds$condition = droplevels(dds$condition)
@@ -566,7 +566,8 @@ if(Test.mature.smartseq2){
     geom_point(size=3) + 
     geom_text(hjust = 1, nudge_y = 1, size=2.5)
   
-  ggsave(paste0(resDir, '/PCA_smartseq2_matureSamples.pdf'),  width=12, height = 8)
+  ggsave(paste0(resDir, '/PCA_smartseq2_matureSamples_onlyUA.Hand.pdf'), 
+         width=12, height = 8)
   
   #ggsave(paste0(resDir, '/PCA_smartseq2_regeneration.timepoints_filteredSamples_onlyR10724.pdf'),  width=12, height = 8)
   
@@ -579,7 +580,7 @@ if(Test.mature.smartseq2){
   cpm = log2(cpm + 2^-4)
   
   colnames(cpm) = gsub('Mature_Hand', 'mHand', colnames(cpm))
-  colnames(cpm) = gsub('Mature_LA', 'mLA', colnames(cpm))
+  #colnames(cpm) = gsub('Mature_LA', 'mLA', colnames(cpm))
   colnames(cpm) = gsub('Mature_UA', 'mUA', colnames(cpm))
   
   dds$condition = droplevels(dds$condition)
@@ -593,13 +594,13 @@ if(Test.mature.smartseq2){
   colnames(res.ii) = paste0(colnames(res.ii), "_mHand.vs.mUA")
   res = data.frame(res.ii[, c(2, 5, 6)])
   
-  res.ii = results(dds, contrast=c("condition", 'Mature_Hand', 'Mature_LA'), alpha = 0.1)
-  colnames(res.ii) = paste0(colnames(res.ii), "_mHand.vs.mLA")
-  res = data.frame(res, res.ii[, c(2, 5, 6)])
-  
-  res.ii = results(dds, contrast=c("condition", 'Mature_LA', 'Mature_UA'), alpha = 0.1)
-  colnames(res.ii) = paste0(colnames(res.ii), "_mLA.vs.mUA")
-  res = data.frame(res, res.ii[, c(2, 5, 6)])
+  # res.ii = results(dds, contrast=c("condition", 'Mature_Hand', 'Mature_LA'), alpha = 0.1)
+  # colnames(res.ii) = paste0(colnames(res.ii), "_mHand.vs.mLA")
+  # res = data.frame(res, res.ii[, c(2, 5, 6)])
+  # 
+  # res.ii = results(dds, contrast=c("condition", 'Mature_LA', 'Mature_UA'), alpha = 0.1)
+  # colnames(res.ii) = paste0(colnames(res.ii), "_mLA.vs.mUA")
+  # res = data.frame(res, res.ii[, c(2, 5, 6)])
   
   res$gene = sapply(rownames(res), function(x) unlist(strsplit(as.character(x), '_'))[1])
   res$geneID = sapply(rownames(res), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
