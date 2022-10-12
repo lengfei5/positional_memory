@@ -509,7 +509,8 @@ plot_tf_network = function(link.list)
   if(length(nb_clusters)<=9) {
     library(khroma)
     muted <- colour("muted")
-    got_palette = c("#CC6677", "#332288", "#DDCC77", "#117733", "#88CCEE", "#882255", "#44AA99")[1:nb_clusters] 
+    got_palette = c("#CC6677", "#332288", "#DDCC77", "#117733", "#88CCEE", "#882255", "#44AA99", 
+                    "#999933", "#AA4499")[1:nb_clusters] 
   }else{
     cat('More than 9 colors needed \n')
     
@@ -555,6 +556,9 @@ plot_tf_network = function(link.list)
   saveRDS(trn, file = paste0(RdataDir, '/TRN_umap_layout.rds'))
   
   trn = readRDS(file = paste0(RdataDir, '/TRN_umap_layout.rds'))
+  nb_clusters = length(unique(V(trn)$cluster))
+  cat(nb_clusters, ' clusters used here \n')
+  got_palette = c("#CC6677", "#332288", "#DDCC77", "#117733", "#88CCEE", "#882255", "#44AA99", "#999999")
   
   #set.seed(2022)
   ggraph(trn, x=umap1, y=umap2) +
@@ -575,7 +579,7 @@ plot_tf_network = function(link.list)
     theme_graph() +
     #theme(legend.position = "bottom") 
     theme(legend.position = "none") 
-  ggsave(paste0(figureDir, "TRN_tfExpr.umap_connectivity.clusters_v6.pdf"), width=10, height = 10)
+  ggsave(paste0(figureDir, "TRN_tfExpr.umap_connectivity.clusters_v7.pdf"), width=10, height = 10)
   
   p1 = ggraph(trn, x=umap1, y=umap2) +
     geom_edge_link(aes(edge_width = weight), edge_colour = "gray80" ) +
@@ -869,6 +873,13 @@ build_subgraph_GRN = function(pp, subgroup = 'BL.day5')
   
   pal<-brewer.pal(nb_clusters, "Set3") # Vertex color assigned per each class number
   
+  # manuallly control the module color
+  modules_all = as.factor(unique(V(trn)$module))
+  modules_sub = as.factor(unique(V(sub_trn)$module))
+  
+  got_palette = c("#CC6677", "#332288", "#DDCC77", "#117733", 
+                  "#88CCEE", "#882255", "#44AA99", "#999999")[match(levels(modules_sub), levels(modules_all))]
+  
   V(sub_trn)$degree<-degree(sub_trn, mode = 'All')
   V(sub_trn)$degreeIn = degree(sub_trn, mode = 'in')
   V(sub_trn)$degreeOut = degree(sub_trn, mode = 'out')
@@ -882,7 +893,7 @@ build_subgraph_GRN = function(pp, subgroup = 'BL.day5')
     geom_node_point(aes(fill = module, size = degree), shape = 21) +
     scale_size_continuous(range = c(1, 7)) +
     #geom_node_text(aes(filter = size >= 20, label = name), family = "serif") +
-    #geom_node_text(aes(filter = size >= 20, label=name), size=6/ggplot2::.pt, repel=T, family = "serif")+
+    geom_node_text(aes(filter = size >= 10, label=name), size=6/ggplot2::.pt, repel=T, family = "serif")+
     scale_edge_width_continuous(range = c(0.05, 0.2)) +
     scale_edge_color_gradientn(colors=rev(brewer.pal(n=11, name="RdBu")), limits=c(0.01, 0.6)) +
     #scale_edge_alpha_continuous(range=c(0.05, 0.4), limits=c(2,20)) +
@@ -895,7 +906,8 @@ build_subgraph_GRN = function(pp, subgroup = 'BL.day5')
     #theme(legend.position = "bottom") 
     theme(legend.position = "none") 
   
-  ggsave(paste0(figureDir, "GRN_tfExpr.umap_connectivit.module_subgraph_", subgroup, ".pdf"), width=8, height = 6)
+  ggsave(paste0(figureDir, "GRN_tfExpr.umap_connectivit.module_subgraph_", subgroup, "_withGeneLabels.pdf"),
+         width=8, height = 6)
   
   library(viridis)
   ntop = 20

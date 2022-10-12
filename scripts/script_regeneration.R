@@ -185,7 +185,7 @@ if(grouping.temporal.peaks){
   ##########################################
   Make.Granges.and.peakAnnotation = TRUE
   if(Make.Granges.and.peakAnnotation){
-    # one enhancer defined by Akane: chr2p               880963799                  880966329
+    # one enhancer defined by Akane: chr2p:880963799-880966329
     gr <- GRanges(
       seqnames = Rle(c("chr2p", "chr7p"), c(1, 1)),
       ranges = IRanges(start = c(880963799, 216589802), end = c(880966329, 216590446), names = c('axe.R', 'Runx1.promoter')),
@@ -441,7 +441,29 @@ if(!Regeneration.peaks.clustering.DPGP)
   res = res[which(!is.na(res$clusters)), ]
   yy = yy[match(rownames(res), rownames(yy)), ]
   
-  res[match(names(loci), rownames(res)),]
+  Annotate.clustered.peaks = FALSE
+  if(Annotate.clustered.peaks){
+    pp = data.frame(t(sapply(rownames(yy), function(x) unlist(strsplit(gsub('_', ':', as.character(x)), ':')))))
+    pp$strand = '*'
+    pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
+                                  start.field="X2", end.field="X3", strand.field="strand")
+    
+    amex = GenomicFeatures::makeTxDbFromGFF(file = gtf.file)
+    pp.annots = annotatePeak(pp, TxDb=amex, tssRegion = c(-2000, 2000), level = 'transcript')
+    
+    pp.annots = as.data.frame(pp.annots)
+    rownames(pp.annots) = rownames(yy)
+    res = data.frame(res, pp.annots, stringsAsFactors = FALSE)
+    
+    kk1 = grep('HAND2|FGF8|SHH|FGF10|GREM1', res$transcriptId)
+    kk2 = grep('Distal', res$annotation, invert = TRUE)
+    kk1 = intersect(kk1, kk2)
+    
+    res[kk1, c(53, 59, 66:67)]
+    
+    
+  }
+  #res[match(names(loci), rownames(res)),]
   ######
   ### given the order of groups and order the peaks withinin groups using hclust
   ## find the row gap and order subclusters   

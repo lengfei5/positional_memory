@@ -28,8 +28,9 @@ if(!dir.exists(RdataDir)) dir.create(RdataDir)
 dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/'
 annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
 
-figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
-tableDir = paste0('/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/SupTables/')
+figureDir = '~/Dropbox (VBC)/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
+#tableDir = paste0(figureDir, 'tables4plots/')
+tableDir = paste0('~/Dropbox (VBC)/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/SupTables/')
 
 saveTables = FALSE
 
@@ -566,9 +567,9 @@ cres = cres[, c(1:4)]
 
 fc.cutoff = 0.7
 
+subgroup = 'mUA'
 sels = which(cres[, 1] - cres[, 2] > fc.cutoff &   cres[, 1] - cres[,3] > fc.cutoff & cres[, 1] - cres[, 4] > fc.cutoff)
 pp = rownames(cres)[sels]
-
 build_subgraph_GRN(pp, subgroup = 'mUA')
 
 ss = cres[, 2] - cres[, 1] 
@@ -578,13 +579,11 @@ build_subgraph_GRN(pp, subgroup = 'BL.day5')
 
 sels = which(cres[, 3] - cres[, 2] > fc.cutoff &  cres[, 3] - cres[,1] > fc.cutoff)
 pp = rownames(cres)[sels]
-
 subgroup = 'BL.day9'
 build_subgraph_GRN(pp, subgroup = 'BL.day9')
 
 sels = which(cres[, 4] - cres[, 3] > fc.cutoff &  cres[, 4] - cres[,1] > fc.cutoff)
 pp = rownames(cres)[sels]
-
 subgroup = 'BL.day13'
 build_subgraph_GRN(pp, subgroup = subgroup)
 
