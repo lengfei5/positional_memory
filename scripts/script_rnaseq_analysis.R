@@ -19,6 +19,7 @@ require(ggplot2)
 require(DESeq2)
 require(dplyr)
 require(gridExtra)
+require(RColorBrewer)
 
 version.Data = 'RNAseq_data_used';
 version.analysis = paste0("_", version.Data, "_20220408") # in the version 20220408, counts were done with update annot with Hox patch
@@ -206,7 +207,8 @@ pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
          cluster_cols=FALSE, annotation_col=df,
          annotation_colors = annot_colors,
          width = 6, height = 12, 
-         filename = paste0(figureDir, '/Fig2A_heatmap_DEgenes_matureSample_fdr.0.05_log2fc.1_microarray_nonScaled.pdf')) 
+         filename = paste0(figureDir, 
+                           '/Fig2A_heatmap_DEgenes_matureSample_fdr.0.05_log2fc.1_microarray_nonScaled.pdf')) 
 
 
 if(saveTables){
@@ -606,12 +608,14 @@ if(Test.mature.smartseq2){
   res$geneID = sapply(rownames(res), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[length(x)])})
   
   saveRDS(data.frame(cpm, res, stringsAsFactors = FALSE), 
-       file = paste0("../results/RNAseq_data_used/Rdata/matureSamples_cpm_DEgenes_8selectedSamples.batch4_v47.hox.patch.rds"))
+       file = paste0("../results/RNAseq_data_used/Rdata/matureSamples_cpm_DEgenes_', 
+                     '8selectedSamples.batch4_v47.hox.patch.rds"))
   
   
   # load results from microarray with limma to compare with
   res = readRDS(file = paste0("../results/RNAseq_data_used/Rdata", 
                               "/matureSamples_cpm_DEgenes_8selectedSamples.batch4_v47.hox.patch.rds"))
+  
   res0 = readRDS(file = paste0("../results/microarray/Rdata/", 
        'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_limma.DE.stats.rds'))
   
@@ -688,21 +692,22 @@ if(GO.term.enrich.Smartseq2){
     
   res = res[order(res$padj_mHand.vs.mUA), ]
   
-  write.csv2(res, file = paste0(tableDir, 'Smartseq2_matureSample_pairwiseComparison_all.csv'), 
+  write.csv2(res, file = paste0(tableDir, 'Smartseq2_matureSample_mUA.mHand_pairwiseComparison_all.csv'), 
               row.names = TRUE, quote = FALSE)
   
   qv.cutoff = 0.1
   logfc.cutoff = 1
   
-  select = which(res$padj_mHand.vs.mLA < qv.cutoff & abs(res$log2FoldChange_mHand.vs.mLA) > logfc.cutoff|
-                   res$padj_mHand.vs.mUA < qv.cutoff & abs(res$log2FoldChange_mHand.vs.mUA) > logfc.cutoff |
-                   res$padj_mLA.vs.mUA < qv.cutoff & abs(res$log2FoldChange_mLA.vs.mUA) > logfc.cutoff )
+  select = which(res$padj_mHand.vs.mUA < qv.cutoff & abs(res$log2FoldChange_mHand.vs.mUA) > logfc.cutoff)
+                 
   # cat(length(select), ' positional genes found \n')
   cat(length(select), ' DE genes selected \n')
   
   yy = res[select, ]
-  write.csv2(yy, file = paste0(tableDir, 'Smartseq2_matureSample_positionalGenes_log2FC.1_fdr0.1.csv'), 
+  write.csv2(yy, file = paste0(tableDir, 'Smartseq2_matureSample_mUA.mHand_positionalGenes_log2FC.1_fdr0.1.csv'), 
              row.names = TRUE, quote = FALSE)
+  
+  saveRDS(yy, file = paste0(RdataDir, 'Smartseq2_matureSample_mUA.mHand_positionalGenes_log2FC.1_fdr0.1.rds'))
   
   library(enrichplot)
   library(clusterProfiler)
@@ -774,7 +779,7 @@ if(GO.term.enrich.Smartseq2){
   barplot(ego) + ggtitle("Go term enrichment for positional genes")
   
   #edox <- setReadable(ego, 'org.Mm.eg.db', 'ENSEMBL')
-  pdfname = paste0(figureDir, 'GOterm_postionalGenes_smartseq2.pdf')
+  pdfname = paste0(figureDir, 'GOterm_postionalGenes_smartseq2_mUA_mHand.pdf')
   pdf(pdfname, width = 12, height = 8)
   par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
   
@@ -785,6 +790,46 @@ if(GO.term.enrich.Smartseq2){
   
   #write.csv(ego, file = paste0(tableDir, "GO_term_enrichmenet_for_positional_genes_Microarray.csv"), 
   #          row.names = TRUE)  
+  
+  ##########################################
+  # make a heatmap for smartseq2 
+  ##########################################
+  yy = readRDS(file = paste0(RdataDir, 'Smartseq2_matureSample_mUA.mHand_positionalGenes_log2FC.1_fdr0.1.rds'))
+  yy = as.matrix(yy[, c(3,4, 1,2)])
+  
+  df <- data.frame(condition = rep(c('mUA', 'mHand'), each = 2))
+  rownames(df) = colnames(yy)
+  colnames(df) = 'segments'
+  
+  annot_colors = c('springgreen4', 'gold2')
+  names(annot_colors) = c('mUA', 'mHand')
+  annot_colors = list(segments = annot_colors)
+  
+  sample_colors = c('springgreen4', 'gold2')
+  names(sample_colors) = c('mUA', 'mHand')
+  annot_colors = list(segments = sample_colors)
+  
+  pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+           color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(16), 
+           show_colnames = FALSE,
+           scale = 'row',
+           cluster_cols=FALSE, annotation_col=df,
+           annotation_colors = annot_colors,
+           width = 4, height = 10, 
+           treeheight_row = 20,
+           filename = paste0(figureDir, '/mUA.mHand_heatmap_DEgenes_fdr.0.1_log2fc.1_smartseq2.pdf')) 
+  
+  pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
+           color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(32), 
+           show_colnames = FALSE,
+           scale = 'none',
+           cluster_cols=FALSE, annotation_col=df,
+           annotation_colors = annot_colors,
+           width = 6, height = 12, 
+           filename = paste0(figureDir, '/mUA.mHand_heatmap_DEgenes_fdr.0.1_log2fc.1_smartseq2_nonScaled.pdf')) 
+  
+  
+  
     
 }
 
