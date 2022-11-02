@@ -496,7 +496,6 @@ Process.deeptools.heatmapTable = function()
   }
   
   features = c('atac','H3K4me3', 'H3K27me3', 'H3K4me1')
-  
   for(n in 1:length(features))
   {
     # n = 4
@@ -525,18 +524,21 @@ Process.deeptools.heatmapTable = function()
     #cols = colorRamp2(c(0.2, range), c("white", "#3794bf"))
     }
     
-    pdf(paste0(figureDir, "/positional_peaks_intensity_heatmap_", features[n], "_v2.pdf"),
+    pdf(paste0(figureDir, "/positional_peaks_intensity_heatmap_", features[n], "_test_v4.pdf"),
         width = 4, height = 10) # Open a new pdf file
     Heatmap(test, 
             cluster_rows = FALSE,
             cluster_columns = FALSE, 
             show_row_names = FALSE,
             show_column_names = FALSE,
-            row_split = splits,
+            row_split = splits, 
             cluster_column_slices = FALSE,
             column_split = factor(sample.sel, levels = c('mUA', 'mLA','mHand')),
             top_annotation = ha,
             show_heatmap_legend = TRUE,
+            use_raster = TRUE,
+            #raster_resize_mat = FALSE,
+            raster_by_magick = FALSE,
             #col = colorRamp2(seq(0, range, length.out = breaks), rev(brewer.pal(n=breaks, name="RdBu")))
             col = cols
             #name = "mtcars", #title of legend

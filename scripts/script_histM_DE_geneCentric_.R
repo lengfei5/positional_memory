@@ -26,7 +26,8 @@ if(!dir.exists(resDir)) dir.create(resDir)
 if(!dir.exists(RdataDir)) dir.create(RdataDir)
 
 figureDir = '~/Dropbox (VBC)/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
-tableDir = paste0(figureDir, 'tables4plots/')
+tableDir = paste0('~/Dropbox (VBC)/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/SupTables/')
+
 
 annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
 dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/histMod_CT_using/'
@@ -485,7 +486,8 @@ if(Plot_histMarkers_for_positionalATAC){
   ##########################################
   # select the genes based on the H3K27me3 
   ##########################################
-  res = readRDS(file = paste0(RdataDir, '/TSSgenebody_fpm_bc_TMM_combat_DBedgeRtest_all3histM_', version.analysis, '.rds'))
+  res = readRDS(file = paste0(RdataDir, '/TSSgenebody_fpm_bc_TMM_combat_DBedgeRtest_all3histM_',
+                              version.analysis, '.rds'))
   source('Functions_histM.R')
   
   ## select the significant peaks
@@ -525,6 +527,18 @@ if(Plot_histMarkers_for_positionalATAC){
   }
   
   colnames(yy) = nms
+  
+  if(saveTables){
+    test = data.frame(geneID = get_geneID(rownames(yy)), 
+                      gene = get_geneName(rownames(yy)), 
+                      yy, 
+                      yy0[, c(9:20)], stringsAsFactors = FALSE)
+    
+    write.csv2(test, file = paste0(tableDir, 'histM_DE_geneCentric_fdr0.1_log2fc.1_rpkm.max.0.6.csv'), 
+              row.names = FALSE)
+    
+  }
+  
   
   df = as.data.frame(sapply(colnames(yy), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[2])}))
   colnames(df) = 'segments'
@@ -613,6 +627,7 @@ if(Plot_histMarkers_for_positionalATAC){
            width = 4., height = 10, 
            filename = paste0(figureDir, 'heatmap_histoneMarker_geneCentric_DE_geneSymbols_v3.pdf'))
            
+  
   
 }
 

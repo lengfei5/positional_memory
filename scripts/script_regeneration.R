@@ -600,7 +600,7 @@ if(PLOT.global.dynamic.parameters.for.histM){
   rm(res)
   
   # import histone marker 
-  RdataHistM = '/Users/jiwang/workspace/imp/positional_memory/results/CT_merged_20220328/Rdata'
+  RdataHistM = '~/workspace/imp/positional_memory/results/CT_merged_20220328/Rdata'
   load(file = paste0(RdataHistM, '/combined_4histMarkers_overlapped55kATACseq_DE_regeneration_v2.Rdata')) # variable (keep and DE.locus)
   design = readRDS(file = paste0(RdataHistM, '/histM_CT_design_info.rds'))
   
@@ -646,7 +646,9 @@ if(PLOT.global.dynamic.parameters.for.histM){
     xx$clusters = res_atac$clusters
     xx$clusters = gsub('mc', 'c', xx$clusters)
     xx = xx[, c(30, 29, 1:28)]
-    write.csv(xx, file = paste0(tableDir, 'Dyanmic_atacseqPeaks_clustering_and_histM_new.csv'), row.names = TRUE)
+    write.csv2(xx, 
+               file = paste0(tableDir, 
+                             'Dynamic_atacseqPeaks_clustering_and_histM.csv'), row.names = TRUE)
      
   }
   

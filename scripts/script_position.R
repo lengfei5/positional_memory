@@ -32,7 +32,7 @@ annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotat
 gtf.file =  paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf')
 
 figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
-tableDir = paste0('/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/SupTables/')
+tableDir = paste0('~/Dropbox (VBC)/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/SupTables/')
 
 saveTables = FALSE
 
@@ -450,8 +450,15 @@ saveRDS(plt, file = paste0(RdataDir, '/postional_atacPeaks_heatmap_orderSaved.rd
 
 saveRDS(xx, file = paste0(resDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters_6.rds'))
 
-write.csv(xx, file = paste0(figureDir, '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters', 
-                            nb_clusters, '.csv'), quote = FALSE, row.names = TRUE)
+if(saveTables){
+  xx = readRDS(file = paste0(resDir, 
+                      '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters_6.rds'))
+  write.csv2(xx, file = paste0(tableDir, 
+                            '/matureSamples_ATACseq_position_dependent_peaks_rmPeaks.head_with.6clusters', 
+                            '.csv'), quote = FALSE, row.names = TRUE)
+  
+}
+
 
 ## save group bed of each cluster for deeptools heatmap
 Save.peak.groups.for.Deeptools = FALSE
@@ -1038,12 +1045,12 @@ yy.sels = as.matrix(yy.sels)
 if(saveTables){
   test = data.frame(peak = rownames(peaks.sels), gene = ggs, geneID = peaks.sels$geneId,  
                     yy.sels, stringsAsFactors = FALSE)
-  test = test[, c(1:6)]
-  test$specificSegment = 'mHand'
-  test$specificSegment[which(test$atac_mUA > test$atac_mHand)] = 'mUA'
-  test = test[, -c(4:6)]
+  #test = test[, c(1:6)]
+  #test$specificSegment = 'mHand'
+  #test$specificSegment[which(test$atac_mUA > test$atac_mHand)] = 'mUA'
+  #test = test[, -c(4:6)]
   
-  write.csv(test, file = paste0(tableDir, 'Figure1_allPromoter_segment_specific_atacPeak.csv'), 
+  write.csv2(test, file = paste0(tableDir, 'matureATACseq_segmentSpecific_promoterPeak_top30.csv'), 
               row.names = FALSE)
   
 }
@@ -1112,6 +1119,23 @@ ggs[!is.na(mm)] = geneSymbols$gene.symbol.toUse[mm[!is.na(mm)]]
 
 grep('HOX', ggs)
 
+if(saveTables)
+{
+  test = yy.sels
+  for(n in 1:length(conds))
+  {
+    ii = grep(conds[n], colnames(test))
+    test[, ii] = t(apply(test[,ii], 1, cal_centering))
+  }
+  
+  test = data.frame(peak = rownames(test), assignedGene = ggs, test, stringsAsFactors = FALSE)
+  
+  write.csv2(test, file = paste0(tableDir, 'matureATACseq_segmentSpecific_enhancerPeak_top50.csv'), 
+             row.names = FALSE)
+  
+}
+
+
 rownames(yy.sels) = ggs
 yy.sels = as.matrix(yy.sels)
 
@@ -1121,6 +1145,8 @@ for(n in 1:length(conds))
   ii = grep(conds[n], colnames(test))
   test[, ii] = t(apply(test[,ii], 1, cal_centering))
 }
+
+
 
 range <- 2.0
 test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))

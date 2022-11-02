@@ -9,7 +9,7 @@
 ##########################################################################
 rm(list = ls())
 
-source('functions_ExonsArray.R')
+#source('functions_ExonsArray.R')
 library(Biobase)
 #library(oligoClasses)
 #library(oligo)
@@ -121,7 +121,8 @@ save(design, raw, file = paste0(RdataDir, 'design_probeIntensityMatrix.Rdata'))
 ##########################################
 load(file = paste0(RdataDir, 'design_probeIntensityMatrix.Rdata'))
 
-mapping = fread('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/microarray_probes/AmexMA_v2-AmexT_v47.bed', 
+mapping = fread(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/microarray_probes/',
+                'AmexMA_v2-AmexT_v47.bed'), 
                 header=FALSE, stringsAsFactors=FALSE)
 colnames(mapping) = c('transcript', 'start', 'end', 'probeName', 'match', 'strand')
 

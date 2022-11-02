@@ -149,6 +149,9 @@ saveRDS(res, file = paste0("../results/microarray/Rdata/",
 res = readRDS(file = paste0("../results/microarray/Rdata/", 
 'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_limma.DE.stats.rds'))
 
+res = readRDS(file = paste0("../results/microarray/Rdata/", 
+'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_normalized_geneSummary_limma.DE.stats_RARB.rds'))
+
 ## manual change the gene annotation MEIS3
 rownames(res)[grep('AMEX60DD024424', rownames(res))]
 rownames(res)[grep('AMEX60DD024424', rownames(res))] = 'MEIS3_AMEX60DD024424' 
@@ -214,6 +217,20 @@ pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
 if(saveTables){
   source('Functions_histM.R')
   
+  yy = data.frame(geneID = get_geneID(rownames(res)),
+                  gene = get_geneName(rownames(res)), 
+                  res[, c(1:18)], stringsAsFactors = FALSE)
+  
+  write.csv2(yy,
+            file = paste0(tableDir, '/matureSamples_microarray_allGenes.csv'), 
+            quote = FALSE, row.names = FALSE)
+  
+  
+  write.csv2(yy[select, ],
+            file = paste0(tableDir, 
+                          '/matureSamples_microarray_positionalGenes_qv.0.05_log2FC.1.csv'), 
+            quote = FALSE, row.names = FALSE)
+  
   yy = readRDS(file = paste0(RdataDir, 'microarray_positionalGenes_data.rds'))
   yy = data.frame(gene = get_geneName(rownames(yy)), geneID = rownames(yy), 
                   specificSegment = 'mHand', yy, stringsAsFactors = FALSE)
@@ -233,9 +250,7 @@ if(saveTables){
            file = paste0(tableDir, '/MEIS_LRAT_FGF_geneList_microarray.csv'), 
            quote = FALSE, row.names = TRUE)
   
-  write.csv(res[select, ],
-            file = paste0(tableDir, '/position_dependent_genes_from_matureSamples_microarray_qv.0.05_log2FC.1.csv'), 
-            quote = FALSE, row.names = TRUE)
+
   
   yy = cal_sample_means(res[, c(1:9)], conds = c('mUA', 'mLA', 'mHand'))
   
@@ -245,13 +260,8 @@ if(saveTables){
             file = paste0(tableDir, '/allGenes_microarray.csv'), 
             quote = FALSE, row.names = TRUE)
   
-  yy = res
-  yy = yy[, c(1:18)]
   
-  write.csv(yy,
-            file = paste0(tableDir, '/allGenes_microarray.csv'), 
-            quote = FALSE, row.names = TRUE)
-  
+ 
   yy = yy[grep('WNT5', rownames(yy)), ]
   write.csv(yy,
             file = paste0(tableDir, '/Genes_microarray_geneExample_Wnt5A.B.csv'), 
@@ -279,7 +289,7 @@ library(clusterProfiler)
 library(openxlsx)
 library(ggplot2)
 library(stringr)
-library(org.Hs.eg.db)
+#library(org.Hs.eg.db)
 library(org.Mm.eg.db)
 
 firstup <- function(x) {
@@ -333,8 +343,8 @@ bgs0.df <- bitr(bgs0, fromType = "SYMBOL",
 ego <-  enrichGO(gene         = gene.df$ENSEMBL,
                  universe     = bgs0.df$ENSEMBL,
                  #universe     = bgs.df$ENSEMBL,
-                 OrgDb         = org.Hs.eg.db,
-                 #OrgDb         = org.Mm.eg.db,
+                 #OrgDb         = org.Hs.eg.db,
+                 OrgDb         = org.Mm.eg.db,
                  keyType       = 'ENSEMBL',
                  ont           = "BP",
                  pAdjustMethod = "BH",
@@ -547,6 +557,9 @@ if(Test.mature.smartseq2){
   design = design[kk, ]
   dds = dds[, kk]
   dds$condition = droplevels(dds$condition)
+  
+  write.csv2(design, file = paste0(tableDir, 'mature_smartseq2_sampleInfo.csv'),
+             row.names = FALSE)
    
   ss = rowSums(counts(dds))
   
@@ -704,6 +717,7 @@ if(GO.term.enrich.Smartseq2){
   cat(length(select), ' DE genes selected \n')
   
   yy = res[select, ]
+  
   write.csv2(yy, file = paste0(tableDir, 'Smartseq2_matureSample_mUA.mHand_positionalGenes_log2FC.1_fdr0.1.csv'), 
              row.names = TRUE, quote = FALSE)
   
@@ -779,12 +793,12 @@ if(GO.term.enrich.Smartseq2){
   barplot(ego) + ggtitle("Go term enrichment for positional genes")
   
   #edox <- setReadable(ego, 'org.Mm.eg.db', 'ENSEMBL')
-  pdfname = paste0(figureDir, 'GOterm_postionalGenes_smartseq2_mUA_mHand.pdf')
+  pdfname = paste0(figureDir, 'GOterm_postionalGenes_smartseq2_mUA_mHand_dotplot.pdf')
   pdf(pdfname, width = 12, height = 8)
   par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
   
-  #dotplot(ego, showCategory=10) + ggtitle("smartseq2 positional genes")
-  barplot(ego, showCategory=10) + ggtitle("Go term enrichment for positional genes")
+  dotplot(ego, showCategory=10) + ggtitle("smartseq2 positional genes")
+  #barplot(ego, showCategory=10) + ggtitle("Go term enrichment for positional genes")
   
   dev.off()
   
@@ -810,8 +824,9 @@ if(GO.term.enrich.Smartseq2){
   annot_colors = list(segments = sample_colors)
   
   pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
-           color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(16), 
+           color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
            show_colnames = FALSE,
+           breaks = seq(-2, 2, by = 0.5),
            scale = 'row',
            cluster_cols=FALSE, annotation_col=df,
            annotation_colors = annot_colors,
@@ -819,18 +834,35 @@ if(GO.term.enrich.Smartseq2){
            treeheight_row = 20,
            filename = paste0(figureDir, '/mUA.mHand_heatmap_DEgenes_fdr.0.1_log2fc.1_smartseq2.pdf')) 
   
-  pheatmap(yy, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 5,
-           color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(32), 
+  pheatmap(yy, cluster_rows=TRUE, show_rownames=TRUE, fontsize_row = 5,
+           color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
            show_colnames = FALSE,
-           scale = 'none',
+           scale = 'row',
+           breaks = seq(-2, 2, by = 0.5),
            cluster_cols=FALSE, annotation_col=df,
            annotation_colors = annot_colors,
-           width = 6, height = 12, 
-           filename = paste0(figureDir, '/mUA.mHand_heatmap_DEgenes_fdr.0.1_log2fc.1_smartseq2_nonScaled.pdf')) 
-  
-  
-  
+           width = 6, height = 18, 
+           treeheight_row = 20,
+           filename = paste0(figureDir, '/mUA.mHand_heatmap_DEgenes_fdr.0.1_log2fc.1_smartseq2_geneName.pdf')) 
     
+  source('Functions_histM.R')
+  require(pheatmap)
+  require(RColorBrewer)
+  ggs = get_geneName(rownames(yy))
+  rownames(yy) = ggs
+ 
+  pheatmap(yy, cluster_rows=TRUE, show_rownames=TRUE, fontsize_row = 5,
+           color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
+           show_colnames = FALSE,
+           scale = 'row',
+           breaks = seq(-2, 2, by = 0.5),
+           cluster_cols=FALSE, annotation_col=df,
+           annotation_colors = annot_colors,
+           width = 6, height = 20, 
+           treeheight_row = 20,
+           filename = paste0(figureDir, '/mUA.mHand_heatmap_DEgenes_fdr.0.1_log2fc.1_smartseq2_geneName_noAmex.pdf')) 
+  
+  
 }
 
 ########################################################
@@ -890,6 +922,8 @@ load(file = paste0(RdataDir, 'design_dds_all_regeneration_12selectedSamples_v47.
 #design$protocol = gsub(' ', '', design$protocol)
 #design$batch = paste0(design$request, '_', design$protocol)
 table(design$condition, design$batch)
+
+write.csv2(design, file = paste0(tableDir, 'regeneration_smartseq2_sampleInfo.csv'), row.names = FALSE)
 
 #sels = which(design$batch == 'R10724_smartseq2' & design$SampleID != '13615x')
 #sels = which(design$batch == 'R11635_smartseq2' | (design$batch == 'R10724_smartseq2' & design$SampleID != '13615x'))
@@ -1077,6 +1111,7 @@ if(saveTable){
   
   write.csv(sample.means[jj, ], file = paste0(tableDir, 'KDM6_LRAT_smartseq2_regeneration.csv'), row.names = TRUE)
   
+  
 }
 res$log2fc = apply(sample.means, 1, function(x) max(x) - min(x))
 res$maxs = apply(sample.means, 1, max)
@@ -1106,6 +1141,21 @@ select = which(
                  (res$padj_dpa13dist.vs.mUA < fdr.cutoff & abs(res$log2FoldChange_dpa13dist.vs.mUA) > logfc.cutoff))
 
 cat(length(select), ' DE genes \n')
+
+if(saveTables){
+  source('Functions_histM.R')
+  test = data.frame(geneID = get_geneID(rownames(res)), 
+                    gene = get_geneName(rownames(res)), 
+                    cpm, res, stringsAsFactors = FALSE)
+  test = test[, c(1:27)]
+  
+  write.csv2(test,
+             file = paste0(tableDir, '/regenerationSamples_Smartseq2_fdr0.05_log2fc.1.csv'), 
+             quote = FALSE, row.names = FALSE)
+  
+  
+}
+
 #gg.select = rownames(res)[select]
 #saveRDS(gg.select, file = paste0(RdataDir, 'RRGs_candidates_tempList.rds'))
 
