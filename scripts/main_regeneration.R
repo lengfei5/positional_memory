@@ -29,8 +29,8 @@ if(!dir.exists(RdataDir)) dir.create(RdataDir)
 dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/atacseq_using/'
 annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
 
-figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
-tableDir = paste0('/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/SupTables/')
+figureDir = '~/Dropbox (VBC)/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
+tableDir = paste0('~/Dropbox (VBC)/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/SupTables/')
 
 saveTables = FALSE
 
@@ -168,6 +168,8 @@ if(grouping.temporal.peaks){
   fpm = readRDS(file = paste0(RdataDir, '/fpm.bc_TMM_combat_mUA_regeneration_dev_2Batches.R10723_R7977_', version.analysis, '.rds'))
   design = readRDS(file = paste0(RdataDir, '/design_sels_bc_TMM_combat_mUA_regeneration_dev_2Batches.R10723_R7977',
                                  version.analysis, '.rds'))
+  
+  write.csv2(design, file = paste0(tableDir, 'RegDev_atac_sampelInfos.csv'), row.names = FALSE)
   
   # prepare the background distribution
   fpm.bg = fpm[grep('bg_', rownames(fpm), invert = FALSE), ]
@@ -358,6 +360,11 @@ for(n in 1:length(conds)) {
 }
 
 keep = keep[, sample.sels]
+
+#mm = match(colnames(keep), design$samples)
+#design = design[mm, ]
+
+
 sample.means = sample.means[match(rownames(keep), rownames(sample.means)), ]
 
 saveRDS(sample.means, paste0(RdataDir, '/sampleMean_regeneration_peaks_beforeScaling_GPDPclustering.rds'))

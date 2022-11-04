@@ -31,7 +31,7 @@ dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memo
 annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
 gtf.file =  paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf')
 
-figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
+figureDir = '~/Dropbox (VBC)/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
 tableDir = paste0('~/Dropbox (VBC)/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/SupTables/')
 
 saveTables = FALSE
@@ -354,6 +354,12 @@ source('Functions_histM.R')
 ### load the previous result: xx (test result and peak annotation) and keep (log2 data of mature samples)
 load(file = paste0(RdataDir, '/ATACseq_positionalPeaks_excluding.headControl', version.analysis, '.Rdata'))
 conds = c("Mature_UA", "Mature_LA", "Mature_Hand")
+
+# design = readRDS(file = paste0(RdataDir, 
+#                                '/design_sels_bc_TMM_combat_MatureSamples_batch2019.2020.2021.2021S.2022.rds'))
+# design = design[grep('102657|102655|74938', design$SampleID, invert = TRUE), ]
+# 
+# write.csv2(design, file = paste0(tableDir, 'atac_mature_sampleInfo.csv'), row.names = FALSE)
 
 # saveRDS(keep, file = paste0(RdataDir, '/positional_peakSignals.rds'))
 pp = data.frame(t(sapply(rownames(xx), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))

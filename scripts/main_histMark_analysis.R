@@ -25,8 +25,8 @@ RdataDir = paste0(resDir, '/Rdata')
 if(!dir.exists(resDir)) dir.create(resDir)
 if(!dir.exists(RdataDir)) dir.create(RdataDir)
 
-figureDir = '/Users/jiwang/Dropbox/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
-tableDir = paste0(figureDir, 'tables4plots/')
+figureDir = '~/Dropbox (VBC)/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
+tableDir = paste0('~/Dropbox (VBC)/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/SupTables/')
 
 annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
 dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/histMod_CT_using/'
@@ -444,6 +444,11 @@ colnames(xx)[c(3, 4)] = c('total.reads.in.million', 'usable.reads.in.million')
 
 write.csv2(xx, file = paste0(resDir, '/Akane_CutAndTag_QCs.csv'), col.names = TRUE,
             row.names = FALSE, sep = '\t', quote = FALSE)
+
+xx = design[grep('H3K27ac', design$marks, invert = TRUE), ]
+yy = design[grep('H3K27ac', design$marks, invert = FALSE), ]
+
+write.csv2(xx, file = paste0(tableDir, 'CT_histM_sampleInfos.csv'), row.names = FALSE)
 
 ##########################################
 # filter peaks below certain thrshold of read counts
