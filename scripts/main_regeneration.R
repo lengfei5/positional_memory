@@ -30,7 +30,7 @@ dataDir = '/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memo
 annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/'
 
 figureDir = '~/Dropbox (VBC)/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
-tableDir = paste0('~/Dropbox (VBC)/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/SupTables/')
+tableDir = paste0('~/Dropbox (VBC)/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/SupTables/')
 
 saveTables = FALSE
 
@@ -374,6 +374,24 @@ cal_z_score <- function(x){
 }
 
 yy <- t(apply(sample.means, 1, cal_z_score))
+
+if(saveTables)
+{
+  res = readRDS(file = paste0(RdataDir, 
+                              '/renegeration_dynamicPeaks_GPDPclustering.merged.extended_manualBCcorrected.rds'))
+  res = res[which(!is.na(res$clusters)), ]
+  yy = yy[match(rownames(res), rownames(yy)), ]
+  
+  mm = match(rownames(res), rownames(sample.means))
+  xx = sample.means[mm, ]
+  
+  res = res[, -c(21:27,51:52)]
+  write.csv2(res, 
+             file = paste0(tableDir, 
+                           'Dynamic_atacseqPeaks_clustering.csv'), row.names = TRUE)
+  
+  
+}
 
 df <- data.frame(conds)
 rownames(df) = colnames(yy)
@@ -3364,3 +3382,70 @@ ggraph(g, layout='tree', circular=TRUE) +
   theme_void()
 
 ggsave(paste0(figureDir, "crossSpecies_RUNX_targets.pdf"), width=7, height = 4)
+
+
+########################################################
+########################################################
+# Section : addtional utility analysis 
+# 
+########################################################
+########################################################
+meta = read.csv2(file = paste0(tableDir, 'metadata/atac_mature_sampleInfo.csv'))
+xx = read.csv(file = paste0(resDir, '/R11637_R12810_atac_QCs_stats.csv'))
+
+mm = match(xx$sampleID, meta$SampleID)
+
+yy = readRDS(file = paste0(RdataDir, '/design_merged_technicalReplicates_Rxxxx_R10723_R11637_R12810.rds'))
+
+load((paste0(RdataDir, '/R11637_atacseq_samples_design_stats.Rdata')))
+
+xx = read.csv2(file = paste0(tableDir, 'metadata/CT_histM_sampleInfos.csv'))
+xx = xx[,c(1, 2, 3, 5, 7, 8, 10, 12, 13)]
+
+for(n in c(6:9))
+{
+  test = as.numeric(as.character(xx[,n]))
+  test[which(test<10^6)] = test[which(test<10^6)]*10^6
+  xx[,n] = test
+}
+
+write.csv2(xx, file = paste0(tableDir, 'metadata/CT_histM_sampleInfos_correctedNumbers.csv'))
+
+
+xx = read.csv2(file = paste0(tableDir, 'metadata/smartseq2_mature_sampleInfo.csv'))
+xx2 = read.csv2(file = paste0(tableDir, 'metadata/smartseq2_reg_sampleInfo.csv'))
+
+xx = xx[, c(1:3)]
+xx2 = xx2[, c(1,2, 6)]
+
+xx = rbind(xx2, xx)
+
+yy = read.csv(file = paste0('/Users/jingkui.wang/workspace/imp/positional_memory/results/rnaseq_RNAseqSamples_all/',
+  'designSampleInfos_QCstat.csv'))
+
+mm = match(xx$SampleID, yy$SampleID)
+
+xx$total.reads = NA
+xx$uniqe.aligned = NA
+xx$assigned = NA
+xx$total.reads = yy$total.reads[mm]
+xx$uniqe.aligned = yy$unique.aligned[mm]
+xx$assigned = yy$assigned.reads[mm]
+
+yy = read.csv(file = paste0('~/workspace/imp/positional_memory/results/rnaseq_RNAseqSamples_all/',
+                            'QCs_stats_R161513.csv'), header = TRUE, sep = ',', dec = '.', quote = "")
+
+colnames(yy)[1] = 'sampleID'
+yy$sampleID = gsub('"', '', yy$sampleID)
+
+jj = which(is.na(xx$total.reads))
+mm = match(xx$SampleID[jj], yy$sampleID)
+yy = yy[mm, ]
+yy = yy[, c(1, 2, 7, 10, 12)]
+
+xx$total.reads[jj] = yy$X..total.reads..
+xx$uniqe.aligned[jj] = yy$X..unique.aligned..
+xx$assigned[jj] = gsub('"', '', yy$X..assigned.reads...)
+
+write.csv2(xx, file = paste0(tableDir, 'metadata/smartseq2_sampleInfos_correctedNumbers.csv'))
+

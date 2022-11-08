@@ -65,16 +65,17 @@ write.csv2(metadata, file = 'allSamples_merged.csv', row.names = FALSE)
 ##########################################
 # from sample ID to find associated raw data and processed data 
 ##########################################
-raw_list = list.files(path = 'geo_submission_positionMemory', pattern = '*.bam$', 
-                      full.names = TRUE, recursive = TRUE, include.dirs = TRUE)
-raw_list = c(raw_list, 
-            list.files(path = 'geo_submission_positionMemory', pattern = '*.fastq.gz$', 
-                                 full.names = TRUE, recursive = TRUE, include.dirs = TRUE))
+metadata = readRDS(file = 'allSamples_merged_processed.raw.files.rds')
+#metadata = read.csv2(file = 'allSamples_merged.csv')
+metadata$pairend = 'paired-end'
 
+#raw_list = list.files(path = 'geo_submission_positionMemory', pattern = '*.bam$', 
+#                      full.names = TRUE, recursive = TRUE, include.dirs = TRUE)
+raw_list = list.files(path = 'geo_submission_positionMemory', pattern = '*.fastq.gz$', 
+                                 full.names = TRUE, recursive = TRUE, include.dirs = TRUE)
 raw_list = c(raw_list, 
              list.files(path = 'geo_submission_positionMemory', pattern = '*.fq.gz$', 
                         full.names = TRUE, recursive = TRUE, include.dirs = TRUE))
-
 
 processed_list = list.files(path = 'geo_submission_positionMemory', pattern = '*.bw$', 
                         full.names = TRUE, recursive = TRUE, include.dirs = TRUE)
@@ -135,67 +136,110 @@ for(n in 1:nrow(metadata))
 metadata$nb_raw = nb_raw
 
 
+#metadata$pairend = 'paired-end'
+#metadata$pairend[which(metadata$protocol == 'smartseq2')] = 'single-end'
+metadata = metadata[, c(1:5, 8, 6,7,9:12)]
 
-metadata$pairend = 'paired-end'
-metadata$pairend[which(metadata$protocol == 'smartseq2')] = 'single-end'
-metadata = metadata[, c(1:5, 8, 6,7,9:11)]
-
-
-write.csv2(metadata, file = 'allSamples_merged_processed_raw.csv', row.names = FALSE)
+# write.csv2(metadata, file = 'allSamples_merged_processed_raw.csv', row.names = FALSE)
 saveRDS(metadata, file = 'allSamples_merged_processed.raw.files.rds')
 
 write.csv2(pair_files,  file = 'paired_end_files.csv', 
-           row.names = FALSE, quote = FALSE, col.names = FALSE)
-
-
-
+           row.names = FALSE, quote = FALSE)
 
 ##########################################
 # get md5sum of processed files and raw data 
 ##########################################
-raw.md5 = read.delim("md5sum_processed.file", header = FALSE, sep = ' ')
-
-# here pair-end raw data and 2 fastq for one samples
-samples = matrix(NA, ncol = 2, nrow = nrow(raw.md5))
-samples = data.frame(samples)
-colnames(samples) = c('file', 'md5sum')
-
-
-for(n in 1:nrow(raw.md5)){
-  cat(n, '--')
-  cat(raw.md5$V3[n], '\n')
-  samples$file[n] = basename(as.character(raw.md5$V3[n]))
-  samples$md5sum[n] = as.character(raw.md5$V1[n])
+Process.md5sum.raw.processedFiles = TRUE
+if(Process.md5sum.raw.processedFiles){
+  raw.md5 = read.delim("md5sum_processed.file", header = FALSE, sep = ' ')
+  
+  # here pair-end raw data and 2 fastq for one samples
+  samples = matrix(NA, ncol = 2, nrow = nrow(raw.md5))
+  samples = data.frame(samples)
+  colnames(samples) = c('file', 'md5sum')
+  
+  for(n in 1:nrow(raw.md5)){
+    cat(n, '--')
+    cat(raw.md5$V3[n], '\n')
+    samples$file[n] = basename(as.character(raw.md5$V3[n]))
+    samples$md5sum[n] = as.character(raw.md5$V1[n])
+    
+  }
+  
+  write.csv2(samples,  file = 'md5sum_processed_files.csv', 
+             row.names = FALSE, quote = FALSE)
+  
+  
+  raw.md5 = read.delim("md5sum_raw.file", header = FALSE, sep = ' ')
+  
+  # here pair-end raw data and 2 fastq for one samples
+  samples = matrix(NA, ncol = 2, nrow = nrow(raw.md5))
+  samples = data.frame(samples)
+  colnames(samples) = c('file', 'md5sum')
+  
+  
+  for(n in 1:nrow(raw.md5)){
+    cat(n, '--')
+    cat(raw.md5$V3[n], '\n')
+    samples$file[n] = basename(as.character(raw.md5$V3[n]))
+    samples$md5sum[n] = as.character(raw.md5$V1[n])
+    
+  }
+  
+  write.csv2(samples,  file = 'md5sum_raw_files.csv', 
+             row.names = FALSE, quote = FALSE)
   
 }
 
-write.csv2(samples,  file = 'md5sum_processed_files.csv', 
+
+##########################################
+# split submission into CT, atac, RNAseq
+##########################################
+metadata = readRDS(file = 'allSamples_merged_processed.raw.files.rds')
+
+#protocol.sel = 'smartseq2'
+#protocol.sel = 'CT'
+protocol.sel = 'atac'
+
+metadata = metadata[which(metadata$protocol == protocol.sel), ] 
+
+## save paired-end files and also metadata
+pair_files = read.csv2(file = 'paired_end_files.csv')
+ids = sapply(pair_files$V1, function(x) {unlist(strsplit(as.character(x), '_'))[1]})
+
+mm = match(ids, metadata$SampleID)
+mm = which(!is.na(mm))
+
+pair_files = pair_files[mm, ]
+
+write.csv2(pair_files,  file = paste0('paired_end_files_', protocol.sel, '.csv'), 
            row.names = FALSE, quote = FALSE)
+write.csv2(metadata, file = paste0('metadata_info_', protocol.sel, '.csv'))
 
-
-raw.md5 = read.delim("md5sum_raw.file", header = FALSE, sep = ' ')
-
-# here pair-end raw data and 2 fastq for one samples
-samples = matrix(NA, ncol = 2, nrow = nrow(raw.md5))
-samples = data.frame(samples)
-colnames(samples) = c('file', 'md5sum')
-
-
-for(n in 1:nrow(raw.md5)){
-  cat(n, '--')
-  cat(raw.md5$V3[n], '\n')
-  samples$file[n] = basename(as.character(raw.md5$V3[n]))
-  samples$md5sum[n] = as.character(raw.md5$V1[n])
-  
+## save md5sum for processed file and also raw files 
+md5.processed = read.csv2(file = 'md5sum_processed_files.csv')
+md5.raw = read.csv2(file = 'md5sum_raw_files.csv')
+index_processed = c()
+index_raw = c()
+for(n in 1:nrow(metadata))
+{
+  index_processed = c(index_processed, grep(metadata$SampleID[n], md5.processed$file))
+  index_raw = c(index_raw, grep(metadata$SampleID[n], md5.raw$file))
 }
 
-write.csv2(samples,  file = 'md5sum_raw_files.csv', 
+write.csv2(md5.processed[index_processed, ], file = paste0('md5sum_processed_files_', protocol.sel, '.csv'), 
+           row.names = FALSE, quote = FALSE)
+
+write.csv2(md5.raw[index_raw, ], file = paste0('md5sum_raw_files_', protocol.sel, '.csv'), 
            row.names = FALSE, quote = FALSE)
 
 
-##########################################
-# collect raw data  
-##########################################
+########################################################
+########################################################
+# Section : collect raw data
+# 
+########################################################
+########################################################
 Data.Collection = FALSE
 if(Data.Collection){
   copyDir = 'geo_submission_25june'

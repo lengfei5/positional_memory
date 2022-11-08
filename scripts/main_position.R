@@ -32,7 +32,7 @@ annotDir = '/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotat
 gtf.file =  paste0(annotDir, 'ax6_UCSC_2021_01_26.gtf')
 
 figureDir = '~/Dropbox (VBC)/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/plots_4figures/' 
-tableDir = paste0('~/Dropbox (VBC)/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/SupTables/')
+tableDir = paste0('~/Dropbox (VBC)/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/SupTables/')
 
 saveTables = FALSE
 
@@ -370,6 +370,7 @@ pp = makeGRangesFromDataFrame(pp, seqnames.field=c("X1"),
 # make.pca.plots(keep, ntop = 1246, conds.plot = 'Mature')
 rep.sels = grep('HEAD|102657|102655|74938', colnames(keep), invert = TRUE)
 yy = keep[, rep.sels]
+
 yy <- t(apply(yy, 1, cal_z_score))
 #saveRDS(yy, file = paste0(RdataDir, '/positional_atacPeaks_data_3reps_forHeatmap.rds'))
 
@@ -459,6 +460,9 @@ saveRDS(xx, file = paste0(resDir, '/position_dependent_peaks_from_matureSamples_
 if(saveTables){
   xx = readRDS(file = paste0(resDir, 
                       '/position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters_6.rds'))
+  
+  xx = xx[, c(1:12)]
+  xx = data.frame(yy, xx, stringsAsFactors = FALSE)
   write.csv2(xx, file = paste0(tableDir, 
                             '/matureSamples_ATACseq_position_dependent_peaks_rmPeaks.head_with.6clusters', 
                             '.csv'), quote = FALSE, row.names = TRUE)
