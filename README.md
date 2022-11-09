@@ -1,9 +1,8 @@
 # Chromatin states at homeoprotein loci distinguish axolotl limb segments prior to regeneration
 
-<br><br> ![](doc/positional_model.png) <br><br>
 
 <p align="center">
-  <img width="460" height="300" src="doc/positional_model.png">
+  <img width="250" height="200" src="doc/positional_model.png">
 </p>
 
 
