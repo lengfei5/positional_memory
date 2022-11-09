@@ -2,7 +2,7 @@
 
 
 <p align="center">
-  <img width="250" height="200" src="doc/positional_model.png">
+  <img width="350" height="200" src="doc/positional_model.png">
 </p>
 
 
