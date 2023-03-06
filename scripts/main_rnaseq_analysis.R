@@ -1106,13 +1106,13 @@ colnames(sample.means) = conds
 cpm = cpm[, sample.sels]
 
 
-if(saveTable){
-  jj = grep('^KDM6|^LRAT_', rownames(sample.means))
-  
-  write.csv(sample.means[jj, ], file = paste0(tableDir, 'KDM6_LRAT_smartseq2_regeneration.csv'), row.names = TRUE)
-  
-  
-}
+# if(saveTable){
+#   jj = grep('^KDM6|^LRAT_', rownames(sample.means))
+#   
+#   write.csv(sample.means[jj, ], file = paste0(tableDir, 'KDM6_LRAT_smartseq2_regeneration.csv'), row.names = TRUE)
+#   
+#   
+# }
 res$log2fc = apply(sample.means, 1, function(x) max(x) - min(x))
 res$maxs = apply(sample.means, 1, max)
 res$mins = apply(sample.means, 1, min)
@@ -1147,7 +1147,8 @@ if(saveTables){
   test = data.frame(geneID = get_geneID(rownames(res)), 
                     gene = get_geneName(rownames(res)), 
                     cpm, res, stringsAsFactors = FALSE)
-  test = test[, c(1:27)]
+  test = test[select, c(1:27)]
+  test = test[, grep('_LRT', colnames(test), invert = TRUE)]
   
   write.csv2(test,
              file = paste0(tableDir, '/regenerationSamples_Smartseq2_fdr0.05_log2fc.1.csv'), 

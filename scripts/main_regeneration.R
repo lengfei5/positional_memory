@@ -377,18 +377,29 @@ yy <- t(apply(sample.means, 1, cal_z_score))
 
 if(saveTables)
 {
+  sample.means = readRDS(paste0(RdataDir, '/sampleMean_regeneration_peaks_beforeScaling_GPDPclustering.rds'))
+
   res = readRDS(file = paste0(RdataDir, 
                               '/renegeration_dynamicPeaks_GPDPclustering.merged.extended_manualBCcorrected.rds'))
   res = res[which(!is.na(res$clusters)), ]
-  yy = yy[match(rownames(res), rownames(yy)), ]
+  #yy = yy[match(rownames(res), rownames(yy)), ]
   
   mm = match(rownames(res), rownames(sample.means))
   xx = sample.means[mm, ]
   
   res = res[, -c(21:27,51:52)]
-  write.csv2(res, 
+  
+  xx = data.frame(xx, stringsAsFactors = FALSE)
+  xx$clusters = res$clusters[match(rownames(xx), rownames(res))]
+  
+  write.csv2(xx, 
              file = paste0(tableDir, 
                            'Dynamic_atacseqPeaks_clustering.csv'), row.names = TRUE)
+  
+  write.table(res, 
+              file = paste0(tableDir, 
+                                 'Dynamic_atacseqPeaks_clustering.txt'), 
+              row.names = TRUE, col.names = TRUE)
   
   
 }

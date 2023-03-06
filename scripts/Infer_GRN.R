@@ -327,7 +327,7 @@ if(Manual_correction_motif_tf_association){
   
   mapping = mapping[-idx.rm, ]
   saveRDS(mapping, file = '../data/JASPAR2022_CORE_UNVALIDED_vertebrates_nonRedundant_metadata_manual_rmRedundantUNVALIDED.rds')
-    
+  
 }
 
 ##########################################
