@@ -20,7 +20,7 @@ figureDir = paste0('~/Dropbox (VBC)/Group Folder Tanaka/Collaborations/Akane/Jin
 tableDir = paste0('~/Dropbox (VBC)/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/SupTables/')
 
 ##########################################
-# gene examples of smartseq2 and microarray data
+# Reviewer 1 (#1) gene examples of smartseq2 and microarray data 
 ##########################################
 res = readRDS(file = paste0("../results/microarray/Rdata/", 
                             'design_probeIntensityMatrix_probeToTranscript.geneID.geneSymbol_',
@@ -98,6 +98,184 @@ for(n in 1:length(gene_examples)){
   }
 }
 
+##########################################
+# Reviewer 1 (#3) 
+##########################################
+source('functions_chipSeq.R')
+source('Functions_atac.R')
+require(ggplot2)
+require(DESeq2)
+require(GenomicRanges)
+require(pheatmap)
+library(tictoc)
+library(ggrepel)
+library(dplyr)
+library(tibble)
+library(reshape2)
+library(tidyverse)
+
+res = readRDS(paste0("../results/CT_merged_20220328/Rdata/TSSgenebody_fpm_bc_TMM_combat_DBedgeRtest",
+                     "_all3histM_CT_merged_20220328.rds"))
+
+source('Functions_histM.R')
+
+## select the significant peaks with all three marks
+fdr.cutoff = 0.1; logfc.cutoff = 1
+
+select1 = 
+  which(((res$adj.P.Val.mLA.vs.mUA.H3K27me3 < fdr.cutoff & abs(res$logFC.mLA.vs.mUA.H3K27me3) > logfc.cutoff) |
+          (res$adj.P.Val.mHand.vs.mUA.H3K27me3 < fdr.cutoff & abs(res$logFC.mHand.vs.mUA.H3K27me3) > logfc.cutoff)|
+          (res$adj.P.Val.mHand.vs.mLA.H3K27me3 < fdr.cutoff & abs(res$logFC.mHand.vs.mLA.H3K27me3) > logfc.cutoff)
+         ) & res$max_rpkm.H3K27me3> 0.6)
+
+select2 = 
+  which(((res$adj.P.Val.mLA.vs.mUA.H3K4me1 < fdr.cutoff & abs(res$logFC.mLA.vs.mUA.H3K4me1) > logfc.cutoff) |
+          (res$adj.P.Val.mHand.vs.mLA.H3K4me1 < fdr.cutoff & abs(res$logFC.mHand.vs.mLA.H3K4me1) > logfc.cutoff) |
+          (res$adj.P.Val.mHand.vs.mUA.H3K4me1 < fdr.cutoff & abs(res$logFC.mHand.vs.mUA.H3K4me1) > logfc.cutoff)
+  ) & res$max_rpkm.H3K4me1 > 0.6)
+
+select3 = 
+  which(((res$adj.P.Val.mHand.vs.mLA.H3K4me3 < fdr.cutoff & abs(res$logFC.mHand.vs.mLA.H3K4me3) > logfc.cutoff) |
+          (res$adj.P.Val.mLA.vs.mUA.H3K4me3 < fdr.cutoff & abs(res$logFC.mLA.vs.mUA.H3K4me3) > logfc.cutoff)|
+          (res$adj.P.Val.mHand.vs.mUA.H3K4me3 < fdr.cutoff & abs(res$logFC.mHand.vs.mUA.H3K4me3) > logfc.cutoff)
+  ) & res$max_rpkm.H3K4me3 > 0.6)
+
+select = unique(c(select1, select2, select3))
+
+
+cat(length(select), ' DE H3K27me3, H3K4me1 or H3K4me3 ',  ' \n')
+
+yy0 = res[select, ]
+range <- 2.0
+
+conds_histM = c("H3K4me3", "H3K27me3", "H3K4me1")
+
+yy = matrix(NA, nrow = nrow(yy0), ncol = length(conds_histM)*3)
+rownames(yy) = rownames(yy0)
+nms = c()
+
+for(n in 1:length(conds_histM)) # transform the data
+{
+  # n = 1
+  jj0 = grep(paste0(conds_histM[n], '_m'), colnames(yy0))
+  
+  test = yy0[, jj0]
+  test = test[, grep('_rRep', colnames(test), invert = TRUE)]
+  
+  test = cal_sample_means(test, conds = paste0(conds_histM[n], c('_mUA', '_mLA', '_mHand')))
+  test = t(apply(test, 1, cal_centering))
+  test = t(apply(test, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
+  yy[, c((3*n-2):(3*n))] = test
+  nms = c(nms, paste0(conds_histM[n], c('_mUA', '_mLA', '_mHand')))
+  
+  #yy0[ ,jj0] = t(apply(yy0[,jj0], 1, cal_transform_histM, cutoff.min = 0, cutoff.max = 5, centering = FALSE, toScale = TRUE))
+  
+}
+
+colnames(yy) = nms
+
+saveTables = FALSE
+if(saveTables){
+  test = data.frame(geneID = get_geneID(rownames(yy)), 
+                    gene = get_geneName(rownames(yy)), 
+                    yy, 
+                    yy0[, c(9:20)], stringsAsFactors = FALSE)
+  
+  write.csv2(test, file = paste0(tableDir, 'histM_DE_geneCentric_fdr0.1_log2fc.1_rpkm.max.0.6.csv'), 
+             row.names = FALSE)
+  
+}
+
+
+df = as.data.frame(sapply(colnames(yy), function(x) {x = unlist(strsplit(as.character(x), '_')); return(x[2])}))
+colnames(df) = 'segments'
+rownames(df) = colnames(yy)
+
+sample_colors = c('springgreen4', 'steelblue2', 'gold2')
+annot_colors = list(segments = sample_colors)
+gaps_col = c(3, 6)
+
+# reorder each cluster
+library(dendextend)
+library(ggplot2)
+source('Functions_histM.R')
+nb_clusters = 5
+my_hclust_gene <- hclust(dist(yy), method = "complete")
+my_gene_col <- cutree(tree = as.dendrogram(my_hclust_gene), k = nb_clusters)
+
+callback = function(hc, mat){
+  sv = abs(svd(t(mat))$v[,4])
+  dend = reorder(as.dendrogram(hc), wts = sv)
+  as.hclust(dend)
+}
+
+o1 = c()
+diffs = yy[, c(4)] - yy[, 6]
+cc1 = which(my_gene_col == 2)
+cc1 = cc1[order(-diffs[cc1])]
+o1 = c(o1, cc1)
+
+cc2 = which(my_gene_col == 1)
+cc2 = cc2[order(diffs[cc2])]
+o1 = c(o1, cc2)
+
+cc1 = which(my_gene_col == 3)
+cc1 = cc1[order(-diffs[cc1])]
+o1 = c(o1, cc1)
+
+yy = yy[o1, ]
+
+pheatmap(yy, cluster_rows=TRUE,
+         #cutree_rows = 6,
+         show_rownames=FALSE, fontsize_row = 4,
+         color = colorRampPalette(rev(brewer.pal(n = 8, name ="RdBu")))(8), 
+         show_colnames = FALSE,
+         scale = 'none',
+         cluster_cols=FALSE, 
+         annotation_col=df,
+         gaps_col = gaps_col,
+         legend = TRUE,
+         treeheight_row = 15,
+         annotation_legend = FALSE, 
+         #annotation_colors = annot_colors,
+         clustering_callback = callback,
+         #breaks = seq(-2, 2, length.out = 8),
+         clustering_method = 'complete', 
+         cutree_rows = nb_clusters,
+         breaks = seq(-range, range, length.out = 8),
+         #gaps_row =  c(22, 79),
+         legend_labels = FALSE,
+         width = 4, height = 12, 
+         filename = paste0(figureDir, 'heatmap_histoneMarker_geneCentric_DE_v4.pdf'))
+
+ggs = get_geneName(rownames(yy))
+xx = data.frame(names(ggs), ggs, my_gene_col[o1], stringsAsFactors = FALSE)
+colnames(xx) = c('gene', 'geneSymbol', 'clusters')
+#saveRDS(xx, file = paste0(RdataDir, '/genes_DE.H3K27me3.rds'))
+rownames(yy) = ggs
+
+pheatmap(yy, 
+         cluster_rows=TRUE,
+         #cutree_rows = 4,
+         show_rownames=TRUE, fontsize_row = 6,
+         color = colorRampPalette(rev(brewer.pal(n = 8, name ="RdBu")))(8), 
+         show_colnames = FALSE,
+         scale = 'none',
+         cluster_cols=FALSE, annotation_col=df,
+         gaps_col = gaps_col,
+         legend = TRUE,
+         treeheight_row = 15,
+         annotation_legend = FALSE, 
+         #annotation_colors = annot_colors,
+         clustering_callback = callback,
+         #breaks = seq(-2, 2, length.out = 8),
+         clustering_method = 'complete', 
+         cutree_rows = nb_clusters,
+         breaks = seq(-range, range, length.out = 8),
+         #gaps_row =  c(22, 79),
+         legend_labels = FALSE,
+         width = 6, height = 16, 
+         filename = paste0(figureDir, 'heatmap_histoneMarker_geneCentric_DE_geneSymbols_v4.pdf'))
 
 
 

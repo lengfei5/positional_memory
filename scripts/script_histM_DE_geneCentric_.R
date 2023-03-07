@@ -490,8 +490,9 @@ if(Plot_histMarkers_for_positionalATAC){
                               version.analysis, '.rds'))
   source('Functions_histM.R')
   
-  ## select the significant peaks
+  ## select the significant peaks with all three marks
   fdr.cutoff = 0.1; logfc.cutoff = 1
+  
   select = which((res$adj.P.Val.mLA.vs.mUA.H3K27me3 < fdr.cutoff & abs(res$logFC.mLA.vs.mUA.H3K27me3) > logfc.cutoff) |
                    (res$adj.P.Val.mHand.vs.mUA.H3K27me3 < fdr.cutoff & abs(res$logFC.mHand.vs.mUA.H3K27me3) > logfc.cutoff)|
                    (res$adj.P.Val.mHand.vs.mLA.H3K27me3 < fdr.cutoff & abs(res$logFC.mHand.vs.mLA.H3K27me3) > logfc.cutoff)
