@@ -278,4 +278,9 @@ pheatmap(yy,
          filename = paste0(figureDir, 'heatmap_histoneMarker_geneCentric_DE_geneSymbols_v4.pdf'))
 
 
+##########################################
+# gene-centric histone mark analysis for regeneration samples 
+##########################################
+
+
 
