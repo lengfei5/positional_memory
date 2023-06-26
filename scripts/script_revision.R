@@ -18,7 +18,8 @@ require(tibble)
 
 figureDir = paste0('~/Dropbox (VBC)/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/',
                    'DEVELOPMENTAL CELL/Review/plots_jingkui/') 
-tableDir = paste0('~/Dropbox (VBC)/Group Folder Tanaka/Collaborations/Akane/Jingkui/Hox Manuscript/figure/SupTables/')
+tableDir = paste0('~/Dropbox (VBC)/Group Folder Tanaka/Collaborations/Akane/',
+                  'Jingkui/Hox Manuscript/figure/SupTables/')
 
 ##########################################
 # Reviewer 1 (#1) gene examples of smartseq2 and microarray data 
@@ -1079,12 +1080,15 @@ if(Plot_histMarkers_for_positionalATAC){
 
 
 ##########################################
+# Reviewer 2 minor comments
+# "Figure S1B- For consistency, please consider keeping the same colors as in the tracks"
 # change the color of Fig S1B 
 ##########################################
 Process.deeptools.heatmapTable = FALSE
 if(Process.deeptools.heatmapTable){
   dpt = read.table(file = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/', 
-                                 'Data/atacseq_using/heatmap_deeptools/heatmaps_all/heatmap_allchrFeatures_matrix4save.txt'),
+                                 'Data/atacseq_using/heatmap_deeptools/heatmaps_all/',
+                                 'heatmap_allchrFeatures_matrix4save.txt'),
                    comment.char = "#", sep = '\t', header = TRUE, skip = 2)
   
   peaks = c(rep(1, 76), 
@@ -1141,11 +1145,11 @@ if(Process.deeptools.heatmapTable){
     new_order = c(new_order, kk[order(-ss[kk])])
   }
   
-  features = c('atac','H3K4me3', 'H3K27me3', 'H3K4me1')
+  features = c('atac','H3K4me1','H3K4me3', 'H3K27me3')
   
   for(n in 1:length(features))
   {
-    # n = 3
+    # n = 4
     cat(n, ' -- ', features[n], '\n')
     
     index = grep(features[n], samples)
@@ -1161,21 +1165,33 @@ if(Process.deeptools.heatmapTable){
     #col_fun = colorRamp2(c(0, 0.5, 1), c("#377EB8", "white", "#E41A1C"))
     quantile(test, c(0, 0.05, 0.1, 0.15, 0.25, 0.5, 0.75, 0.8, 0.85,  0.90,  0.95, 0.99, 1))
     
-    if(features[n] == 'atac') {range = 2.5; 
-    #cols = colorRamp2(c(0, 0.5, 1.5, range), (brewer.pal(n=4, name="Greys")))
-    cols = colorRamp2(c(0, range), colors = c('white', 'black'))
-    #cols = colorRamp2(c(0, 2, 4), c("blue", "white", "red"));
+    if(features[n] == 'atac') {
+      range = 2.5; 
+      test[which(test>range)] = range
+      cols = colorRamp2(seq(0, range, length.out = 100), colorRampPalette((brewer.pal(n = 7, name ="Greys")))(100))
+      #cols = colorRamp2(c(0, range), colors = c('white', 'black'))
+      #cols = colorRamp2(c(0, 2, 4), c("blue", "white", "red"));
+      #cols = color = colorRampPalette((brewer.pal(n = 7, name ="Greys")))(100)
     }
-    if(features[n] == 'H3K4me1'){range = 7; cols = colorRamp2(c(0, range), colors = c('white', 'darkgoldenrod2'))}
-    #if(features[n] == 'H3K27me3') {range = 5; cols = colorRamp2(c(0, range), colors = c('white', 'deepskyblue1'))}
-    if(features[n] == 'H3K27me3') {range = 5; cols = colorRamp2(c(0, range), colors = c('white', 'dodgerblue2'))}
-    
+    if(features[n] == 'H3K4me1'){
+      range = 7; 
+      #cols = colorRamp2(c(0, range), colors = c('white', 'orange2'))
+      cols = colorRamp2(c(0, range), colors = c('white', 'goldenrod1'))
+      }
+  
     #if(features[n] == 'H3K4me3'){range = 5; cols = colorRamp2(c(0, range), c("white", "violetred1"))
-    if(features[n] == 'H3K4me3'){range = 5; cols = colorRamp2(c(0, range), c("white", "darkorchid1"))
-    #cols = colorRamp2(c(0.2, range), c("white", "#3794bf"))
+    if(features[n] == 'H3K4me3'){range = 4; 
+    #cols = colorRamp2(c(0, range), c("white", "darkorchid1"))
+    cols = colorRamp2(c(0, range), c("white", "magenta1"))
     }
     
-    pdf(paste0(figureDir, "/positional_peaks_intensity_heatmap_", features[n], "_test_v4.pdf"),
+    #if(features[n] == 'H3K27me3') {range = 5; cols = colorRamp2(c(0, range), colors = c('white', 'deepskyblue1'))}
+    if(features[n] == 'H3K27me3') {
+      range = 4; 
+      cols = colorRamp2(c(0, range), colors = c('white', 'steelblue2'))
+      }
+    
+    pdf(paste0(figureDir, "/positional_peaks_intensity_heatmap_", features[n], "_test_v5.pdf"),
         width = 4, height = 10) # Open a new pdf file
     Heatmap(test, 
             cluster_rows = FALSE,
@@ -1200,6 +1216,5 @@ if(Process.deeptools.heatmapTable){
     dev.off()
     
   }
-  
   
 }
