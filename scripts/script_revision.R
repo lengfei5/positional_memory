@@ -116,7 +116,16 @@ if(Use.microarray.mUA){
   
   ggs = sapply(rownames(res), function(x){unlist(strsplit(as.character(x), '_'))[1]})
   
+  xx = data.frame(genes = ggs, 
+                  mUA = apply(res[, c(1:3)], 1, mean),
+                  mHand = apply(res[, c(7:9)], 1, mean), 
+                  stringsAsFactors = FALSE)
+  ggs = sapply(rownames(res), function(x){x = unlist(strsplit(as.character(x), '_')); x[length(x)]})
+  
+  xx$genes = ggs
+  
   res = data.frame(genes = ggs, res[, c(1:3)], stringsAsFactors = FALSE)
+  
   
 }
 Use.Smartseq.mUA = FALSE
@@ -132,6 +141,18 @@ if(Use.Smartseq.mUA){
   res$gene[which(res$geneID == 'AMEX60DD024424')] = 'MEIS3'
   res$gene[which(res$geneID == 'AMEX60DD002658')] = 'OTOS'
   #xx = res[, 3]
+  
+  Calculate.Correlation.RNAseq.micrarray = FALSE
+  if(Calculate.Correlation.RNAseq.micrarray){
+    mm = match(xx$genes, res$geneID)
+    xx = xx[which(!is.na(mm)), ]
+    yy = res[mm[which(!is.na(mm))], ]
+    yy = yy[, c(1:4)]
+    
+    cor(yy[,c(3,4)], xx[, 2], use = "everything", method = 'spearman')
+    cor(yy[,c(1,2)], xx[, 3], use = "everything", method = 'spearman')
+    
+  }
   
   ll = read.table(paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/',
                          'Data/R14026_Quantseq/featurecounts_Q10/204810_S6_R1_001.sort_umiDedup_featureCounts.txt'),

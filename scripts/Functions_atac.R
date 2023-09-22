@@ -1597,6 +1597,7 @@ pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
   library(Seurat)
   library(patchwork)
   
+  
   aa = CreateSeuratObject(counts = counts, project = "limb_regeneration", assay = 'RNA', meta.data = as.data.frame(metadata),
                           min.cells = 10, min.features = 500)
   
@@ -1620,8 +1621,11 @@ pseudo.bulk.by.pooling.scRNAseq_fibroblastCells.Dev = function()
   p1 + p2
   
   ggsave(paste0(resDir, "/Overview_Gerber2018_Fluidigm.C1_batches_v2.pdf"), width = 12, height = 8)
-  
   saveRDS(aa, file = paste0(RdataDir, '/Gerber2018_Fluidigm.C1_batches_seuratObj.rds'))
+  
+  # RdataDir = '../results/Rxxxx_R10723_R11637_R12810_atac/Rdata'
+  aa = readRDS(file = paste0(RdataDir, '/Gerber2018_Fluidigm.C1_batches_seuratObj.rds'))
+  
   
   ## find DE genes between mUA and stage 40 and stage 44
   Idents(aa) = aa$timepoint

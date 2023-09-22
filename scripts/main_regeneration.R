@@ -79,6 +79,72 @@ if(Save.peak.consensus){
 }
 
 
+##########################################
+# test PCA for three samples 
+##########################################
+PCA_for_Wouter.Monika = FALSE
+if(PCA_for_Wouter.Monika){
+  sels = which(design$SampleID == '137330'| design$SampleID == '136164'| design$SampleID == '136166')
+  
+  #design = design[sels, ]
+  ddx = dds[, sels]
+  ddx$conds = droplevels(ddx$conds)
+  ss = rowSums(counts(ddx))
+  #dds$batch = droplevels(dds$batch)
+  condition <- factor(c("A","A","A"))
+  ddx = DESeqDataSetFromMatrix(counts(ddx), DataFrame(condition), ~ 1 )
+  
+  ddx = estimateSizeFactors(ddx)
+  
+  vsd <- varianceStabilizingTransformation(ddx, blind = FALSE)
+  
+  #pca=plotPCA(vsd, intgroup = c('conds'), returnData = FALSE)
+  #print(pca)
+  
+  # modify the PCA plot (https://github.com/mikelove/DESeq2/blob/devel/R/plots.R)
+  # calculate the variance for each gene
+  rv <- rowVars(assay(vsd))
+  
+  # select the ntop genes by variance
+  ntop = 5000
+  select <- order(rv, decreasing=TRUE)[seq_len(min(ntop, length(rv)))]
+  
+  # perform a PCA on the data in assay(x) for the selected genes
+  pca <- prcomp(t(assay(vsd)[select,]), rank. = 10)
+  
+  # the contribution to the total variance for each component
+  percentVar <- pca$sdev^2 / sum( pca$sdev^2 )
+  
+  # assembly the data for the plot
+  pcsToUse = 1:3
+  pcs <- paste0("PC", pcsToUse)
+  d <- data.frame(V1=pca$x[,pcsToUse[1]],
+                  V2=pca$x[,pcsToUse[2]],
+                  V3=pca$x[,pcsToUse[2]],
+                  sample=colnames(vsd))
+  colnames(d)[1:3] <- pcs
+  
+  pca2save = d
+  #pca2save = as.data.frame(plotPCA(vsd, intgroup = c('condition'), returnData = TRUE, ntop = 5000))
+  
+  ggplot(data=pca2save, aes(PC1, PC2, label = sample, color= sample))  + 
+    geom_point(size=4) + 
+    geom_text(hjust = 1, nudge_y = 1, size=4) +
+    theme_classic() + 
+    theme(legend.text = element_text(size=12),
+          legend.title = element_text(size = 14),
+          #legend.position=c(0.8, 0.2),
+          plot.margin = margin(),
+          axis.text.x = element_text(angle = 0, size = 14), 
+          axis.text.y = element_text(angle = 0, size = 14), 
+          axis.title =  element_text(size = 14)
+          #legend.key.size = unit(1, 'cm')
+          #legend.key.width= unit(1, 'cm')
+    ) 
+  
+  
+}
+
 table(design$condition, design$batch)
 
 # regeneration time points and embryo stages
