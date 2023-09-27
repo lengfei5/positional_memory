@@ -8,7 +8,6 @@
 # Date of creation: Thu May  5 11:22:31 2022
 ##########################################################################
 ##########################################################################
-
 ## test code for depmixS4, original code from https://stackoverflow.com/questions/66682218/multinomial-hmm-using-r
 library(depmixS4)
 set.seed(1)

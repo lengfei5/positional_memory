@@ -517,7 +517,7 @@ if(Find.histonePeaks.overlapping.nonOverlapping.with.dynamicATACpeaks)
   peaks = readRDS(file = paste0('~/workspace/imp/positional_memory/results/Rdata/', 
                                 'position_dependent_peaks_from_matureSamples_ATACseq_rmPeaks.head_with.clusters_6.rds'))
   
-  pp_atac = data.frame(t(sapply(rownames(peaks), function(x) unlist(strsplit(gsub('-', ':', as.character(x)), ':')))))
+  pp_atac = data.frame(t(sapply(rownames(peaks), function(x) unlist(strspelit(gsub('-', ':', as.character(x)), ':')))))
   pp_atac$strand = '*'
   pp_atac = makeGRangesFromDataFrame(pp_atac, seqnames.field=c("X1"),
                                      start.field="X2", end.field="X3", strand.field="strand")

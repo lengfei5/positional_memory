@@ -64,6 +64,8 @@ gene$end[which(gene$strand == '-')] = gene$end[which(gene$strand == '-')] + 5000
 #gene$tx_name = sapply(gene$tx_name, function(x){x = unlist(strsplit(as.character(x), '[|]')); x[length(x)]})
 gene$start[which(gene$start<=1)] = 1
 
+
+
 SAF = data.frame(GeneID=gene$gene_id, 
                  Chr=gene$seqnames, 
                  Start=gene$start, 
@@ -894,7 +896,5 @@ enrich = enrich[order(enrich)]
 enrich = data.frame(motif = names(enrich), pval = enrich, stringsAsFactors = FALSE)
 
 write.csv(enrich, file = paste0(tableDir, 'figure_1g_motifEnrichment.csv'), row.names = FALSE)
-
-
 
 
