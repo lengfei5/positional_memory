@@ -31,6 +31,21 @@ nb_chromStates = 6
 inputDir = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/',
                   'chromHMM/chromHMM_out_mergedRep_v2/clusters_', nb_chromStates)
 
+
+Read_chromHMM_segments_into_GenomicRanger = function(segment = 'mUA', nb_chromStates,
+                                                     inputDir)
+{
+  x = read.table(paste0(inputDir, '/', segment, '_', nb_chromStates, '_segments.bed'), header = FALSE)
+  x = data.frame(x, stringsAsFactors = FALSE)
+  colnames(x)[4] = 'state'
+  x$strand = '*'
+  x = makeGRangesFromDataFrame(x, 
+                               seqnames.field=c("V1"),
+                               start.field="V2", end.field="V3", 
+                               strand.field="strand", keep.extra.columns=TRUE)
+  return(x)
+}
+
 ########################################################
 ########################################################
 # Section I : here we first show the emission probability of defined chromatin states
@@ -368,7 +383,6 @@ if(Make_Alluvial_plot){
   #   )
   # 
   # plot(q)
-  
 }
 
 ########################################################
@@ -381,20 +395,6 @@ if(Make_Alluvial_plot){
 ##########################################
 # read the replicates of chromHMM output
 ##########################################
-Read_chromHMM_segments_into_GenomicRanger = function(segment = 'mUA', nb_chromStates,
-                                                     inputDir)
-{
-  x = read.table(paste0(inputDir, '/', segment, '_', nb_chromStates, '_segments.bed'), header = FALSE)
-  x = data.frame(x, stringsAsFactors = FALSE)
-  colnames(x)[4] = 'state'
-  x$strand = '*'
-  x = makeGRangesFromDataFrame(x, 
-                               seqnames.field=c("V1"),
-                               start.field="V2", end.field="V3", 
-                               strand.field="strand", keep.extra.columns=TRUE)
-  return(x)
-}
-
 Import_chromHMM_state_perReplicate = FALSE
 if(Import_chromHMM_state_perReplicate){
   nb_chromStates = 6
@@ -458,6 +458,7 @@ kk = which(!is.na(mm))
 ggs[kk] = paste0(annot$gene.symbol.toUse[mm[kk]], '_',  annot$geneID[mm[kk]])
 
 genes$gene_id = ggs
+
 ##########################################
 # make a differential test using chromswitch 
 ##########################################
@@ -508,6 +509,42 @@ for(n in 1:nb_chromStates)
 
 saveRDS(scores, file = paste0(tableDir, '/savedConsensusScores_mUA_mHand_replicates_chromswitch.rds'))
 
+
+##########################################
+# plot the chromswitch output run in CBE   
+##########################################
+scores = readRDS(file = paste0('/Volumes/groups/tanaka/People/current/jiwang/',
+                               'projects/positional_memory/Data/chromHMM/',
+                               'savedConsensusScores_mUA_mHand_replicates_chromswitch_v1.rds'))
+# thresold used in 
+# https://www.bioconductor.org/packages/release/bioc/vignettes/chromswitch/inst/doc/chromswitch_intro.html
+maxs = apply(scores, 1, max)
+scores = scores[which(maxs > 0.7), ] 
+
+df <- data.frame(condition = colnames(scores))
+rownames(df) = colnames(scores)
+colnames(df) = 'chromState'
+
+
+#annotation_colors = ann_colors
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+chrom_cols = cbPalette[1:nrow(df)]
+names(chrom_cols) = rownames(df)
+annot_colors = list(chromSate = chrom_cols)
+
+#df$chromState = cbPalette[1:nrow(df)]
+
+pheatmap(scores, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 4,
+         color = colorRampPalette((brewer.pal(n = 4, name ="Reds")))(4), 
+         show_colnames = TRUE,
+         scale = 'none',
+         cluster_cols=FALSE,
+         annotation_col=df,
+         annotation_colors = annot_colors,
+         width = 6, height = 12, 
+         filename = paste0(figureDir, '/heatmap_chromswitchSocres_mHand.vs.mUA_nbState.',
+                           nb_chromStates, '.pdf')) 
+
 ##########################################
 # ## Construct cs*gene matrix for differential genes
 ##########################################
@@ -527,20 +564,24 @@ intersect_GenomicRanges_keepMetadata = function(gr1, gr2)
   return(unlist(mendoapply(foo, grl1, y=grl2)))
 }
 
-
+mUA = Read_chromHMM_segments_into_GenomicRanger(segment = 'mUA', nb_chromStates = nb_chromStates, 
+                                                           inputDir = inputDir)
+mHand = Read_chromHMM_segments_into_GenomicRanger(segment = 'mHand', nb_chromStates = nb_chromStates, 
+                                                inputDir = inputDir)
 
 res = matrix(NA, ncol = nb_chromStates, nrow = length(unique(genes$gene_id)))
 colnames(res) = paste0('E', c(1:nb_chromStates))
 rownames(res) = ggs
 
-pseudo_cutoff = 500
+pseudo_cutoff = 1000
+
 library(tictoc)
 tic()
 
 for(n in 1:nrow(res))
 #for(n in 1:100)
 {
-  # n = 5276
+  # n = 289
   #if(n%%100 == 0) 
   cat(n, '\n')
   
@@ -553,59 +594,90 @@ for(n in 1:nrow(res))
   {
     x1 = sum(width(overlap1)[which(overlap1$state == colnames(res)[m])])
     x2 = sum(width(overlap2)[which(overlap2$state == colnames(res)[m])])
-    if(x1 >0 & x2 > 0) res[n, m] = x2/x1
-    if(x1 ==0 & x2>0) {
-      #cat(n, '--', rownames(res)[n],  ' : 0 in the denominator \n')
-      res[n, m] = x2/(x1 + pseudo_cutoff)
-    }
-    if(x1 > 0 & x2 == 0) {
-      #cat(n, '--', rownames(res)[n],  ' : 0 in the denominator \n')
-      res[n, m] = (x2+pseudo_cutoff)/(x1)
+    
+    if(x1 > pseudo_cutoff & x2 > pseudo_cutoff) {
+      res[n, m] = x2/x1
+    }else{
+      if(x1 > pseudo_cutoff & x2 < pseudo_cutoff){
+        res[n, m] = (x2 + pseudo_cutoff)/x1
+      }
+      if(x1 <= pseudo_cutoff & x2 > pseudo_cutoff){
+        res[n, m] = (x2)/(x1 + pseudo_cutoff)
+      }
     }
   }
-  
 }
 
 toc()
 
-saveRDS(res, file = paste0(tableDir, '/chromState_coverageChanges_mHand.vs.mUA_', nb_chromStates, '.rds'))
+saveRDS(res, file = paste0(tableDir, '/chromState_coverageChanges_mHand.vs.mUA_', nb_chromStates, '_v2.rds'))
+
+##########################################
+# make the heatmap 
+##########################################
+scores = readRDS(file = paste0('/Volumes/groups/tanaka/People/current/jiwang/',
+                               'projects/positional_memory/Data/chromHMM/',
+                               'savedConsensusScores_mUA_mHand_replicates_chromswitch_v1.rds'))
+# thresold used in 
+# https://www.bioconductor.org/packages/release/bioc/vignettes/chromswitch/inst/doc/chromswitch_intro.html
+maxs = apply(scores, 1, max)
+
+scores = scores[which(maxs > 0.7), ] 
 
 require(pheatmap)
-res = readRDS(file = paste0(tableDir, '/chromState_coverageChanges_mHand.vs.mUA_', nb_chromStates, '.rds'))
+res= readRDS(file = paste0(tableDir, '/chromState_coverageChanges_mHand.vs.mUA_', nb_chromStates, '_v2.rds'))
 
 res = log2(res)
-res[which(abs(res) == Inf)] = 0
+#res[which(abs(res) == Inf)] = 0
 res[which(is.na(res))] = 0
-maxs = apply(abs(res), 1, max)
+
+maxs_fc = apply(abs(res), 1, max)
 #res = res[order(-maxs),]
 
-res = res[which(maxs>1), ]
+sels = which((maxs > 0.7 & maxs_fc >= 2) | (maxs_fc >= 2 & maxs > 0.2) ,)
 
-range <- 3.0
+res = res[sels, ]
+#res = res[which(maxs>1), ]
+
+range <- 4.0
 test = t(apply(res, 1, function(x) {x[which(x >= range)] = range; x[which(x<= (-range))] = -range; x}))
 
 df <- data.frame(condition = colnames(res))
 rownames(df) = colnames(test)
 colnames(df) = 'chromState'
 
-annot_colors = c(1:ncol(res))
-names(annot_colors) = c('mUA', 'mLA', 'mHand')
-annot_colors = list(segments = annot_colors)
+#annotation_colors = ann_colors
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+chrom_cols = cbPalette[1:nrow(df)]
+names(chrom_cols) = rownames(df)
+annot_colors = list(chromState = chrom_cols)
 
-sample_colors = c('springgreen4', 'steelblue2', 'gold2')
-names(sample_colors) = c('mUA', 'mLA', 'mHand')
-annot_colors = list(segments = sample_colors)
+#annot_colors = c(1:ncol(res))
+#names(annot_colors) = c('mUA', 'mLA', 'mHand')
+#annot_colors = list(segments = annot_colors)
+#sample_colors = c('springgreen4', 'steelblue2', 'gold2')
+#names(sample_colors) = c('mUA', 'mLA', 'mHand')
+#annot_colors = list(segments = sample_colors)
 
 pheatmap(test, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 4,
-         color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(16), 
+         color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
          show_colnames = TRUE,
          scale = 'none',
          cluster_cols=FALSE,
          annotation_col=df,
          #annotation_colors = annot_colors,
          width = 6, height = 12, 
-         filename = paste0(figureDir, '/heatmap_chromState_coverageChange_mHand.vs.mUA_nbState.',nb_chromStates,
-                           '.pdf')) 
+         filename = paste0(figureDir, '/heatmap_chromState_coverageChange_mHand.vs.mUA_chromswitchSignificant_',
+                           'nbState.',  nb_chromStates,'.pdf'))
 
-
+pheatmap(test, cluster_rows=TRUE, show_rownames=TRUE, fontsize_row = 4,
+         color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
+         show_colnames = TRUE,
+         scale = 'none',
+         cluster_cols=FALSE,
+         annotation_col=df,
+         annotation_colors = annot_colors,
+         width = 6, height = 12, 
+         filename = paste0(figureDir, '/heatmap_chromState_coverageChange_mHand.vs.mUA_chromswitchSignificant_',
+                            'withGeneNames_nbState.',  nb_chromStates,'.pdf'))
 
