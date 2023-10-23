@@ -135,7 +135,8 @@ pheatmap(transition, cluster_rows=TRUE, show_rownames=TRUE, fontsize_row = 12,
          treeheight_row = 20,
          treeheight_col = 20,
          filename = paste0(figureDir, '/chromState_transition_clustering_',
-                           nb_chromStates, '.pdf')) 
+                           nb_chromStates, '.pdf'))
+
 ##########################################
 # test alluvial plots  
 # https://stackoverflow.com/questions/68487536/how-to-align-and-label-the-stratum-in-ggalluvial-using-ggrepel-or-otherwise
