@@ -1105,6 +1105,7 @@ for(n in 1:length(conds))
 colnames(sample.means) = conds
 cpm = cpm[, sample.sels]
 
+saveRDS(sample.means, file = paste0(RdataDir, 'smartseq2_regeneratoin_sampleMean.rds'))
 
 # if(saveTable){
 #   jj = grep('^KDM6|^LRAT_', rownames(sample.means))

@@ -21,17 +21,18 @@ library(tidyverse)
 require(GenomicRanges)
 library('rtracklayer')
 library('GenomicFeatures')
-library(pheatmap)
 library("ggalluvial")
 library(tidyr)
 library(dplyr)
-
+require(pheatmap)
 
 figureDir = paste0('/Users/jingkui.wang/Dropbox (VBC)/Group Folder Tanaka/Collaborations/Akane/',
                    'Jingkui/Hox Manuscript/DEVELOPMENTAL CELL/REVISION/analysis/plots_jiwang_regeneration') 
 tableDir = paste0(figureDir, '/tables')
 
 nb_chromStates = 8
+states = paste0('E', c(1:nb_chromStates))
+
 inputDir = paste0('/Volumes/groups/tanaka/People/current/jiwang/projects/positional_memory/Data/',
                   'chromHMM/chromHMM_regeneration_mergedRep/clusters_', nb_chromStates)
 
@@ -86,6 +87,7 @@ convert_fread_GenomicRange = function(x)
                                start.field="V2", end.field="V3", 
                                strand.field="strand", keep.extra.columns=TRUE)
   return(x)
+  
 }
 
 
@@ -440,6 +442,9 @@ yy = readRDS(file = paste0('/Users/jingkui.wang/workspace/imp/positional_memory/
 rownames(yy)[grep('AMEX60DD024424', rownames(yy))]
 rownames(yy)[grep('AMEX60DD024424', rownames(yy))] = 'MEIS3_AMEX60DD024424' 
 
+yy$gene = sapply(rownames(yy), function(x) unlist(strsplit(as.character(x), '_'))[1])
+yy$geneID = sapply(rownames(yy), function(x) {x = unlist(strsplit(as.character(x), '_')); x[length(x)]})
+
 Make_bedFile_regGenes = FALSE
 if(Make_bedFile_regGenes){
   genes = readRDS(file = paste0("../data/genes_23585_used_for_histone_chromStates.rds"))
@@ -459,24 +464,22 @@ if(Make_bedFile_regGenes){
 
 Further_filtering_regGenes = FALSE
 if(Further_filtering_regGenes){
-  ggs = sapply(rownames(yy), function(x){unlist(strsplit(as.character(x), '_'))[1]})
+  #ggs = sapply(rownames(yy), function(x){unlist(strsplit(as.character(x), '_'))[1]})
   qv.cutoff = 0.01
   logfc.cutoff = 1
   #select = which(yy$fdr.max> -log10(qv.cutoff) & abs(yy$logFC.max)> 0)
   select = which(yy$padj_dpa5.vs.mUA < qv.cutoff & abs(yy$log2FoldChange_dpa5.vs.mUA) > logfc.cutoff|
                    yy$padj_dpa9.vs.mUA < qv.cutoff & abs(yy$log2FoldChange_dpa9.vs.mUA) > logfc.cutoff)
   cat(length(select), ' DE genes selected \n')
-  ggs = ggs[select]
   
-  ggs[grep('SHH|HOXA|HOXD|MEIS|SHOX|FGF', ggs)]
-  yy = yy[select, ]
+  ii_keep = grep('SHH|HOXA|HOXD|MEIS|SHOX|FGF', yy$gene)
+  yy = yy[unique(c(select, ii_keep)), ]
   
-  yy$gene = sapply(rownames(yy), function(x) unlist(strsplit(as.character(x), '_'))[1])
-  yy$geneID = sapply(rownames(yy), function(x) {x = unlist(strsplit(as.character(x), '_')); x[length(x)]})
+  ggs = yy$gene
   
+  ## add more HOXA and HOXD genes here
   sels = unique(c(grep('HOXA|HOXD', genes$gene_id), 
                   which(!is.na(match(genes$gene_id, yy$geneID)))))
-  
   genes = genes[sels]
   
 }
@@ -681,8 +684,6 @@ rownames(res) = genes$gene_id
 colnames(res) = paste0(rep(paste0('E', c(1:nb_chromStates), '_'), each = length(states_regeneration)), 
                        rep(names(states_regeneration), times = nb_chromStates))
 
-states = paste0('E', c(1:nb_chromStates))
-
 #pseudo_cutoff = 1000
 
 library(tictoc)
@@ -712,6 +713,7 @@ if(Test_parallel){
         test[which(colnames(res) == paste0(s,'_', names(states_regeneration)[i]))] = x
       }
     }
+    
     return(test)
     
   }
@@ -746,6 +748,8 @@ if(Test_parallel){
 scores_list = readRDS(file = paste0(resDir, 'chromswitch_scores_significantThreshold.0.7_nbStates.',
                                     nb_chromStates, '.rds'))
 
+res= readRDS(file = paste0(resDir, '/chromState_coverageChanges_regenerations_', nb_chromStates, '_v1.rds'))
+
 gg_sels = c()
 for(n in 1:length(scores_list))
 {
@@ -759,10 +763,6 @@ for(n in 1:length(scores_list))
   
 }
 
-
-require(pheatmap)
-res= readRDS(file = paste0(resDir, '/chromState_coverageChanges_regenerations_', nb_chromStates, '_v1.rds'))
-
 pseudo_cutoff = 1000
 res = log2(res + pseudo_cutoff)
 #res[which(abs(res) == Inf)] = 0
@@ -775,9 +775,11 @@ for(s in states)
   jj = grep(s, colnames(res))
   xx = res[, jj]
   range <- 4.0
-  xx = t(apply(as.matrix(xx), 1, function(x) {x = (x - x[1]);
-                                                            x[which(x >= range)] = range; 
-  x[which(x<= (-range))] = -range; x}))
+  xx = t(apply(as.matrix(xx), 1, 
+               function(x) {x = (x - x[1]); x[which(x >= range)] = range; 
+                            x[which(x<= (-range))] = -range; x}
+               )
+         )
   
   test[, jj] = xx
   
@@ -795,57 +797,269 @@ saveRDS(test, file = paste0(resDir, '/chromState_coverageChanges_regenerations_s
 saveRDS(rownames(test), file = paste0(resDir, '/chromState_regeneration_signifiGene_list.rds'))
 
 
+Add_smartseq2_regeneration = FALSE
+if(Add_smartseq2_regeneration){
+  res = readRDS(file = paste0(resDir, '/chromState_coverageChanges_regenerations_signifGenes', 
+                              nb_chromStates, '_v1.rds'))
+  
+  kk = grep('_dpa0', colnames(res))
+  res = res[ ,-kk]
+  
+  gg1 = sapply(rownames(res), function(x) {x = unlist(strsplit(as.character(x), '_')); x[length(x)]})
+               
+  ## import smartseq2 data
+  yy = readRDS(file = paste0('../results/RNAseq_data_used/Rdata/',
+                             'smartseq2_regeneratoin_sampleMean.rds'))
+  
+  ## manual change the gene annotation MEIS3
+  rownames(yy)[grep('AMEX60DD024424', rownames(yy))]
+  rownames(yy)[grep('AMEX60DD024424', rownames(yy))] = 'MEIS3_AMEX60DD024424' 
+  
+  gg2 =  sapply(rownames(yy), function(x) {x = unlist(strsplit(as.character(x), '_')); x[length(x)]})
+  
+  mm = match(gg1, gg2)
+  yy = yy[mm, ]
+  
+  yy = yy - yy[, 1]
+  yy = yy[, -c(1)]
+  
+  range <- 4.0
+  
+  yy = t(apply(as.matrix(yy), 1, 
+               function(x) {x[which(x >= range)] = range; 
+               x[which(x<= (-range))] = -range; x})
+         )
+  
+  colnames(yy) = paste0('smartseq2_', c('dpa5', 'dpa9', 'dpa13_prox', 'dpa13_dist'))
+  
+  res = cbind(res, yy)
+  
+  saveRDS(res, file = paste0(resDir, '/chromState_coverageChanges_smartseq2_regenerations_signifGenes', 
+                              nb_chromStates, '_v1.rds'))
+  
+}
+
+
 ##########################################
 # make heatmap for genes that changes chromatin states
+# add also the smart-seq2 data
 ##########################################
-res = readRDS(file = paste0(resDir, '/chromState_coverageChanges_regenerations_signifGenes', 
+res = readRDS(file = paste0(resDir, '/chromState_coverageChanges_smartseq2_regenerations_signifGenes', 
                             nb_chromStates, '_v1.rds'))
-
 
 df <- data.frame(chromState = colnames(res),
                  time = colnames(res))
 rownames(df) = colnames(res)
 
 df$chromState = sapply(df$chromState, function(x) unlist(strsplit(as.character(x), '_'))[1])
-df$time = sapply(df$time, function(x) {x = unlist(strsplit(as.character(x), '_')); 
+df$time = sapply(df$time, function(x) {x = unlist(strsplit(as.character(x), '_'));
 paste0(x[2:length(x)], collapse = '.')})
 
 #annotation_colors = ann_colors
-cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
-chrom_cols = cbPalette[1:length(states)]
-names(chrom_cols) = states
-time_colors = c('darkblue', 'springgreen', 'springgreen3', 'gold2', 'red')
-names(time_colors) = unique(df$time)
-annot_colors = list(chromState = chrom_cols, 
-                    time = time_colors)
+ss = unique(df$chromState)
+cbPalette <- c("#999999", "#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+chrom_cols = cbPalette[1:length(ss)]
 
-pheatmap(res, cluster_rows=TRUE, show_rownames=FALSE, fontsize_row = 4,
+names(chrom_cols) = ss
+time_colors = c('springgreen', 'springgreen2', 'springgreen3', 'gold2')
+names(time_colors) = unique(df$time)
+
+library(dendextend)
+nb_clusters = 12
+my_hclust_gene <- hclust(dist(res), method = "complete")
+my_gene_col <- cutree(tree = as.dendrogram(my_hclust_gene), k = nb_clusters)
+#res$clusters = NA; 
+#res$clusters[match(names(my_gene_col), rownames(res))] = my_gene_col # save the cluster index in ther res
+
+my_gene_col <- data.frame(cluster =  paste0('cluster_', my_gene_col))
+rownames(my_gene_col) = rownames(res)
+
+col3 <- c("#a6cee3", "#1f78b4", "#b2df8a",
+          "#33a02c", "#fb9a99", "#e31a1c",
+          "#fdbf6f", "#ff7f00", "#cab2d6",
+          "#6a3d9a", "#ffff99", "#b15928")
+
+cluster_col = col3[1:nb_clusters]
+names(cluster_col) = paste0('cluster_', c(1:nb_clusters))
+
+annot_colors = list(time = time_colors,
+  chromState = chrom_cols, 
+                    cluster = cluster_col)
+
+plt = pheatmap(res, cluster_rows=TRUE, 
+         annotation_row = my_gene_col, 
+         show_rownames=FALSE, fontsize_row = 4,
          #color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
          color =  colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(10),
          show_colnames = TRUE,
+         clustering_method = 'complete', cutree_rows = nb_clusters, 
          scale = 'none',
          cluster_cols=FALSE,
          annotation_col=df,
-         gaps_col = c(1:7)*5, 
+         gaps_col = c(1:8)*4, 
          #treeheight_row = 30,
          #annotation_colors = annot_colors,
          width = 18, height = 12, 
-         filename = paste0(figureDir, '/heatmap_chromState_coverageChange_mHand.vs.mUA_chromswitchSignificant_',
+         filename = paste0(resDir, '/heatmap_chromState_coverageChange_regeneration.vs.mUA_chromswitchSignificant_',
                            'nbState.',  nb_chromStates,'.pdf'))
 
-pheatmap(res, cluster_rows=TRUE, show_rownames=TRUE, fontsize_row = 0.5,
+source('Functions_histM.R')
+clusters = cutree(plt$tree_row, k = nb_clusters)
+clusters = clusters[plt$tree_row$order]
+cluster_order = unique(clusters)
+clusters[which(clusters == 12| clusters == 9)] = 2
+clusters[which(clusters == 10)] = 7
+clusters[which(clusters == 11)] = 9
+
+gaps.row = cal_clusterGaps(plt, nb_clusters = nb_clusters)
+gaps.row = gaps.row[-1]
+gaps.row = gaps.row[1:8]
+
+clusters_old = clusters
+cu = unique(clusters)
+
+for(n in 1:length(cu))
+{
+   clusters[which(clusters_old == cu[n])] = n
+}
+
+my_gene_col <- data.frame(cluster =  paste0('cluster_', clusters))
+rownames(my_gene_col) = names(clusters)
+
+annot_colors = list(chromState = chrom_cols, time = time_colors,
+                    
+                    cluster = cluster_col[!is.na(match(names(cluster_col), 
+                                                       paste0('cluster_', unique(clusters))))])
+
+df = df[, c(2, 1)]
+pheatmap(res[plt$tree_row$order, ], cluster_rows=FALSE, 
+         annotation_row = my_gene_col, 
+         show_rownames=FALSE, fontsize_row = 4,
          #color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
          color =  colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(10),
          show_colnames = TRUE,
+         #clustering_method = 'complete', cutree_rows = nb_clusters, 
          scale = 'none',
          cluster_cols=FALSE,
          annotation_col=df,
-         gaps_col = c(1:7)*5, 
+         gaps_col = c(1:8)*4, 
+         gaps_row =  gaps.row, 
          #treeheight_row = 30,
-         #annotation_colors = annot_colors,
+         annotation_colors = annot_colors,
+         width = 18, height = 12, 
+         filename = paste0(resDir, '/heatmap_chromState_coverageChange_regeneration.vs.mUA_chromswitchSignificant_',
+                           'nbState.',  nb_chromStates,'.pdf'))
+
+
+pheatmap(res[plt$tree_row$order, ], cluster_rows=FALSE, 
+         annotation_row = my_gene_col, 
+         show_rownames=TRUE, fontsize_row = 0.5,
+         #color = colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(8), 
+         color =  colorRampPalette(rev(brewer.pal(n = 7, name ="RdBu")))(10),
+         show_colnames = TRUE,
+         #clustering_method = 'complete', cutree_rows = nb_clusters, 
+         scale = 'none',
+         cluster_cols=FALSE,
+         annotation_col=df,
+         gaps_col = c(1:8)*4, 
+         gaps_row =  gaps.row, 
+         #treeheight_row = 30,
+         annotation_colors = annot_colors,
          width = 18, height = 80, 
-         filename = paste0(resDir, '/heatmap_chromState_coverageChange_mHand.vs.mUA_chromswitchSignificant_',
-                            'withGeneNames_nbState.',  nb_chromStates,'.pdf'))
+         filename = paste0(resDir, '/heatmap_chromState_coverageChange_regeneration.vs.mUA_chromswitchSignificant_',
+                           'nbState.',  nb_chromStates,'_withGeneSymbols.pdf'))
+
+
+##########################################
+# GO term enrichment for each cluster
+##########################################
+library(enrichplot)
+library(clusterProfiler)
+library(openxlsx)
+library(ggplot2)
+library(stringr)
+#library(org.Hs.eg.db)
+library(org.Mm.eg.db)
+
+firstup <- function(x) {
+  substr(x, 1, 1) <- toupper(substr(x, 1, 1))
+  x
+}
+
+clean_geneNames = function(gg.expressed)
+{
+  gg.expressed = unique(unlist(lapply(gg.expressed, 
+                                      function(x) { x = unlist(strsplit(as.character(x), '_'));  
+                                      return(x[length(x)])})))
+  gg.expressed = unique(annot$gene.symbol.toUse[match(gg.expressed, annot$geneID)])
+  gg.expressed = gg.expressed[which(gg.expressed != '' & gg.expressed != 'N/A' & !is.na(gg.expressed))]
+  
+  return(gg.expressed)
+}
+
+annot = readRDS(paste0('/Volumes/groups/tanaka/People/current/jiwang/Genomes/axolotl/annotations/', 
+                       'geneAnnotation_geneSymbols_cleaning_synteny_sameSymbols.hs.nr_curated.geneSymbol.toUse.rds'))
+xx  = readRDS(file = paste0('../results/RNAseq_data_used/Rdata/',
+                            'smartseq2_regeneratoin_sampleMean.rds'))
+bgs0 = rownames(xx) 
+bgs0 = sapply(bgs0, function(x) {x = unlist(strsplit(as.character(x), '_'))[1]})
+bgs0 = unique(bgs0[grep('AMEX6', bgs0, invert = TRUE)])
+
+for(c in unique(clusters))
+{
+  # c = 9
+  jj = which(clusters == c)
+ 
+  ggs  = names(clusters)[jj]
+  ggs = sapply(ggs, function(x) {x = unlist(strsplit(as.character(x), '_'))[1]})
+  ggs = unique(ggs[grep('AMEX6', ggs, invert = TRUE)])
+  cat('cluster -- ', c, ': ', length(ggs), ' genes with symbols \n')
+  
+  # background
+  #bgs0 = unique(clean_geneNames(rownames(xx)))
+  
+  gg.expressed = ggs
+  gg.expressed = firstup(tolower(gg.expressed))
+  bgs0 = firstup(tolower(bgs0))
+  
+  gene.df <- bitr(gg.expressed, fromType = "SYMBOL",
+                  toType = c("ENSEMBL", "ENTREZID"),
+                  OrgDb = org.Mm.eg.db)
+  head(gene.df)
+  
+  bgs0.df <- bitr(bgs0, fromType = "SYMBOL",
+                  toType = c("ENSEMBL", "ENTREZID"),
+                  OrgDb = org.Mm.eg.db)
+  
+  #pval.cutoff = 0.05
+  ego <-  enrichGO(gene         = gene.df$ENSEMBL,
+                   universe     = bgs0.df$ENSEMBL,
+                   #universe     = bgs.df$ENSEMBL,
+                   #OrgDb         = org.Hs.eg.db,
+                   OrgDb         = org.Mm.eg.db,
+                   keyType       = 'ENSEMBL',
+                   ont           = "BP",
+                   pAdjustMethod = "BH",
+                   pvalueCutoff  = 0.05,
+                   qvalueCutoff  = 0.2, 
+                   minGSSize = 10
+                   )
+  
+  #barplot(ego) + ggtitle("Go term enrichment with BP")
+  
+  #edox <- setReadable(ego, 'org.Mm.eg.db', 'ENSEMBL')
+  pdfname = paste0(resDir, '/GOterm_chromStates_cluster_', c, '.pdf')
+  pdf(pdfname, width = 8, height = 6)
+  par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
+  
+  dotplot(ego) + ggtitle(paste0('cluster_', c))
+  
+  dev.off()
+  
+  write.csv(ego, file = paste0(resDir, "/GOterm_chromStates_cluster_", c, ".csv"), 
+            row.names = TRUE)
+  
+}
 
 ########################################################
 ########################################################
